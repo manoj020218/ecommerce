@@ -4,6 +4,7 @@ const { createApp } = require("../app");
 const { resetCatalogStoreForRegression } = require("../database/catalog-store");
 const { resetInvoiceStoreForRegression } = require("../database/invoice-store");
 const { resetPaymentStoreForRegression } = require("../database/payment-store");
+const { resetRecoveryStoreForRegression } = require("../database/recovery-store");
 const { resetSearchStoreForRegression } = require("../database/search-store");
 const { resetShippingStoreForRegression } = require("../database/shipping-store");
 const { jsonFileStore } = require("../database/json-file-store");
@@ -28,6 +29,7 @@ async function run() {
   await resetCatalogStoreForRegression();
   await resetInvoiceStoreForRegression();
   await resetPaymentStoreForRegression();
+  await resetRecoveryStoreForRegression();
   await resetSearchStoreForRegression();
   await resetShippingStoreForRegression();
   await resetAuthStoreForRegression();
@@ -1940,6 +1942,400 @@ async function run() {
       }
     );
     assert.equal(phase11GuestOrderAfterLink.response.status, 200);
+
+    const phase12StockTopUp = await requestJson(
+      baseUrl,
+      `/api/admin/products/${createdProductId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          stockQty: 12
+        })
+      }
+    );
+    assert.equal(phase12StockTopUp.response.status, 200);
+
+    const phase12ReminderCartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase12-reminder-session",
+        productId: createdProductId,
+        qty: 1
+      })
+    });
+    assert.equal(phase12ReminderCartAdd.response.status, 201);
+
+    const phase12RecoveryListAfterAdd = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts?limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase12RecoveryListAfterAdd.response.status, 200);
+    const phase12ReminderRecovery = phase12RecoveryListAfterAdd.json.data.find(
+      (row) => row.ownerId === "phase12-reminder-session"
+    );
+    assert.equal(Boolean(phase12ReminderRecovery), true);
+    assert.equal(phase12ReminderRecovery.stage, "cart_added");
+    assert.equal(phase12ReminderRecovery.cartItemCount, 1);
+    assert.equal(Boolean(phase12ReminderRecovery.recoveryToken), true);
+
+    const phase12ReminderCheckout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase12-reminder-session",
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Phase 12 Reminder User",
+          email: "phase12.reminder@example.com",
+          mobile: "+91-9333300001",
+          addressLine1: "4 Service Lane",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 12 Reminder User",
+          email: "phase12.reminder@example.com",
+          mobile: "+91-9333300001",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase12ReminderCheckout.response.status, 200);
+
+    const phase12ReminderAttempt = await requestJson(
+      baseUrl,
+      "/api/payments/create-attempt",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "phase12-reminder-session",
+          checkoutSessionId: phase12ReminderCheckout.json.data.checkoutSession.id,
+          gateway: "mock_online"
+        })
+      }
+    );
+    assert.equal(phase12ReminderAttempt.response.status, 201);
+
+    const phase12ReminderFailWebhook = await requestJson(
+      baseUrl,
+      "/api/payments/webhook/mock",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          attemptId: phase12ReminderAttempt.json.data.attemptId,
+          status: "failed",
+          gatewayTxnId: "txn_phase12_fail_01",
+          failureReason: "payment_problem"
+        })
+      }
+    );
+    assert.equal(phase12ReminderFailWebhook.response.status, 200);
+
+    const phase12RecoveryAfterFailure = await requestJson(
+      baseUrl,
+      `/api/admin/abandoned-carts/${phase12ReminderRecovery.id}`,
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase12RecoveryAfterFailure.response.status, 200);
+    assert.equal(phase12RecoveryAfterFailure.json.data.stage, "payment_failed");
+    assert.equal(
+      phase12RecoveryAfterFailure.json.data.paymentAttemptId,
+      phase12ReminderAttempt.json.data.attemptId
+    );
+    assert.equal(phase12RecoveryAfterFailure.json.data.failureReason, "payment_problem");
+
+    const phase12FeedbackSave = await requestJson(
+      baseUrl,
+      `/api/recovery/${phase12ReminderRecovery.recoveryToken}/feedback`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          reason: "need GST invoice",
+          note: "Need GST bill before paying."
+        })
+      }
+    );
+    assert.equal(phase12FeedbackSave.response.status, 200);
+    assert.equal(phase12FeedbackSave.json.data.feedbackReason, "need GST invoice");
+
+    const phase12FailureLastActivityAt =
+      phase12RecoveryAfterFailure.json.data.lastActivityAt;
+    const phase12RunReminderA = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts/reminders/run",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          nowIso: new Date(
+            Date.parse(phase12FailureLastActivityAt) + 31 * 60 * 1000
+          ).toISOString(),
+          limit: 20
+        })
+      }
+    );
+    assert.equal(phase12RunReminderA.response.status, 200);
+    assert.equal(
+      phase12RunReminderA.json.data.reminders.some(
+        (row) => row.recoveryId === phase12ReminderRecovery.id
+      ),
+      true
+    );
+
+    const phase12RunReminderB = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts/reminders/run",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          nowIso: new Date(
+            Date.parse(phase12FailureLastActivityAt) + 7 * 60 * 60 * 1000
+          ).toISOString(),
+          limit: 20
+        })
+      }
+    );
+    assert.equal(phase12RunReminderB.response.status, 200);
+    assert.equal(
+      phase12RunReminderB.json.data.reminders.some(
+        (row) => row.recoveryId === phase12ReminderRecovery.id
+      ),
+      true
+    );
+
+    const phase12RunReminderC = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts/reminders/run",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          nowIso: new Date(
+            Date.parse(phase12FailureLastActivityAt) + 25 * 60 * 60 * 1000
+          ).toISOString(),
+          limit: 20
+        })
+      }
+    );
+    assert.equal(phase12RunReminderC.response.status, 200);
+    assert.equal(
+      phase12RunReminderC.json.data.reminders.some(
+        (row) => row.recoveryId === phase12ReminderRecovery.id
+      ),
+      true
+    );
+
+    const phase12RunReminderD = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts/reminders/run",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          nowIso: new Date(
+            Date.parse(phase12FailureLastActivityAt) + 49 * 60 * 60 * 1000
+          ).toISOString(),
+          limit: 20
+        })
+      }
+    );
+    assert.equal(phase12RunReminderD.response.status, 200);
+    assert.equal(phase12RunReminderD.json.data.dispatchedCount, 0);
+
+    const phase12RecoveryAfterReminders = await requestJson(
+      baseUrl,
+      `/api/admin/abandoned-carts/${phase12ReminderRecovery.id}`,
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase12RecoveryAfterReminders.response.status, 200);
+    assert.equal(phase12RecoveryAfterReminders.json.data.reminderCount, 3);
+    assert.equal(phase12RecoveryAfterReminders.json.data.feedbackReason, "need GST invoice");
+
+    const phase12RestoreSourceAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase12-restore-source",
+        productId: createdProductId,
+        qty: 1
+      })
+    });
+    assert.equal(phase12RestoreSourceAdd.response.status, 201);
+
+    const phase12RecoveryListForRestore = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts?limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase12RecoveryListForRestore.response.status, 200);
+    const phase12RestoreRecovery = phase12RecoveryListForRestore.json.data.find(
+      (row) => row.ownerId === "phase12-restore-source"
+    );
+    assert.equal(Boolean(phase12RestoreRecovery), true);
+
+    const phase12RestoreCart = await requestJson(
+      baseUrl,
+      `/api/recovery/${phase12RestoreRecovery.recoveryToken}/restore`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          targetSessionId: "phase12-restore-target",
+          mode: "replace"
+        })
+      }
+    );
+    assert.equal(phase12RestoreCart.response.status, 200);
+    assert.equal(phase12RestoreCart.json.data.restored, true);
+
+    const phase12RestoredCartView = await requestJson(
+      baseUrl,
+      "/api/cart?sessionId=phase12-restore-target"
+    );
+    assert.equal(phase12RestoredCartView.response.status, 200);
+    assert.equal(
+      phase12RestoredCartView.json.data.items.some(
+        (row) => row.productId === createdProductId && row.qty === 1
+      ),
+      true
+    );
+
+    const phase12CompletedCartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase12-complete-session",
+        productId: createdProductId,
+        qty: 1
+      })
+    });
+    assert.equal(phase12CompletedCartAdd.response.status, 201);
+
+    const phase12CompletedCheckout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase12-complete-session",
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Phase 12 Complete User",
+          email: "phase12.complete@example.com",
+          mobile: "+91-9333300002",
+          addressLine1: "8 Complete Road",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 12 Complete User",
+          email: "phase12.complete@example.com",
+          mobile: "+91-9333300002",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase12CompletedCheckout.response.status, 200);
+
+    const phase12CompletedAttempt = await requestJson(
+      baseUrl,
+      "/api/payments/create-attempt",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "phase12-complete-session",
+          checkoutSessionId: phase12CompletedCheckout.json.data.checkoutSession.id,
+          gateway: "mock_online"
+        })
+      }
+    );
+    assert.equal(phase12CompletedAttempt.response.status, 201);
+
+    const phase12CompletedWebhook = await requestJson(
+      baseUrl,
+      "/api/payments/webhook/mock",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          attemptId: phase12CompletedAttempt.json.data.attemptId,
+          status: "success",
+          gatewayTxnId: "txn_phase12_complete_01"
+        })
+      }
+    );
+    assert.equal(phase12CompletedWebhook.response.status, 200);
+
+    const phase12RecoveryListAfterComplete = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts?limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase12RecoveryListAfterComplete.response.status, 200);
+    const phase12CompletedRecovery = phase12RecoveryListAfterComplete.json.data.find(
+      (row) => row.ownerId === "phase12-complete-session"
+    );
+    assert.equal(Boolean(phase12CompletedRecovery), true);
+    assert.equal(phase12CompletedRecovery.stage, "recovered");
+    assert.equal(phase12CompletedRecovery.reminderCount, 0);
+
+    const phase12RunReminderAfterComplete = await requestJson(
+      baseUrl,
+      "/api/admin/abandoned-carts/reminders/run",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          nowIso: new Date(
+            Date.parse(phase12CompletedRecovery.lastActivityAt) + 49 * 60 * 60 * 1000
+          ).toISOString(),
+          limit: 20
+        })
+      }
+    );
+    assert.equal(phase12RunReminderAfterComplete.response.status, 200);
+    assert.equal(
+      phase12RunReminderAfterComplete.json.data.reminders.some(
+        (row) => row.recoveryId === phase12CompletedRecovery.id
+      ),
+      false
+    );
+
+    const phase12CompletedRecoveryRefetch = await requestJson(
+      baseUrl,
+      `/api/admin/abandoned-carts/${phase12CompletedRecovery.id}`,
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase12CompletedRecoveryRefetch.response.status, 200);
+    assert.equal(phase12CompletedRecoveryRefetch.json.data.reminderCount, 0);
 
     const phase9DiscountCartAdd = await requestJson(baseUrl, "/api/cart/items", {
       method: "POST",

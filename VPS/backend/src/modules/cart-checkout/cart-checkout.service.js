@@ -24,6 +24,13 @@ const {
 } = require("../payment-gateways/payment-gateways.service");
 const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
 const {
+  trackCartSaved,
+  trackCheckoutStarted,
+  trackPaymentAttemptCreated,
+  trackPaymentFailed,
+  trackRecoveryCompleted
+} = require("../abandoned-cart/abandoned-cart.service");
+const {
   CART_OWNER_TYPES,
   PAYMENT_METHODS,
   SHIPPING_METHODS,
@@ -775,7 +782,9 @@ async function getCart(context, query) {
     });
   }
 
-  return buildCartView(owner, cart, lines, pricing);
+  const cartView = buildCartView(owner, cart, lines, pricing);
+  await trackCartSaved(owner, cartView);
+  return cartView;
 }
 
 async function addCartItem(context, payload) {
@@ -829,7 +838,9 @@ async function addCartItem(context, payload) {
     });
   }
 
-  return buildCartView(owner, cart, lines, pricing);
+  const cartView = buildCartView(owner, cart, lines, pricing);
+  await trackCartSaved(owner, cartView);
+  return cartView;
 }
 
 async function updateCartItem(context, productId, payload) {
@@ -882,7 +893,9 @@ async function updateCartItem(context, productId, payload) {
     });
   }
 
-  return buildCartView(owner, cart, lines, pricing);
+  const cartView = buildCartView(owner, cart, lines, pricing);
+  await trackCartSaved(owner, cartView);
+  return cartView;
 }
 
 async function deleteCartItem(context, productId, query) {
@@ -1007,9 +1020,11 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
         writeCatalog: true
       });
     }
+    const cartView = buildCartView(owner, userCart, lines, pricing);
+    await trackCartSaved(owner, cartView);
     return {
       merged: false,
-      cart: buildCartView(owner, userCart, lines, pricing)
+      cart: cartView
     };
   }
 
@@ -1055,9 +1070,12 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
     });
   }
 
+  const cartView = buildCartView(owner, userCart, lines, pricing);
+  await trackCartSaved(owner, cartView);
+
   return {
     merged: true,
-    cart: buildCartView(owner, userCart, lines, pricing)
+    cart: cartView
   };
 }
 
@@ -1263,13 +1281,16 @@ async function claimSharedCart(context, shareToken, payload) {
     });
   }
 
+  const cartView = buildCartView(targetOwner, targetCart, lines, pricing);
+  await trackCartSaved(targetOwner, cartView);
+
   return {
     claimed: true,
     claimedTo: {
       ownerType: targetOwner.ownerType,
       ownerId: targetOwner.ownerId
     },
-    cart: buildCartView(targetOwner, targetCart, lines, pricing)
+    cart: cartView
   };
 }
 
@@ -1374,6 +1395,8 @@ async function startCheckout(context, payload) {
       });
     }
 
+    await trackCheckoutStarted(owner, session);
+
     return {
       checkoutBlocked: true,
       reason: "quote_required",
@@ -1451,6 +1474,8 @@ async function startCheckout(context, payload) {
       writeCatalog: true
     });
   }
+
+  await trackCheckoutStarted(owner, session, checkoutOrder);
 
   return {
     checkoutBlocked: false,
@@ -1620,6 +1645,8 @@ async function createPaymentAttempt(context, payload) {
     });
   }
 
+  await trackPaymentAttemptCreated(owner, session, attempt);
+
   return {
     attemptId: attempt.id,
     checkoutSessionId: session.id,
@@ -1743,6 +1770,16 @@ async function processPaymentWebhook(gatewayCode, payload) {
       });
     }
 
+    await trackPaymentFailed(
+      {
+        ownerType: session.ownerType,
+        ownerId: session.ownerId
+      },
+      session,
+      attempt,
+      attempt.failureReason
+    );
+
     await addActivityLog({
       action: "payments.webhook.failed",
       actorId: session.ownerId,
@@ -1855,6 +1892,15 @@ async function processPaymentWebhook(gatewayCode, payload) {
       paymentStore
     });
   }
+
+  await trackRecoveryCompleted(
+    {
+      ownerType: session.ownerType,
+      ownerId: session.ownerId
+    },
+    session.id,
+    order.id
+  );
 
   const invoiceResult = await ensureInvoiceForOrder(
     order.id,

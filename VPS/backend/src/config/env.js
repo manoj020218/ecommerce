@@ -33,6 +33,8 @@ const env = {
     process.env.CATALOG_STORE_PATH || "backend/src/database/json/catalog-store.json",
   paymentStorePath:
     process.env.PAYMENT_STORE_PATH || "backend/src/database/json/payment-store.json",
+  recoveryStorePath:
+    process.env.RECOVERY_STORE_PATH || "backend/src/database/json/recovery-store.json",
   invoiceStorePath:
     process.env.INVOICE_STORE_PATH || "backend/src/database/json/invoice-store.json",
   shippingStorePath:

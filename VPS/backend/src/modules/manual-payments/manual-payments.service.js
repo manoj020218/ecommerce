@@ -17,6 +17,10 @@ const {
 } = require("../payment-gateways/payment-gateways.service");
 const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
 const {
+  trackPaymentFailed,
+  trackRecoveryCompleted
+} = require("../abandoned-cart/abandoned-cart.service");
+const {
   MANUAL_PAYMENT_STATUSES,
   sanitizeManualPaymentSubmission
 } = require("./manual-payments.model");
@@ -276,6 +280,7 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
   if (!order) {
     throw new HttpError(404, "Order not found for manual payment submission.");
   }
+  const checkoutSession = findCheckoutSessionById(authStore, order.checkoutSessionId);
 
   if (payload.action === "reject") {
     submission.status = MANUAL_PAYMENT_STATUSES.REJECTED;
@@ -286,6 +291,18 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
     order.manualPaymentStatus = "rejected";
 
     await Promise.all([writeAuthStore(authStore), writePaymentStore(paymentStore)]);
+
+    if (checkoutSession) {
+      await trackPaymentFailed(
+        {
+          ownerType: checkoutSession.ownerType,
+          ownerId: checkoutSession.ownerId
+        },
+        checkoutSession,
+        null,
+        submission.rejectionReason
+      );
+    }
 
     await addActivityLog({
       action: "manual_payment.rejected",
@@ -317,7 +334,6 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
     order.paymentVerifiedAt = nowIso();
     order.gatewayTxnId = payload.gatewayTxnId || submission.utrNumber;
 
-    const checkoutSession = findCheckoutSessionById(authStore, order.checkoutSessionId);
     authStore.paymentAttempts.push({
       id: generateId("pay_attempt"),
       checkoutSessionId: order.checkoutSessionId || "",
@@ -338,6 +354,17 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
     writeCatalogStore(catalogStore),
     writePaymentStore(paymentStore)
   ]);
+
+  if (checkoutSession) {
+    await trackRecoveryCompleted(
+      {
+        ownerType: checkoutSession.ownerType,
+        ownerId: checkoutSession.ownerId
+      },
+      checkoutSession.id,
+      order.id
+    );
+  }
 
   const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
     source: "manual_payment_verification"

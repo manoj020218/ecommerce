@@ -45,6 +45,10 @@ const { createTallyExportRouter } = require("../modules/tally-export/tally-expor
 const {
   createCustomerAccountRouter
 } = require("../modules/customer-account/customer-account.routes");
+const {
+  createAdminAbandonedCartRouter,
+  createPublicRecoveryRouter
+} = require("../modules/abandoned-cart/abandoned-cart.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -69,12 +73,14 @@ function createApiRouter() {
   router.use("/payments", createPaymentsRouter());
   router.use("/payments/manual", createPublicManualPaymentsRouter());
   router.use("/customer/account", createCustomerAccountRouter());
+  router.use("/admin/abandoned-carts", createAdminAbandonedCartRouter());
   router.use("/admin/payment-gateways", createPaymentGatewaysRouter());
   router.use("/admin/manual-payments", createAdminManualPaymentsRouter());
   router.use("/admin/invoices", createInvoicesRouter());
   router.use("/admin/tally-export", createTallyExportRouter());
   router.use("/admin/shipping", createAdminShippingRouter());
   router.use("/shipping", createPublicShippingRouter());
+  router.use("/recovery", createPublicRecoveryRouter());
 
   return router;
 }

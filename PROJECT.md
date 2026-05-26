@@ -1946,7 +1946,7 @@ Codex must update this section after each phase.
 [x] Phase 9 â€” Multi Payment Gateway and Manual Bank Transfer
 [x] Phase 10 â€” GST Invoice, Tally Export, Invoice Settings
 [x] Phase 11 â€” Customer Profile and Order History
-[ ] Phase 12 â€” Abandoned Cart and Customer Recovery
+[x] Phase 12 â€” Abandoned Cart and Customer Recovery
 [ ] Phase 13 â€” Blog / Knowledge Base
 [ ] Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
 [ ] Phase 15 â€” Website Buyer Lead Form

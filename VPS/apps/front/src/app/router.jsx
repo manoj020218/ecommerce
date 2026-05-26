@@ -4,6 +4,7 @@ import { CustomerAccountPage } from "../modules/account/account-page";
 import { CustomerOrderPage } from "../modules/account/account-order-page";
 import { ProductsListPage } from "../modules/products/products-list-page";
 import { ProductPage } from "../modules/products/product-page";
+import { RecoveryPage } from "../modules/recovery/recovery-page";
 import { useCustomerSession } from "../shared/auth/customer-session";
 
 function CustomerProtectedRoute({ children }) {
@@ -36,6 +37,7 @@ export function AppRouter() {
     <Routes>
       <Route path="/" element={<ProductsListPage />} />
       <Route path="/products/:slug" element={<ProductPage />} />
+      <Route path="/recover/:recoveryToken" element={<RecoveryPage />} />
       <Route path="/account/login" element={<CustomerAccountLoginPage />} />
       <Route
         path="/account"

@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory – Jenix Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .sidebar-link { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #9CA3AF; transition: all 0.15s; cursor: pointer; }
+    .sidebar-link:hover { background: #1F2937; color: #fff; }
+    .sidebar-link.active { background: #E8231A; color: #fff; }
+    .sidebar-sub { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 36px; border-radius: 8px; font-size: 12px; font-weight: 500; color: #6B7280; transition: all 0.15s; cursor: pointer; }
+    .sidebar-sub:hover { background: #1F2937; color: #D1D5DB; }
+    .sidebar-sub.active { color: #E8231A; }
+    .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; font-size: 10px; font-weight: 700; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside id="sidebar" class="hidden lg:flex flex-col fixed left-0 top-0 h-full w-60 bg-gray-900 z-40 overflow-y-auto scrollbar-hide">
+
+    <!-- Logo -->
+    <div class="flex items-center gap-3 px-4 py-5 border-b border-gray-800">
+      <img src="../../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert">
+      <span class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Admin</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-0.5">
+
+      <div class="sidebar-link" onclick="location.href='dashboard.html'">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Dashboard
+      </div>
+
+      <!-- Orders -->
+      <div class="pt-3 pb-1 px-3 text-xs font-semibold text-gray-600 uppercase tracking-widest">Orders</div>
+      <div class="sidebar-link" onclick="location.href='orders.html'">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        All Orders
+        <span class="ml-auto badge bg-brand text-white">12</span>
+      </div>
+      <div class="sidebar-sub">Payment Pending <span class="ml-auto badge bg-amber-500 text-white">5</span></div>
+      <div class="sidebar-sub">Processing</div>
+      <div class="sidebar-sub">Shipped</div>
+      <div class="sidebar-sub">Delivered</div>
+      <div class="sidebar-sub">Returns / RMA</div>
+
+      <!-- Catalogue -->
+      <div class="pt-3 pb-1 px-3 text-xs font-semibold text-gray-600 uppercase tracking-widest">Catalogue</div>
+      <div class="sidebar-link" onclick="location.href='catalogue.html'">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        Products
+      </div>
+      <div class="sidebar-sub active">
+        <svg class="w-3.5 h-3.5 flex-shrink-0 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+        Inventory
+      </div>
+      <div class="sidebar-sub">Categories</div>
+      <div class="sidebar-sub">Brands</div>
+      <div class="sidebar-sub">HSN / GST Codes</div>
+
+      <!-- Customers -->
+      <div class="pt-3 pb-1 px-3 text-xs font-semibold text-gray-600 uppercase tracking-widest">Customers</div>
+      <div class="sidebar-link">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        All Customers
+      </div>
+
+      <!-- Finance -->
+      <div class="pt-3 pb-1 px-3 text-xs font-semibold text-gray-600 uppercase tracking-widest">Finance</div>
+      <div class="sidebar-link">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        Payments
+      </div>
+      <div class="sidebar-link">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Invoices & Reports
+      </div>
+
+      <!-- More -->
+      <div class="pt-3 pb-1 px-3 text-xs font-semibold text-gray-600 uppercase tracking-widest">More</div>
+      <div class="sidebar-link">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+        Marketing
+      </div>
+      <div class="sidebar-link">
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Settings
+      </div>
+
+    </nav>
+
+    <!-- Admin Profile -->
+    <div class="px-3 py-4 border-t border-gray-800">
+      <div class="flex items-center gap-3 px-2">
+        <div class="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold flex-shrink-0">MA</div>
+        <div class="min-w-0">
+          <div class="text-xs font-semibold text-white truncate">Manoj Admin</div>
+          <div class="text-xs text-gray-500 truncate">admin@jenixindia.com</div>
+        </div>
+        <button class="ml-auto text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="lg:ml-60 min-h-screen flex flex-col">
+
+    <!-- Top Bar -->
+    <header class="bg-white border-b border-gray-200 px-4 lg:px-6 h-14 flex items-center gap-4 sticky top-0 z-30">
+      <button class="lg:hidden text-gray-500">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="flex-1 min-w-0">
+        <h1 class="text-base font-bold text-gray-900 truncate">Inventory Management</h1>
+        <p class="text-xs text-gray-400 hidden sm:block">Last updated: 18 May 2026, 10:42 AM</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="hidden sm:flex items-center gap-2 text-xs font-semibold text-gray-600 border border-gray-300 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Export Stock Report
+        </button>
+        <button class="relative text-gray-500 hover:text-gray-700">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span class="absolute -top-0.5 -right-0.5 w-2 h-2 bg-brand rounded-full"></span>
+        </button>
+        <div class="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold">MA</div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="flex-1 p-4 lg:p-6 pb-20 lg:pb-6">
+
+      <!-- ===== SUMMARY STAT CARDS ===== -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total SKUs</span>
+            <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-gray-900">524</div>
+          <div class="text-xs text-gray-400 mt-0.5">Active products</div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-green-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-green-600 uppercase tracking-wide">In Stock</span>
+            <div class="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-gray-900">489</div>
+          <div class="text-xs text-gray-400 mt-0.5">93.3% of catalogue</div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-amber-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-amber-600 uppercase tracking-wide">Low Stock</span>
+            <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-amber-600">27</div>
+          <div class="text-xs text-gray-400 mt-0.5">Below reorder threshold</div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-red-200 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-semibold text-brand uppercase tracking-wide">Out of Stock</span>
+            <div class="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-brand">8</div>
+          <div class="text-xs text-gray-400 mt-0.5">Need restocking</div>
+        </div>
+
+      </div>
+
+      <!-- ===== LOW STOCK ALERT PANEL ===== -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-sm font-bold text-amber-800">Low Stock Alert — 5 Critical Items</h3>
+              <button class="text-xs font-semibold text-amber-700 underline flex-shrink-0">View All 27</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <span class="inline-flex items-center gap-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-xs">
+                <span class="w-2 h-2 bg-brand rounded-full"></span>
+                <span class="font-medium text-gray-800">DS-2CD2143G2 · 4MP Dome</span>
+                <span class="text-amber-700 font-bold">2 left</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-xs">
+                <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
+                <span class="font-medium text-gray-800">GL-X750 · 4G Router</span>
+                <span class="text-amber-700 font-bold">3 left</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-xs">
+                <span class="w-2 h-2 bg-brand rounded-full"></span>
+                <span class="font-medium text-gray-800">EM-500 · Gate Motor</span>
+                <span class="text-amber-700 font-bold">1 left</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-xs">
+                <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
+                <span class="font-medium text-gray-800">DS-K1T341BMI · FR Terminal</span>
+                <span class="text-amber-700 font-bold">4 left</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5 text-xs">
+                <span class="w-2 h-2 bg-brand rounded-full"></span>
+                <span class="font-medium text-gray-800">VDB-2532 · Video Doorbell</span>
+                <span class="text-amber-700 font-bold">2 left</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== FILTER + SEARCH BAR ===== -->
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+
+        <!-- Filter Tabs -->
+        <div class="flex border-b border-gray-200 overflow-x-auto scrollbar-hide">
+          <button onclick="setTab(this,'all')" id="tab-all" class="tab-btn flex-shrink-0 px-4 py-3 text-sm font-semibold border-b-2 border-brand text-brand bg-red-50 transition-colors">
+            All Products <span class="ml-1.5 bg-gray-100 text-gray-600 rounded-full px-2 py-0.5 text-xs font-bold">524</span>
+          </button>
+          <button onclick="setTab(this,'low')" id="tab-low" class="tab-btn flex-shrink-0 px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-colors">
+            Low Stock <span class="ml-1.5 bg-amber-100 text-amber-700 rounded-full px-2 py-0.5 text-xs font-bold">27</span>
+          </button>
+          <button onclick="setTab(this,'out')" id="tab-out" class="tab-btn flex-shrink-0 px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-colors">
+            Out of Stock <span class="ml-1.5 bg-red-100 text-brand rounded-full px-2 py-0.5 text-xs font-bold">8</span>
+          </button>
+          <button onclick="setTab(this,'res')" id="tab-res" class="tab-btn flex-shrink-0 px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 hover:text-gray-800 transition-colors">
+            Has Reserved Stock <span class="ml-1.5 bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 text-xs font-bold">14</span>
+          </button>
+        </div>
+
+        <!-- Search + Filters -->
+        <div class="p-4 flex flex-col sm:flex-row gap-3">
+          <div class="flex-1 relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" placeholder="Search by product name, SKU, or model..." class="w-full pl-10 pr-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand focus:border-transparent">
+          </div>
+          <select class="sm:w-44 px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand text-gray-700">
+            <option>All Categories</option>
+            <option>CCTV Cameras</option>
+            <option>Smart Locks</option>
+            <option>Gate Automation</option>
+            <option>Access Control</option>
+            <option>4G Routers</option>
+            <option>Smart Home</option>
+          </select>
+          <button class="flex items-center gap-2 text-xs font-semibold text-gray-600 border border-gray-300 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors flex-shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== INVENTORY TABLE — DESKTOP ===== -->
+      <div class="hidden lg:block bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8"><input type="checkbox" class="accent-brand"></th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
+              <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">In Stock</th>
+              <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reserved</th>
+              <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Available</th>
+              <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Threshold</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+              <th class="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+
+            <!-- Row 1 — In Stock -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.867v6.266a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 text-sm leading-tight">Hikvision DS-2CD2143G2-I</div>
+                    <div class="text-xs text-gray-400 mt-0.5">CCTV · 4MP AcuSense Dome</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3"><span class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">HVN-2CD2143</span></td>
+              <td class="px-4 py-3 text-center">
+                <span class="text-base font-bold text-gray-900">48</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="text-sm text-blue-600 font-semibold">3</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="text-sm font-bold text-green-600">45</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="text-xs text-gray-500">10</span>
+              </td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> In Stock
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button onclick="openAdjust('Hikvision DS-2CD2143G2-I','HVN-2CD2143',48)" class="text-xs font-semibold text-brand hover:bg-red-50 border border-brand rounded-lg px-3 py-1.5 transition-colors">Adjust</button>
+              </td>
+            </tr>
+
+            <!-- Row 2 — In Stock -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 text-sm leading-tight">Godrej EVLE SL 501</div>
+                    <div class="text-xs text-gray-400 mt-0.5">Smart Locks · Deadbolt WiFi</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3"><span class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">GDJ-EVLE-501</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-base font-bold text-gray-900">22</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm text-blue-600 font-semibold">1</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm font-bold text-green-600">21</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-xs text-gray-500">5</span></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> In Stock
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button onclick="openAdjust('Godrej EVLE SL 501','GDJ-EVLE-501',22)" class="text-xs font-semibold text-brand hover:bg-red-50 border border-brand rounded-lg px-3 py-1.5 transition-colors">Adjust</button>
+              </td>
+            </tr>
+
+            <!-- Row 3 — Low Stock (amber highlight) -->
+            <tr class="bg-amber-50 border-l-4 border-l-amber-400 hover:bg-amber-100 transition-colors">
+              <td class="px-4 py-3"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 text-sm leading-tight">GL.iNet GL-X750 Spitz</div>
+                    <div class="text-xs text-gray-400 mt-0.5">4G Routers · Dual SIM OpenWRT</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3"><span class="font-mono text-xs text-gray-600 bg-amber-100 px-2 py-1 rounded">GLI-X750-4G</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-base font-bold text-amber-700">3</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm text-blue-600 font-semibold">0</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm font-bold text-amber-700">3</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-xs text-gray-500">10</span></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 border border-amber-300 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> Low Stock
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button onclick="openAdjust('GL.iNet GL-X750 Spitz','GLI-X750-4G',3)" class="text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-lg px-3 py-1.5 transition-colors">Adjust</button>
+              </td>
+            </tr>
+
+            <!-- Row 4 — Low Stock (amber, critical) -->
+            <tr class="bg-amber-50 border-l-4 border-l-brand hover:bg-amber-100 transition-colors">
+              <td class="px-4 py-3"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 text-sm leading-tight">FAAC 391 Gate Motor</div>
+                    <div class="text-xs text-gray-400 mt-0.5">Gate Automation · Sliding 500kg</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3"><span class="font-mono text-xs text-gray-600 bg-red-100 px-2 py-1 rounded">FAC-391-SLDR</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-base font-bold text-brand">1</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm text-blue-600 font-semibold">1</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm font-bold text-brand">0</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-xs text-gray-500">3</span></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1 bg-red-50 text-brand border border-red-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <span class="w-1.5 h-1.5 bg-brand rounded-full"></span> Critical
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button onclick="openAdjust('FAAC 391 Gate Motor','FAC-391-SLDR',1)" class="text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-lg px-3 py-1.5 transition-colors">Adjust</button>
+              </td>
+            </tr>
+
+            <!-- Row 5 — Out of Stock -->
+            <tr class="opacity-60 hover:opacity-80 transition-opacity">
+              <td class="px-4 py-3"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 text-sm leading-tight">Hikvision DS-VDB2532</div>
+                    <div class="text-xs text-gray-400 mt-0.5">Video Doorbell · 2MP WiFi PoE</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3"><span class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">HVN-VDB2532</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-base font-bold text-gray-400">0</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm text-gray-400 font-semibold">0</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-sm font-bold text-gray-400">0</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-xs text-gray-500">5</span></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 border border-gray-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <span class="w-1.5 h-1.5 bg-gray-400 rounded-full"></span> Out of Stock
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button onclick="openAdjust('Hikvision DS-VDB2532','HVN-VDB2532',0)" class="text-xs font-semibold text-brand hover:bg-red-50 border border-brand rounded-lg px-3 py-1.5 transition-colors">Restock</button>
+              </td>
+            </tr>
+
+            <!-- Row 6 — In Stock with reserved -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-semibold text-gray-900 text-sm leading-tight">Hikvision DS-K1T341BMI</div>
+                    <div class="text-xs text-gray-400 mt-0.5">Access Control · Face Recognition Terminal</div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3"><span class="font-mono text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">HVN-K1T341B</span></td>
+              <td class="px-4 py-3 text-center"><span class="text-base font-bold text-gray-900">11</span></td>
+              <td class="px-4 py-3 text-center">
+                <span class="text-sm text-blue-600 font-semibold">7</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <span class="text-sm font-bold text-amber-600">4</span>
+              </td>
+              <td class="px-4 py-3 text-center"><span class="text-xs text-gray-500">5</span></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  <span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> Low Stock
+                </span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button onclick="openAdjust('Hikvision DS-K1T341BMI','HVN-K1T341B',11)" class="text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-lg px-3 py-1.5 transition-colors">Adjust</button>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+
+        <!-- Table Footer -->
+        <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+          <span class="text-xs text-gray-500">Showing 6 of 524 products</span>
+          <div class="flex items-center gap-1">
+            <button class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">← Prev</button>
+            <button class="px-3 py-1.5 text-xs font-semibold text-white bg-brand rounded-lg">1</button>
+            <button class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">2</button>
+            <button class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">3</button>
+            <span class="px-2 text-xs text-gray-400">...</span>
+            <button class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">88</button>
+            <button class="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MOBILE INVENTORY CARDS ===== -->
+      <div class="lg:hidden space-y-3">
+
+        <!-- Card 1 — In Stock -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.867v6.266a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="font-semibold text-gray-900 text-sm">Hikvision DS-2CD2143G2-I</div>
+                  <div class="text-xs text-gray-400 mt-0.5">SKU: <span class="font-mono">HVN-2CD2143</span> · CCTV</div>
+                </div>
+                <span class="inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
+                  <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span> In Stock
+                </span>
+              </div>
+              <div class="flex items-center gap-4 mt-3">
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">In Stock</div>
+                  <div class="text-lg font-bold text-gray-900">48</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">Reserved</div>
+                  <div class="text-lg font-bold text-blue-600">3</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">Available</div>
+                  <div class="text-lg font-bold text-green-600">45</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">Threshold</div>
+                  <div class="text-lg font-bold text-gray-400">10</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button onclick="openAdjust('Hikvision DS-2CD2143G2-I','HVN-2CD2143',48)" class="mt-3 w-full text-xs font-semibold text-brand border border-brand rounded-lg py-2.5 hover:bg-red-50 transition-colors">
+            Adjust Stock
+          </button>
+        </div>
+
+        <!-- Card 2 — Low Stock -->
+        <div class="bg-amber-50 rounded-xl border border-amber-300 border-l-4 border-l-amber-500 p-4">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="font-semibold text-gray-900 text-sm">GL.iNet GL-X750 Spitz</div>
+                  <div class="text-xs text-gray-400 mt-0.5">SKU: <span class="font-mono">GLI-X750-4G</span> · 4G Routers</div>
+                </div>
+                <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0">
+                  <span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> Low Stock
+                </span>
+              </div>
+              <div class="flex items-center gap-4 mt-3">
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">In Stock</div>
+                  <div class="text-lg font-bold text-amber-700">3</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">Reserved</div>
+                  <div class="text-lg font-bold text-blue-600">0</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">Available</div>
+                  <div class="text-lg font-bold text-amber-700">3</div>
+                </div>
+                <div class="text-center">
+                  <div class="text-xs text-gray-400">Threshold</div>
+                  <div class="text-lg font-bold text-gray-400">10</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button onclick="openAdjust('GL.iNet GL-X750 Spitz','GLI-X750-4G',3)" class="mt-3 w-full text-xs font-semibold text-white bg-brand rounded-lg py-2.5 hover:bg-brand-dark transition-colors">
+            Adjust Stock
+          </button>
+        </div>
+
+        <!-- Load More -->
+        <button class="w-full bg-white border border-gray-200 rounded-xl py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+          Load More Products
+        </button>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ===== ADJUST STOCK MODAL ===== -->
+  <div id="adjustModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+    <!-- Overlay -->
+    <div class="absolute inset-0 bg-black/60" onclick="closeAdjust()"></div>
+
+    <!-- Modal Panel -->
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div>
+          <h2 class="text-base font-bold text-gray-900">Adjust Stock</h2>
+          <p id="modalProductName" class="text-xs text-gray-500 mt-0.5">Product name</p>
+        </div>
+        <button onclick="closeAdjust()" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-5 space-y-4">
+
+        <!-- Current Stock Display -->
+        <div class="bg-gray-50 rounded-xl p-3 flex items-center justify-between">
+          <span class="text-sm font-medium text-gray-600">Current Stock</span>
+          <span id="modalCurrentStock" class="text-xl font-bold text-gray-900">—</span>
+        </div>
+
+        <!-- Adjustment Type -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Adjustment Type</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="setAdjType('add')" id="adj-add" class="adj-type-btn border-2 border-brand bg-red-50 text-brand rounded-xl py-3 text-xs font-bold text-center transition-colors">
+              <div class="text-lg mb-0.5">+</div>
+              Add Stock
+            </button>
+            <button onclick="setAdjType('remove')" id="adj-remove" class="adj-type-btn border-2 border-gray-200 text-gray-500 rounded-xl py-3 text-xs font-bold text-center transition-colors hover:border-gray-400">
+              <div class="text-lg mb-0.5">−</div>
+              Remove
+            </button>
+            <button onclick="setAdjType('set')" id="adj-set" class="adj-type-btn border-2 border-gray-200 text-gray-500 rounded-xl py-3 text-xs font-bold text-center transition-colors hover:border-gray-400">
+              <div class="text-lg mb-0.5">=</div>
+              Set Exact
+            </button>
+          </div>
+        </div>
+
+        <!-- Quantity Input -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Quantity</label>
+          <div class="flex items-center gap-3">
+            <button onclick="adjQty(-1)" class="w-10 h-10 flex items-center justify-center text-lg font-bold text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">−</button>
+            <input id="adjQtyInput" type="number" value="1" min="0" class="flex-1 text-center text-xl font-bold text-gray-900 border border-gray-300 rounded-xl py-2.5 outline-none focus:ring-2 focus:ring-brand focus:border-transparent">
+            <button onclick="adjQty(1)" class="w-10 h-10 flex items-center justify-center text-lg font-bold text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-100 transition-colors">+</button>
+          </div>
+          <!-- New stock preview -->
+          <div id="stockPreview" class="mt-2 text-center text-xs text-gray-500">New stock after adjustment: <span id="previewVal" class="font-bold text-gray-800">—</span></div>
+        </div>
+
+        <!-- Reason -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Reason <span class="text-brand">*</span></label>
+          <select id="adjReason" class="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand text-gray-700">
+            <option value="">— Select reason —</option>
+            <option>Supplier delivery received</option>
+            <option>Customer return / RMA</option>
+            <option>Damaged / defective write-off</option>
+            <option>Physical stock count correction</option>
+            <option>Internal use / demo unit</option>
+            <option>Transfer to another branch</option>
+            <option>Other (enter below)</option>
+          </select>
+        </div>
+
+        <!-- Notes (optional) -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Notes <span class="text-gray-400 font-normal normal-case">(optional)</span></label>
+          <textarea rows="2" placeholder="e.g. Invoice #INV-0234 from distributor, batch received 18 May..." class="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand resize-none placeholder-gray-400"></textarea>
+        </div>
+
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="px-5 pb-5 flex gap-3">
+        <button onclick="closeAdjust()" class="flex-1 py-3 border border-gray-300 text-gray-700 font-semibold text-sm rounded-xl hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button id="saveAdjBtn" class="flex-1 py-3 bg-brand text-white font-bold text-sm rounded-xl hover:bg-brand-dark transition-colors opacity-60 cursor-not-allowed" disabled>
+          Save Adjustment
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== MOBILE BOTTOM NAV ===== -->
+  <nav class="lg:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 z-30 flex">
+    <a href="dashboard.html" class="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-gray-500 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <span class="text-xs font-medium">Dashboard</span>
+    </a>
+    <a href="orders.html" class="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-gray-500 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <span class="text-xs font-medium">Orders</span>
+    </a>
+    <a href="catalogue.html" class="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-gray-500 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+      <span class="text-xs font-medium">Products</span>
+    </a>
+    <a href="inventory.html" class="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-brand border-t-2 border-brand">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+      <span class="text-xs font-bold">Inventory</span>
+    </a>
+    <a href="#" class="flex-1 flex flex-col items-center justify-center py-3 gap-1 text-gray-500 hover:text-white transition-colors">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      <span class="text-xs font-medium">Settings</span>
+    </a>
+  </nav>
+
+  <!-- ===== JS ===== -->
+  <script>
+    // Tab switching
+    function setTab(btn, id) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('border-brand','text-brand','bg-red-50');
+        b.classList.add('border-transparent','text-gray-500');
+      });
+      btn.classList.remove('border-transparent','text-gray-500');
+      btn.classList.add('border-brand','text-brand','bg-red-50');
+    }
+
+    // Modal state
+    let currentStock = 0;
+    let adjType = 'add';
+
+    function openAdjust(name, sku, stock) {
+      currentStock = stock;
+      document.getElementById('modalProductName').textContent = name + ' · ' + sku;
+      document.getElementById('modalCurrentStock').textContent = stock;
+      document.getElementById('adjQtyInput').value = 1;
+      updatePreview();
+      document.getElementById('adjustModal').classList.remove('hidden');
+    }
+
+    function closeAdjust() {
+      document.getElementById('adjustModal').classList.add('hidden');
+    }
+
+    function setAdjType(type) {
+      adjType = type;
+      document.querySelectorAll('.adj-type-btn').forEach(b => {
+        b.classList.remove('border-brand','bg-red-50','text-brand');
+        b.classList.add('border-gray-200','text-gray-500');
+      });
+      const btn = document.getElementById('adj-' + type);
+      btn.classList.remove('border-gray-200','text-gray-500');
+      btn.classList.add('border-brand','bg-red-50','text-brand');
+      updatePreview();
+    }
+
+    function adjQty(delta) {
+      const inp = document.getElementById('adjQtyInput');
+      const val = Math.max(0, parseInt(inp.value || 0) + delta);
+      inp.value = val;
+      updatePreview();
+    }
+
+    function updatePreview() {
+      const qty = parseInt(document.getElementById('adjQtyInput').value || 0);
+      let newVal;
+      if (adjType === 'add') newVal = currentStock + qty;
+      else if (adjType === 'remove') newVal = Math.max(0, currentStock - qty);
+      else newVal = qty;
+      document.getElementById('previewVal').textContent = newVal;
+
+      // Enable save button if qty > 0
+      const saveBtn = document.getElementById('saveAdjBtn');
+      if (qty > 0) {
+        saveBtn.disabled = false;
+        saveBtn.classList.remove('opacity-60','cursor-not-allowed');
+      } else {
+        saveBtn.disabled = true;
+        saveBtn.classList.add('opacity-60','cursor-not-allowed');
+      }
+    }
+
+    // Listen for quantity input changes
+    document.getElementById('adjQtyInput').addEventListener('input', updatePreview);
+
+    // Validate reason before save
+    document.getElementById('saveAdjBtn').addEventListener('click', function() {
+      const reason = document.getElementById('adjReason').value;
+      if (!reason) {
+        document.getElementById('adjReason').classList.add('ring-2','ring-brand','border-brand');
+        document.getElementById('adjReason').focus();
+        return;
+      }
+      // Simulate save — show brief success state
+      this.textContent = '✓ Saved!';
+      this.classList.add('bg-green-600');
+      this.classList.remove('bg-brand','hover:bg-brand-dark');
+      setTimeout(() => closeAdjust(), 800);
+    });
+
+    document.getElementById('adjReason').addEventListener('change', function() {
+      this.classList.remove('ring-2','ring-brand','border-brand');
+    });
+  </script>
+
+</body>
+</html>

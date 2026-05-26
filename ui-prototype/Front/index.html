@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jenix India – Smart Security & IoT Solutions</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15', light: '#FF4A42' } } } }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+  <!-- ANNOUNCEMENT BAR -->
+  <div class="bg-brand text-white text-center py-1.5 text-xs font-medium px-4">
+    🚚 Free shipping on orders above ₹999 &nbsp;|&nbsp; GST Invoice Available &nbsp;|&nbsp; WhatsApp: +91 98765 43210
+  </div>
+
+  <!-- HEADER -->
+  <header class="bg-gray-900 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center gap-3 h-14">
+        <a href="index.html" class="flex-shrink-0">
+          <img src="../jenix logo.png" alt="Jenix" class="h-8 brightness-0 invert">
+        </a>
+        <div class="flex-1 hidden sm:flex items-center bg-white rounded-lg overflow-hidden shadow-sm">
+          <input type="text" placeholder="Search cameras, smart locks, gate motors..." class="flex-1 px-4 py-2.5 text-sm text-gray-800 outline-none">
+          <button class="bg-brand text-white px-4 py-2.5 hover:bg-brand-dark transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </button>
+        </div>
+        <div class="flex items-center gap-1 ml-auto sm:ml-0">
+          <button class="sm:hidden text-white p-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </button>
+          <a href="#" class="hidden sm:flex items-center gap-1.5 text-white text-xs px-2 py-1.5 hover:text-brand transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <span>Login</span>
+          </a>
+          <a href="cart.html" class="relative text-white p-2 hover:text-brand transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <span class="absolute -top-0.5 -right-0.5 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">3</span>
+          </a>
+        </div>
+      </div>
+    </div>
+    <nav class="hidden md:block bg-gray-800 border-t border-gray-700">
+      <div class="max-w-7xl mx-auto px-4">
+        <ul class="flex items-center gap-6 py-2.5 overflow-x-auto scrollbar-hide">
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs font-medium whitespace-nowrap transition-colors">All Products</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">CCTV & Surveillance</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">Smart Door Locks</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">Gate Automation</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">Access Control</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">4G Routers</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">Smart Home</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">Parking Systems</a></li>
+          <li><a href="products.html" class="text-gray-300 hover:text-white text-xs whitespace-nowrap">Video Doorbell</a></li>
+        </ul>
+      </div>
+    </nav>
+  </header>
+
+  <main class="pb-20 md:pb-0">
+
+    <!-- HERO -->
+    <section class="bg-gray-900 overflow-hidden">
+      <div class="max-w-7xl mx-auto">
+        <div class="relative h-52 sm:h-72 md:h-88 lg:h-96 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-700 flex items-center">
+          <div class="absolute inset-0 opacity-5 bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] bg-[size:32px_32px]"></div>
+          <div class="relative z-10 px-6 md:px-16 max-w-lg">
+            <span class="inline-block bg-brand text-white text-xs font-bold px-3 py-1 rounded mb-3 tracking-widest uppercase">New Arrival</span>
+            <h1 class="text-2xl md:text-4xl font-extrabold text-white leading-tight mb-3">
+              AI Face Recognition<br><span class="text-brand">Access Terminal</span>
+            </h1>
+            <p class="text-gray-300 text-sm mb-5">Temperature sensing + attendance + access control. Built for offices, schools & factories.</p>
+            <div class="flex gap-3">
+              <a href="product-detail.html" class="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded text-sm font-semibold transition-colors">Shop Now</a>
+              <a href="products.html" class="border border-gray-500 text-white hover:border-white px-5 py-2.5 rounded text-sm font-medium transition-colors">View All</a>
+            </div>
+          </div>
+          <div class="absolute right-8 md:right-24 bottom-0 hidden sm:flex items-end">
+            <div class="w-32 md:w-44 h-40 md:h-56 bg-gradient-to-t from-gray-800 to-gray-700 rounded-t-xl border border-gray-600 flex flex-col items-center justify-center gap-2 p-4">
+              <svg class="w-12 h-12 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+              <div class="w-full h-1 bg-brand rounded"></div>
+              <p class="text-gray-400 text-xs text-center">Product Image</p>
+            </div>
+          </div>
+          <div class="absolute bottom-4 left-6 flex gap-1.5">
+            <div class="w-6 h-1.5 bg-brand rounded-full"></div>
+            <div class="w-1.5 h-1.5 bg-gray-600 rounded-full"></div>
+            <div class="w-1.5 h-1.5 bg-gray-600 rounded-full"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CATEGORY GRID -->
+    <section class="py-6 md:py-10 px-4 max-w-7xl mx-auto">
+      <h2 class="text-base md:text-lg font-bold text-gray-900 mb-4">Shop by Category</h2>
+      <div class="grid grid-cols-4 md:grid-cols-8 gap-2 md:gap-3">
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">CCTV</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">Smart Locks</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">Gate Motors</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">Access Control</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">4G Routers</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">Smart Home</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 0M3 10h13"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">Parking</span>
+        </a>
+        <a href="products.html" class="flex flex-col items-center gap-2 group">
+          <div class="w-full aspect-square bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-center group-hover:border-brand group-hover:shadow-md transition-all p-2.5 md:p-3">
+            <svg class="w-7 h-7 md:w-8 md:h-8 text-gray-500 group-hover:text-brand transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18H3a2 2 0 01-2-2V8a2 2 0 012-2h2m14 0h2a2 2 0 012 2v8a2 2 0 01-2 2h-2M9 6h6"/></svg>
+          </div>
+          <span class="text-xs text-gray-600 text-center leading-tight">Doorbell</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- BESTSELLERS -->
+    <section class="py-4 md:py-8 bg-white">
+      <div class="px-4 max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base md:text-lg font-bold text-gray-900">Bestsellers</h2>
+          <a href="products.html" class="text-brand text-sm font-medium hover:underline">View all →</a>
+        </div>
+        <div class="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-3">
+          <!-- Card 1 -->
+          <a href="product-detail.html" class="flex-shrink-0 w-44 sm:w-52 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+            <div class="bg-gray-50 h-40 flex items-center justify-center relative">
+              <svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              <span class="absolute top-2 left-2 bg-brand text-white text-xs px-2 py-0.5 rounded font-semibold">-15%</span>
+            </div>
+            <div class="p-3">
+              <p class="text-xs text-gray-400">Jenix · CCTV</p>
+              <p class="text-sm font-semibold text-gray-800 leading-snug my-1.5 line-clamp-2 group-hover:text-brand transition-colors">4MP IP Bullet Camera Outdoor Weatherproof</p>
+              <div class="flex items-baseline gap-1.5"><span class="text-base font-bold text-brand">₹2,450</span><span class="text-xs text-gray-400 line-through">₹2,899</span></div>
+              <p class="text-xs text-gray-400 mt-0.5">+18% GST</p>
+              <button class="w-full mt-2.5 bg-brand text-white text-xs font-semibold py-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+            </div>
+          </a>
+          <!-- Card 2 -->
+          <a href="product-detail.html" class="flex-shrink-0 w-44 sm:w-52 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+            <div class="bg-gray-50 h-40 flex items-center justify-center relative">
+              <svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              <span class="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded font-semibold">New</span>
+            </div>
+            <div class="p-3">
+              <p class="text-xs text-gray-400">Jenix · Smart Locks</p>
+              <p class="text-sm font-semibold text-gray-800 leading-snug my-1.5 line-clamp-2 group-hover:text-brand transition-colors">Fingerprint + PIN Smart Door Lock</p>
+              <div class="flex items-baseline gap-1.5"><span class="text-base font-bold text-brand">₹8,999</span></div>
+              <p class="text-xs text-gray-400 mt-0.5">+18% GST</p>
+              <button class="w-full mt-2.5 bg-brand text-white text-xs font-semibold py-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+            </div>
+          </a>
+          <!-- Card 3 -->
+          <a href="product-detail.html" class="flex-shrink-0 w-44 sm:w-52 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+            <div class="bg-gray-50 h-40 flex items-center justify-center relative">
+              <svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+            </div>
+            <div class="p-3">
+              <p class="text-xs text-gray-400">Jenix · Networking</p>
+              <p class="text-sm font-semibold text-gray-800 leading-snug my-1.5 line-clamp-2 group-hover:text-brand transition-colors">4G SIM Router Industrial Grade</p>
+              <div class="flex items-baseline gap-1.5"><span class="text-base font-bold text-brand">₹4,500</span><span class="text-xs text-gray-400 line-through">₹5,200</span></div>
+              <p class="text-xs text-gray-400 mt-0.5">+18% GST</p>
+              <button class="w-full mt-2.5 bg-brand text-white text-xs font-semibold py-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+            </div>
+          </a>
+          <!-- Card 4 -->
+          <a href="product-detail.html" class="flex-shrink-0 w-44 sm:w-52 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+            <div class="bg-gray-50 h-40 flex items-center justify-center relative">
+              <svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+              <span class="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded font-semibold">Popular</span>
+            </div>
+            <div class="p-3">
+              <p class="text-xs text-gray-400">Jenix · Gate Automation</p>
+              <p class="text-sm font-semibold text-gray-800 leading-snug my-1.5 line-clamp-2 group-hover:text-brand transition-colors">Sliding Gate Motor 600kg</p>
+              <div class="flex items-baseline gap-1.5"><span class="text-base font-bold text-brand">₹15,500</span></div>
+              <p class="text-xs text-gray-400 mt-0.5">+18% GST</p>
+              <button class="w-full mt-2.5 bg-brand text-white text-xs font-semibold py-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+            </div>
+          </a>
+          <!-- Card 5 -->
+          <a href="product-detail.html" class="flex-shrink-0 w-44 sm:w-52 bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg transition-shadow group">
+            <div class="bg-gray-50 h-40 flex items-center justify-center relative">
+              <svg class="w-14 h-14 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            </div>
+            <div class="p-3">
+              <p class="text-xs text-gray-400">Jenix · Access Control</p>
+              <p class="text-sm font-semibold text-gray-800 leading-snug my-1.5 line-clamp-2 group-hover:text-brand transition-colors">Face Recognition Terminal + Temp Sensor</p>
+              <div class="flex items-baseline gap-1.5"><span class="text-base font-bold text-brand">₹22,000</span></div>
+              <p class="text-xs text-gray-400 mt-0.5">+18% GST</p>
+              <button class="w-full mt-2.5 bg-brand text-white text-xs font-semibold py-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- USP BAR -->
+    <section class="bg-gray-900 py-5">
+      <div class="max-w-7xl mx-auto px-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            </div>
+            <div><p class="text-white text-sm font-semibold">100% Genuine</p><p class="text-gray-400 text-xs">Authorised products only</p></div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            </div>
+            <div><p class="text-white text-sm font-semibold">Pan India Shipping</p><p class="text-gray-400 text-xs">Fast & tracked delivery</p></div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
+            <div><p class="text-white text-sm font-semibold">GST Invoice</p><p class="text-gray-400 text-xs">Proper tax invoice</p></div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            </div>
+            <div><p class="text-white text-sm font-semibold">Expert Support</p><p class="text-gray-400 text-xs">Installation guidance</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEW ARRIVALS -->
+    <section class="py-6 md:py-10 px-4 max-w-7xl mx-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-base md:text-lg font-bold text-gray-900">New Arrivals</h2>
+        <a href="products.html" class="text-brand text-sm font-medium hover:underline">View all →</a>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+          <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+            <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+            <span class="absolute top-2 left-2 bg-brand text-white text-xs px-2 py-0.5 rounded">NEW</span>
+          </div>
+          <div class="p-3">
+            <p class="text-xs text-gray-400">Jenix</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-2 line-clamp-2 group-hover:text-brand transition-colors">PTZ IP Camera 20x Optical Zoom</p>
+            <div class="flex items-center justify-between">
+              <div><span class="text-sm font-bold text-brand">₹18,500</span><p class="text-xs text-gray-400">+18% GST</p></div>
+              <button class="bg-brand text-white p-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
+            </div>
+          </div>
+        </a>
+        <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+          <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+            <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <div class="p-3">
+            <p class="text-xs text-gray-400">Jenix</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-2 line-clamp-2 group-hover:text-brand transition-colors">QR Code + RFID Card Smart Lock</p>
+            <div class="flex items-center justify-between">
+              <div><span class="text-sm font-bold text-brand">₹12,500</span><p class="text-xs text-gray-400">+18% GST</p></div>
+              <button class="bg-brand text-white p-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
+            </div>
+          </div>
+        </a>
+        <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+          <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+            <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+          </div>
+          <div class="p-3">
+            <p class="text-xs text-gray-400">Jenix</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-2 line-clamp-2 group-hover:text-brand transition-colors">Outdoor 4G WiFi Router IP67 Rated</p>
+            <div class="flex items-center justify-between">
+              <div><span class="text-sm font-bold text-brand">₹6,800</span><p class="text-xs text-gray-400">+18% GST</p></div>
+              <button class="bg-brand text-white p-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
+            </div>
+          </div>
+        </a>
+        <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+          <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+            <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18H3a2 2 0 01-2-2V8a2 2 0 012-2h2"/></svg>
+            <span class="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded">HOT</span>
+          </div>
+          <div class="p-3">
+            <p class="text-xs text-gray-400">Jenix</p>
+            <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-2 line-clamp-2 group-hover:text-brand transition-colors">WiFi Video Doorbell 2K Night Vision</p>
+            <div class="flex items-center justify-between">
+              <div><span class="text-sm font-bold text-brand">₹3,200</span><p class="text-xs text-gray-400">+18% GST</p></div>
+              <button class="bg-brand text-white p-2 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
+            </div>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- BLOG / KNOWLEDGE BASE -->
+    <section class="py-6 md:py-10 bg-white px-4">
+      <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base md:text-lg font-bold text-gray-900">Knowledge Base & Buying Guides</h2>
+          <a href="#" class="text-brand text-sm font-medium hover:underline">All guides →</a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <a href="#" class="bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow group border border-gray-100">
+            <div class="h-32 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+            </div>
+            <div class="p-4">
+              <span class="text-xs font-semibold text-brand bg-red-50 px-2 py-0.5 rounded">CCTV Guide</span>
+              <h3 class="text-sm font-semibold text-gray-800 mt-2 mb-1 group-hover:text-brand transition-colors leading-snug">How to choose the right CCTV for your shop or home?</h3>
+              <p class="text-xs text-gray-500">Resolution, night vision, storage — complete guide for beginners.</p>
+            </div>
+          </a>
+          <a href="#" class="bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow group border border-gray-100">
+            <div class="h-32 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            </div>
+            <div class="p-4">
+              <span class="text-xs font-semibold text-brand bg-red-50 px-2 py-0.5 rounded">Smart Lock Guide</span>
+              <h3 class="text-sm font-semibold text-gray-800 mt-2 mb-1 group-hover:text-brand transition-colors leading-snug">Smart lock vs traditional lock — which is right for you?</h3>
+              <p class="text-xs text-gray-500">Security levels, features, installation — full comparison.</p>
+            </div>
+          </a>
+          <a href="#" class="bg-gray-50 rounded-xl overflow-hidden hover:shadow-md transition-shadow group border border-gray-100">
+            <div class="h-32 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <svg class="w-10 h-10 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18"/></svg>
+            </div>
+            <div class="p-4">
+              <span class="text-xs font-semibold text-brand bg-red-50 px-2 py-0.5 rounded">Gate Guide</span>
+              <h3 class="text-sm font-semibold text-gray-800 mt-2 mb-1 group-hover:text-brand transition-colors leading-snug">Sliding vs swing gate motor — what's best for your home?</h3>
+              <p class="text-xs text-gray-500">Space, capacity, remote options — everything explained.</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUSINESS LEAD SECTION -->
+    <section class="py-8 bg-gray-900 px-4">
+      <div class="max-w-xl mx-auto text-center">
+        <p class="text-brand text-xs font-bold uppercase tracking-widest mb-2">For Businesses</p>
+        <h2 class="text-xl font-bold text-white mb-2">Want This Platform for Your Business?</h2>
+        <p class="text-gray-400 text-sm mb-6">We build custom IoT & security e-commerce platforms. Get a free demo.</p>
+        <div class="bg-gray-800 rounded-xl p-4 text-left">
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <input type="text" placeholder="Your Name" class="bg-gray-700 text-white text-sm px-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-brand placeholder-gray-500">
+            <input type="tel" placeholder="Mobile Number" class="bg-gray-700 text-white text-sm px-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-brand placeholder-gray-500">
+            <input type="text" placeholder="Business Name" class="bg-gray-700 text-white text-sm px-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-brand placeholder-gray-500">
+            <input type="text" placeholder="City" class="bg-gray-700 text-white text-sm px-3 py-2.5 rounded-lg outline-none focus:ring-1 focus:ring-brand placeholder-gray-500">
+          </div>
+          <button class="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-lg text-sm transition-colors">Request Free Demo →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="bg-gray-900 border-t border-gray-800 px-4 py-8">
+      <div class="max-w-7xl mx-auto">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+          <div class="col-span-2 md:col-span-1">
+            <img src="../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert mb-3">
+            <p class="text-gray-400 text-xs leading-relaxed">India's trusted partner for IoT security systems. CCTV, smart locks, gate automation & more.</p>
+            <a href="#" class="inline-flex items-center gap-1.5 bg-green-600 text-white text-xs px-3 py-2 rounded-lg hover:bg-green-700 mt-4">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp Support
+            </a>
+          </div>
+          <div>
+            <h4 class="text-white text-sm font-semibold mb-3">Products</h4>
+            <ul class="space-y-2">
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">CCTV Cameras</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Smart Locks</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Gate Motors</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Access Control</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">4G Routers</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Smart Home</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-white text-sm font-semibold mb-3">Company</h4>
+            <ul class="space-y-2">
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">About Us</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Contact</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Dealer Program</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Blog</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Careers</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 class="text-white text-sm font-semibold mb-3">Help</h4>
+            <ul class="space-y-2">
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Track Order</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Returns & Refunds</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Privacy Policy</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Terms of Use</a></li>
+              <li><a href="#" class="text-gray-400 hover:text-white text-xs">Shipping Policy</a></li>
+            </ul>
+            <p class="text-gray-500 text-xs mt-4">GSTIN: 27XXXXX1234X1ZX</p>
+          </div>
+        </div>
+        <div class="border-t border-gray-800 pt-4 text-center">
+          <p class="text-gray-500 text-xs">© 2026 Jenix India. All rights reserved. Jenix® is a registered trademark.</p>
+        </div>
+      </div>
+    </footer>
+  </main>
+
+  <!-- WHATSAPP FAB -->
+  <a href="#" class="fixed bottom-24 md:bottom-6 right-4 bg-green-500 text-white p-3.5 rounded-full shadow-lg hover:bg-green-600 transition-colors z-40">
+    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  </a>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <div class="grid grid-cols-5 h-16">
+      <a href="index.html" class="flex flex-col items-center justify-center gap-1 text-brand">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        <span class="text-xs font-medium">Home</span>
+      </a>
+      <a href="products.html" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+        <span class="text-xs">Categories</span>
+      </a>
+      <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span class="text-xs">Search</span>
+      </a>
+      <a href="cart.html" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand transition-colors relative">
+        <div class="relative">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          <span class="absolute -top-1.5 -right-2 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">3</span>
+        </div>
+        <span class="text-xs">Cart</span>
+      </a>
+      <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        <span class="text-xs">Account</span>
+      </a>
+    </div>
+  </nav>
+
+</body>
+</html>

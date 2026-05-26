@@ -1,0 +1,43 @@
+{
+  "name": "jenix-commerce-vps",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Jenix Commerce monorepo in VPS folder (pnpm + PM2)",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev:backend": "node --watch backend/src/server.js",
+    "start:backend": "node backend/src/server.js",
+    "dev:admin": "pnpm --filter @jenix/admin-panel dev",
+    "dev:front": "pnpm --filter @jenix/front dev",
+    "build:admin": "pnpm --filter @jenix/admin-panel build",
+    "build:front": "pnpm --filter @jenix/front build",
+    "check:backend": "node backend/src/checks/run-regression-checks.js",
+    "lint": "eslint backend/src",
+    "format:check": "prettier --check \"**/*.{js,json,md,yaml,yml}\"",
+    "format": "prettier --write \"**/*.{js,json,md,yaml,yml}\"",
+    "pm2:start": "pm2 start ecosystem.config.cjs --only jenix-backend",
+    "pm2:restart": "pm2 restart jenix-backend",
+    "pm2:stop": "pm2 stop jenix-backend",
+    "pm2:logs": "pm2 logs jenix-backend",
+    "pm2:status": "pm2 status"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "pm2": "^7.0.1",
+    "prettier": "^3.8.3"
+  }
+}

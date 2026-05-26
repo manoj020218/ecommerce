@@ -1,0 +1,4 @@
+when sending order confirmed email to buyer 
+after that when order dispatched is marked with tracking detail then make standard message for Whatsapp where it should include 1. Invoice PDF, 2.  Actula pHoto of Parcel ( as at time of order dispatch to upload photo of final packed box) 3. courier tracking number 4. Tracking link ( so user click on this link and reach to coueir site with tracking details input data) 5. standard messaage like " Hi, Your Order in the name of 'Buyer Name' with Order '#Order ID' and Invoice No. 'Invoice no', has been dispatched Courier Name : ' Courier Name ' , Tracking Number " Track number' , tracking Link: 'Link'.. Thanks for Buying and below at www.jenixindia.com 
+and Seller Can manual press the button to send this by Whatsapp so whatsapp link should have buyer mobile number.
+

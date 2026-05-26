@@ -1,0 +1,1955 @@
+const crypto = require("node:crypto");
+const { HttpError } = require("../../common/http-error");
+const { env } = require("../../config/env");
+const { generateId, hashValue } = require("../../common/identity");
+const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
+const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
+const { readPaymentStore, writePaymentStore } = require("../../database/payment-store");
+const { readShippingStore } = require("../../database/shipping-store");
+const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const { calculateAvailableQty } = require("../products/products.model");
+const {
+  createPaymentGateway
+} = require("../../integrations/payment-gateways/payment-gateway.adapter");
+const {
+  createShippingProvider
+} = require("../../integrations/shipping-providers/shipping-provider.adapter");
+const {
+  resolveDirectPaymentDiscountPercent,
+  getManualPaymentInstructions
+} = require("../payment-gateways/payment-gateways.model");
+const {
+  ensurePaymentStoreShape,
+  resolveGatewayForPaymentAttempt
+} = require("../payment-gateways/payment-gateways.service");
+const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
+const {
+  CART_OWNER_TYPES,
+  PAYMENT_METHODS,
+  SHIPPING_METHODS,
+  CHECKOUT_STATUSES,
+  RESERVATION_STATUSES,
+  PAYMENT_ATTEMPT_STATUSES,
+  SHARE_CLAIM_MODES,
+  QUOTE_REQUEST_STATUSES,
+  sanitizeCartView,
+  sanitizeCheckoutSession,
+  sanitizeReservation
+} = require("./cart-checkout.model");
+
+const STOCK_RESERVATION_MINUTES = Number(env.cartStockReservationMinutes || 15);
+
+function roundMoney(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function getReservationTtlMinutes() {
+  if (Number.isNaN(STOCK_RESERVATION_MINUTES) || STOCK_RESERVATION_MINUTES < 5) {
+    return 15;
+  }
+  return STOCK_RESERVATION_MINUTES;
+}
+
+function ensurePhase7StoreShape(store) {
+  if (!Array.isArray(store.guestCarts)) {
+    store.guestCarts = [];
+  }
+  if (!Array.isArray(store.userCarts)) {
+    store.userCarts = [];
+  }
+  if (!Array.isArray(store.cartShares)) {
+    store.cartShares = [];
+  }
+  if (!Array.isArray(store.stockReservations)) {
+    store.stockReservations = [];
+  }
+  if (!Array.isArray(store.checkoutSessions)) {
+    store.checkoutSessions = [];
+  }
+  if (!Array.isArray(store.paymentAttempts)) {
+    store.paymentAttempts = [];
+  }
+  if (!Array.isArray(store.quoteRequests)) {
+    store.quoteRequests = [];
+  }
+  if (!Array.isArray(store.orders)) {
+    store.orders = [];
+  }
+}
+
+function resolveStockStatus(product) {
+  const availableQty = calculateAvailableQty(product);
+  const lowStockThreshold = Number(product.lowStockThreshold || 0);
+
+  if (availableQty <= 0) {
+    return product.allowBackorder ? "backorder" : "out_of_stock";
+  }
+
+  if (availableQty <= lowStockThreshold) {
+    return "low_stock";
+  }
+
+  return "in_stock";
+}
+
+function resolveCartOwner(context) {
+  if (context.customerId) {
+    return {
+      ownerType: CART_OWNER_TYPES.CUSTOMER,
+      ownerId: context.customerId
+    };
+  }
+
+  if (context.sessionId) {
+    return {
+      ownerType: CART_OWNER_TYPES.GUEST,
+      ownerId: context.sessionId
+    };
+  }
+
+  throw new HttpError(
+    400,
+    "Guest sessionId is required when customer authentication is not present."
+  );
+}
+
+function getCartCollectionByOwnerType(store, ownerType) {
+  return ownerType === CART_OWNER_TYPES.CUSTOMER ? store.userCarts : store.guestCarts;
+}
+
+function ensureCartRecord(store, owner, createIfMissing = true) {
+  const collection = getCartCollectionByOwnerType(store, owner.ownerType);
+  const keyName = owner.ownerType === CART_OWNER_TYPES.CUSTOMER ? "userId" : "sessionId";
+
+  let cart = collection.find((row) => row[keyName] === owner.ownerId);
+
+  if (!cart && createIfMissing) {
+    cart = {
+      [keyName]: owner.ownerId,
+      items: [],
+      updatedAt: nowIso()
+    };
+    collection.push(cart);
+  }
+
+  if (cart && !Array.isArray(cart.items)) {
+    cart.items = [];
+  }
+
+  return cart || null;
+}
+
+function findActiveProductOrThrow(catalogStore, productId) {
+  const row = catalogStore.products.find((product) => product.id === productId);
+  if (!row || !row.isActive) {
+    throw new HttpError(409, "One or more cart items are unavailable.");
+  }
+  return row;
+}
+
+function buildBulkPriceRule(product, qty) {
+  const baseUnitPrice = Number(product.salePrice || product.basePrice || 0);
+  const slabs = ensureArray(product.bulkPriceSlabs)
+    .map((slab) => ({
+      minQty: Number(slab.minQty),
+      unitPrice: Number(slab.unitPrice)
+    }))
+    .filter((slab) => slab.minQty > 0)
+    .sort((a, b) => a.minQty - b.minQty);
+
+  if (!product.bulkPricingEnabled || slabs.length === 0) {
+    return {
+      unitPrice: baseUnitPrice,
+      bulkApplied: false,
+      bulkRule: null
+    };
+  }
+
+  let selected = null;
+  for (const slab of slabs) {
+    if (qty >= slab.minQty) {
+      selected = slab;
+    }
+  }
+
+  if (!selected) {
+    return {
+      unitPrice: baseUnitPrice,
+      bulkApplied: false,
+      bulkRule: null
+    };
+  }
+
+  return {
+    unitPrice: Number(selected.unitPrice),
+    bulkApplied: true,
+    bulkRule: {
+      minQty: Number(selected.minQty),
+      unitPrice: Number(selected.unitPrice)
+    }
+  };
+}
+
+function computeEffectiveAvailableQty(product, reservedForCurrentCheckout = 0) {
+  const stockQty = Number(product.stockQty || 0);
+  const reservedQty = Number(product.reservedQty || 0);
+  return Math.max(0, stockQty - reservedQty + Number(reservedForCurrentCheckout || 0));
+}
+
+function buildCartLineFromItem(catalogStore, item, options = {}) {
+  const product = findActiveProductOrThrow(catalogStore, item.productId);
+  const qty = Number(item.qty || 0);
+
+  if (!Number.isInteger(qty) || qty <= 0) {
+    throw new HttpError(400, "Cart quantity must be a positive integer.");
+  }
+
+  const moq = Number(product.moq || 1);
+  if (qty < moq) {
+    throw new HttpError(400, `MOQ not met for product '${product.title}'.`);
+  }
+
+  const availableQty = computeEffectiveAvailableQty(
+    product,
+    Number(options.reservedForCurrentCheckout || 0)
+  );
+  if (
+    options.enforceStockCheck &&
+    !product.allowBackorder &&
+    qty > availableQty
+  ) {
+    throw new HttpError(409, "Requested quantity is not available right now.");
+  }
+
+  const { unitPrice, bulkApplied, bulkRule } = buildBulkPriceRule(product, qty);
+  const lineSubtotal = roundMoney(unitPrice * qty);
+  const quoteRequiredAboveQty =
+    product.quoteRequiredAboveQty === null || product.quoteRequiredAboveQty === undefined
+      ? null
+      : Number(product.quoteRequiredAboveQty);
+
+  return {
+    productId: product.id,
+    title: product.title,
+    slug: product.slug,
+    sku: product.sku,
+    hsnCode: product.hsnCode || "",
+    qty,
+    moq,
+    gstRate: Number(product.gstRate || 0),
+    unitPrice: Number(unitPrice),
+    finalUnitPriceAfterDiscount: Number(unitPrice),
+    discountAmount: 0,
+    taxableValue: lineSubtotal,
+    gstAmount: 0,
+    lineTotal: 0,
+    lineSubtotal,
+    bulkApplied,
+    bulkRule,
+    quoteRequired:
+      quoteRequiredAboveQty !== null && qty >= Number(quoteRequiredAboveQty || 0),
+    quoteRequiredAboveQty,
+    availabilityStatus: product.stockStatus || "in_stock",
+    stockVisibility: "hide_quantity",
+    allowBackorder: Boolean(product.allowBackorder),
+    deadWeightKg: Number(product.deadWeightKg || 0),
+    lengthCm:
+      product.lengthCm === null || product.lengthCm === undefined
+        ? null
+        : Number(product.lengthCm),
+    widthCm:
+      product.widthCm === null || product.widthCm === undefined
+        ? null
+        : Number(product.widthCm),
+    heightCm:
+      product.heightCm === null || product.heightCm === undefined
+        ? null
+        : Number(product.heightCm)
+  };
+}
+
+function normalizeDestination(destination) {
+  return {
+    pincode: String(destination?.pincode || destination?.shippingPincode || "")
+      .trim()
+      .replace(/[^0-9]/g, "")
+      .slice(0, 6),
+    stateCode: String(
+      destination?.stateCode || destination?.shippingStateCode || ""
+    )
+      .trim()
+      .toUpperCase(),
+    state: String(destination?.state || destination?.shippingState || "")
+      .trim()
+      .toUpperCase()
+  };
+}
+
+async function calculateShippingQuote(lines, shippingMethod, destination, shippingStore) {
+  const provider = createShippingProvider("manual_courier");
+  return provider.calculateShipping({
+    lines,
+    shippingMethod,
+    destination: normalizeDestination(destination || {}),
+    shippingStore
+  });
+}
+
+async function calculatePricing(
+  lines,
+  paymentMethod,
+  shippingMethod,
+  destination,
+  shippingStore,
+  paymentStore
+) {
+  const itemCount = lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
+  const productSubtotal = roundMoney(
+    lines.reduce((sum, line) => sum + Number(line.lineSubtotal || 0), 0)
+  );
+
+  const directDiscountPercent = resolveDirectPaymentDiscountPercent(
+    paymentMethod,
+    paymentStore || {}
+  );
+  let discountAmount =
+    directDiscountPercent > 0
+      ? roundMoney(productSubtotal * (Number(directDiscountPercent) / 100))
+      : 0;
+  if (discountAmount > productSubtotal) {
+    discountAmount = productSubtotal;
+  }
+
+  let taxableValue = 0;
+  let gstTotal = 0;
+  let discountLeft = discountAmount;
+
+  const lineCount = lines.length;
+  for (let index = 0; index < lineCount; index += 1) {
+    const line = lines[index];
+    const isLast = index === lineCount - 1;
+    const allocatedDiscount =
+      productSubtotal <= 0
+        ? 0
+        : isLast
+          ? discountLeft
+          : roundMoney((line.lineSubtotal / productSubtotal) * discountAmount);
+
+    const lineDiscount = Math.min(discountLeft, allocatedDiscount);
+    discountLeft = roundMoney(discountLeft - lineDiscount);
+
+    line.discountAmount = lineDiscount;
+    line.taxableValue = roundMoney(line.lineSubtotal - lineDiscount);
+    line.gstAmount = roundMoney(line.taxableValue * (Number(line.gstRate || 0) / 100));
+    line.lineTotal = roundMoney(line.taxableValue + line.gstAmount);
+    line.finalUnitPriceAfterDiscount = roundMoney(line.taxableValue / line.qty);
+
+    taxableValue = roundMoney(taxableValue + line.taxableValue);
+    gstTotal = roundMoney(gstTotal + line.gstAmount);
+  }
+
+  const shippingQuote = await calculateShippingQuote(
+    lines,
+    shippingMethod,
+    destination,
+    shippingStore
+  );
+  const shippingCharge = Number(shippingQuote.shippingCharge || 0);
+  const preRoundGrand = roundMoney(taxableValue + gstTotal + shippingCharge);
+  const roundedGrand = Math.round(preRoundGrand);
+  const roundOff = roundMoney(roundedGrand - preRoundGrand);
+  const grandTotal = roundMoney(preRoundGrand + roundOff);
+
+  return {
+    itemCount,
+    productSubtotal,
+    discountAmount,
+    taxableValue,
+    gstTotal,
+    shippingCharge,
+    roundOff,
+    grandTotal,
+    paymentMethod,
+    shippingMethod,
+    shippingMeta: {
+      zone: shippingQuote.zone,
+      zoneLabel: shippingQuote.zoneLabel,
+      totalWeightKg: shippingQuote.totalWeightKg,
+      remoteExtraCharge: shippingQuote.remoteExtraCharge
+    }
+  };
+}
+
+function mapReservationItemsByProduct(reservation) {
+  const map = new Map();
+  if (!reservation || !Array.isArray(reservation.items)) {
+    return map;
+  }
+  for (const item of reservation.items) {
+    map.set(item.productId, Number(item.qty || 0));
+  }
+  return map;
+}
+
+function buildStrictCartLines(catalogStore, cartItems, options = {}) {
+  const safeItems = ensureArray(cartItems);
+  const lines = [];
+
+  for (const item of safeItems) {
+    const reservedForCurrentCheckout = options.reservedByProduct?.get(item.productId) || 0;
+    lines.push(
+      buildCartLineFromItem(catalogStore, item, {
+        enforceStockCheck: Boolean(options.enforceStockCheck),
+        reservedForCurrentCheckout
+      })
+    );
+  }
+
+  return lines;
+}
+
+function buildCartView(owner, cart, lines, pricing) {
+  return sanitizeCartView({
+    ownerType: owner.ownerType,
+    ownerId: owner.ownerId,
+    updatedAt: cart?.updatedAt || null,
+    itemCount: pricing.itemCount,
+    items: lines,
+    pricing
+  });
+}
+
+function releaseReservationInternal(catalogStore, reservation, reason, nextStatus) {
+  if (!reservation || reservation.status !== RESERVATION_STATUSES.ACTIVE) {
+    return false;
+  }
+
+  for (const item of ensureArray(reservation.items)) {
+    const index = catalogStore.products.findIndex((row) => row.id === item.productId);
+    if (index < 0) {
+      continue;
+    }
+
+    const product = catalogStore.products[index];
+    const nextReserved = Math.max(
+      0,
+      Number(product.reservedQty || 0) - Number(item.qty || 0)
+    );
+
+    catalogStore.products[index] = {
+      ...product,
+      reservedQty: nextReserved,
+      stockStatus: resolveStockStatus({
+        ...product,
+        reservedQty: nextReserved
+      }),
+      updatedAt: nowIso()
+    };
+  }
+
+  reservation.status = nextStatus || RESERVATION_STATUSES.RELEASED;
+  reservation.releaseReason = reason;
+  reservation.releasedAt = nowIso();
+  return true;
+}
+
+function expireReservationInternal(catalogStore, reservation) {
+  if (!reservation || reservation.status !== RESERVATION_STATUSES.ACTIVE) {
+    return false;
+  }
+
+  const changed = releaseReservationInternal(
+    catalogStore,
+    reservation,
+    "timeout",
+    RESERVATION_STATUSES.EXPIRED
+  );
+  if (changed) {
+    reservation.expiredAt = nowIso();
+  }
+  return changed;
+}
+
+function consumeReservationInternal(catalogStore, reservation) {
+  if (!reservation || reservation.status !== RESERVATION_STATUSES.ACTIVE) {
+    return false;
+  }
+
+  for (const item of ensureArray(reservation.items)) {
+    const index = catalogStore.products.findIndex((row) => row.id === item.productId);
+    if (index < 0) {
+      continue;
+    }
+
+    const product = catalogStore.products[index];
+    const nextStockQty = Math.max(0, Number(product.stockQty || 0) - Number(item.qty || 0));
+    const nextReserved = Math.max(
+      0,
+      Number(product.reservedQty || 0) - Number(item.qty || 0)
+    );
+
+    catalogStore.products[index] = {
+      ...product,
+      stockQty: nextStockQty,
+      reservedQty: nextReserved,
+      stockStatus: resolveStockStatus({
+        ...product,
+        stockQty: nextStockQty,
+        reservedQty: nextReserved
+      }),
+      updatedAt: nowIso()
+    };
+  }
+
+  reservation.status = RESERVATION_STATUSES.CONSUMED;
+  reservation.consumedAt = nowIso();
+  return true;
+}
+
+function cleanupExpiredReservations(authStore, catalogStore) {
+  let changed = false;
+
+  for (const reservation of ensureArray(authStore.stockReservations)) {
+    if (reservation.status !== RESERVATION_STATUSES.ACTIVE) {
+      continue;
+    }
+    if (Date.parse(reservation.expiresAt) <= Date.now()) {
+      const expired = expireReservationInternal(catalogStore, reservation);
+      if (expired) {
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
+}
+
+function reserveStockForCheckout(authStore, catalogStore, input) {
+  for (const line of input.lines) {
+    const index = catalogStore.products.findIndex((row) => row.id === line.productId);
+    if (index < 0) {
+      throw new HttpError(409, "One or more cart items are unavailable.");
+    }
+
+    const product = catalogStore.products[index];
+    const availableQty = computeEffectiveAvailableQty(product, 0);
+    if (!product.allowBackorder && Number(line.qty || 0) > availableQty) {
+      throw new HttpError(409, "Requested quantity is not available right now.");
+    }
+  }
+
+  for (const line of input.lines) {
+    const index = catalogStore.products.findIndex((row) => row.id === line.productId);
+    const product = catalogStore.products[index];
+    const nextReservedQty = Number(product.reservedQty || 0) + Number(line.qty || 0);
+
+    catalogStore.products[index] = {
+      ...product,
+      reservedQty: nextReservedQty,
+      stockStatus: resolveStockStatus({
+        ...product,
+        reservedQty: nextReservedQty
+      }),
+      updatedAt: nowIso()
+    };
+  }
+
+  const reservation = {
+    id: generateId("reserve"),
+    checkoutSessionId: input.checkoutSessionId,
+    ownerType: input.owner.ownerType,
+    ownerId: input.owner.ownerId,
+    status: RESERVATION_STATUSES.ACTIVE,
+    items: input.lines.map((line) => ({
+      productId: line.productId,
+      qty: Number(line.qty || 0)
+    })),
+    createdAt: nowIso(),
+    expiresAt: new Date(Date.now() + input.ttlMinutes * 60 * 1000).toISOString(),
+    releasedAt: null,
+    consumedAt: null
+  };
+
+  authStore.stockReservations.push(reservation);
+  return reservation;
+}
+
+function buildCartItemsFromSession(session) {
+  return ensureArray(session?.cart?.items).map((line) => ({
+    productId: line.productId,
+    qty: Number(line.qty || 0)
+  }));
+}
+
+function sanitizeLegacyCartForAuth(owner, cart) {
+  if (owner.ownerType === CART_OWNER_TYPES.CUSTOMER) {
+    return {
+      userId: owner.ownerId,
+      items: ensureArray(cart?.items).map((item) => ({
+        productId: item.productId,
+        qty: Number(item.qty || 0)
+      })),
+      updatedAt: cart?.updatedAt || null
+    };
+  }
+
+  return {
+    sessionId: owner.ownerId,
+    items: ensureArray(cart?.items).map((item) => ({
+      productId: item.productId,
+      qty: Number(item.qty || 0)
+    })),
+    updatedAt: cart?.updatedAt || null
+  };
+}
+
+function resolveShareByToken(authStore, shareToken) {
+  const shareTokenHash = hashValue(shareToken);
+  const share = ensureArray(authStore.cartShares).find(
+    (row) => row.tokenHash === shareTokenHash && row.isActive !== false
+  );
+
+  if (!share) {
+    throw new HttpError(404, "Shared cart not found.");
+  }
+
+  if (Date.parse(share.expiresAt) <= Date.now()) {
+    share.isActive = false;
+    share.expiredAt = nowIso();
+    throw new HttpError(410, "Shared cart link is expired.");
+  }
+
+  return share;
+}
+
+function assertCheckoutOwnership(session, owner) {
+  if (!session) {
+    throw new HttpError(404, "Checkout session not found.");
+  }
+
+  if (session.ownerType !== owner.ownerType || session.ownerId !== owner.ownerId) {
+    throw new HttpError(403, "Checkout session is not accessible for this cart owner.");
+  }
+}
+
+function generateOrderNo(authStore) {
+  const prefix = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const counter = ensureArray(authStore.orders).length + 1;
+  return `JNX-ORD-${prefix}-${String(counter).padStart(5, "0")}`;
+}
+
+function findOrderById(authStore, orderId) {
+  return ensureArray(authStore.orders).find((order) => order.id === orderId);
+}
+
+function createOrderFromSession(authStore, session, options = {}) {
+  const paymentStatus = options.paymentStatus || "paid";
+  const orderStatus = options.orderStatus || "placed";
+
+  return {
+    id: generateId("order"),
+    orderNo: generateOrderNo(authStore),
+    checkoutSessionId: session.id,
+    ownerType: session.ownerType,
+    ownerId: session.ownerId,
+    userId:
+      session.ownerType === CART_OWNER_TYPES.CUSTOMER ? session.ownerId : null,
+    customerType: "retail",
+    items: session.cart.items.map((item) => ({
+      productId: item.productId,
+      title: item.title,
+      sku: item.sku,
+      hsnCode: item.hsnCode || "",
+      qty: item.qty,
+      finalUnitPrice: item.finalUnitPriceAfterDiscount,
+      bulkApplied: Boolean(item.bulkApplied),
+      bulkRule: item.bulkRule || null,
+      gstRate: item.gstRate,
+      taxableValue: item.taxableValue,
+      gstAmount: item.gstAmount,
+      lineTotal: item.lineTotal
+    })),
+    productSubtotal: Number(session.cart.pricing.productSubtotal || 0),
+    discountAmount: Number(session.cart.pricing.discountAmount || 0),
+    taxableValue: Number(session.cart.pricing.taxableValue || 0),
+    gstTotal: Number(session.cart.pricing.gstTotal || 0),
+    shippingCharge: Number(session.cart.pricing.shippingCharge || 0),
+    roundOff: Number(session.cart.pricing.roundOff || 0),
+    grandTotal: Number(session.cart.pricing.grandTotal || 0),
+    paymentStatus,
+    orderStatus,
+    shipmentStatus: "pending_packing",
+    invoiceId: null,
+    paymentMethod: session.paymentMethod,
+    shippingMethod: session.shippingMethod,
+    billingAddress: session.billingAddress || {},
+    shippingAddress: session.shippingAddress || {},
+    createdAt: nowIso()
+  };
+}
+
+function clearOwnerCart(authStore, owner) {
+  const cart = ensureCartRecord(authStore, owner, true);
+  cart.items = [];
+  cart.updatedAt = nowIso();
+}
+
+async function persistStores(authStore, catalogStore, options = {}) {
+  if (options.writeCatalog) {
+    await writeCatalogStore(catalogStore);
+  }
+  if (options.writeAuth) {
+    await writeAuthStore(authStore);
+  }
+  if (options.writePayment && options.paymentStore) {
+    await writePaymentStore(options.paymentStore);
+  }
+}
+
+async function getCart(context, query) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: query.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+
+  const cart = ensureCartRecord(authStore, owner, true);
+  const validItems = [];
+  const lines = [];
+
+  for (const item of ensureArray(cart.items)) {
+    try {
+      const line = buildCartLineFromItem(catalogStore, item, {
+        enforceStockCheck: false
+      });
+      validItems.push({
+        productId: item.productId,
+        qty: Number(item.qty || 0)
+      });
+      lines.push(line);
+    } catch (_error) {
+      changed = true;
+    }
+  }
+
+  if (validItems.length !== ensureArray(cart.items).length) {
+    cart.items = validItems;
+    cart.updatedAt = nowIso();
+    changed = true;
+  }
+
+  const pricing = await calculatePricing(
+    lines,
+    query.paymentMethod,
+    query.shippingMethod,
+    {
+      pincode: query.shippingPincode,
+      stateCode: query.shippingStateCode,
+      state: query.shippingState
+    },
+    shippingStore,
+    paymentStore
+  );
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return buildCartView(owner, cart, lines, pricing);
+}
+
+async function addCartItem(context, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+
+  const cart = ensureCartRecord(authStore, owner, true);
+  const existing = cart.items.find((item) => item.productId === payload.productId);
+  if (existing) {
+    existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
+  } else {
+    cart.items.push({
+      productId: payload.productId,
+      qty: Number(payload.qty || 0)
+    });
+  }
+
+  const lines = buildStrictCartLines(catalogStore, cart.items, {
+    enforceStockCheck: true
+  });
+
+  cart.updatedAt = nowIso();
+  changed = true;
+
+  const pricing = await calculatePricing(
+    lines,
+    PAYMENT_METHODS.ONLINE,
+    SHIPPING_METHODS.STANDARD,
+    {},
+    shippingStore,
+    paymentStore
+  );
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return buildCartView(owner, cart, lines, pricing);
+}
+
+async function updateCartItem(context, productId, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+
+  const cart = ensureCartRecord(authStore, owner, true);
+  const index = cart.items.findIndex((item) => item.productId === productId);
+  if (index < 0) {
+    throw new HttpError(404, "Cart item not found.");
+  }
+
+  cart.items[index] = {
+    productId,
+    qty: Number(payload.qty || 0)
+  };
+
+  const lines = buildStrictCartLines(catalogStore, cart.items, {
+    enforceStockCheck: true
+  });
+  cart.updatedAt = nowIso();
+  changed = true;
+
+  const pricing = await calculatePricing(
+    lines,
+    PAYMENT_METHODS.ONLINE,
+    SHIPPING_METHODS.STANDARD,
+    {},
+    shippingStore,
+    paymentStore
+  );
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return buildCartView(owner, cart, lines, pricing);
+}
+
+async function deleteCartItem(context, productId, query) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: query.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+  const cart = ensureCartRecord(authStore, owner, true);
+  const previousLength = cart.items.length;
+  cart.items = cart.items.filter((item) => item.productId !== productId);
+
+  if (cart.items.length === previousLength) {
+    throw new HttpError(404, "Cart item not found.");
+  }
+
+  cart.updatedAt = nowIso();
+  changed = true;
+  const lines = buildStrictCartLines(catalogStore, cart.items, {
+    enforceStockCheck: true
+  });
+  const pricing = await calculatePricing(
+    lines,
+    PAYMENT_METHODS.ONLINE,
+    SHIPPING_METHODS.STANDARD,
+    {},
+    shippingStore,
+    paymentStore
+  );
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return buildCartView(owner, cart, lines, pricing);
+}
+
+async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+
+  const owner = {
+    ownerType: CART_OWNER_TYPES.CUSTOMER,
+    ownerId: customerId
+  };
+
+  const userCart = ensureCartRecord(authStore, owner, true);
+  const guestCart = ensureCartRecord(
+    authStore,
+    {
+      ownerType: CART_OWNER_TYPES.GUEST,
+      ownerId: guestSessionId
+    },
+    false
+  );
+
+  const normalizeValidItems = (items) => {
+    const rows = [];
+    for (const item of ensureArray(items)) {
+      try {
+        buildCartLineFromItem(catalogStore, item, {
+          enforceStockCheck: false
+        });
+        rows.push({
+          productId: item.productId,
+          qty: Number(item.qty || 0)
+        });
+      } catch (_error) {
+        changed = true;
+      }
+    }
+    return rows;
+  };
+
+  const cleanUserItems = normalizeValidItems(userCart.items);
+  const cleanGuestItems = normalizeValidItems(guestCart?.items || []);
+  if (cleanUserItems.length !== ensureArray(userCart.items).length) {
+    userCart.items = cleanUserItems;
+    userCart.updatedAt = nowIso();
+  }
+  if (guestCart && cleanGuestItems.length !== ensureArray(guestCart.items).length) {
+    guestCart.items = cleanGuestItems;
+    guestCart.updatedAt = nowIso();
+  }
+
+  if (!guestCart || guestCart.items.length === 0) {
+    const lines = buildStrictCartLines(catalogStore, cleanUserItems, {
+      enforceStockCheck: true
+    });
+    const pricing = await calculatePricing(
+      lines,
+      PAYMENT_METHODS.ONLINE,
+      SHIPPING_METHODS.STANDARD,
+      {},
+      shippingStore,
+      paymentStore
+    );
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
+      });
+    }
+    return {
+      merged: false,
+      cart: buildCartView(owner, userCart, lines, pricing)
+    };
+  }
+
+  const combinedMap = new Map();
+  for (const item of cleanUserItems) {
+    combinedMap.set(item.productId, Number(item.qty || 0));
+  }
+  for (const item of cleanGuestItems) {
+    combinedMap.set(
+      item.productId,
+      Number(combinedMap.get(item.productId) || 0) + Number(item.qty || 0)
+    );
+  }
+
+  const combinedItems = [...combinedMap.entries()].map(([productId, qty]) => ({
+    productId,
+    qty
+  }));
+  const lines = buildStrictCartLines(catalogStore, combinedItems, {
+    enforceStockCheck: true
+  });
+
+  userCart.items = combinedItems;
+  userCart.updatedAt = nowIso();
+  authStore.guestCarts = authStore.guestCarts.filter(
+    (row) => row.sessionId !== guestSessionId
+  );
+  changed = true;
+
+  const pricing = await calculatePricing(
+    lines,
+    PAYMENT_METHODS.ONLINE,
+    SHIPPING_METHODS.STANDARD,
+    {},
+    shippingStore,
+    paymentStore
+  );
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return {
+    merged: true,
+    cart: buildCartView(owner, userCart, lines, pricing)
+  };
+}
+
+async function createCartShare(context, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+  const cart = ensureCartRecord(authStore, owner, true);
+  const lines = buildStrictCartLines(catalogStore, cart.items, {
+    enforceStockCheck: true
+  });
+
+  if (lines.length === 0) {
+    throw new HttpError(400, "Cart is empty. Add products before sharing.");
+  }
+
+  const shareToken = crypto.randomBytes(24).toString("hex");
+  const shareRecord = {
+    id: generateId("cart_share"),
+    tokenHash: hashValue(shareToken),
+    sourceOwnerType: owner.ownerType,
+    sourceOwnerId: owner.ownerId,
+    items: cart.items.map((item) => ({
+      productId: item.productId,
+      qty: Number(item.qty || 0)
+    })),
+    isActive: true,
+    usedCount: 0,
+    createdAt: nowIso(),
+    expiresAt: new Date(
+      Date.now() + Number(payload.expiresInMinutes || 1440) * 60 * 1000
+    ).toISOString(),
+    lastClaimedAt: null
+  };
+
+  authStore.cartShares.push(shareRecord);
+  changed = true;
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return {
+    shareId: shareRecord.id,
+    shareToken,
+    shareUrl: `${env.publicBaseUrl}/cart/share/${shareToken}`,
+    sourceOwnerType: owner.ownerType,
+    expiresAt: shareRecord.expiresAt,
+    itemCount: lines.reduce((sum, line) => sum + Number(line.qty || 0), 0)
+  };
+}
+
+async function getSharedCart(shareToken) {
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+  let share;
+  try {
+    share = resolveShareByToken(authStore, shareToken);
+  } catch (error) {
+    if (error.statusCode === 410) {
+      changed = true;
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
+      });
+    }
+    throw error;
+  }
+
+  const lines = buildStrictCartLines(catalogStore, share.items, {
+    enforceStockCheck: false
+  });
+  const pricing = await calculatePricing(
+    lines,
+    PAYMENT_METHODS.ONLINE,
+    SHIPPING_METHODS.STANDARD,
+    {},
+    shippingStore,
+    paymentStore
+  );
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return {
+    shareId: share.id,
+    sourceOwnerType: share.sourceOwnerType,
+    expiresAt: share.expiresAt,
+    usedCount: Number(share.usedCount || 0),
+    cart: sanitizeCartView({
+      ownerType: share.sourceOwnerType,
+      ownerId: share.sourceOwnerId,
+      updatedAt: share.createdAt,
+      itemCount: pricing.itemCount,
+      items: lines,
+      pricing
+    })
+  };
+}
+
+async function claimSharedCart(context, shareToken, payload) {
+  const targetOwner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.targetSessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+  let share;
+  try {
+    share = resolveShareByToken(authStore, shareToken);
+  } catch (error) {
+    if (error.statusCode === 410) {
+      changed = true;
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
+      });
+    }
+    throw error;
+  }
+
+  const targetCart = ensureCartRecord(authStore, targetOwner, true);
+  const snapshotItems = ensureArray(share.items).map((item) => ({
+    productId: item.productId,
+    qty: Number(item.qty || 0)
+  }));
+
+  if (payload.mode === SHARE_CLAIM_MODES.REPLACE) {
+    targetCart.items = snapshotItems;
+  } else {
+    const qtyMap = new Map();
+    for (const item of ensureArray(targetCart.items)) {
+      qtyMap.set(item.productId, Number(item.qty || 0));
+    }
+    for (const item of snapshotItems) {
+      qtyMap.set(
+        item.productId,
+        Number(qtyMap.get(item.productId) || 0) + Number(item.qty || 0)
+      );
+    }
+    targetCart.items = [...qtyMap.entries()].map(([productId, qty]) => ({
+      productId,
+      qty
+    }));
+  }
+
+  const lines = buildStrictCartLines(catalogStore, targetCart.items, {
+    enforceStockCheck: true
+  });
+  const pricing = await calculatePricing(
+    lines,
+    PAYMENT_METHODS.ONLINE,
+    SHIPPING_METHODS.STANDARD,
+    {},
+    shippingStore,
+    paymentStore
+  );
+
+  targetCart.updatedAt = nowIso();
+  share.usedCount = Number(share.usedCount || 0) + 1;
+  share.lastClaimedAt = nowIso();
+  changed = true;
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return {
+    claimed: true,
+    claimedTo: {
+      ownerType: targetOwner.ownerType,
+      ownerId: targetOwner.ownerId
+    },
+    cart: buildCartView(targetOwner, targetCart, lines, pricing)
+  };
+}
+
+async function startCheckout(context, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+  const cart = ensureCartRecord(authStore, owner, true);
+
+  if (!cart.items.length) {
+    throw new HttpError(400, "Cart is empty.");
+  }
+
+  const lines = buildStrictCartLines(catalogStore, cart.items, {
+    enforceStockCheck: true
+  });
+
+  if (
+    payload.paymentMethod === PAYMENT_METHODS.DIRECT_BANK_TRANSFER ||
+    payload.paymentMethod === PAYMENT_METHODS.MANUAL_UPI
+  ) {
+    const gatewayAvailability = ensureArray(paymentStore.gateways).find(
+      (row) => row.code === payload.paymentMethod
+    );
+    if (!gatewayAvailability || gatewayAvailability.isEnabled === false) {
+      throw new HttpError(409, "Selected manual payment method is currently unavailable.");
+    }
+  }
+
+  const pricing = await calculatePricing(
+    lines,
+    payload.paymentMethod,
+    payload.shippingMethod,
+    payload.shippingAddress || {},
+    shippingStore,
+    paymentStore
+  );
+
+  const quoteLines = lines.filter((line) => line.quoteRequired);
+  const now = nowIso();
+
+  if (quoteLines.length > 0) {
+    const quoteRequest = {
+      id: generateId("quote_req"),
+      ownerType: owner.ownerType,
+      ownerId: owner.ownerId,
+      status: QUOTE_REQUEST_STATUSES.OPEN,
+      items: quoteLines.map((line) => ({
+        productId: line.productId,
+        qty: line.qty,
+        quoteRequiredAboveQty: line.quoteRequiredAboveQty
+      })),
+      createdAt: now,
+      updatedAt: now
+    };
+    authStore.quoteRequests.push(quoteRequest);
+
+    const session = {
+      id: generateId("checkout"),
+      ownerType: owner.ownerType,
+      ownerId: owner.ownerId,
+      status: CHECKOUT_STATUSES.QUOTE_REQUIRED,
+      paymentMethod: payload.paymentMethod,
+      shippingMethod: payload.shippingMethod,
+      quoteRequestId: quoteRequest.id,
+      reservationId: null,
+      reservationExpiresAt: null,
+      orderId: null,
+      cart: buildCartView(owner, cart, lines, pricing),
+      billingAddress: payload.billingAddress || {},
+      shippingAddress: payload.shippingAddress || {},
+      createdAt: now,
+      updatedAt: now
+    };
+    authStore.checkoutSessions.push(session);
+    changed = true;
+
+    await addActivityLog({
+      action: "checkout.quote_required",
+      actorId: owner.ownerId,
+      actorRole: owner.ownerType,
+      resourceType: "quote_request",
+      resourceId: quoteRequest.id
+    });
+
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
+      });
+    }
+
+    return {
+      checkoutBlocked: true,
+      reason: "quote_required",
+      quoteRequestId: quoteRequest.id,
+      checkoutSession: sanitizeCheckoutSession(session)
+    };
+  }
+
+  const session = {
+    id: generateId("checkout"),
+    ownerType: owner.ownerType,
+    ownerId: owner.ownerId,
+    status: CHECKOUT_STATUSES.STARTED,
+    paymentMethod: payload.paymentMethod,
+    shippingMethod: payload.shippingMethod,
+    quoteRequestId: null,
+    reservationId: null,
+    reservationExpiresAt: null,
+    orderId: null,
+    cart: buildCartView(owner, cart, lines, pricing),
+    billingAddress: payload.billingAddress || {},
+    shippingAddress: payload.shippingAddress || {},
+    createdAt: now,
+    updatedAt: now
+  };
+
+  let manualPaymentInstructions = null;
+  let checkoutOrder = null;
+
+  if (payload.paymentMethod === PAYMENT_METHODS.ONLINE) {
+    const reservation = reserveStockForCheckout(authStore, catalogStore, {
+      owner,
+      checkoutSessionId: session.id,
+      ttlMinutes: getReservationTtlMinutes(),
+      lines
+    });
+    session.reservationId = reservation.id;
+    session.reservationExpiresAt = reservation.expiresAt;
+    session.status = CHECKOUT_STATUSES.PAYMENT_PENDING;
+  } else if (
+    payload.paymentMethod === PAYMENT_METHODS.DIRECT_BANK_TRANSFER ||
+    payload.paymentMethod === PAYMENT_METHODS.MANUAL_UPI
+  ) {
+    checkoutOrder = createOrderFromSession(authStore, session, {
+      paymentStatus: "pending",
+      orderStatus: "payment_pending"
+    });
+    checkoutOrder.manualPaymentStatus = "awaiting_submission";
+    authStore.orders.push(checkoutOrder);
+
+    session.orderId = checkoutOrder.id;
+    session.status = CHECKOUT_STATUSES.PAYMENT_PENDING;
+
+    manualPaymentInstructions = getManualPaymentInstructions(
+      payload.paymentMethod,
+      paymentStore
+    );
+    clearOwnerCart(authStore, owner);
+  }
+
+  authStore.checkoutSessions.push(session);
+  changed = true;
+
+  await addActivityLog({
+    action: "checkout.started",
+    actorId: owner.ownerId,
+    actorRole: owner.ownerType,
+    resourceType: "checkout",
+    resourceId: session.id
+  });
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return {
+    checkoutBlocked: false,
+    checkoutSession: sanitizeCheckoutSession(session),
+    order:
+      checkoutOrder === null
+        ? null
+        : {
+            id: checkoutOrder.id,
+            orderNo: checkoutOrder.orderNo,
+            paymentStatus: checkoutOrder.paymentStatus,
+            orderStatus: checkoutOrder.orderStatus,
+            grandTotal: checkoutOrder.grandTotal
+          },
+    manualPaymentInstructions,
+    reservation:
+      session.reservationId === null
+        ? null
+        : sanitizeReservation(
+            authStore.stockReservations.find((row) => row.id === session.reservationId)
+          )
+  };
+}
+
+async function getCheckoutSession(context, checkoutSessionId, query) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: query.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  const changed = cleanupExpiredReservations(authStore, catalogStore);
+  const session = authStore.checkoutSessions.find((row) => row.id === checkoutSessionId);
+  assertCheckoutOwnership(session, owner);
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return sanitizeCheckoutSession(session);
+}
+
+async function createPaymentAttempt(context, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+  const session = authStore.checkoutSessions.find(
+    (row) => row.id === payload.checkoutSessionId
+  );
+  assertCheckoutOwnership(session, owner);
+
+  if (session.status === CHECKOUT_STATUSES.QUOTE_REQUIRED) {
+    throw new HttpError(409, "Checkout requires quote approval.");
+  }
+
+  if (session.status === CHECKOUT_STATUSES.PAID) {
+    throw new HttpError(409, "Checkout already paid.");
+  }
+
+  if (session.paymentMethod !== PAYMENT_METHODS.ONLINE) {
+    throw new HttpError(
+      409,
+      "Payment attempt is supported only for online checkout sessions."
+    );
+  }
+
+  let reservation = session.reservationId
+    ? authStore.stockReservations.find((row) => row.id === session.reservationId)
+    : null;
+
+  const cartItems = buildCartItemsFromSession(session);
+  if (cartItems.length === 0) {
+    throw new HttpError(409, "Checkout cart is empty.");
+  }
+
+  if (!reservation || reservation.status !== RESERVATION_STATUSES.ACTIVE) {
+    const lines = buildStrictCartLines(catalogStore, cartItems, {
+      enforceStockCheck: true
+    });
+    reservation = reserveStockForCheckout(authStore, catalogStore, {
+      owner,
+      checkoutSessionId: session.id,
+      ttlMinutes: getReservationTtlMinutes(),
+      lines
+    });
+    session.reservationId = reservation.id;
+    session.reservationExpiresAt = reservation.expiresAt;
+    changed = true;
+  } else {
+    const reservedByProduct = mapReservationItemsByProduct(reservation);
+    buildStrictCartLines(catalogStore, cartItems, {
+      enforceStockCheck: true,
+      reservedByProduct
+    });
+  }
+
+  const amount = Number(session.cart.pricing.grandTotal || 0);
+  const attemptId = generateId("pay_attempt");
+  const selectedGateway = resolveGatewayForPaymentAttempt(paymentStore, {
+    requestedGateway: payload.gateway,
+    amount
+  });
+  const gatewayProvider = createPaymentGateway(selectedGateway.code);
+  const providerOrder = await gatewayProvider.createPaymentOrder({
+    attemptId,
+    orderId: session.orderId || session.id,
+    checkoutSessionId: session.id,
+    amount,
+    currency: "INR",
+    customerId: owner.ownerType === CART_OWNER_TYPES.CUSTOMER ? owner.ownerId : null,
+    instructions: selectedGateway.instructions || {}
+  });
+
+  const attempt = {
+    id: attemptId,
+    checkoutSessionId: session.id,
+    ownerType: session.ownerType,
+    ownerId: session.ownerId,
+    gateway: selectedGateway.code,
+    status: PAYMENT_ATTEMPT_STATUSES.CREATED,
+    amount,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    gatewayOrderId: providerOrder.gatewayOrderId || "",
+    gatewayPaymentLink: providerOrder.paymentLink || "",
+    gatewayTxnId: "",
+    failureReason: ""
+  };
+  authStore.paymentAttempts.push(attempt);
+  session.status = CHECKOUT_STATUSES.PAYMENT_ATTEMPT_CREATED;
+  session.updatedAt = nowIso();
+  changed = true;
+
+  await addActivityLog({
+    action: "payments.attempt.created",
+    actorId: owner.ownerId,
+    actorRole: owner.ownerType,
+    resourceType: "payment_attempt",
+    resourceId: attempt.id
+  });
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return {
+    attemptId: attempt.id,
+    checkoutSessionId: session.id,
+    amount: attempt.amount,
+    status: attempt.status,
+    gateway: attempt.gateway,
+    gatewayOrderId: attempt.gatewayOrderId || "",
+    gatewayPaymentLink: attempt.gatewayPaymentLink || "",
+    reservation: sanitizeReservation(reservation)
+  };
+}
+
+async function processPaymentWebhook(gatewayCode, payload) {
+  const normalizedGatewayCode = String(gatewayCode || "mock_online")
+    .trim()
+    .toLowerCase();
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  let changed = cleanupExpiredReservations(authStore, catalogStore);
+
+  const gatewayProvider = createPaymentGateway(normalizedGatewayCode);
+  const normalizedPayload = await gatewayProvider.handleWebhook(payload || {});
+  const attemptId = String(normalizedPayload.attemptId || payload.attemptId || "").trim();
+  const status = String(normalizedPayload.status || payload.status || "")
+    .trim()
+    .toLowerCase();
+
+  if (!attemptId || !["success", "failed"].includes(status)) {
+    throw new HttpError(400, "Invalid payment webhook payload.");
+  }
+
+  const webhookEventId =
+    String(normalizedPayload.eventId || payload.eventId || "").trim() ||
+    `${attemptId}:${status}:${String(normalizedPayload.gatewayTxnId || payload.gatewayTxnId || "")}`;
+  const duplicateEvent = ensureArray(paymentStore.processedWebhooks).find(
+    (event) =>
+      event.gateway === normalizedGatewayCode &&
+      event.eventId &&
+      event.eventId === webhookEventId
+  );
+  if (duplicateEvent) {
+    return {
+      handled: true,
+      duplicate: true,
+      attemptId,
+      status
+    };
+  }
+
+  const attempt = authStore.paymentAttempts.find((row) => row.id === attemptId);
+  if (!attempt) {
+    throw new HttpError(404, "Payment attempt not found.");
+  }
+
+  const session = authStore.checkoutSessions.find(
+    (row) => row.id === attempt.checkoutSessionId
+  );
+  if (!session) {
+    throw new HttpError(404, "Checkout session not found for payment attempt.");
+  }
+
+  const reservation = session.reservationId
+    ? authStore.stockReservations.find((row) => row.id === session.reservationId)
+    : null;
+
+  const gatewayMatch =
+    attempt.gateway === normalizedGatewayCode ||
+    (attempt.gateway === "razorpay" && normalizedGatewayCode === "mock_online") ||
+    (attempt.gateway === "mock_online" && normalizedGatewayCode === "razorpay");
+  if (!gatewayMatch) {
+    throw new HttpError(409, "Webhook gateway does not match payment attempt gateway.");
+  }
+
+  paymentStore.processedWebhooks.push({
+    id: generateId("pg_webhook"),
+    gateway: normalizedGatewayCode,
+    eventId: webhookEventId,
+    attemptId,
+    status,
+    receivedAt: nowIso()
+  });
+  changed = true;
+
+  if (status === "failed") {
+    if (attempt.status !== PAYMENT_ATTEMPT_STATUSES.FAILED) {
+      attempt.status = PAYMENT_ATTEMPT_STATUSES.FAILED;
+      attempt.failureReason =
+        normalizedPayload.failureReason || payload.failureReason || "payment_failed";
+      attempt.updatedAt = nowIso();
+      changed = true;
+    }
+
+    if (reservation && reservation.status === RESERVATION_STATUSES.ACTIVE) {
+      const released = releaseReservationInternal(
+        catalogStore,
+        reservation,
+        "payment_failed",
+        RESERVATION_STATUSES.RELEASED
+      );
+      if (released) {
+        changed = true;
+      }
+    }
+
+    session.status = CHECKOUT_STATUSES.PAYMENT_FAILED;
+    session.updatedAt = nowIso();
+    changed = true;
+
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true,
+        writePayment: true,
+        paymentStore
+      });
+    }
+
+    await addActivityLog({
+      action: "payments.webhook.failed",
+      actorId: session.ownerId,
+      actorRole: session.ownerType,
+      resourceType: "payment_attempt",
+      resourceId: attempt.id
+    });
+
+    return {
+      handled: true,
+      status: "failed",
+      attemptId: attempt.id,
+      reservationStatus: reservation ? reservation.status : null
+    };
+  }
+
+  if (attempt.status === PAYMENT_ATTEMPT_STATUSES.SUCCESS) {
+    const existingOrder = session.orderId ? findOrderById(authStore, session.orderId) : null;
+
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true,
+        writePayment: true,
+        paymentStore
+      });
+    }
+
+    const invoiceResult =
+      existingOrder?.id
+        ? await ensureInvoiceForOrder(
+            existingOrder.id,
+            { id: "system", role: "system" },
+            { source: "payment_webhook_duplicate" }
+          )
+        : null;
+
+    return {
+      handled: true,
+      status: "success",
+      attemptId: attempt.id,
+      orderId: existingOrder?.id || session.orderId || null,
+      invoiceId: invoiceResult?.invoice?.id || existingOrder?.invoiceId || null
+    };
+  }
+
+  const cartItems = buildCartItemsFromSession(session);
+  const reservedByProduct = mapReservationItemsByProduct(reservation);
+  const lines = buildStrictCartLines(catalogStore, cartItems, {
+    enforceStockCheck: true,
+    reservedByProduct
+  });
+
+  let activeReservation = reservation;
+  if (!activeReservation || activeReservation.status !== RESERVATION_STATUSES.ACTIVE) {
+    activeReservation = reserveStockForCheckout(authStore, catalogStore, {
+      owner: {
+        ownerType: session.ownerType,
+        ownerId: session.ownerId
+      },
+      checkoutSessionId: session.id,
+      ttlMinutes: getReservationTtlMinutes(),
+      lines
+    });
+    session.reservationId = activeReservation.id;
+    session.reservationExpiresAt = activeReservation.expiresAt;
+    changed = true;
+  }
+
+  const consumed = consumeReservationInternal(catalogStore, activeReservation);
+  if (consumed) {
+    changed = true;
+  }
+
+  attempt.status = PAYMENT_ATTEMPT_STATUSES.SUCCESS;
+  attempt.gatewayTxnId = normalizedPayload.gatewayTxnId || payload.gatewayTxnId || "";
+  attempt.updatedAt = nowIso();
+  session.status = CHECKOUT_STATUSES.PAID;
+  session.updatedAt = nowIso();
+
+  let order = session.orderId ? findOrderById(authStore, session.orderId) : null;
+  if (order) {
+    order.paymentStatus = "paid";
+    order.orderStatus = "placed";
+    order.gatewayTxnId = attempt.gatewayTxnId;
+    order.paymentVerifiedAt = nowIso();
+  } else {
+    order = createOrderFromSession(authStore, session, {
+      paymentStatus: "paid",
+      orderStatus: "placed"
+    });
+    order.gatewayTxnId = attempt.gatewayTxnId;
+    order.paymentVerifiedAt = nowIso();
+    authStore.orders.push(order);
+    session.orderId = order.id;
+  }
+
+  clearOwnerCart(authStore, {
+    ownerType: session.ownerType,
+    ownerId: session.ownerId
+  });
+
+  changed = true;
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true,
+      writePayment: true,
+      paymentStore
+    });
+  }
+
+  const invoiceResult = await ensureInvoiceForOrder(
+    order.id,
+    { id: "system", role: "system" },
+    { source: "payment_webhook_success" }
+  );
+
+  await addActivityLog({
+    action: "payments.webhook.success",
+    actorId: session.ownerId,
+    actorRole: session.ownerType,
+    resourceType: "order",
+    resourceId: order.id
+  });
+
+  return {
+    handled: true,
+    status: "success",
+    attemptId: attempt.id,
+    order: {
+      id: order.id,
+      orderNo: order.orderNo,
+      grandTotal: order.grandTotal
+    },
+    invoice: invoiceResult.invoice,
+    reservationStatus: activeReservation.status
+  };
+}
+
+async function processMockPaymentWebhook(payload) {
+  return processPaymentWebhook("mock_online", payload);
+}
+
+async function getGuestCartLegacy(sessionId) {
+  const authStore = await readAuthStore();
+  ensurePhase7StoreShape(authStore);
+  const owner = {
+    ownerType: CART_OWNER_TYPES.GUEST,
+    ownerId: sessionId
+  };
+  const cart = ensureCartRecord(authStore, owner, false);
+  return sanitizeLegacyCartForAuth(owner, cart);
+}
+
+async function getCustomerCartLegacy(customerId) {
+  const authStore = await readAuthStore();
+  ensurePhase7StoreShape(authStore);
+  const owner = {
+    ownerType: CART_OWNER_TYPES.CUSTOMER,
+    ownerId: customerId
+  };
+  const cart = ensureCartRecord(authStore, owner, false);
+  return sanitizeLegacyCartForAuth(owner, cart);
+}
+
+async function addGuestCartItemLegacy(payload) {
+  const authStore = await readAuthStore();
+  ensurePhase7StoreShape(authStore);
+
+  const owner = {
+    ownerType: CART_OWNER_TYPES.GUEST,
+    ownerId: payload.sessionId
+  };
+  const cart = ensureCartRecord(authStore, owner, true);
+  const existing = cart.items.find((item) => item.productId === payload.productId);
+
+  if (existing) {
+    existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
+  } else {
+    cart.items.push({
+      productId: payload.productId,
+      qty: Number(payload.qty || 0)
+    });
+  }
+
+  cart.updatedAt = nowIso();
+  await writeAuthStore(authStore);
+  return sanitizeLegacyCartForAuth(owner, cart);
+}
+
+module.exports = {
+  getCart,
+  addCartItem,
+  updateCartItem,
+  deleteCartItem,
+  mergeGuestCartIntoCustomer,
+  createCartShare,
+  getSharedCart,
+  claimSharedCart,
+  startCheckout,
+  getCheckoutSession,
+  createPaymentAttempt,
+  processPaymentWebhook,
+  processMockPaymentWebhook,
+  getGuestCartLegacy,
+  getCustomerCartLegacy,
+  addGuestCartItemLegacy
+};

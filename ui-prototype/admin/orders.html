@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders – Jenix Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>* { font-family: 'Inter', sans-serif; } .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }</style>
+</head>
+<body class="bg-gray-100">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR (same as dashboard, condensed) -->
+  <aside class="hidden md:flex w-60 bg-gray-900 flex-col flex-shrink-0">
+    <div class="px-4 py-4 border-b border-gray-800"><img src="../../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert"><p class="text-gray-500 text-xs mt-1">Admin Panel</p></div>
+    <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto scrollbar-hide text-sm">
+      <a href="dashboard.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Dashboard</a>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest px-3 pt-4 pb-1">Orders</p>
+      <a href="orders.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white bg-brand transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>All Orders<span class="ml-auto bg-white/20 text-white text-xs rounded-full px-1.5 py-0.5 font-bold">12</span></a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Walk-in Orders</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Payment Pending<span class="ml-auto bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5">5</span></a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Manual Pay Verify</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Abandoned Carts</a>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest px-3 pt-4 pb-1">Catalogue</p>
+      <a href="catalogue.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Products</a>
+      <a href="inventory.html" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Inventory</a>
+    </nav>
+    <div class="px-3 py-3 border-t border-gray-800"><div class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-800 cursor-pointer"><div class="w-8 h-8 bg-brand rounded-full flex items-center justify-center text-white font-bold text-sm">A</div><div class="min-w-0"><p class="text-white text-xs font-semibold truncate">Super Admin</p><p class="text-gray-500 text-xs truncate">admin@jenixindia.com</p></div></div></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-gray-200 flex-shrink-0">
+      <div class="flex items-center gap-3 px-4 h-14">
+        <button class="md:hidden text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div><h1 class="text-lg font-bold text-gray-900">Orders</h1><p class="text-xs text-gray-400 hidden sm:block">Manage all customer orders</p></div>
+        <div class="ml-auto flex items-center gap-2">
+          <button class="relative p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg><span class="absolute top-1 right-1 w-2 h-2 bg-brand rounded-full"></span></button>
+          <button class="w-8 h-8 bg-brand rounded-full text-white font-bold text-sm flex items-center justify-center">A</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
+
+      <!-- STATUS TABS -->
+      <div class="flex gap-2 overflow-x-auto scrollbar-hide mb-4 pb-1">
+        <button class="flex-shrink-0 bg-brand text-white text-xs font-semibold px-4 py-2 rounded-full">All Orders (312)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">New (12)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Payment Pending (5)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Processing (8)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Shipped (45)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Delivered (238)</button>
+      </div>
+
+      <!-- FILTER BAR -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-3 mb-4 shadow-sm">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <div class="flex-1 relative">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" placeholder="Search by order #, customer name, phone..." class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-1 focus:ring-brand">
+          </div>
+          <input type="date" value="2026-05-18" class="text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-1 focus:ring-brand">
+          <select class="text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-1 focus:ring-brand bg-white">
+            <option>All Payment Status</option>
+            <option>Paid</option>
+            <option>Pending</option>
+            <option>Failed</option>
+          </select>
+          <button class="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- DESKTOP TABLE -->
+      <div class="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3.5 w-8"><input type="checkbox" class="accent-brand"></th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Order #</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Customer</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Items</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Amount</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Payment</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Shipment</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Date</th>
+              <th class="px-3 py-3.5"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+
+            <!-- Row 1: Payment pending (highlight) -->
+            <tr class="bg-amber-50/50 hover:bg-amber-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-3 py-4 font-mono text-xs font-bold text-brand">#JNX-2026-00847</td>
+              <td class="px-3 py-4"><div><p class="font-semibold text-gray-800">Ravi Sharma</p><p class="text-xs text-gray-400">+91 98765 43210</p><p class="text-xs text-gray-400">Mumbai</p></div></td>
+              <td class="px-3 py-4 text-xs text-gray-600">4 items</td>
+              <td class="px-3 py-4 font-bold text-gray-900">₹21,277</td>
+              <td class="px-3 py-4"><span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs px-2.5 py-1 rounded-full font-medium"><span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>Verify Pending</span></td>
+              <td class="px-3 py-4"><span class="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">Awaiting</span></td>
+              <td class="px-3 py-4 text-xs text-gray-500">18 May<br>2:34 PM</td>
+              <td class="px-3 py-4">
+                <div class="flex items-center gap-1">
+                  <button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="bg-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-brand-dark transition-colors">View</button>
+                  <button class="border border-amber-300 text-amber-700 text-xs px-3 py-1.5 rounded-lg hover:bg-amber-50 transition-colors">Verify</button>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Row 2 -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-3 py-4 font-mono text-xs font-bold text-brand">#JNX-2026-00846</td>
+              <td class="px-3 py-4"><div><p class="font-semibold text-gray-800">Priya Desai</p><p class="text-xs text-gray-400">+91 99887 65432</p><p class="text-xs text-gray-400">Pune</p></div></td>
+              <td class="px-3 py-4 text-xs text-gray-600">1 item</td>
+              <td class="px-3 py-4 font-bold text-gray-900">₹8,999</td>
+              <td class="px-3 py-4"><span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium"><span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>Paid</span></td>
+              <td class="px-3 py-4"><span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full font-medium">Packing</span></td>
+              <td class="px-3 py-4 text-xs text-gray-500">18 May<br>1:15 PM</td>
+              <td class="px-3 py-4"><div class="flex items-center gap-1"><button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="bg-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-brand-dark">View</button><button class="border border-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg hover:bg-gray-50">Ship</button></div></td>
+            </tr>
+
+            <!-- Row 3 -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-3 py-4 font-mono text-xs font-bold text-brand">#JNX-2026-00845</td>
+              <td class="px-3 py-4"><div><p class="font-semibold text-gray-800">Amit Kumar</p><p class="text-xs text-gray-400">+91 91234 56789</p><p class="text-xs text-gray-400">New Delhi</p></div></td>
+              <td class="px-3 py-4 text-xs text-gray-600">6 items</td>
+              <td class="px-3 py-4 font-bold text-gray-900">₹45,600</td>
+              <td class="px-3 py-4"><span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium"><span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>Paid</span></td>
+              <td class="px-3 py-4"><span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-medium">Shipped</span></td>
+              <td class="px-3 py-4 text-xs text-gray-500">17 May<br>4:50 PM</td>
+              <td class="px-3 py-4"><div class="flex items-center gap-1"><button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="bg-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-brand-dark">View</button><a href="#" class="border border-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg hover:bg-gray-50">Invoice</a></div></td>
+            </tr>
+
+            <!-- Row 4 -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-3 py-4 font-mono text-xs font-bold text-brand">#JNX-2026-00844</td>
+              <td class="px-3 py-4"><div><p class="font-semibold text-gray-800">Suresh Nair</p><p class="text-xs text-gray-400">+91 88654 32100</p><p class="text-xs text-gray-400">Bangalore</p></div></td>
+              <td class="px-3 py-4 text-xs text-gray-600">2 items</td>
+              <td class="px-3 py-4 font-bold text-gray-900">₹15,500</td>
+              <td class="px-3 py-4"><span class="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs px-2.5 py-1 rounded-full font-medium"><span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>Paid</span></td>
+              <td class="px-3 py-4"><span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-medium">Delivered</span></td>
+              <td class="px-3 py-4 text-xs text-gray-500">15 May<br>10:20 AM</td>
+              <td class="px-3 py-4"><div class="flex items-center gap-1"><button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="bg-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-brand-dark">View</button><a href="#" class="border border-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-lg hover:bg-gray-50">Invoice</a></div></td>
+            </tr>
+
+            <!-- Row 5: Failed payment -->
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-3 py-4 font-mono text-xs font-bold text-brand">#JNX-2026-00843</td>
+              <td class="px-3 py-4"><div><p class="font-semibold text-gray-800">Meena Patel</p><p class="text-xs text-gray-400">+91 77654 32111</p><p class="text-xs text-gray-400">Ahmedabad</p></div></td>
+              <td class="px-3 py-4 text-xs text-gray-600">1 item</td>
+              <td class="px-3 py-4 font-bold text-gray-900">₹4,500</td>
+              <td class="px-3 py-4"><span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs px-2.5 py-1 rounded-full font-medium"><span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>Failed</span></td>
+              <td class="px-3 py-4"><span class="bg-gray-100 text-gray-400 text-xs px-2 py-1 rounded-full">—</span></td>
+              <td class="px-3 py-4 text-xs text-gray-500">15 May<br>9:05 AM</td>
+              <td class="px-3 py-4"><button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="bg-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-brand-dark">View</button></td>
+            </tr>
+
+          </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="flex items-center justify-between px-5 py-4 border-t border-gray-100">
+          <p class="text-xs text-gray-500">Showing 1–10 of 312 orders</p>
+          <div class="flex items-center gap-1">
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-brand hover:text-brand transition-colors text-xs">←</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-white text-xs font-semibold">1</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-brand hover:text-brand transition-colors text-xs">2</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-brand hover:text-brand transition-colors text-xs">3</button>
+            <span class="px-1 text-gray-400 text-xs">...</span>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-brand hover:text-brand transition-colors text-xs">32</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-brand hover:text-brand transition-colors text-xs">→</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOBILE CARDS -->
+      <div class="md:hidden space-y-3">
+        <div class="bg-white rounded-2xl border border-amber-200 p-4 bg-amber-50/30">
+          <div class="flex items-start justify-between mb-3">
+            <div><p class="font-mono text-xs font-bold text-brand">#JNX-2026-00847</p><p class="text-sm font-bold text-gray-900 mt-0.5">Ravi Sharma</p><p class="text-xs text-gray-400">Mumbai · 18 May 2:34 PM</p></div>
+            <div class="text-right"><p class="font-bold text-brand text-lg">₹21,277</p><span class="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">Verify Pending</span></div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="flex-1 bg-brand text-white text-xs font-semibold py-2 rounded-lg">View Order</button>
+            <button class="flex-1 border border-amber-300 text-amber-700 text-xs font-semibold py-2 rounded-lg">Verify Payment</button>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <div class="flex items-start justify-between mb-3">
+            <div><p class="font-mono text-xs font-bold text-brand">#JNX-2026-00846</p><p class="text-sm font-bold text-gray-900 mt-0.5">Priya Desai</p><p class="text-xs text-gray-400">Pune · 18 May 1:15 PM</p></div>
+            <div class="text-right"><p class="font-bold text-brand text-lg">₹8,999</p><span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full">Paid</span></div>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="document.getElementById('orderDetail').classList.remove('hidden')" class="flex-1 bg-brand text-white text-xs font-semibold py-2 rounded-lg">View Order</button>
+            <button class="flex-1 border border-gray-200 text-gray-700 text-xs font-semibold py-2 rounded-lg">Mark Shipped</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+</div>
+
+<!-- ORDER DETAIL SIDE PANEL -->
+<div id="orderDetail" class="hidden fixed inset-0 z-50 flex">
+  <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('orderDetail').classList.add('hidden')"></div>
+  <div class="relative ml-auto bg-white w-full max-w-lg h-full overflow-y-auto shadow-2xl">
+    <div class="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between z-10">
+      <div><p class="font-mono text-sm font-bold text-brand">#JNX-2026-00847</p><p class="text-xs text-gray-400">18 May 2026, 2:34 PM</p></div>
+      <button onclick="document.getElementById('orderDetail').classList.add('hidden')" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="p-5 space-y-5">
+
+      <!-- Customer -->
+      <div class="bg-gray-50 rounded-xl p-4">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Customer</p>
+        <p class="font-bold text-gray-900">Ravi Sharma</p>
+        <p class="text-sm text-gray-600">+91 98765 43210</p>
+        <p class="text-sm text-gray-600">ravi.sharma@email.com</p>
+        <p class="text-xs text-gray-500 mt-2">Flat 402, Sunrise Apt, Andheri West, Mumbai – 400058</p>
+      </div>
+
+      <!-- Items -->
+      <div>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Order Items</p>
+        <div class="space-y-2">
+          <div class="flex items-center gap-3 bg-white border border-gray-100 rounded-xl p-3">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div>
+            <div class="flex-1"><p class="text-xs font-semibold text-gray-800">4MP IP Bullet Camera × 2</p><p class="text-xs text-gray-400">SKU: JNX-BC4MP-01</p></div>
+            <p class="text-sm font-bold text-gray-900">₹4,900</p>
+          </div>
+          <div class="flex items-center gap-3 bg-white border border-gray-100 rounded-xl p-3">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div>
+            <div class="flex-1"><p class="text-xs font-semibold text-gray-800">Fingerprint Smart Lock × 1</p><p class="text-xs text-gray-400">SKU: JNX-SL-FP01</p></div>
+            <p class="text-sm font-bold text-gray-900">₹8,999</p>
+          </div>
+          <div class="flex items-center gap-3 bg-white border border-gray-100 rounded-xl p-3">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0"><svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01"/></svg></div>
+            <div class="flex-1"><p class="text-xs font-semibold text-gray-800">4G SIM Router × 1</p><p class="text-xs text-gray-400">SKU: JNX-4GR-IND</p></div>
+            <p class="text-sm font-bold text-gray-900">₹4,500</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Financials -->
+      <div class="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
+        <div class="flex justify-between"><span class="text-gray-500">Product Total</span><span class="font-medium">₹18,399</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">GST (18%)</span><span class="font-medium">₹3,312</span></div>
+        <div class="flex justify-between text-green-600"><span>Direct Pay Discount</span><span>− ₹434</span></div>
+        <div class="flex justify-between"><span class="text-gray-500">Shipping</span><span class="font-medium text-green-600">FREE</span></div>
+        <div class="flex justify-between font-bold text-base pt-2 border-t border-gray-200"><span>Grand Total</span><span class="text-brand">₹21,277</span></div>
+      </div>
+
+      <!-- Payment -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-4">
+        <p class="text-xs font-semibold text-gray-700 mb-2">Payment Details</p>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex justify-between"><span class="text-gray-500">Method</span><span>Bank Transfer / UPI</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">UTR Ref</span><span class="font-mono text-xs">HDFC241200087654</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Status</span><span class="text-amber-600 font-semibold">Verification Pending</span></div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex flex-col gap-2">
+        <button class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm">✓ Verify Payment & Confirm Order</button>
+        <div class="grid grid-cols-2 gap-2">
+          <button class="border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50">Download Invoice</button>
+          <button class="border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-50">Add Shipment</button>
+        </div>
+        <button class="w-full border border-red-200 text-red-600 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50 transition-colors">Cancel Order</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 z-40">
+  <div class="grid grid-cols-5 h-16">
+    <a href="dashboard.html" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span class="text-xs">Dashboard</span></a>
+    <a href="orders.html" class="flex flex-col items-center justify-center gap-1 text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg><span class="text-xs font-medium">Orders</span></a>
+    <a href="catalogue.html" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg><span class="text-xs">Products</span></a>
+    <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg><span class="text-xs">Payments</span></a>
+    <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="text-xs">Settings</span></a>
+  </div>
+</nav>
+
+</body>
+</html>

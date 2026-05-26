@@ -1,4 +1,4 @@
-# Jenix Commerce PROJECT.md
+﻿# Jenix Commerce PROJECT.md
 
 ## 0. Purpose
 
@@ -87,57 +87,57 @@ This document is the master context for Codex. Keep it updated as work progresse
 
 ```text
 jenix-commerce/
-│
-├── apps/
-│   ├── admin-panel/          # Admin PWA
-│   └── front/                # Customer-facing PWA
-│
-├── backend/                  # API + business logic
-│   └── src/
-│       ├── modules/
-│       ├── common/
-│       ├── config/
-│       ├── database/
-│       ├── integrations/
-│       ├── jobs/
-│       ├── middlewares/
-│       └── server.js
-│
-├── packages/
-│   ├── shared-types/
-│   ├── shared-utils/
-│   ├── validators/
-│   └── ui/
-│
-├── scripts/
-│   ├── install.sh
-│   ├── setup-vps.sh
-│   ├── setup-nginx.sh
-│   ├── setup-ssl.sh
-│   ├── backup.sh
-│   ├── restore.sh
-│   ├── seed-admin.js
-│   ├── seed-demo-data.js
-│   └── health-check.sh
-│
-├── docker/
-│   ├── docker-compose.yml
-│   ├── backend.Dockerfile
-│   ├── front.Dockerfile
-│   └── admin.Dockerfile
-│
-├── docs/
-│   ├── PROJECT.md
-│   ├── DEPLOYMENT.md
-│   ├── ADMIN_SETUP_GUIDE.md
-│   ├── PAYMENT_GATEWAY_GUIDE.md
-│   ├── GOOGLE_MERCHANT_GUIDE.md
-│   ├── SEO_GUIDE.md
-│   └── TROUBLESHOOTING.md
-│
-├── .env.example
-├── package.json
-└── README.md
+â”‚
+â”œâ”€â”€ apps/
+â”‚   â”œâ”€â”€ admin-panel/          # Admin PWA
+â”‚   â””â”€â”€ front/                # Customer-facing PWA
+â”‚
+â”œâ”€â”€ backend/                  # API + business logic
+â”‚   â””â”€â”€ src/
+â”‚       â”œâ”€â”€ modules/
+â”‚       â”œâ”€â”€ common/
+â”‚       â”œâ”€â”€ config/
+â”‚       â”œâ”€â”€ database/
+â”‚       â”œâ”€â”€ integrations/
+â”‚       â”œâ”€â”€ jobs/
+â”‚       â”œâ”€â”€ middlewares/
+â”‚       â””â”€â”€ server.js
+â”‚
+â”œâ”€â”€ packages/
+â”‚   â”œâ”€â”€ shared-types/
+â”‚   â”œâ”€â”€ shared-utils/
+â”‚   â”œâ”€â”€ validators/
+â”‚   â””â”€â”€ ui/
+â”‚
+â”œâ”€â”€ scripts/
+â”‚   â”œâ”€â”€ install.sh
+â”‚   â”œâ”€â”€ setup-vps.sh
+â”‚   â”œâ”€â”€ setup-nginx.sh
+â”‚   â”œâ”€â”€ setup-ssl.sh
+â”‚   â”œâ”€â”€ backup.sh
+â”‚   â”œâ”€â”€ restore.sh
+â”‚   â”œâ”€â”€ seed-admin.js
+â”‚   â”œâ”€â”€ seed-demo-data.js
+â”‚   â””â”€â”€ health-check.sh
+â”‚
+â”œâ”€â”€ docker/
+â”‚   â”œâ”€â”€ docker-compose.yml
+â”‚   â”œâ”€â”€ backend.Dockerfile
+â”‚   â”œâ”€â”€ front.Dockerfile
+â”‚   â””â”€â”€ admin.Dockerfile
+â”‚
+â”œâ”€â”€ docs/
+â”‚   â”œâ”€â”€ PROJECT.md
+â”‚   â”œâ”€â”€ DEPLOYMENT.md
+â”‚   â”œâ”€â”€ ADMIN_SETUP_GUIDE.md
+â”‚   â”œâ”€â”€ PAYMENT_GATEWAY_GUIDE.md
+â”‚   â”œâ”€â”€ GOOGLE_MERCHANT_GUIDE.md
+â”‚   â”œâ”€â”€ SEO_GUIDE.md
+â”‚   â””â”€â”€ TROUBLESHOOTING.md
+â”‚
+â”œâ”€â”€ .env.example
+â”œâ”€â”€ package.json
+â””â”€â”€ README.md
 ```
 
 ---
@@ -204,13 +204,13 @@ Every module should follow this structure:
 
 ```text
 backend/src/modules/<module-name>/
-├── <module>.model.js
-├── <module>.routes.js
-├── <module>.controller.js
-├── <module>.service.js
-├── <module>.validator.js
-├── <module>.permissions.js optional
-└── <module>.test.js or regression-checklist.md
+â”œâ”€â”€ <module>.model.js
+â”œâ”€â”€ <module>.routes.js
+â”œâ”€â”€ <module>.controller.js
+â”œâ”€â”€ <module>.service.js
+â”œâ”€â”€ <module>.validator.js
+â”œâ”€â”€ <module>.permissions.js optional
+â””â”€â”€ <module>.test.js or regression-checklist.md
 ```
 
 Backend modules:
@@ -358,7 +358,7 @@ Settings
 
 Codex must execute phase-wise. Do not jump randomly.
 
-### Phase 0 — Project Bootstrap
+### Phase 0 â€” Project Bootstrap
 
 Goal: Create clean monorepo and base tooling.
 
@@ -384,7 +384,7 @@ Acceptance checks:
 
 ---
 
-### Phase 1 — Core Settings, Branding, Store Profile
+### Phase 1 â€” Core Settings, Branding, Store Profile
 
 Goal: Create settings foundation used by invoice, email, SEO, bank transfer, contact page.
 
@@ -466,7 +466,7 @@ Regression tests:
 
 ---
 
-### Phase 2 — Auth, Staff, Permission Groups
+### Phase 2 â€” Auth, Staff, Permission Groups
 
 Goal: Create secure admin and customer authentication.
 
@@ -515,7 +515,7 @@ Regression tests:
 
 ---
 
-### Phase 3 — Catalogue, Categories, Products, HSN, Inventory
+### Phase 3 â€” Catalogue, Categories, Products, HSN, Inventory
 
 Goal: Build product catalogue for 500+ products.
 
@@ -602,7 +602,7 @@ Regression tests:
 
 ---
 
-### Phase 4 — Product Migration from Existing Site
+### Phase 4 â€” Product Migration from Existing Site
 
 Goal: Migrate public product data from `jenixindia.com` because website builder does not provide CSV export.
 
@@ -678,7 +678,7 @@ Regression tests:
 
 ---
 
-### Phase 5 — Buyer-Intent Search
+### Phase 5 â€” Buyer-Intent Search
 
 Goal: Search must work like problem-to-product mapping, not only technical product name search.
 
@@ -745,7 +745,7 @@ Regression tests:
 
 ---
 
-### Phase 6 — Product Page UX and Recommendations
+### Phase 6 â€” Product Page UX and Recommendations
 
 Goal: Product page should sell, educate, and cross-sell.
 
@@ -792,7 +792,7 @@ Regression tests:
 
 ---
 
-### Phase 7 — Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
+### Phase 7 â€” Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
 
 Goal: Accurate cart calculation and stock safety.
 
@@ -846,7 +846,7 @@ Regression tests:
 
 ---
 
-### Phase 8 — Shipping Calculation and Courier Tracking
+### Phase 8 â€” Shipping Calculation and Courier Tracking
 
 Goal: Transparent cart-level shipping and manual tracking with future aggregator API readiness.
 
@@ -938,7 +938,7 @@ Regression tests:
 
 ---
 
-### Phase 9 — Multi Payment Gateway and Manual Bank Transfer
+### Phase 9 â€” Multi Payment Gateway and Manual Bank Transfer
 
 Goal: Avoid vendor lock-in to Razorpay.
 
@@ -1003,7 +1003,7 @@ Regression tests:
 
 ---
 
-### Phase 10 — GST Invoice, Tally Export, Invoice Settings
+### Phase 10 â€” GST Invoice, Tally Export, Invoice Settings
 
 Goal: GST-compliant invoice and accounting export.
 
@@ -1084,7 +1084,7 @@ Regression tests:
 
 ---
 
-### Phase 11 — Customer Profile and Order History
+### Phase 11 â€” Customer Profile and Order History
 
 Goal: Customer self-service area.
 
@@ -1140,7 +1140,7 @@ Reorder:
 Regression tests:
 
 1. Customer can see own orders.
-2. Customer cannot see another user’s order.
+2. Customer cannot see another userâ€™s order.
 3. Customer can download own invoice.
 4. Guest order links only after verified mobile/email.
 5. Reorder recalculates current prices.
@@ -1148,7 +1148,7 @@ Regression tests:
 
 ---
 
-### Phase 12 — Abandoned Cart and Customer Recovery
+### Phase 12 â€” Abandoned Cart and Customer Recovery
 
 Goal: Recover carts and understand payment friction.
 
@@ -1207,7 +1207,7 @@ Regression tests:
 
 ---
 
-### Phase 13 — Blog / Knowledge Base
+### Phase 13 â€” Blog / Knowledge Base
 
 Goal: Education-to-product funnel and SEO.
 
@@ -1272,7 +1272,7 @@ Regression tests:
 
 ---
 
-### Phase 14 — Google Shopping, SEO, Feeds, Sitemap
+### Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
 
 Goal: Products appear in Google Shopping / merchant surfaces.
 
@@ -1330,7 +1330,7 @@ Regression tests:
 
 ---
 
-### Phase 15 — Website Buyer Lead Form
+### Phase 15 â€” Website Buyer Lead Form
 
 Goal: Use Jenix site as demo to sell same webapp to others.
 
@@ -1375,7 +1375,7 @@ Regression tests:
 
 ---
 
-### Phase 16 — Reports
+### Phase 16 â€” Reports
 
 Goal: Admin can download useful business data.
 
@@ -1446,7 +1446,7 @@ Regression tests:
 
 ---
 
-### Phase 17 — Marketing, Offers, Templates, Notifications
+### Phase 17 â€” Marketing, Offers, Templates, Notifications
 
 Goal: Communication and promotion control.
 
@@ -1539,7 +1539,7 @@ Regression tests:
 
 ---
 
-### Phase 18 — B2B Dealer / Stockist Workflow
+### Phase 18 â€” B2B Dealer / Stockist Workflow
 
 Goal: Approved customers get dealer/stockist pricing and offline order flow.
 
@@ -1608,7 +1608,7 @@ Note: Dealer mobile app is future phase after web platform stabilizes.
 
 ---
 
-### Phase 19 — Walk-in Orders / Manual Orders
+### Phase 19 â€” Walk-in Orders / Manual Orders
 
 Goal: Admin can create offline/walk-in order.
 
@@ -1657,7 +1657,7 @@ Regression tests:
 
 ---
 
-### Phase 20 — Installer, Setup Wizard, Productization
+### Phase 20 â€” Installer, Setup Wizard, Productization
 
 Goal: Same project can be sold to other businesses.
 
@@ -1724,7 +1724,7 @@ Regression tests:
 
 ---
 
-## 8. Data Models — Minimum Draft
+## 8. Data Models â€” Minimum Draft
 
 ### Product
 
@@ -1934,32 +1934,32 @@ For each phase, Codex must:
 Codex must update this section after each phase.
 
 ```text
-[ ] Phase 0 — Project Bootstrap
-[ ] Phase 1 — Core Settings, Branding, Store Profile
-[ ] Phase 2 — Auth, Staff, Permission Groups
-[ ] Phase 3 — Catalogue, Categories, Products, HSN, Inventory
-[ ] Phase 4 — Product Migration from Existing Site
-[ ] Phase 5 — Buyer-Intent Search
-[ ] Phase 6 — Product Page UX and Recommendations
-[ ] Phase 7 — Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
-[ ] Phase 8 — Shipping Calculation and Courier Tracking
-[ ] Phase 9 — Multi Payment Gateway and Manual Bank Transfer
-[ ] Phase 10 — GST Invoice, Tally Export, Invoice Settings
-[ ] Phase 11 — Customer Profile and Order History
-[ ] Phase 12 — Abandoned Cart and Customer Recovery
-[ ] Phase 13 — Blog / Knowledge Base
-[ ] Phase 14 — Google Shopping, SEO, Feeds, Sitemap
-[ ] Phase 15 — Website Buyer Lead Form
-[ ] Phase 16 — Reports
-[ ] Phase 17 — Marketing, Offers, Templates, Notifications
-[ ] Phase 18 — B2B Dealer / Stockist Workflow
-[ ] Phase 19 — Walk-in Orders / Manual Orders
-[ ] Phase 20 — Installer, Setup Wizard, Productization
+[x] Phase 0 â€” Project Bootstrap
+[x] Phase 1 â€” Core Settings, Branding, Store Profile
+[x] Phase 2 â€” Auth, Staff, Permission Groups
+[x] Phase 3 â€” Catalogue, Categories, Products, HSN, Inventory
+[~] Phase 4 â€” Product Migration from Existing Site (Deferred)
+[x] Phase 5 â€” Buyer-Intent Search
+[x] Phase 6 â€” Product Page UX and Recommendations
+[x] Phase 7 â€” Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
+[x] Phase 8 â€” Shipping Calculation and Courier Tracking
+[x] Phase 9 â€” Multi Payment Gateway and Manual Bank Transfer
+[x] Phase 10 â€” GST Invoice, Tally Export, Invoice Settings
+[x] Phase 11 â€” Customer Profile and Order History
+[ ] Phase 12 â€” Abandoned Cart and Customer Recovery
+[ ] Phase 13 â€” Blog / Knowledge Base
+[ ] Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
+[ ] Phase 15 â€” Website Buyer Lead Form
+[ ] Phase 16 â€” Reports
+[ ] Phase 17 â€” Marketing, Offers, Templates, Notifications
+[ ] Phase 18 â€” B2B Dealer / Stockist Workflow
+[ ] Phase 19 â€” Walk-in Orders / Manual Orders
+[ ] Phase 20 â€” Installer, Setup Wizard, Productization
 ```
 
 ---
 
-### Backend-First Execution Log (VPS) � Updated May 22, 2026
+### Backend-First Execution Log (VPS) — Updated May 23, 2026
 
 Phase 0 (Backend scope) status: `[x]`
 
@@ -1986,8 +1986,7 @@ Completed files:
 
 Pending files/tasks before full Phase 0 closure:
 - Runnable `Next.js/React` shell for `VPS/apps/front`
-- Runnable `Next.js/React` shell for `VPS/apps/admin-panel`
-- Startup/build checks for those two app shells
+- Startup/build checks for front app shell (`VPS/apps/front`)
 
 Phase 1 (Backend scope: Admin first, then Front) status: `[x]`
 
@@ -2012,6 +2011,499 @@ Pending files/tasks before full Phase 1 closure:
 - Front home/footer/contact integration in `apps/front` using public settings APIs
 - Branding asset upload UI flow on admin side
 - Front consumption of SEO defaults on homepage metadata
+
+Phase 2 (Backend scope: Auth, Staff, Permission Groups) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/modules/auth/auth.model.js`
+- `VPS/backend/src/modules/auth/auth.validator.js`
+- `VPS/backend/src/modules/auth/auth.permissions.js`
+- `VPS/backend/src/modules/auth/auth.service.js`
+- `VPS/backend/src/modules/auth/auth.controller.js`
+- `VPS/backend/src/modules/auth/auth.routes.js`
+- `VPS/backend/src/modules/auth/regression-checklist.md`
+- `VPS/backend/src/modules/staff/staff.model.js`
+- `VPS/backend/src/modules/staff/staff.validator.js`
+- `VPS/backend/src/modules/staff/staff.permissions.js`
+- `VPS/backend/src/modules/staff/staff.service.js`
+- `VPS/backend/src/modules/staff/staff.controller.js`
+- `VPS/backend/src/modules/staff/staff.routes.js`
+- `VPS/backend/src/modules/staff/regression-checklist.md`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.model.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.validator.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.permissions.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.service.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.controller.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.routes.js`
+- `VPS/backend/src/modules/roles-permissions/regression-checklist.md`
+- `VPS/backend/src/modules/audit-logs/audit-logs.model.js`
+- `VPS/backend/src/modules/audit-logs/audit-logs.validator.js`
+- `VPS/backend/src/modules/audit-logs/audit-logs.permissions.js`
+- `VPS/backend/src/modules/audit-logs/audit-logs.service.js`
+- `VPS/backend/src/modules/audit-logs/audit-logs.controller.js`
+- `VPS/backend/src/modules/audit-logs/audit-logs.routes.js`
+- `VPS/backend/src/modules/audit-logs/regression-checklist.md`
+- `VPS/backend/src/middlewares/require-admin-permission.js`
+- `VPS/backend/src/middlewares/require-customer-auth.js`
+- `VPS/backend/src/common/token-service.js`
+- `VPS/backend/src/common/identity.js`
+- `VPS/backend/src/database/auth-store.js`
+- `VPS/backend/src/integrations/google-auth/google-auth.adapter.js`
+
+Pending files/tasks before full Phase 2 closure:
+- Complete remaining staff/permission-group management screens in `apps/admin-panel` (admin login is now wired)
+- Integrate customer login/signup/OTP flows in `apps/front`
+- Replace mock Google/OTP verification with provider adapters in future integration phase
+- Add secure HttpOnly cookie strategy for refresh tokens in production deployment hardening
+
+Phase 3 (Backend scope: Catalogue, Categories, Products, HSN, Inventory) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/database/catalog-store.js`
+- `VPS/backend/src/modules/catalogue/catalogue.model.js`
+- `VPS/backend/src/modules/catalogue/catalogue.validator.js`
+- `VPS/backend/src/modules/catalogue/catalogue.permissions.js`
+- `VPS/backend/src/modules/catalogue/catalogue.service.js`
+- `VPS/backend/src/modules/catalogue/catalogue.controller.js`
+- `VPS/backend/src/modules/catalogue/catalogue.routes.js`
+- `VPS/backend/src/modules/catalogue/regression-checklist.md`
+- `VPS/backend/src/modules/categories/categories.model.js`
+- `VPS/backend/src/modules/categories/categories.validator.js`
+- `VPS/backend/src/modules/categories/categories.permissions.js`
+- `VPS/backend/src/modules/categories/categories.service.js`
+- `VPS/backend/src/modules/categories/categories.controller.js`
+- `VPS/backend/src/modules/categories/categories.routes.js`
+- `VPS/backend/src/modules/categories/regression-checklist.md`
+- `VPS/backend/src/modules/hsn-tax/hsn-tax.model.js`
+- `VPS/backend/src/modules/hsn-tax/hsn-tax.validator.js`
+- `VPS/backend/src/modules/hsn-tax/hsn-tax.permissions.js`
+- `VPS/backend/src/modules/hsn-tax/hsn-tax.service.js`
+- `VPS/backend/src/modules/hsn-tax/hsn-tax.controller.js`
+- `VPS/backend/src/modules/hsn-tax/hsn-tax.routes.js`
+- `VPS/backend/src/modules/hsn-tax/regression-checklist.md`
+- `VPS/backend/src/modules/products/products.model.js`
+- `VPS/backend/src/modules/products/products.validator.js`
+- `VPS/backend/src/modules/products/products.permissions.js`
+- `VPS/backend/src/modules/products/products.service.js`
+- `VPS/backend/src/modules/products/products.controller.js`
+- `VPS/backend/src/modules/products/products.routes.js`
+- `VPS/backend/src/modules/products/regression-checklist.md`
+- `VPS/backend/src/modules/inventory/inventory.model.js`
+- `VPS/backend/src/modules/inventory/inventory.validator.js`
+- `VPS/backend/src/modules/inventory/inventory.permissions.js`
+- `VPS/backend/src/modules/inventory/inventory.service.js`
+- `VPS/backend/src/modules/inventory/inventory.controller.js`
+- `VPS/backend/src/modules/inventory/inventory.routes.js`
+- `VPS/backend/src/modules/inventory/regression-checklist.md`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+
+Pending files/tasks before full Phase 3 closure:
+- Build front product listing/detail pages in `apps/front` using new public endpoints
+- Add real image pipeline (WebP resize/sizes) in migration/import phase (Phase 4)
+- Add import/export tooling with CSV validations (Phase 4)
+
+Phase 3 (Admin UI scope: Catalogue, Categories, Products, HSN, Inventory) status: `[x]`
+
+Completed files:
+- `VPS/apps/admin-panel/package.json`
+- `VPS/apps/admin-panel/.env.example`
+- `VPS/apps/admin-panel/vite.config.js`
+- `VPS/apps/admin-panel/index.html`
+- `VPS/apps/admin-panel/public/manifest.webmanifest`
+- `VPS/apps/admin-panel/public/icon-192.svg`
+- `VPS/apps/admin-panel/public/icon-512.svg`
+- `VPS/apps/admin-panel/src/main.jsx`
+- `VPS/apps/admin-panel/src/styles.css`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
+- `VPS/apps/admin-panel/src/shared/api/http-client.js`
+- `VPS/apps/admin-panel/src/shared/utils/permissions.js`
+- `VPS/apps/admin-panel/src/shared/utils/formatters.js`
+- `VPS/apps/admin-panel/src/shared/components/loading-block.jsx`
+- `VPS/apps/admin-panel/src/shared/components/error-block.jsx`
+- `VPS/apps/admin-panel/src/shared/components/empty-block.jsx`
+- `VPS/apps/admin-panel/src/shared/components/modal.jsx`
+- `VPS/apps/admin-panel/src/shared/components/status-badge.jsx`
+- `VPS/apps/admin-panel/src/shared/components/page-header.jsx`
+- `VPS/apps/admin-panel/src/modules/auth/auth.api.js`
+- `VPS/apps/admin-panel/src/modules/auth/auth.store.js`
+- `VPS/apps/admin-panel/src/modules/auth/use-auth-session.js`
+- `VPS/apps/admin-panel/src/modules/auth/auth-guard.jsx`
+- `VPS/apps/admin-panel/src/modules/auth/login-page.jsx`
+- `VPS/apps/admin-panel/src/modules/catalogue/catalogue.api.js`
+- `VPS/apps/admin-panel/src/modules/catalogue/catalogue-page.jsx`
+- `VPS/apps/admin-panel/src/modules/categories/categories.api.js`
+- `VPS/apps/admin-panel/src/modules/categories/categories-page.jsx`
+- `VPS/apps/admin-panel/src/modules/products/products.api.js`
+- `VPS/apps/admin-panel/src/modules/products/products-page.jsx`
+- `VPS/apps/admin-panel/src/modules/hsn-tax/hsn-tax.api.js`
+- `VPS/apps/admin-panel/src/modules/hsn-tax/hsn-tax-page.jsx`
+- `VPS/apps/admin-panel/src/modules/inventory/inventory.api.js`
+- `VPS/apps/admin-panel/src/modules/inventory/inventory-page.jsx`
+- `VPS/apps/admin-panel/README.md`
+- `VPS/package.json` (admin scripts)
+
+Pending files/tasks after Phase 3 admin UI scope:
+- Build front product listing/detail pages in `apps/front` using new public endpoints
+- Add import/export workflow UI for CSV validation and upload in Phase 4
+- Replace placeholder import API in backend once Phase 4 migration tooling is implemented
+
+Phase 4 status update: `[~] Deferred` (by user decision on May 23, 2026)
+
+Deferred notes:
+- Full-site product migration crawler for `jenixindia.com` is deferred to final migration window.
+- Phase 5+ backend development continues first to avoid blocking execution velocity.
+- Phase 4 remains mandatory before go-live cutover and SEO redirect validation.
+
+Phase 5 (Backend scope: Buyer-Intent Search) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/database/search-store.js`
+- `VPS/backend/src/modules/search/search.model.js`
+- `VPS/backend/src/modules/search/search.validator.js`
+- `VPS/backend/src/modules/search/search.permissions.js`
+- `VPS/backend/src/modules/search/search.service.js`
+- `VPS/backend/src/modules/search/search.controller.js`
+- `VPS/backend/src/modules/search/search.routes.js`
+- `VPS/backend/src/modules/search/regression-checklist.md`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.model.js`
+- `VPS/backend/src/config/env.js`
+- `VPS/.env.example`
+- `VPS/backend/src/checks/run-regression-checks.js`
+
+Pending files/tasks before full Phase 5 closure:
+- Build admin search management UI in `apps/admin-panel` for synonyms, phrase mappings, redirects, zero-result monitoring, and reindex controls
+- Build front search UX in `apps/front` (autocomplete, recent searches, recently viewed, suggested categories, direct product results)
+- Add click/cart/purchase blended ranking once cart/order modules stabilize in later phases
+- Add semantic/vector adapter integration (future-ready TODO)
+
+Phase 6 (Backend + Front scope: Product Page UX and Recommendations) status: `[x]`
+
+Completed backend files:
+- `VPS/backend/src/modules/products/products.model.js`
+- `VPS/backend/src/modules/products/products.validator.js`
+- `VPS/backend/src/modules/products/products.service.js`
+- `VPS/backend/src/modules/products/products.controller.js`
+- `VPS/backend/src/modules/products/products.routes.js`
+- `VPS/backend/src/modules/products/regression-checklist.md`
+- `VPS/backend/src/checks/run-regression-checks.js`
+
+Backend outcomes delivered:
+- Product relations supported with ordered relation types:
+  - `related`, `accessory`, `required_with`, `spare_part`, `similar`, `upgrade`, `frequently_bought_together`
+- Admin relation update endpoint added: `PUT /api/admin/products/:productId/relations`
+- Public product page bundle endpoint added: `GET /api/products/:slug/page`
+- Public recommendations endpoint added: `GET /api/products/:slug/recommendations`
+- Public shipping estimator endpoint added: `POST /api/products/:slug/shipping-estimate`
+- Public responses keep stock quantity hidden (`stockQty` not exposed)
+- Inactive related products are filtered from recommendation carousels
+- Logged-in customer recent search/view payload included in recommendations bundle
+
+Completed front files:
+- `VPS/apps/front/package.json`
+- `VPS/apps/front/vite.config.js`
+- `VPS/apps/front/.env.example`
+- `VPS/apps/front/index.html`
+- `VPS/apps/front/public/icon-192.svg`
+- `VPS/apps/front/public/icon-512.svg`
+- `VPS/apps/front/src/main.jsx`
+- `VPS/apps/front/src/styles.css`
+- `VPS/apps/front/src/app/router.jsx`
+- `VPS/apps/front/src/shared/api/http-client.js`
+- `VPS/apps/front/src/modules/products/products.api.js`
+- `VPS/apps/front/src/modules/products/products-list-page.jsx`
+- `VPS/apps/front/src/modules/products/product-page.jsx`
+- `VPS/apps/front/README.md`
+- `VPS/package.json` (front scripts: `dev:front`, `build:front`)
+
+Front outcomes delivered:
+- React PWA front app scaffold activated in `apps/front`
+- Product listing route wired to `/api/products`
+- Product detail route wired with Phase 6 section order and mobile-first carousels
+- Recommendation failure fallback implemented:
+  - Main product still loads from `/api/products/:slug` even if recommendation bundle fails
+- Shipping estimator wired to `/api/products/:slug/shipping-estimate`
+
+Validation completed:
+- `pnpm run check:backend` passed (including Phase 6 assertions)
+- `pnpm run build:front` passed
+- `pnpm run lint` passed
+
+Pending files/tasks after Phase 6 closure:
+- Phase 5 front search UX still pending:
+  - autocomplete experience
+  - search suggestion UI and query chip journey
+  - zero-result recovery prompts on storefront
+- Helpful guides/blog links currently placeholder content until Phase 13 content module lands
+
+Phase 7 (Backend scope: Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.model.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.validator.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.service.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.controller.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.routes.js`
+- `VPS/backend/src/modules/cart-checkout/regression-checklist.md`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/modules/auth/auth.service.js`
+- `VPS/backend/src/database/auth-store.js`
+- `VPS/backend/src/config/env.js`
+- `VPS/.env.example`
+- `VPS/backend/src/checks/run-regression-checks.js`
+
+Delivered APIs (Phase 7 + extra cart-sharing feature):
+- `GET /api/cart`
+- `POST /api/cart/items`
+- `PATCH /api/cart/items/:productId`
+- `DELETE /api/cart/items/:productId`
+- `POST /api/cart/merge`
+- `POST /api/cart/share`
+- `GET /api/cart/shared/:shareToken`
+- `POST /api/cart/shared/:shareToken/claim`
+- `POST /api/checkout/start`
+- `GET /api/checkout/:checkoutSessionId`
+- `POST /api/payments/create-attempt`
+- `POST /api/payments/webhook/mock`
+
+Phase 7 outcomes delivered:
+- Guest cart, customer cart, and guest-to-user merge support implemented
+- MOQ validation enforced at cart add/update and checkout validation
+- Bulk slab pricing auto-applied in cart totals and checkout pricing
+- Quote-required flow implemented (checkout blocked + quote request generated)
+- Stock checks implemented at:
+  - add to cart
+  - cart update
+  - checkout start
+  - payment attempt creation
+  - payment success webhook
+- Stock reservation lifecycle implemented:
+  - default reservation TTL 15 minutes
+  - release on payment failure
+  - timeout expiry cleanup
+  - deduct stock on payment success
+- GST on discounted taxable value, shipping charge, bank-transfer discount, and round-off included in pricing engine
+- Exact stock quantity is not exposed in public cart/checkout payloads
+- Extra feature delivered:
+  - Cart share token + claim flow supports checkout/payment continuation on another device/session (mobile/desktop)
+
+Validation completed:
+- `pnpm run lint` passed
+- `pnpm run check:backend` passed (includes Phase 7 assertions + cart-share cross-device flow)
+
+Pending files/tasks after Phase 7 closure:
+- Front cart and checkout UI wiring in `apps/front` to consume new `/api/cart`, `/api/checkout`, `/api/payments` APIs
+- Replace mock payment webhook path with real gateway adapters in Phase 9
+
+Phase 8 (Backend scope: Shipping Calculation and Courier Tracking) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/database/shipping-store.js`
+- `VPS/backend/src/modules/shipping/shipping.model.js`
+- `VPS/backend/src/modules/shipping/shipping.validator.js`
+- `VPS/backend/src/modules/shipping/shipping.permissions.js`
+- `VPS/backend/src/modules/shipping/shipping-calculator.js`
+- `VPS/backend/src/modules/shipping/shipping.service.js`
+- `VPS/backend/src/modules/shipping/shipping.controller.js`
+- `VPS/backend/src/modules/shipping/shipping.routes.js`
+- `VPS/backend/src/modules/shipping/regression-checklist.md`
+- `VPS/backend/src/integrations/shipping-providers/shipping-provider.adapter.js`
+- `VPS/backend/src/integrations/shipping-providers/manual-courier.provider.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.model.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.validator.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.service.js`
+- `VPS/backend/src/modules/products/products.service.js`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/backend/src/config/env.js`
+- `VPS/.env.example`
+
+Delivered APIs (Phase 8):
+- `GET /api/admin/shipping/settings`
+- `PATCH /api/admin/shipping/settings`
+- `GET /api/admin/shipping/rate-cards`
+- `POST /api/admin/shipping/rate-cards`
+- `PATCH /api/admin/shipping/rate-cards/:rateCardId`
+- `GET /api/admin/shipping/couriers`
+- `POST /api/admin/shipping/couriers`
+- `PATCH /api/admin/shipping/couriers/:courierProfileId`
+- `GET /api/admin/shipping/queue`
+- `POST /api/admin/shipping/shipments`
+- `GET /api/admin/shipping/shipments/:shipmentId`
+- `PATCH /api/admin/shipping/shipments/:shipmentId/tracking`
+- `PATCH /api/admin/shipping/shipments/:shipmentId/status`
+- `POST /api/admin/shipping/shipments/:shipmentId/tracking-email`
+- `POST /api/admin/shipping/shipments/:shipmentId/pod`
+- `GET /api/shipping/cart-estimate`
+- `GET /api/shipping/tracking/:trackingId`
+
+Phase 8 outcomes delivered:
+- Cart shipping calculation is now zone/method/weight-driven and applied once at cart level
+- Shipping charge stays separate from product pricing and supports remote pincode surcharge
+- Standard/express/local pickup/self pickup/transport/manual delivery methods are supported
+- Courier profile management supports manual tracking URL templates and future provider flags
+- Paid orders flow into shipping queue and can move through manual shipment lifecycle
+- Tracking email dispatch is logged through backend email-log simulation
+- POD upload saves public URL and links it with shipment
+- Delivered shipment status updates related order status
+- Product shipping estimator now uses the Phase 8 rate matrix instead of fixed placeholder math
+
+Validation completed:
+- `pnpm run lint` passed
+- `pnpm run check:backend` passed (includes all Phase 8 regression assertions)
+
+Pending files/tasks after Phase 8 closure:
+- Wire admin shipping UI screens in `apps/admin-panel` (rate cards, couriers, queue, tracking, POD)
+- Wire front cart shipping estimator + tracking views in `apps/front`
+- Add real courier API adapters in future phases (Shiprocket/Delhivery/DTDC/BlueDart)
+- Implement actual email provider integration for tracking notifications in later notification phase
+
+Phase 9 (Backend scope: Multi Payment Gateway and Manual Bank Transfer) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/database/payment-store.js`
+- `VPS/backend/src/database/json/payment-store.json`
+- `VPS/backend/src/modules/payment-gateways/payment-gateways.model.js`
+- `VPS/backend/src/modules/payment-gateways/payment-gateways.validator.js`
+- `VPS/backend/src/modules/payment-gateways/payment-gateways.permissions.js`
+- `VPS/backend/src/modules/payment-gateways/payment-gateways.service.js`
+- `VPS/backend/src/modules/payment-gateways/payment-gateways.controller.js`
+- `VPS/backend/src/modules/payment-gateways/payment-gateways.routes.js`
+- `VPS/backend/src/modules/payment-gateways/regression-checklist.md`
+- `VPS/backend/src/modules/manual-payments/manual-payments.model.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.validator.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.permissions.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.service.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.controller.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.routes.js`
+- `VPS/backend/src/modules/manual-payments/regression-checklist.md`
+- `VPS/backend/src/integrations/payment-gateways/payment-gateway.adapter.js`
+- `VPS/backend/src/integrations/payment-gateways/razorpay.gateway.js`
+- `VPS/backend/src/integrations/payment-gateways/manual-upi.gateway.js`
+- `VPS/backend/src/integrations/payment-gateways/bank-transfer.gateway.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.model.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.validator.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.service.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.controller.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.routes.js`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/config/env.js`
+- `VPS/.env.example`
+- `VPS/backend/src/checks/run-regression-checks.js`
+
+Delivered APIs (Phase 9):
+- `GET /api/admin/payment-gateways`
+- `PATCH /api/admin/payment-gateways/:gatewayCode`
+- `PATCH /api/admin/payment-gateways/discount/direct-payment`
+- `POST /api/payments/manual/submit`
+- `GET /api/admin/manual-payments`
+- `POST /api/admin/manual-payments/:submissionId/verify`
+- `POST /api/payments/webhook/:gateway`
+
+Phase 9 outcomes delivered:
+- Multi-gateway configuration store added with enable/disable, priority, mode, amount limits, and credentials placeholders.
+- Gateway adapter interface expanded for create order, verify, webhook, refund, and payment status methods.
+- Manual payment flow added with UTR + proof upload, pending verification queue, and admin approve/reject actions.
+- Direct payment discount moved to configurable store-level policy instead of hard-coded method logic.
+- Checkout/payment flow updated to support repeated attempts on the same checkout until payment success.
+- Webhook processing made idempotent using processed-event dedupe to avoid duplicate paid-order handling.
+- Manual payment verification now finalizes order payment status and consumes reserved stock only after admin approval.
+
+Validation completed:
+- `pnpm run lint` passed
+- `pnpm run check:backend` passed (includes Phase 9 assertions for gateway controls, duplicate webhook idempotency, manual verification, and method-based discount rules)
+
+Pending files/tasks after Phase 9 closure:
+- Wire admin payment gateway and manual verification screens in `apps/admin-panel`
+- Wire customer manual payment upload and status visibility in `apps/front`
+- Replace current provider placeholders with production gateway credentials and signature verification hardening
+- Add refund workflow UI and settlement reconciliation reporting in later payment/report phases
+
+Phase 10 (Backend scope: GST Invoice, Tally Export, Invoice Settings) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/database/invoice-store.js`
+- `VPS/backend/src/modules/invoices/invoices.model.js`
+- `VPS/backend/src/modules/invoices/invoices.validator.js`
+- `VPS/backend/src/modules/invoices/invoices.permissions.js`
+- `VPS/backend/src/modules/invoices/invoices.service.js`
+- `VPS/backend/src/modules/invoices/invoices.controller.js`
+- `VPS/backend/src/modules/invoices/invoices.routes.js`
+- `VPS/backend/src/modules/invoices/regression-checklist.md`
+- `VPS/backend/src/modules/tally-export/tally-export.model.js`
+- `VPS/backend/src/modules/tally-export/tally-export.validator.js`
+- `VPS/backend/src/modules/tally-export/tally-export.permissions.js`
+- `VPS/backend/src/modules/tally-export/tally-export.service.js`
+- `VPS/backend/src/modules/tally-export/tally-export.controller.js`
+- `VPS/backend/src/modules/tally-export/tally-export.routes.js`
+- `VPS/backend/src/modules/tally-export/regression-checklist.md`
+- `VPS/backend/src/modules/settings/settings.model.js`
+- `VPS/backend/src/modules/settings/settings.validator.js`
+- `VPS/backend/src/modules/settings/settings.service.js`
+- `VPS/backend/src/modules/settings/settings.controller.js`
+- `VPS/backend/src/modules/settings/settings.routes.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.model.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.service.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.service.js`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/config/env.js`
+- `VPS/.env.example`
+- `VPS/backend/src/checks/run-regression-checks.js`
+
+Delivered APIs (Phase 10):
+- `PUT /api/admin/settings/invoice-settings`
+- `POST /api/admin/settings/invoice-settings/upload/:assetKey`
+- `GET /api/admin/invoices`
+- `GET /api/admin/invoices/order/:orderId`
+- `POST /api/admin/invoices/order/:orderId/generate`
+- `GET /api/admin/invoices/:invoiceId`
+- `GET /api/admin/invoices/:invoiceId/download`
+- `GET /api/admin/tally-export`
+
+Phase 10 outcomes delivered:
+- Invoice settings added for prefix/postfix, financial year format, starting number, padding, footer, terms, signatory image, bank detail visibility, HSN summary visibility, shipping/discount lines, and custom invoice fields.
+- Dedicated invoice store added with financial-year sequence tracking and locked invoice snapshots.
+- GST split logic implemented:
+  - same-state buyer -> CGST + SGST
+  - different-state buyer -> IGST
+- Paid online webhook success now auto-generates exactly one invoice per order.
+- Manual payment approval now auto-generates exactly one invoice after admin verification.
+- Invoice snapshot includes seller details, buyer details, GSTIN, place of supply, HSN, SKU, final unit price, taxable value, GST split, shipping line, discount line, round-off, grand total, amount in words, payment status, terms, and custom fields.
+- Tally CSV export added with selected date range filtering and monthly/yearly period support.
+- XML export remains future-ready TODO and is explicitly flagged as not yet enabled.
+
+Validation completed:
+- `node node_modules/eslint/bin/eslint.js backend/src` passed
+- `node backend/src/checks/run-regression-checks.js` passed (includes Phase 10 assertions for sequential invoice numbering, same-state vs inter-state GST split, invoice lock/idempotent regenerate, duplicate webhook invoice safety, custom fields, round-off, and Tally CSV totals)
+
+Pending files/tasks after Phase 10 closure:
+- Wire admin invoice settings, invoice list, and Tally export screens in `apps/admin-panel`
+- Replace current JSON placeholder invoice download payload with actual PDF/HTML invoice rendering
+
+Phase 11 outcomes delivered:
+- Added `customer-account` backend module with protected customer profile, orders, invoices, tracking, address book, GST details, saved products, guest-order linking, and reorder APIs.
+- Reorder now recalculates current pricing, MOQ, GST, shipping, and stock using the original order shipping/payment context instead of reusing stale order values.
+- Extended regression coverage for:
+  - own order visibility
+  - blocked access to another customer order
+  - customer invoice download
+  - verified-only guest order linking
+  - reorder price recalculation
+  - shipment tracking visibility after admin update
+- Added front-end customer session persistence plus new `apps/front` routes for:
+  - `/account/login`
+  - `/account`
+  - `/account/orders/:orderId`
+- Delivered customer account UI sections for profile, orders, invoices, tracking, addresses, GST details, recently viewed, recent searches, saved products, guest-order linking, and support contact actions.
+- Added product-page account entry and save-product actions tied to the new customer account APIs.
+
+Validation completed after Phase 11:
+- `node node_modules\eslint\bin\eslint.js backend\src` passed
+- `node node_modules\vite\bin\vite.js build` passed in `VPS/apps/front`
+- `node backend\src\checks\run-regression-checks.js` passed with Phase 11 assertions enabled
 
 ---
 ## 13. First Codex Execution Prompt
@@ -2056,7 +2548,7 @@ After implementation, run basic start/build checks and report results.
 ```text
 Continue Jenix Commerce from PROJECT.md.
 
-Implement Phase 1 — Core Settings, Branding, Store Profile.
+Implement Phase 1 â€” Core Settings, Branding, Store Profile.
 
 Backend:
 - settings module
@@ -2096,5 +2588,9 @@ Future dealer app can reuse:
 - self pickup/dispatch status
 
 Do not block web development waiting for mobile app.
+
+
+
+
 
 

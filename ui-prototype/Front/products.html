@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCTV & Surveillance – Jenix India</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>* { font-family: 'Inter', sans-serif; } .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }</style>
+</head>
+<body class="bg-gray-50">
+
+  <!-- HEADER -->
+  <header class="bg-gray-900 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4">
+      <div class="flex items-center gap-3 h-14">
+        <a href="index.html"><img src="../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert"></a>
+        <div class="flex-1 hidden sm:flex items-center bg-white rounded-lg overflow-hidden">
+          <input type="text" placeholder="Search cameras, smart locks, gate motors..." class="flex-1 px-4 py-2.5 text-sm outline-none">
+          <button class="bg-brand text-white px-4 py-2.5 hover:bg-brand-dark"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></button>
+        </div>
+        <div class="flex items-center gap-1 ml-auto sm:ml-0">
+          <button class="sm:hidden text-white p-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></button>
+          <a href="#" class="hidden sm:flex items-center gap-1 text-white text-xs px-2 py-1.5 hover:text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg><span>Login</span></a>
+          <a href="cart.html" class="relative text-white p-2 hover:text-brand"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg><span class="absolute -top-0.5 -right-0.5 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">3</span></a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="pb-20 md:pb-0">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+
+      <!-- BREADCRUMB -->
+      <nav class="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+        <a href="index.html" class="hover:text-brand">Home</a>
+        <span>/</span>
+        <span class="text-gray-700 font-medium">CCTV & Surveillance</span>
+      </nav>
+
+      <!-- CATEGORY HEADER + FILTER BAR -->
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">CCTV & Surveillance</h1>
+          <p class="text-sm text-gray-500 mt-0.5">128 products found</p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <!-- Sort dropdown -->
+          <select class="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 outline-none focus:ring-1 focus:ring-brand hidden sm:block">
+            <option>Sort: Relevance</option>
+            <option>Price: Low to High</option>
+            <option>Price: High to Low</option>
+            <option>Newest First</option>
+          </select>
+          <!-- Filter button mobile -->
+          <button onclick="document.getElementById('filterSheet').classList.remove('translate-y-full')" class="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg hover:border-brand hover:text-brand transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+            Filters
+            <span class="bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">2</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ACTIVE FILTER CHIPS -->
+      <div class="flex items-center gap-2 mb-4 overflow-x-auto scrollbar-hide">
+        <span class="text-xs text-gray-500 whitespace-nowrap">Active:</span>
+        <span class="flex items-center gap-1 bg-red-50 text-brand border border-red-200 text-xs px-2.5 py-1 rounded-full whitespace-nowrap">Indoor Cameras <button class="ml-1 hover:text-brand-dark">✕</button></span>
+        <span class="flex items-center gap-1 bg-red-50 text-brand border border-red-200 text-xs px-2.5 py-1 rounded-full whitespace-nowrap">4MP & Above <button class="ml-1 hover:text-brand-dark">✕</button></span>
+        <button class="text-xs text-gray-400 hover:text-brand whitespace-nowrap underline">Clear all</button>
+      </div>
+
+      <div class="flex gap-6">
+
+        <!-- FILTER SIDEBAR (Desktop) -->
+        <aside class="hidden md:block w-56 flex-shrink-0">
+          <div class="bg-white rounded-xl border border-gray-100 p-4 sticky top-20">
+            <h3 class="font-semibold text-gray-900 text-sm mb-4">Filters</h3>
+
+            <!-- Category -->
+            <div class="mb-5">
+              <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Sub-Category</p>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand" checked><span class="text-sm text-gray-600">IP Cameras</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">Bullet Cameras</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">Dome Cameras</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">PTZ Cameras</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">Fisheye</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">NVR / DVR</span></label>
+              </div>
+            </div>
+
+            <!-- Resolution -->
+            <div class="mb-5">
+              <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Resolution</p>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">2MP / 1080p</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand" checked><span class="text-sm text-gray-600">4MP</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">5MP</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">8MP / 4K</span></label>
+              </div>
+            </div>
+
+            <!-- Price Range -->
+            <div class="mb-5">
+              <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Price Range</p>
+              <div class="space-y-2">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="price" class="accent-brand"><span class="text-sm text-gray-600">Under ₹3,000</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="price" class="accent-brand" checked><span class="text-sm text-gray-600">₹3,000 – ₹10,000</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="price" class="accent-brand"><span class="text-sm text-gray-600">₹10,000 – ₹25,000</span></label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="price" class="accent-brand"><span class="text-sm text-gray-600">Above ₹25,000</span></label>
+              </div>
+            </div>
+
+            <!-- Availability -->
+            <div>
+              <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Availability</p>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="accent-brand" checked><span class="text-sm text-gray-600">In Stock Only</span></label>
+            </div>
+
+            <button class="w-full mt-5 bg-brand text-white text-sm font-medium py-2.5 rounded-lg hover:bg-brand-dark transition-colors">Apply Filters</button>
+          </div>
+        </aside>
+
+        <!-- PRODUCT GRID -->
+        <div class="flex-1">
+          <!-- Sort (mobile) -->
+          <div class="sm:hidden mb-3">
+            <select class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 outline-none">
+              <option>Sort: Relevance</option>
+              <option>Price: Low to High</option>
+              <option>Price: High to Low</option>
+              <option>Newest First</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <!-- Product cards (8 items) -->
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                <span class="absolute top-2 left-2 bg-brand text-white text-xs px-1.5 py-0.5 rounded">-15%</span>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">4MP IP Bullet Camera Outdoor Weatherproof</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹2,450</span><span class="text-xs text-gray-400 line-through">₹2,899</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">2MP Dome Camera Indoor IR Night Vision</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹1,850</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                <span class="absolute top-2 left-2 bg-brand text-white text-xs px-1.5 py-0.5 rounded">NEW</span>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">PTZ 20x Optical Zoom IP Camera</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹18,500</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">4K 8MP Fisheye 360° Camera</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹9,800</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                <span class="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-1.5 py-0.5 rounded">Hot</span>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">16 Ch NVR with 2TB HDD CCTV Kit</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹28,500</span><span class="text-xs text-gray-400 line-through">₹32,000</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">Solar Powered Outdoor Camera 4G</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹12,200</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">Mini Hidden Camera 1080p WiFi</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹3,400</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+
+            <a href="product-detail.html" class="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow group">
+              <div class="bg-gray-50 h-36 sm:h-44 flex items-center justify-center relative">
+                <svg class="w-12 h-12 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+              </div>
+              <div class="p-3">
+                <p class="text-xs text-gray-400">Jenix</p>
+                <p class="text-sm font-semibold text-gray-800 mt-0.5 mb-1.5 line-clamp-2 leading-snug group-hover:text-brand transition-colors">ANPR / License Plate Camera IR</p>
+                <div class="flex items-baseline gap-1"><span class="font-bold text-brand">₹14,500</span></div>
+                <p class="text-xs text-gray-400 mt-0.5 mb-2">+18% GST</p>
+                <button class="w-full bg-brand text-white text-xs font-semibold py-1.5 rounded-lg hover:bg-brand-dark transition-colors" onclick="event.preventDefault()">Add to Cart</button>
+              </div>
+            </a>
+          </div>
+
+          <!-- LOAD MORE -->
+          <div class="mt-8 text-center">
+            <button class="bg-white border border-gray-200 text-gray-700 text-sm font-medium px-8 py-3 rounded-lg hover:border-brand hover:text-brand transition-colors">
+              Load More (120 remaining)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- FILTER BOTTOM SHEET (Mobile) -->
+  <div id="filterSheet" class="md:hidden fixed inset-0 z-50 translate-y-full transition-transform duration-300">
+    <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('filterSheet').classList.add('translate-y-full')"></div>
+    <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[80vh] overflow-y-auto">
+      <div class="flex items-center justify-between p-4 border-b border-gray-100 sticky top-0 bg-white">
+        <h3 class="font-bold text-gray-900">Filters</h3>
+        <button onclick="document.getElementById('filterSheet').classList.add('translate-y-full')" class="p-2 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div class="p-4 space-y-5">
+        <div>
+          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Sub-Category</p>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand" checked><span class="text-sm text-gray-600">IP Cameras</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">Bullet Cameras</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">Dome Cameras</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">PTZ Cameras</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">NVR / DVR</span></label>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Resolution</p>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">2MP / 1080p</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand" checked><span class="text-sm text-gray-600">4MP</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">5MP</span></label>
+            <label class="flex items-center gap-2"><input type="checkbox" class="accent-brand"><span class="text-sm text-gray-600">8MP / 4K</span></label>
+          </div>
+        </div>
+        <div>
+          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Price Range</p>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2"><input type="radio" name="price2" class="accent-brand"><span class="text-sm text-gray-600">Under ₹3,000</span></label>
+            <label class="flex items-center gap-2"><input type="radio" name="price2" class="accent-brand" checked><span class="text-sm text-gray-600">₹3,000 – ₹10,000</span></label>
+            <label class="flex items-center gap-2"><input type="radio" name="price2" class="accent-brand"><span class="text-sm text-gray-600">₹10,000 – ₹25,000</span></label>
+            <label class="flex items-center gap-2"><input type="radio" name="price2" class="accent-brand"><span class="text-sm text-gray-600">Above ₹25,000</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t border-gray-100 flex gap-3 sticky bottom-0 bg-white">
+        <button class="flex-1 border border-gray-200 text-gray-700 text-sm font-medium py-3 rounded-lg">Clear All</button>
+        <button class="flex-1 bg-brand text-white text-sm font-semibold py-3 rounded-lg hover:bg-brand-dark" onclick="document.getElementById('filterSheet').classList.add('translate-y-full')">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHATSAPP FAB -->
+  <a href="#" class="fixed bottom-24 md:bottom-6 right-4 bg-green-500 text-white p-3 rounded-full shadow-lg hover:bg-green-600 z-40">
+    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  </a>
+
+  <!-- MOBILE BOTTOM NAV -->
+  <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+    <div class="grid grid-cols-5 h-16">
+      <a href="index.html" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span class="text-xs">Home</span></a>
+      <a href="products.html" class="flex flex-col items-center justify-center gap-1 text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg><span class="text-xs font-medium">Categories</span></a>
+      <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg><span class="text-xs">Search</span></a>
+      <a href="cart.html" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand relative"><div class="relative"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg><span class="absolute -top-1.5 -right-2 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">3</span></div><span class="text-xs">Cart</span></a>
+      <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg><span class="text-xs">Account</span></a>
+    </div>
+  </nav>
+
+</body>
+</html>

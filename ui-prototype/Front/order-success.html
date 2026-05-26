@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Placed – Jenix India</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    @keyframes checkPop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+    .check-pop { animation: checkPop 0.5s ease forwards; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-up { animation: fadeUp 0.5s ease forwards; }
+    .fade-up-1 { animation-delay: 0.3s; opacity: 0; }
+    .fade-up-2 { animation-delay: 0.5s; opacity: 0; }
+    .fade-up-3 { animation-delay: 0.7s; opacity: 0; }
+  </style>
+</head>
+<body class="bg-gray-50">
+
+  <!-- MINIMAL HEADER -->
+  <header class="bg-gray-900 border-b border-gray-800">
+    <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-center">
+      <a href="index.html"><img src="../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert"></a>
+    </div>
+  </header>
+
+  <main class="min-h-screen py-10 px-4">
+    <div class="max-w-lg mx-auto text-center">
+
+      <!-- SUCCESS ICON -->
+      <div class="check-pop w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-200">
+        <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+      </div>
+
+      <!-- HEADING -->
+      <div class="fade-up fade-up-1">
+        <h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 mb-1">Order Placed!</h1>
+        <p class="text-gray-500 mb-2">Thank you for your order, Ravi!</p>
+        <div class="inline-flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-full text-sm font-semibold">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Payment verification in progress
+        </div>
+      </div>
+
+      <!-- ORDER CARD -->
+      <div class="fade-up fade-up-2 bg-white rounded-2xl border border-gray-100 p-5 mt-6 text-left shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <p class="text-xs text-gray-400">Order Number</p>
+            <p class="text-lg font-extrabold text-gray-900 font-mono">#JNX-2026-00847</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs text-gray-400">Order Date</p>
+            <p class="text-sm font-semibold text-gray-700">18 May 2026, 2:34 PM</p>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-50 pt-4 space-y-2 text-sm mb-4">
+          <div class="flex justify-between"><span class="text-gray-500">Products</span><span class="text-gray-800 font-medium">4 items</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Payment Method</span><span class="text-gray-800 font-medium">Bank Transfer / UPI</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Payment Status</span><span class="text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded-full text-xs">Verification Pending</span></div>
+          <div class="flex justify-between"><span class="text-gray-500">Shipping To</span><span class="text-gray-800 font-medium text-right max-w-[180px]">Andheri West, Mumbai 400058</span></div>
+        </div>
+
+        <div class="border-t border-gray-50 pt-4 flex justify-between items-center">
+          <span class="font-bold text-gray-900">Amount Paid</span>
+          <span class="text-2xl font-extrabold text-brand">₹21,277</span>
+        </div>
+      </div>
+
+      <!-- WHAT HAPPENS NEXT -->
+      <div class="fade-up fade-up-2 mt-5 bg-white rounded-2xl border border-gray-100 p-5 text-left shadow-sm">
+        <h3 class="font-bold text-gray-900 mb-4">What happens next?</h3>
+        <ol class="space-y-4">
+          <li class="flex items-start gap-3">
+            <div class="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span class="text-amber-600 text-xs font-bold">1</span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Payment Verification (2–4 hrs)</p>
+              <p class="text-xs text-gray-500 mt-0.5">Our team will verify your bank transfer / UPI payment and confirm your order.</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <div class="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span class="text-blue-600 text-xs font-bold">2</span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Order Processing (1 business day)</p>
+              <p class="text-xs text-gray-500 mt-0.5">We'll pack your items and generate your GST invoice after confirmation.</p>
+            </div>
+          </li>
+          <li class="flex items-start gap-3">
+            <div class="w-7 h-7 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span class="text-green-600 text-xs font-bold">3</span>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-gray-800">Dispatch & Tracking (5–7 days)</p>
+              <p class="text-xs text-gray-500 mt-0.5">You'll receive a tracking link via SMS and email once dispatched.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+
+      <!-- ACTION BUTTONS -->
+      <div class="fade-up fade-up-3 mt-6 space-y-3">
+        <a href="#" class="flex items-center justify-center gap-2 w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-3.5 rounded-xl transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          View My Orders
+        </a>
+        <div class="grid grid-cols-2 gap-3">
+          <a href="#" class="flex items-center justify-center gap-2 border border-gray-200 text-gray-700 hover:border-brand hover:text-brand font-medium py-3 rounded-xl text-sm transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+            Track Order
+          </a>
+          <a href="#" class="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-medium py-3 rounded-xl text-sm transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </a>
+        </div>
+        <a href="index.html" class="block text-center text-sm text-gray-400 hover:text-brand transition-colors">← Continue Shopping</a>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catalogue – Jenix Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>* { font-family: 'Inter', sans-serif; } .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }</style>
+</head>
+<body class="bg-gray-100">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="hidden md:flex w-60 bg-gray-900 flex-col flex-shrink-0">
+    <div class="px-4 py-4 border-b border-gray-800"><img src="../../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert"><p class="text-gray-500 text-xs mt-1">Admin Panel</p></div>
+    <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto scrollbar-hide text-sm">
+      <a href="dashboard.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Dashboard</a>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest px-3 pt-4 pb-1">Orders</p>
+      <a href="orders.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>All Orders<span class="ml-auto bg-brand text-white text-xs rounded-full px-1.5 py-0.5 font-bold">12</span></a>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest px-3 pt-4 pb-1">Catalogue</p>
+      <a href="catalogue.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white bg-brand"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Products</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Categories</a>
+      <a href="inventory.html" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Inventory</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">HSN / Tax</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Bulk Pricing</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Import / Export</a>
+    </nav>
+    <div class="px-3 py-3 border-t border-gray-800"><div class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-800 cursor-pointer"><div class="w-8 h-8 bg-brand rounded-full flex items-center justify-center text-white font-bold text-sm">A</div><div class="min-w-0"><p class="text-white text-xs font-semibold truncate">Super Admin</p><p class="text-gray-500 text-xs truncate">admin@jenixindia.com</p></div></div></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-gray-200 flex-shrink-0">
+      <div class="flex items-center gap-3 px-4 h-14">
+        <button class="md:hidden text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div><h1 class="text-lg font-bold text-gray-900">Products / Catalogue</h1><p class="text-xs text-gray-400 hidden sm:block">Manage your product catalogue</p></div>
+        <div class="ml-auto flex items-center gap-2">
+          <a href="product-edit.html" class="flex items-center gap-1.5 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Product
+          </a>
+          <button class="w-8 h-8 bg-brand rounded-full text-white font-bold text-sm flex items-center justify-center">A</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
+
+      <!-- CATEGORY FILTER CHIPS -->
+      <div class="flex gap-2 overflow-x-auto scrollbar-hide mb-4 pb-1">
+        <button class="flex-shrink-0 bg-brand text-white text-xs font-semibold px-4 py-2 rounded-full">All (524)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">CCTV (128)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Smart Locks (86)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Gate Automation (54)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Access Control (72)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Routers (48)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Smart Home (62)</button>
+        <button class="flex-shrink-0 bg-white text-gray-600 text-xs font-medium px-4 py-2 rounded-full border border-gray-200 hover:border-brand hover:text-brand transition-colors">Inactive (18)</button>
+      </div>
+
+      <!-- FILTER BAR -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-3 mb-4 shadow-sm">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <div class="flex-1 relative">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" placeholder="Search by name, SKU, model number..." class="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-1 focus:ring-brand">
+          </div>
+          <select class="text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-1 focus:ring-brand bg-white">
+            <option>All Status</option>
+            <option>Active</option>
+            <option>Inactive</option>
+          </select>
+          <select class="text-sm border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:ring-1 focus:ring-brand bg-white">
+            <option>All Stock</option>
+            <option>In Stock</option>
+            <option>Low Stock</option>
+            <option>Out of Stock</option>
+          </select>
+          <button class="flex items-center gap-2 border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export
+          </button>
+        </div>
+      </div>
+
+      <!-- BULK ACTIONS (appears when items selected) -->
+      <div class="bg-brand/10 border border-brand/20 rounded-xl p-3 mb-4 flex items-center gap-3">
+        <span class="text-sm font-semibold text-brand">3 products selected</span>
+        <div class="flex gap-2 ml-auto">
+          <button class="text-xs bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50">Activate</button>
+          <button class="text-xs bg-white border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50">Deactivate</button>
+          <button class="text-xs bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50">Delete</button>
+        </div>
+      </div>
+
+      <!-- PRODUCT TABLE (Desktop) -->
+      <div class="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th class="text-left px-5 py-3.5 w-8"><input type="checkbox" class="accent-brand"></th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Product</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">SKU</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Category</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Price</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Stock</th>
+              <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-3 py-3.5">Status</th>
+              <th class="px-3 py-3.5"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand" checked></td>
+              <td class="px-3 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0"><svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div>
+                  <div><p class="font-semibold text-gray-800 text-sm">4MP IP Bullet Camera Outdoor</p><p class="text-xs text-gray-400">HSN: 85258000 · 18% GST</p></div>
+                </div>
+              </td>
+              <td class="px-3 py-4 font-mono text-xs text-gray-600">JNX-BC4MP-01</td>
+              <td class="px-3 py-4 text-xs text-gray-600">CCTV</td>
+              <td class="px-3 py-4"><p class="font-semibold text-brand">₹2,450</p><p class="text-xs text-gray-400 line-through">₹2,899</p></td>
+              <td class="px-3 py-4"><span class="flex items-center gap-1 text-xs text-green-600 font-medium"><span class="w-2 h-2 bg-green-500 rounded-full"></span>In Stock</span></td>
+              <td class="px-3 py-4"><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked class="sr-only peer"><div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"></div></label></td>
+              <td class="px-3 py-4">
+                <div class="flex items-center gap-1">
+                  <a href="product-edit.html" class="text-xs text-brand hover:underline font-medium">Edit</a>
+                  <span class="text-gray-200">|</span>
+                  <button class="text-xs text-gray-400 hover:text-brand">Clone</button>
+                </div>
+              </td>
+            </tr>
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand" checked></td>
+              <td class="px-3 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0"><svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div>
+                  <div><p class="font-semibold text-gray-800 text-sm">Fingerprint + PIN Smart Door Lock</p><p class="text-xs text-gray-400">HSN: 83013000 · 18% GST</p></div>
+                </div>
+              </td>
+              <td class="px-3 py-4 font-mono text-xs text-gray-600">JNX-SL-FP01</td>
+              <td class="px-3 py-4 text-xs text-gray-600">Smart Locks</td>
+              <td class="px-3 py-4"><p class="font-semibold text-brand">₹8,999</p></td>
+              <td class="px-3 py-4"><span class="flex items-center gap-1 text-xs text-amber-600 font-medium"><span class="w-2 h-2 bg-amber-500 rounded-full"></span>Low Stock (3)</span></td>
+              <td class="px-3 py-4"><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked class="sr-only peer"><div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"></div></label></td>
+              <td class="px-3 py-4"><div class="flex items-center gap-1"><a href="product-edit.html" class="text-xs text-brand hover:underline font-medium">Edit</a><span class="text-gray-200">|</span><button class="text-xs text-gray-400 hover:text-brand">Clone</button></div></td>
+            </tr>
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand" checked></td>
+              <td class="px-3 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0"><svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0"/></svg></div>
+                  <div><p class="font-semibold text-gray-800 text-sm">4G SIM Card Router Industrial Grade</p><p class="text-xs text-gray-400">HSN: 85176200 · 18% GST</p></div>
+                </div>
+              </td>
+              <td class="px-3 py-4 font-mono text-xs text-gray-600">JNX-4GR-IND</td>
+              <td class="px-3 py-4 text-xs text-gray-600">4G Routers</td>
+              <td class="px-3 py-4"><p class="font-semibold text-brand">₹4,500</p><p class="text-xs text-gray-400 line-through">₹5,200</p></td>
+              <td class="px-3 py-4"><span class="flex items-center gap-1 text-xs text-green-600 font-medium"><span class="w-2 h-2 bg-green-500 rounded-full"></span>In Stock</span></td>
+              <td class="px-3 py-4"><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked class="sr-only peer"><div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"></div></label></td>
+              <td class="px-3 py-4"><div class="flex items-center gap-1"><a href="product-edit.html" class="text-xs text-brand hover:underline font-medium">Edit</a><span class="text-gray-200">|</span><button class="text-xs text-gray-400 hover:text-brand">Clone</button></div></td>
+            </tr>
+            <tr class="hover:bg-gray-50 transition-colors opacity-60">
+              <td class="px-5 py-4"><input type="checkbox" class="accent-brand"></td>
+              <td class="px-3 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0"><svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18"/></svg></div>
+                  <div><p class="font-semibold text-gray-800 text-sm">Sliding Gate Motor 600kg (Discontinued)</p><p class="text-xs text-gray-400">HSN: 85015100 · 18% GST</p></div>
+                </div>
+              </td>
+              <td class="px-3 py-4 font-mono text-xs text-gray-600">JNX-SGM-600</td>
+              <td class="px-3 py-4 text-xs text-gray-600">Gate Automation</td>
+              <td class="px-3 py-4"><p class="font-semibold text-gray-400">₹15,500</p></td>
+              <td class="px-3 py-4"><span class="flex items-center gap-1 text-xs text-red-600 font-medium"><span class="w-2 h-2 bg-red-500 rounded-full"></span>Out of Stock</span></td>
+              <td class="px-3 py-4"><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" class="sr-only peer"><div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"></div></label></td>
+              <td class="px-3 py-4"><div class="flex items-center gap-1"><a href="product-edit.html" class="text-xs text-brand hover:underline font-medium">Edit</a><span class="text-gray-200">|</span><button class="text-xs text-gray-400 hover:text-brand">Clone</button></div></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex items-center justify-between px-5 py-4 border-t border-gray-100">
+          <p class="text-xs text-gray-500">Showing 1–10 of 524 products</p>
+          <div class="flex items-center gap-1">
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-brand text-xs">←</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-white text-xs font-semibold">1</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 text-xs">2</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 text-xs">3</button>
+            <button class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:border-brand text-xs">→</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MOBILE CARDS -->
+      <div class="md:hidden space-y-3">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <div class="flex items-start gap-3">
+            <div class="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0"><svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-gray-800 text-sm line-clamp-1">4MP IP Bullet Camera Outdoor</p>
+              <p class="text-xs text-gray-400 font-mono mt-0.5">JNX-BC4MP-01 · CCTV</p>
+              <div class="flex items-center gap-2 mt-1.5">
+                <span class="font-bold text-brand text-sm">₹2,450</span>
+                <span class="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>In Stock</span>
+              </div>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked class="sr-only peer"><div class="w-10 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"></div></label>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <a href="product-edit.html" class="flex-1 bg-brand text-white text-xs font-semibold py-2 rounded-lg text-center">Edit</a>
+            <button class="flex-1 border border-gray-200 text-gray-700 text-xs font-medium py-2 rounded-lg">Clone</button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-amber-200 p-4 bg-amber-50/30">
+          <div class="flex items-start gap-3">
+            <div class="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0"><svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg></div>
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-gray-800 text-sm line-clamp-1">Fingerprint + PIN Smart Lock</p>
+              <p class="text-xs text-gray-400 font-mono mt-0.5">JNX-SL-FP01 · Smart Locks</p>
+              <div class="flex items-center gap-2 mt-1.5">
+                <span class="font-bold text-brand text-sm">₹8,999</span>
+                <span class="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"><span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>Low Stock (3)</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <a href="product-edit.html" class="flex-1 bg-brand text-white text-xs font-semibold py-2 rounded-lg text-center">Edit</a>
+            <a href="inventory.html" class="flex-1 border border-amber-300 text-amber-700 text-xs font-medium py-2 rounded-lg text-center">Adjust Stock</a>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 z-40">
+  <div class="grid grid-cols-5 h-16">
+    <a href="dashboard.html" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg><span class="text-xs">Dashboard</span></a>
+    <a href="orders.html" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg><span class="text-xs">Orders</span></a>
+    <a href="catalogue.html" class="flex flex-col items-center justify-center gap-1 text-brand"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg><span class="text-xs font-medium">Products</span></a>
+    <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg><span class="text-xs">Payments</span></a>
+    <a href="#" class="flex flex-col items-center justify-center gap-1 text-gray-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span class="text-xs">Settings</span></a>
+  </div>
+</nav>
+
+</body>
+</html>

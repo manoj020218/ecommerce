@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login – Jenix India</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>* { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-sm">
+
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <img src="../../jenix logo.png" alt="Jenix" class="h-10 brightness-0 invert mx-auto mb-2">
+      <p class="text-gray-400 text-sm">Admin Panel</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="bg-gray-800 rounded-2xl border border-gray-700 p-7 shadow-2xl">
+      <h1 class="text-xl font-bold text-white mb-1">Sign In</h1>
+      <p class="text-gray-400 text-sm mb-6">Enter your admin credentials</p>
+
+      <form action="dashboard.html" method="GET">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wide">Email Address</label>
+            <input type="email" value="admin@jenixindia.com" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-brand focus:border-transparent placeholder-gray-500 transition-all">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wide">Password</label>
+            <div class="relative">
+              <input type="password" value="••••••••••" class="w-full bg-gray-700 border border-gray-600 text-white rounded-xl px-4 py-3 pr-11 text-sm outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all">
+              <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" class="accent-brand" checked>
+              <span class="text-xs text-gray-400">Remember me</span>
+            </label>
+            <a href="#" class="text-xs text-brand hover:underline">Forgot password?</a>
+          </div>
+
+          <a href="dashboard.html" class="block w-full bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl text-center transition-colors text-sm mt-2">
+            Sign In to Admin Panel
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Security note -->
+    <p class="text-center text-xs text-gray-500 mt-6 flex items-center justify-center gap-1.5">
+      <svg class="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      Secure admin access · All actions are activity-logged
+    </p>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Product – Jenix Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { theme: { extend: { colors: { brand: { DEFAULT: '#E8231A', dark: '#C41D15' } } } } }</script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>* { font-family: 'Inter', sans-serif; } .scrollbar-hide::-webkit-scrollbar { display: none; } .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; } .form-label { @apply block text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide; } .form-input { @apply w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-brand transition-all; } .form-section { @apply bg-white rounded-2xl border border-gray-100 p-5 shadow-sm; }</style>
+</head>
+<body class="bg-gray-100">
+<div class="flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="hidden lg:flex w-60 bg-gray-900 flex-col flex-shrink-0">
+    <div class="px-4 py-4 border-b border-gray-800"><img src="../../jenix logo.png" alt="Jenix" class="h-7 brightness-0 invert"><p class="text-gray-500 text-xs mt-1">Admin Panel</p></div>
+    <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto scrollbar-hide text-sm">
+      <a href="dashboard.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>Dashboard</a>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest px-3 pt-4 pb-1">Catalogue</p>
+      <a href="catalogue.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-white bg-brand"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>Products</a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Categories</a>
+      <a href="inventory.html" class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 text-xs pl-8">Inventory</a>
+    </nav>
+    <div class="px-3 py-3 border-t border-gray-800"><div class="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-800 cursor-pointer"><div class="w-8 h-8 bg-brand rounded-full flex items-center justify-center text-white font-bold text-sm">A</div><div><p class="text-white text-xs font-semibold">Super Admin</p><p class="text-gray-500 text-xs">admin@jenixindia.com</p></div></div></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- STICKY TOP BAR WITH SAVE ACTIONS -->
+    <header class="bg-white border-b border-gray-200 flex-shrink-0 z-10">
+      <div class="flex items-center gap-3 px-4 h-14">
+        <button class="lg:hidden text-gray-600 p-1.5 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div>
+          <nav class="flex items-center gap-1.5 text-xs text-gray-400">
+            <a href="catalogue.html" class="hover:text-brand">Catalogue</a>
+            <span>/</span>
+            <span class="text-gray-700 font-semibold">Add New Product</span>
+          </nav>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+          <a href="catalogue.html" class="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 hover:bg-gray-100 rounded-xl transition-colors">Discard</a>
+          <button class="flex items-center gap-1.5 bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-300 transition-colors">Save Draft</button>
+          <button class="flex items-center gap-1.5 bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            Save & Publish
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- FORM CONTENT -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
+      <div class="flex flex-col xl:flex-row gap-5 max-w-6xl">
+
+        <!-- LEFT COLUMN: Main form -->
+        <div class="flex-1 space-y-5">
+
+          <!-- BASIC INFO -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">1</span>Basic Information</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="form-label">Product Title *</label>
+                <input type="text" class="form-input" placeholder="e.g. 4MP IP Bullet Camera Outdoor Weatherproof with 60m IR" value="4MP IP Bullet Camera Outdoor Weatherproof with IR Night Vision">
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label">Category *</label>
+                  <select class="form-input bg-white">
+                    <option>CCTV & Surveillance</option>
+                    <option>Smart Locks</option>
+                    <option>Gate Automation</option>
+                    <option>Access Control</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Brand</label>
+                  <input type="text" class="form-input" placeholder="e.g. Jenix / Hikvision / Dahua" value="Jenix">
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="form-label">Model Number / MPN</label>
+                  <input type="text" class="form-input" placeholder="e.g. BC-4M-IR60" value="BC-4M-IR60">
+                </div>
+                <div>
+                  <label class="form-label">SKU (Auto-generated)</label>
+                  <input type="text" class="form-input bg-gray-50 font-mono" value="JNX-BC4MP-01" readonly>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Short Description</label>
+                <textarea class="form-input h-20 resize-none" placeholder="Brief product description (shown in listings)">Outdoor 4MP IP bullet camera with 60m infrared night vision. IP67 weatherproof, H.265+ compression, PoE supported. Ideal for shops, offices and homes.</textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- IMAGES -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">2</span>Product Images</h2>
+            <div class="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center hover:border-brand transition-colors cursor-pointer mb-4">
+              <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              <p class="text-sm font-medium text-gray-600">Drag & drop images here, or <span class="text-brand">browse files</span></p>
+              <p class="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB each · Recommended: 1200×1200px square</p>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              <div class="aspect-square bg-gray-100 rounded-xl flex items-center justify-center border-2 border-brand relative">
+                <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg>
+                <span class="absolute top-1 left-1 bg-brand text-white text-xs px-1 rounded font-bold">Main</span>
+              </div>
+              <div class="aspect-square bg-gray-100 rounded-xl flex items-center justify-center border border-gray-200"><svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div>
+              <div class="aspect-square bg-gray-100 rounded-xl flex items-center justify-center border border-gray-200"><svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/></svg></div>
+              <div class="aspect-square bg-gray-50 rounded-xl flex items-center justify-center border-2 border-dashed border-gray-200 hover:border-brand transition-colors cursor-pointer"><svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></div>
+            </div>
+          </div>
+
+          <!-- PRICING -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">3</span>Pricing</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label class="form-label">Base Price (₹) *</label>
+                <input type="number" class="form-input" value="2899">
+              </div>
+              <div>
+                <label class="form-label">Sale Price (₹)</label>
+                <input type="number" class="form-input" value="2450">
+              </div>
+              <div>
+                <label class="form-label">MOQ</label>
+                <input type="number" class="form-input" value="1" min="1">
+              </div>
+            </div>
+
+            <!-- Bulk pricing toggle -->
+            <div class="flex items-center justify-between mb-3">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="bulkToggle" class="accent-brand" checked>
+                <span class="text-sm font-semibold text-gray-700">Enable Bulk Pricing</span>
+              </label>
+            </div>
+            <!-- Bulk pricing slabs -->
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+              <div class="space-y-2">
+                <div class="grid grid-cols-3 gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide px-1"><span>Min Qty</span><span>Max Qty</span><span>Price (₹)</span></div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                  <input type="number" class="form-input py-2 text-sm" value="1">
+                  <input type="number" class="form-input py-2 text-sm" value="4">
+                  <input type="number" class="form-input py-2 text-sm" value="2450">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                  <input type="number" class="form-input py-2 text-sm" value="5">
+                  <input type="number" class="form-input py-2 text-sm" value="19">
+                  <input type="number" class="form-input py-2 text-sm" value="2200">
+                </div>
+                <div class="grid grid-cols-3 gap-2 items-center">
+                  <input type="number" class="form-input py-2 text-sm" value="20">
+                  <input type="text" class="form-input py-2 text-sm" placeholder="No limit" value="∞">
+                  <input type="number" class="form-input py-2 text-sm" value="2000">
+                </div>
+              </div>
+              <button class="mt-3 text-xs text-brand font-medium hover:underline flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Slab
+              </button>
+            </div>
+          </div>
+
+          <!-- INVENTORY -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">4</span>Inventory</h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="form-label">Stock Quantity *</label>
+                <input type="number" class="form-input" value="42">
+              </div>
+              <div>
+                <label class="form-label">Low Stock Alert</label>
+                <input type="number" class="form-input" value="5" placeholder="e.g. 5">
+              </div>
+              <div>
+                <label class="form-label">Max Order Qty</label>
+                <input type="number" class="form-input" placeholder="Leave blank for no limit">
+              </div>
+            </div>
+            <div class="flex items-center gap-6 mt-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" class="accent-brand">
+                <span class="text-sm text-gray-700">Allow Backorder</span>
+              </label>
+            </div>
+            <div class="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700">
+              <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              Exact stock quantity is never shown to customers. Only "In Stock / Low Stock / Out of Stock" is displayed.
+            </div>
+          </div>
+
+          <!-- GST & HSN -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">5</span>GST & HSN</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label class="form-label">HSN Code *</label>
+                <input type="text" class="form-input" value="85258000" placeholder="e.g. 85258000">
+              </div>
+              <div>
+                <label class="form-label">GST Rate *</label>
+                <select class="form-input bg-white">
+                  <option value="0">0% (Exempt)</option>
+                  <option value="5">5%</option>
+                  <option value="12">12%</option>
+                  <option value="18" selected>18%</option>
+                  <option value="28">28%</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">Product Weight (kg)</label>
+                <input type="number" step="0.1" class="form-input" value="0.58" placeholder="For shipping calc">
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-3 gap-4">
+              <div class="text-center p-3 bg-gray-50 rounded-xl">
+                <p class="text-xs text-gray-500">CGST</p>
+                <p class="font-bold text-gray-800">9%</p>
+              </div>
+              <div class="text-center p-3 bg-gray-50 rounded-xl">
+                <p class="text-xs text-gray-500">SGST</p>
+                <p class="font-bold text-gray-800">9%</p>
+              </div>
+              <div class="text-center p-3 bg-gray-50 rounded-xl">
+                <p class="text-xs text-gray-500">IGST</p>
+                <p class="font-bold text-gray-800">18%</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- DESCRIPTION & SPECS -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">6</span>Full Description & Specifications</h2>
+            <div class="mb-4">
+              <label class="form-label">Full Description</label>
+              <div class="border border-gray-200 rounded-xl overflow-hidden">
+                <div class="flex items-center gap-1 bg-gray-50 border-b border-gray-200 p-2">
+                  <button class="p-1.5 rounded hover:bg-gray-200 text-sm font-bold text-gray-600">B</button>
+                  <button class="p-1.5 rounded hover:bg-gray-200 text-sm italic text-gray-600">I</button>
+                  <button class="p-1.5 rounded hover:bg-gray-200 text-sm text-gray-600 underline">U</button>
+                  <div class="w-px h-4 bg-gray-200 mx-1"></div>
+                  <button class="p-1.5 rounded hover:bg-gray-200 text-xs text-gray-600">H2</button>
+                  <button class="p-1.5 rounded hover:bg-gray-200 text-xs text-gray-600">H3</button>
+                  <div class="w-px h-4 bg-gray-200 mx-1"></div>
+                  <button class="p-1.5 rounded hover:bg-gray-200 text-xs text-gray-600">• List</button>
+                </div>
+                <textarea class="w-full px-4 py-3 text-sm outline-none h-32 resize-none" placeholder="Full HTML/rich text product description...">The Jenix 4MP IP Bullet Camera delivers crystal-clear 2560×1440 resolution surveillance, perfect for outdoor applications requiring high detail capture...
+
+Key features:
+• Ultra HD 4MP resolution captures license plates and faces clearly
+• 60m infrared night vision for round-the-clock security
+• IP67 fully weatherproof – withstands rain, dust, and extreme temperatures...</textarea>
+              </div>
+            </div>
+
+            <!-- Specs -->
+            <label class="form-label">Technical Specifications</label>
+            <div class="space-y-2">
+              <div class="flex gap-2">
+                <input type="text" class="form-input py-2" placeholder="Specification name" value="Image Sensor">
+                <input type="text" class="form-input py-2" placeholder="Value" value="1/3 inch Progressive CMOS">
+                <button class="p-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              </div>
+              <div class="flex gap-2">
+                <input type="text" class="form-input py-2" placeholder="Specification name" value="Resolution">
+                <input type="text" class="form-input py-2" placeholder="Value" value="4MP (2560 × 1440)">
+                <button class="p-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              </div>
+              <div class="flex gap-2">
+                <input type="text" class="form-input py-2" placeholder="Specification name" value="IR Range">
+                <input type="text" class="form-input py-2" placeholder="Value" value="Up to 60 metres">
+                <button class="p-2 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+              </div>
+              <button class="text-xs text-brand font-medium hover:underline flex items-center gap-1 mt-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Specification Row
+              </button>
+            </div>
+          </div>
+
+          <!-- SEARCH KEYWORDS -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4 flex items-center gap-2"><span class="w-6 h-6 bg-brand text-white rounded-full text-xs flex items-center justify-center font-bold">7</span>Search Keywords (Buyer Intent)</h2>
+            <div class="space-y-4">
+              <div>
+                <label class="form-label">Technical Keywords</label>
+                <input type="text" class="form-input" value="ip camera, 4mp camera, bullet camera, outdoor cctv, poe camera, h265">
+                <p class="text-xs text-gray-400 mt-1">Comma-separated technical terms</p>
+              </div>
+              <div>
+                <label class="form-label">Customer Problem Phrases (Hindi/Hinglish OK)</label>
+                <input type="text" class="form-input" value="shop ke liye camera, dukan ka camera, bahar ki recording, night vision camera">
+                <p class="text-xs text-gray-400 mt-1">How customers describe their problem — critical for search</p>
+              </div>
+              <div>
+                <label class="form-label">Use Cases</label>
+                <input type="text" class="form-input" value="Shop entrance, Parking area, Office perimeter, Warehouse outdoor">
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN: Status & SEO -->
+        <div class="xl:w-72 space-y-5">
+
+          <!-- STATUS -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4">Product Status</h2>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="text-sm font-medium text-gray-700">Active / Visible</label>
+                <label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked class="sr-only peer"><div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-5 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div></label>
+              </div>
+            </div>
+            <div class="mt-4 p-3 bg-green-50 border border-green-100 rounded-xl flex items-center gap-2">
+              <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+              <span class="text-xs text-green-700 font-medium">Product will be visible on storefront</span>
+            </div>
+          </div>
+
+          <!-- SEO -->
+          <div class="form-section">
+            <h2 class="font-bold text-gray-900 mb-4">SEO & Google Shopping</h2>
+            <div class="space-y-3">
+              <div>
+                <label class="form-label">URL Slug</label>
+                <input type="text" class="form-input font-mono text-xs" value="4mp-ip-bullet-camera-outdoor-weatherproof">
+              </div>
+              <div>
+                <label class="form-label">Meta Title</label>
+                <input type="text" class="form-input" value="4MP IP Bullet Camera Outdoor – Buy Online | Jenix India">
+                <p class="text-xs text-gray-400 mt-1"><span class="text-green-600">57/60</span> characters</p>
+              </div>
+              <div>
+                <label class="form-label">Meta Description</label>
+                <textarea class="form-input h-16 resize-none text-xs" placeholder="SEO meta description...">Buy Jenix 4MP outdoor IP bullet camera with 60m IR night vision. IP67 weatherproof, H.265+ compression. GST invoice available. Free shipping above ₹999.</textarea>
+                <p class="text-xs text-gray-400 mt-1"><span class="text-green-600">152/160</span> characters</p>
+              </div>
+              <div>
+                <label class="form-label">Google Shopping Category</label>
+                <input type="text" class="form-input" value="Electronics > Cameras > Surveillance Cameras" placeholder="Google product category">
+              </div>
+            </div>
+          </div>
+
+          <!-- PUBLISH ACTIONS -->
+          <div class="form-section">
+            <button class="w-full bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-xl text-sm transition-colors mb-3">
+              ✓ Save & Publish Product
+            </button>
+            <button class="w-full border border-gray-200 text-gray-700 font-medium py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors mb-2">
+              Save as Draft
+            </button>
+            <a href="catalogue.html" class="block text-center text-sm text-gray-400 hover:text-brand transition-colors">Discard Changes</a>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+</body>
+</html>

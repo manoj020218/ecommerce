@@ -5,8 +5,10 @@ const {
   writeSearchStore
 } = require("../../database/search-store");
 const { readCatalogStore } = require("../../database/catalog-store");
+const { readContentStore } = require("../../database/content-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { toPublicProduct } = require("../products/products.model");
+const { isBlogPublished, toPublicBlogCard } = require("../blogs/blogs.model");
 const {
   normalizeSearchText,
   tokenizeSearchText,
@@ -142,6 +144,23 @@ function buildSearchTextForProduct(product, categoryName, keywordMapping) {
   );
 }
 
+function buildSearchTextForBlog(blog, categoryName) {
+  return normalizeSearchText(
+    [
+      blog.title,
+      blog.slug,
+      blog.excerpt,
+      blog.content,
+      categoryName,
+      blog.author,
+      ...(blog.tags || []),
+      ...(blog.faqItems || []).flatMap((item) => [item.question, item.answer])
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
 function buildExpandedTerms(normalizedQuery, synonymLookup) {
   const expanded = new Set([normalizedQuery]);
   const tokens = tokenizeSearchText(normalizedQuery);
@@ -163,6 +182,7 @@ function computeProductScore({
   queryTokens,
   expandedTerms,
   searchText,
+  searchTokens,
   phraseBoost,
   signal,
   userViewedSet
@@ -204,7 +224,10 @@ function computeProductScore({
     if (term.length < 2) {
       continue;
     }
-    if (searchText.includes(term)) {
+
+    const matched =
+      searchTokens.includes(term) || (term.length >= 3 && searchText.includes(term));
+    if (matched) {
       tokenHitCount += 1;
       score += term === normalizedQuery ? 0 : 12;
     }
@@ -244,9 +267,26 @@ function computeProductScore({
 function createSearchResultEntry(product, scoreEntry) {
   return {
     id: product.id,
+    entityType: "product",
+    title: product.title,
+    slug: product.slug,
+    publicPath: `/products/${product.slug}`,
     score: Number(scoreEntry.score.toFixed(3)),
     reasons: scoreEntry.reasons,
     product: toPublicProduct(product)
+  };
+}
+
+function createBlogSearchResultEntry(blog, category, scoreEntry) {
+  return {
+    id: blog.id,
+    entityType: "blog",
+    title: blog.title,
+    slug: blog.slug,
+    publicPath: `/guides/${blog.slug}`,
+    score: Number(scoreEntry.score.toFixed(3)),
+    reasons: scoreEntry.reasons,
+    blog: toPublicBlogCard(blog, category || null)
   };
 }
 
@@ -314,8 +354,9 @@ async function performSearch(input) {
   const normalizedQuery = normalizeSearchText(input.q);
   const queryTokens = tokenizeSearchText(normalizedQuery);
 
-  const [catalogStore, searchStore] = await Promise.all([
+  const [catalogStore, contentStore, searchStore] = await Promise.all([
     readCatalogStore(),
+    readContentStore(),
     readSearchStore()
   ]);
   ensureSearchStoreShape(searchStore);
@@ -323,8 +364,16 @@ async function performSearch(input) {
   const redirect = resolveSearchRedirect(searchStore.searchRedirects, normalizedQuery);
 
   const activeProducts = catalogStore.products.filter((product) => product.isActive);
+  const publishedBlogs = Array.isArray(contentStore.blogs)
+    ? contentStore.blogs.filter((blog) => isBlogPublished(blog))
+    : [];
   const categoriesById = new Map(
     catalogStore.categories.map((category) => [category.id, category])
+  );
+  const blogCategoriesById = new Map(
+    (Array.isArray(contentStore.blogCategories) ? contentStore.blogCategories : []).map(
+      (category) => [category.id, category]
+    )
   );
 
   const synonymLookup = buildSynonymLookup(searchStore.searchSynonyms);
@@ -363,7 +412,7 @@ async function performSearch(input) {
 
   let results = [];
   if (!redirect) {
-    results = activeProducts
+    const productResults = activeProducts
       .map((product) => {
         const categoryName =
           categoriesById.get(product.categoryId || "")?.name || "";
@@ -373,6 +422,7 @@ async function performSearch(input) {
           categoryName,
           keywordMapping
         );
+        const searchTokens = tokenizeSearchText(searchText);
 
         const scoreEntry = computeProductScore({
           product,
@@ -380,6 +430,7 @@ async function performSearch(input) {
           queryTokens,
           expandedTerms,
           searchText,
+          searchTokens,
           phraseBoost: Number(phraseBoostByProduct.get(product.id) || 0),
           signal: signalMap.get(product.id),
           userViewedSet
@@ -391,13 +442,56 @@ async function performSearch(input) {
 
         return createSearchResultEntry(product, scoreEntry);
       })
-      .filter(Boolean)
+      .filter(Boolean);
+
+    const blogResults = publishedBlogs
+      .map((blog) => {
+        const category = blogCategoriesById.get(blog.categoryId) || null;
+        const categoryName = category?.name || "";
+        const searchText = buildSearchTextForBlog(blog, categoryName);
+        const searchTokens = tokenizeSearchText(searchText);
+
+        const scoreEntry = computeProductScore({
+          product: {
+            id: blog.id,
+            title: blog.title,
+            slug: blog.slug,
+            sku: "",
+            modelNumber: "",
+            brand: blog.author || ""
+          },
+          normalizedQuery,
+          queryTokens,
+          expandedTerms,
+          searchText,
+          searchTokens,
+          phraseBoost: 0,
+          signal: null,
+          userViewedSet: new Set()
+        });
+
+        if (scoreEntry.score <= 0) {
+          return null;
+        }
+
+        return createBlogSearchResultEntry(blog, category, scoreEntry);
+      })
+      .filter(Boolean);
+
+    results = [...productResults, ...blogResults]
       .sort((a, b) => {
         if (b.score !== a.score) {
           return b.score - a.score;
         }
-        const aUpdatedAt = Date.parse(a.product.updatedAt || "");
-        const bUpdatedAt = Date.parse(b.product.updatedAt || "");
+
+        const aUpdatedAt =
+          a.entityType === "product"
+            ? Date.parse(a.product.updatedAt || "")
+            : Date.parse(a.blog.updatedAt || a.blog.publishedAt || "");
+        const bUpdatedAt =
+          b.entityType === "product"
+            ? Date.parse(b.product.updatedAt || "")
+            : Date.parse(b.blog.updatedAt || b.blog.publishedAt || "");
         return bUpdatedAt - aUpdatedAt;
       })
       .slice(0, input.limit);
@@ -433,14 +527,18 @@ async function performSearch(input) {
 
 async function suggestSearch(input) {
   const normalizedQuery = normalizeSearchText(input.q);
-  const [catalogStore, searchStore] = await Promise.all([
+  const [catalogStore, contentStore, searchStore] = await Promise.all([
     readCatalogStore(),
+    readContentStore(),
     readSearchStore()
   ]);
   ensureSearchStoreShape(searchStore);
 
   const activeProducts = catalogStore.products.filter((product) => product.isActive);
   const activeCategories = catalogStore.categories.filter((category) => category.isActive);
+  const publishedBlogs = Array.isArray(contentStore.blogs)
+    ? contentStore.blogs.filter((blog) => isBlogPublished(blog))
+    : [];
 
   const suggestions = new Set();
   if (normalizedQuery) {
@@ -460,6 +558,14 @@ async function suggestSearch(input) {
       const normalizedName = normalizeSearchText(name);
       if (normalizedName && normalizedName.includes(normalizedQuery)) {
         suggestions.add(name);
+      }
+    });
+
+    publishedBlogs.forEach((blog) => {
+      const title = String(blog.title || "").trim();
+      const normalizedTitle = normalizeSearchText(title);
+      if (normalizedTitle && normalizedTitle.includes(normalizedQuery)) {
+        suggestions.add(title);
       }
     });
 
@@ -505,6 +611,22 @@ async function suggestSearch(input) {
       slug: category.slug
     }));
 
+  const blogMatches = publishedBlogs
+    .filter((blog) => {
+      if (!normalizedQuery) {
+        return false;
+      }
+      const text = buildSearchTextForBlog(blog, "");
+      return text.includes(normalizedQuery);
+    })
+    .slice(0, input.limit)
+    .map((blog) => ({
+      id: blog.id,
+      title: blog.title,
+      slug: blog.slug,
+      publicPath: `/guides/${blog.slug}`
+    }));
+
   const customerId = input.customerId || null;
   const recentSearches = customerId
     ? searchStore.userSearchHistory
@@ -537,6 +659,7 @@ async function suggestSearch(input) {
     suggestions: [...suggestions].slice(0, input.limit),
     productMatches,
     categoryMatches,
+    blogMatches,
     recentSearches,
     recentlyViewed
   };

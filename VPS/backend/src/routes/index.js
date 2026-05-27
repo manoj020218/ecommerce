@@ -49,6 +49,14 @@ const {
   createAdminAbandonedCartRouter,
   createPublicRecoveryRouter
 } = require("../modules/abandoned-cart/abandoned-cart.routes");
+const {
+  createAdminBlogsRouter,
+  createPublicBlogsRouter
+} = require("../modules/blogs/blogs.routes");
+const {
+  createAdminWebsiteLeadsRouter,
+  createPublicWebsiteLeadsRouter
+} = require("../modules/website-leads/website-leads.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -79,8 +87,12 @@ function createApiRouter() {
   router.use("/admin/invoices", createInvoicesRouter());
   router.use("/admin/tally-export", createTallyExportRouter());
   router.use("/admin/shipping", createAdminShippingRouter());
+  router.use("/admin/blogs", createAdminBlogsRouter());
+  router.use("/admin/website-leads", createAdminWebsiteLeadsRouter());
   router.use("/shipping", createPublicShippingRouter());
   router.use("/recovery", createPublicRecoveryRouter());
+  router.use("/blogs", createPublicBlogsRouter());
+  router.use("/website-leads", createPublicWebsiteLeadsRouter());
 
   return router;
 }

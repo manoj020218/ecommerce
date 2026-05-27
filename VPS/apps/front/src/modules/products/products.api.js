@@ -13,6 +13,22 @@ export function listProducts(params = {}) {
   return apiFetch(`/products${suffix}`);
 }
 
+export function searchStorefront(params = {}) {
+  const query = new URLSearchParams();
+  if (params.q) {
+    query.set("q", params.q);
+  }
+  if (params.limit) {
+    query.set("limit", String(params.limit));
+  }
+  if (params.sessionId) {
+    query.set("sessionId", params.sessionId);
+  }
+
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return apiFetch(`/search${suffix}`, { auth: true });
+}
+
 export function getProduct(slug) {
   return apiFetch(`/products/${slug}`);
 }

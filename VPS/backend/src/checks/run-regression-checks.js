@@ -7,6 +7,7 @@ const { resetPaymentStoreForRegression } = require("../database/payment-store");
 const { resetRecoveryStoreForRegression } = require("../database/recovery-store");
 const { resetSearchStoreForRegression } = require("../database/search-store");
 const { resetShippingStoreForRegression } = require("../database/shipping-store");
+const { resetContentStoreForRegression } = require("../database/content-store");
 const { jsonFileStore } = require("../database/json-file-store");
 const { resetAuthStoreForRegression } = require("../database/auth-store");
 const { ensureAuthBootstrap } = require("../modules/auth/auth.service");
@@ -15,6 +16,25 @@ async function requestJson(baseUrl, path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, options);
   const json = await response.json();
   return { response, json };
+}
+
+async function requestText(baseUrl, path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, options);
+  const text = await response.text();
+  return { response, text };
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractMerchantItem(xmlText, itemId) {
+  const match = String(xmlText || "").match(
+    new RegExp(
+      `<item>[\\s\\S]*?<g:id>${escapeRegExp(itemId)}<\\/g:id>[\\s\\S]*?<\\/item>`
+    )
+  );
+  return match ? match[0] : "";
 }
 
 function authHeaders(accessToken) {
@@ -32,6 +52,7 @@ async function run() {
   await resetRecoveryStoreForRegression();
   await resetSearchStoreForRegression();
   await resetShippingStoreForRegression();
+  await resetContentStoreForRegression();
   await resetAuthStoreForRegression();
   await ensureAuthBootstrap();
 
@@ -96,6 +117,7 @@ async function run() {
     });
     assert.equal(createCategory.response.status, 201);
     const categoryId = createCategory.json.data.id;
+    const categorySlug = createCategory.json.data.slug;
 
     const createHsnRecord = await requestJson(baseUrl, "/api/admin/hsn-tax", {
       method: "POST",
@@ -115,9 +137,20 @@ async function run() {
       body: JSON.stringify({
         title: "Smart CCTV Camera",
         categoryId,
+        brand: "Jenix",
+        mpn: "JNX-CCTV-RET-01",
         hsnCode: "8525",
         basePrice: 5000,
         salePrice: 4500,
+        deadWeightKg: 1.75,
+        shortDescription: "Retail-ready CCTV camera with GST billing support and night vision.",
+        fullDescription:
+          "Retail-ready CCTV camera with GST billing support, night vision, and easy NVR integration.",
+        googleShoppingTitle: "Jenix Smart CCTV Camera for Retail Security",
+        googleShoppingDescription:
+          "Retail CCTV camera for shops with GST invoice support, night vision, and NVR compatibility.",
+        googleProductCategory: "Electronics > Video > Surveillance > Security Cameras",
+        productType: "CCTV > Retail Surveillance",
         stockQty: 8,
         lowStockThreshold: 10,
         customerKeywords: ["shop camera", "security camera"],
@@ -129,6 +162,7 @@ async function run() {
     assert.equal(createProduct.json.data.gstRate, 18);
     const createdProductId = createProduct.json.data.id;
     const createdProductSlug = createProduct.json.data.slug;
+    const createdProductSku = createProduct.json.data.sku;
 
     const createRelatedA = await requestJson(baseUrl, "/api/admin/products", {
       method: "POST",
@@ -177,6 +211,7 @@ async function run() {
     });
     assert.equal(createInactiveRelated.response.status, 201);
     const inactiveRelatedId = createInactiveRelated.json.data.id;
+    const inactiveRelatedSku = createInactiveRelated.json.data.sku;
 
     const createBulkProduct = await requestJson(baseUrl, "/api/admin/products", {
       method: "POST",
@@ -217,6 +252,25 @@ async function run() {
     });
     assert.equal(createTightStockProduct.response.status, 201);
     const tightStockProductId = createTightStockProduct.json.data.id;
+
+    const createOutOfStockProduct = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Warehouse Demo Camera",
+        categoryId,
+        brand: "Jenix",
+        hsnCode: "8525",
+        basePrice: 2800,
+        salePrice: 2800,
+        deadWeightKg: 2.25,
+        stockQty: 0,
+        stockStatus: "out_of_stock",
+        lowStockThreshold: 1
+      })
+    });
+    assert.equal(createOutOfStockProduct.response.status, 201);
+    const outOfStockProductSku = createOutOfStockProduct.json.data.sku;
 
     const createSearchSynonym = await requestJson(
       baseUrl,
@@ -405,6 +459,25 @@ async function run() {
     assert.equal(patchStoreProfile.response.status, 200);
     assert.equal(patchStoreProfile.json.data.storeName, "Jenix India Pvt Ltd");
 
+    const patchSeoDefaults = await requestJson(
+      baseUrl,
+      "/api/admin/settings/seo-defaults",
+      {
+        method: "PUT",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          canonicalDomain: "https://jenixindia.com",
+          homeMetaTitle: "Jenix India Products",
+          homeMetaDescription: "Industrial security and automation catalogue."
+        })
+      }
+    );
+    assert.equal(patchSeoDefaults.response.status, 200);
+    assert.equal(
+      patchSeoDefaults.json.data.canonicalDomain,
+      "https://jenixindia.com"
+    );
+
     const patchInvoiceSettings = await requestJson(
       baseUrl,
       "/api/admin/settings/invoice-settings",
@@ -543,6 +616,96 @@ async function run() {
     );
     assert.equal(updateProductRelations.response.status, 200);
 
+    const createPublishedBlog = await requestJson(baseUrl, "/api/admin/blogs", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "How to Choose CCTV for a Retail Store",
+        excerpt:
+          "Retail CCTV buying guide for blind spots, GST billing, and front-counter coverage.",
+        content:
+          "Retail CCTV buying guide for small stores.\n\nChoose wider-angle cameras for counters, keep NVR storage ready, and plan GST invoice requirements before purchasing.\n\nUse linked product suggestions to compare camera bundles and accessories.",
+        categoryId: "blogcat_cctv-surveillance-guide",
+        tags: ["cctv", "retail", "buying guide"],
+        author: "Jenix India Team",
+        status: "published",
+        linkedProductIds: [createdProductId, relatedBId],
+        linkedCategoryIds: [categoryId],
+        faqItems: [
+          {
+            question: "Which CCTV camera is best for a small shop?",
+            answer: "Pick a wide-angle camera with reliable night vision and enough storage for your operating hours."
+          }
+        ]
+      })
+    });
+    assert.equal(createPublishedBlog.response.status, 201);
+    const publishedBlogId = createPublishedBlog.json.data.id;
+    const publishedBlogSlug = createPublishedBlog.json.data.slug;
+
+    const createDraftBlog = await requestJson(baseUrl, "/api/admin/blogs", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Internal Draft Smart Lock Notes",
+        excerpt: "Draft blog that must stay hidden from public routes.",
+        content: "This draft blog should not be visible until it is published.",
+        categoryId: "blogcat_smart-door-lock-guide",
+        tags: ["draft", "smart lock"],
+        author: "Jenix Draft Team",
+        status: "draft",
+        linkedProductIds: [createdProductId],
+        linkedCategoryIds: [categoryId]
+      })
+    });
+    assert.equal(createDraftBlog.response.status, 201);
+    const draftBlogSlug = createDraftBlog.json.data.slug;
+
+    const publicBlogs = await requestJson(baseUrl, "/api/blogs?limit=20");
+    assert.equal(publicBlogs.response.status, 200);
+    assert.equal(
+      publicBlogs.json.data.some((row) => row.slug === publishedBlogSlug),
+      true
+    );
+    assert.equal(
+      publicBlogs.json.data.some((row) => row.slug === draftBlogSlug),
+      false
+    );
+
+    const publicBlogDetail = await requestJson(
+      baseUrl,
+      `/api/blogs/${publishedBlogSlug}`
+    );
+    assert.equal(publicBlogDetail.response.status, 200);
+    assert.equal(publicBlogDetail.json.data.relatedProducts.length > 0, true);
+    assert.equal(publicBlogDetail.json.data.article.slug, publishedBlogSlug);
+    assert.equal(
+      publicBlogDetail.json.data.structuredData.article["@type"],
+      "Article"
+    );
+    assert.equal(
+      publicBlogDetail.json.data.structuredData.faq["@type"],
+      "FAQPage"
+    );
+
+    const publicDraftBlogDetail = await requestJson(
+      baseUrl,
+      `/api/blogs/${draftBlogSlug}`
+    );
+    assert.equal(publicDraftBlogDetail.response.status, 404);
+
+    const blogSearch = await requestJson(
+      baseUrl,
+      `/api/search?q=${encodeURIComponent("retail cctv buying guide")}&limit=10`
+    );
+    assert.equal(blogSearch.response.status, 200);
+    assert.equal(
+      blogSearch.json.data.results.some(
+        (row) => row.entityType === "blog" && row.id === publishedBlogId
+      ),
+      true
+    );
+
     const customerProductPage = await requestJson(
       baseUrl,
       `/api/products/${createdProductSlug}/page?limitPerGroup=10&historyLimit=10`,
@@ -560,6 +723,42 @@ async function run() {
       false
     );
     assert.equal(customerProductPage.json.data.recommendations.recently.viewedProducts.length > 0, true);
+    assert.equal(
+      customerProductPage.json.data.recommendations.guides.some(
+        (row) => row.slug === publishedBlogSlug
+      ),
+      true
+    );
+    assert.equal(customerProductPage.json.data.seo.metaTitle, "Jenix Smart CCTV Camera for Retail Security");
+    assert.equal(
+      customerProductPage.json.data.seo.canonicalUrl,
+      `https://jenixindia.com/products/${createdProductSlug}`
+    );
+    assert.equal(
+      customerProductPage.json.data.structuredData.product["@type"],
+      "Product"
+    );
+    assert.equal(
+      customerProductPage.json.data.structuredData.offer["@type"],
+      "Offer"
+    );
+    assert.equal(
+      customerProductPage.json.data.structuredData.breadcrumb["@type"],
+      "BreadcrumbList"
+    );
+    assert.equal(
+      customerProductPage.json.data.structuredData.product.offers["@id"],
+      `https://jenixindia.com/products/${createdProductSlug}#offer`
+    );
+    assert.equal(
+      customerProductPage.json.data.structuredData.offer.price,
+      "4500.00"
+    );
+    assert.equal(
+      customerProductPage.json.data.structuredData.offer.hasMerchantReturnPolicy
+        .returnPolicyCategory,
+      "https://schema.org/MerchantReturnNotPermitted"
+    );
 
     const productRecommendations = await requestJson(
       baseUrl,
@@ -579,6 +778,10 @@ async function run() {
       ),
       false
     );
+    assert.equal(
+      productRecommendations.json.data.guides.some((row) => row.slug === publishedBlogSlug),
+      true
+    );
 
     const recommendationFailure = await requestJson(
       baseUrl,
@@ -591,6 +794,72 @@ async function run() {
       `/api/products/${createdProductSlug}`
     );
     assert.equal(productStillLoads.response.status, 200);
+
+    const merchantFeed = await requestText(baseUrl, "/google-merchant-feed.xml");
+    assert.equal(merchantFeed.response.status, 200);
+    const primaryMerchantItem = extractMerchantItem(merchantFeed.text, createdProductSku);
+    assert.equal(Boolean(primaryMerchantItem), true);
+    assert.equal(
+      primaryMerchantItem.includes(
+        "<title>Jenix Smart CCTV Camera for Retail Security</title>"
+      ),
+      true
+    );
+    assert.equal(
+      primaryMerchantItem.includes("<g:price>5000.00 INR</g:price>"),
+      true
+    );
+    assert.equal(
+      primaryMerchantItem.includes("<g:sale_price>4500.00 INR</g:sale_price>"),
+      true
+    );
+    assert.equal(
+      primaryMerchantItem.includes("<g:shipping_weight>1.75 kg</g:shipping_weight>"),
+      true
+    );
+    assert.equal(
+      primaryMerchantItem.includes("<g:availability>in stock</g:availability>"),
+      true
+    );
+    assert.equal(
+      merchantFeed.text.includes(`<g:id>${inactiveRelatedSku}</g:id>`),
+      false
+    );
+    const outOfStockMerchantItem = extractMerchantItem(
+      merchantFeed.text,
+      outOfStockProductSku
+    );
+    assert.equal(
+      outOfStockMerchantItem.includes("<g:availability>out of stock</g:availability>"),
+      true
+    );
+
+    const sitemap = await requestText(baseUrl, "/sitemap.xml");
+    assert.equal(sitemap.response.status, 200);
+    assert.equal(sitemap.text.includes("/sitemaps/products.xml"), true);
+    assert.equal(sitemap.text.includes("/sitemaps/categories.xml"), true);
+    assert.equal(sitemap.text.includes("/sitemaps/blogs.xml"), true);
+
+    const productSitemap = await requestText(baseUrl, "/sitemaps/products.xml");
+    assert.equal(productSitemap.response.status, 200);
+    assert.equal(
+      productSitemap.text.includes(`https://jenixindia.com/products/${createdProductSlug}`),
+      true
+    );
+
+    const categorySitemap = await requestText(baseUrl, "/sitemaps/categories.xml");
+    assert.equal(categorySitemap.response.status, 200);
+    assert.equal(
+      categorySitemap.text.includes(`https://jenixindia.com/categories/${categorySlug}`),
+      true
+    );
+
+    const blogSitemap = await requestText(baseUrl, "/sitemaps/blogs.xml");
+    assert.equal(blogSitemap.response.status, 200);
+    assert.equal(
+      blogSitemap.text.includes(`https://jenixindia.com/guides/${publishedBlogSlug}`),
+      true
+    );
 
     const shippingEstimate = await requestJson(
       baseUrl,
@@ -606,6 +875,12 @@ async function run() {
     );
     assert.equal(shippingEstimate.response.status, 200);
     assert.equal(shippingEstimate.json.data.options.length >= 2, true);
+    assert.equal(
+      shippingEstimate.json.data.options.some(
+        (option) => Number(option.shippingCharge || 0) > 0
+      ),
+      true
+    );
 
     const phase7GuestAdd = await requestJson(baseUrl, "/api/cart/items", {
       method: "POST",

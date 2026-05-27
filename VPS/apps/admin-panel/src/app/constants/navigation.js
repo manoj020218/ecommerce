@@ -33,5 +33,16 @@ export const ADMIN_NAV_ITEMS = [
         permission: "inventory.view"
       }
     ]
+  },
+  {
+    group: "Content",
+    items: [
+      {
+        key: "blogs",
+        label: "Blogs",
+        path: "/blogs",
+        permission: "blogs.view"
+      }
+    ]
   }
 ];

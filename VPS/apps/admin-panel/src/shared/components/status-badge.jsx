@@ -1,6 +1,9 @@
 const STATUS_CLASS = {
   active: "green",
   inactive: "gray",
+  draft: "amber",
+  published: "green",
+  archived: "gray",
   in_stock: "green",
   low_stock: "amber",
   out_of_stock: "red",

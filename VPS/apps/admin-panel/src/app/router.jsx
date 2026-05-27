@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "./layout/admin-layout";
 import { AuthGuard } from "../modules/auth/auth-guard";
+import { BlogsPage } from "../modules/blogs/blogs-page";
 import { LoginPage } from "../modules/auth/login-page";
 import { CataloguePage } from "../modules/catalogue/catalogue-page";
 import { CategoriesPage } from "../modules/categories/categories-page";
@@ -21,6 +22,7 @@ export function AppRouter() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="hsn-tax" element={<HsnTaxPage />} />
           <Route path="inventory" element={<InventoryPage />} />
+          <Route path="blogs" element={<BlogsPage />} />
         </Route>
       </Route>
 

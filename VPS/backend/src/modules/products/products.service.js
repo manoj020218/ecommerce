@@ -9,6 +9,8 @@ const {
   createShippingProvider
 } = require("../../integrations/shipping-providers/shipping-provider.adapter");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const { listHelpfulGuidesForProduct } = require("../blogs/blogs.service");
+const { buildProductPageSeoPayload } = require("../seo/seo.service");
 const { trackCustomerProductView } = require("../search/search.service");
 const { SHIPPING_METHODS } = require("../shipping/shipping.model");
 const {
@@ -750,12 +752,14 @@ async function getPublicProductRecommendations(slug, options) {
     )
   };
 
+  const guides = await listHelpfulGuidesForProduct(product, Math.min(options.limitPerGroup, 6));
+
   return {
     productId: product.id,
     productSlug: product.slug,
     recommendationGroups,
     recently,
-    guides: []
+    guides
   };
 }
 
@@ -772,10 +776,13 @@ async function getPublicProductPage(slug, options) {
   }
 
   const recommendations = await getPublicProductRecommendations(slug, options);
+  const breadcrumb = buildBreadcrumb(store, product);
+  const publicProduct = toPublicProduct(product);
+  const seoPayload = await buildProductPageSeoPayload(product, breadcrumb);
 
   return {
-    breadcrumb: buildBreadcrumb(store, product),
-    product: toPublicProduct(product),
+    breadcrumb,
+    product: publicProduct,
     sectionsOrder: [
       "breadcrumb",
       "gallery",
@@ -797,7 +804,9 @@ async function getPublicProductPage(slug, options) {
       "top_searched_or_most_visited",
       "helpful_guides"
     ],
-    recommendations
+    recommendations,
+    seo: seoPayload.seo,
+    structuredData: seoPayload.structuredData
   };
 }
 

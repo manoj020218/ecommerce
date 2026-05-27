@@ -736,6 +736,10 @@ input {
   background: #f8fafd;
 }
 
+.guide-card-link {
+  text-decoration: none;
+}
+
 .guide-card strong {
   display: block;
   line-height: 1.5;
@@ -746,6 +750,108 @@ input {
   margin: 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.guide-filter-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.guide-filter-grid input,
+.guide-filter-grid select {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.guide-filter-grid button {
+  border: 0;
+  border-radius: 12px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 700;
+  padding: 0 20px;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.guide-list-grid,
+.guide-inline-grid,
+.faq-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.guide-list-card,
+.guide-inline-card,
+.guide-content-card,
+.faq-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.guide-list-card {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.guide-list-copy h3,
+.guide-title-block h1 {
+  margin: 10px 0 8px;
+}
+
+.guide-list-copy p,
+.guide-title-block p,
+.guide-content-card p,
+.guide-inline-card p,
+.faq-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.compact-guide-link {
+  width: fit-content;
+}
+
+.guide-meta-text {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.guide-title-block h1 {
+  font-size: 30px;
+  line-height: 1.2;
+}
+
+.guide-content-card {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.guide-inline-card {
+  text-decoration: none;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.guide-inline-card strong,
+.faq-card strong {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.faq-card {
+  padding: 14px;
+  display: grid;
+  gap: 8px;
 }
 
 .hero-kicker-row,
@@ -1081,6 +1187,19 @@ input {
   }
 
   .feedback-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guide-filter-grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.9fr) auto;
+  }
+
+  .guide-list-card {
+    grid-template-columns: 1fr auto;
+    align-items: start;
+  }
+
+  .guide-inline-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

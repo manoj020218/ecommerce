@@ -1,0 +1,4 @@
+- [ ] Website buyer lead form submits from the public storefront.
+- [ ] Submitted lead appears in the admin listing with the original `sourcePage`.
+- [ ] Admin can update lead `status`.
+- [ ] Admin can update lead `notes`.

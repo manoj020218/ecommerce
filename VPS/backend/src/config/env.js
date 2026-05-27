@@ -41,6 +41,11 @@ const env = {
     process.env.SHIPPING_STORE_PATH || "backend/src/database/json/shipping-store.json",
   searchStorePath:
     process.env.SEARCH_STORE_PATH || "backend/src/database/json/search-store.json",
+  contentStorePath:
+    process.env.CONTENT_STORE_PATH || "backend/src/database/json/content-store.json",
+  websiteLeadsStorePath:
+    process.env.WEBSITE_LEADS_STORE_PATH ||
+    "backend/src/database/json/website-leads-store.json",
   otpDevDefaultCode: process.env.OTP_DEV_DEFAULT_CODE || "123456",
   cartStockReservationMinutes: Number.parseInt(
     process.env.CART_STOCK_RESERVATION_MINUTES || "15",

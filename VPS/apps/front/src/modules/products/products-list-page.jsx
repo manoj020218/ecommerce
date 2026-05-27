@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listProducts } from "./products.api";
+import { listProducts, searchStorefront } from "./products.api";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 
 function currency(amount) {
@@ -42,6 +42,7 @@ export function ProductsListPage() {
   const [query, setQuery] = useState("");
   const [searchText, setSearchText] = useState("");
   const [products, setProducts] = useState([]);
+  const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -50,11 +51,33 @@ export function ProductsListPage() {
     setLoading(true);
     setError("");
 
-    listProducts({ q: query })
-      .then((rows) => {
-        if (mounted) {
-          setProducts(Array.isArray(rows) ? rows : []);
+    const request = query
+      ? searchStorefront({ q: query, limit: 20 })
+      : listProducts({ q: "" });
+
+    request
+      .then((payload) => {
+        if (!mounted) {
+          return;
         }
+
+        if (query) {
+          const results = Array.isArray(payload?.results) ? payload.results : [];
+          setProducts(
+            results
+              .filter((row) => row.entityType === "product" && row.product)
+              .map((row) => row.product)
+          );
+          setBlogs(
+            results
+              .filter((row) => row.entityType === "blog" && row.blog)
+              .map((row) => row.blog)
+          );
+          return;
+        }
+
+        setProducts(Array.isArray(payload) ? payload : []);
+        setBlogs([]);
       })
       .catch((err) => {
         if (mounted) {
@@ -72,7 +95,7 @@ export function ProductsListPage() {
     };
   }, [query]);
 
-  const total = useMemo(() => products.length, [products]);
+  const total = useMemo(() => products.length + blogs.length, [products, blogs]);
 
   return (
     <main className="front-shell">
@@ -88,6 +111,12 @@ export function ProductsListPage() {
         <div className="brand-block">
           <p>Jenix India</p>
           <h1>Security Product Store</h1>
+        </div>
+
+        <div className="chip-row">
+          <Link to="/guides" className="inline-link">
+            Browse Guides
+          </Link>
         </div>
 
         <form
@@ -115,11 +144,32 @@ export function ProductsListPage() {
       {error ? <div className="state-box error">{error}</div> : null}
 
       {!loading && !error ? (
-        <section className="products-grid">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </section>
+        <>
+          {products.length > 0 ? (
+            <section className="products-grid">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </section>
+          ) : null}
+
+          {blogs.length > 0 ? (
+            <section className="section-block">
+              <div className="section-head">
+                <h3>Helpful guides from search</h3>
+              </div>
+              <div className="guide-inline-grid">
+                {blogs.map((blog) => (
+                  <Link key={blog.id} to={`/guides/${blog.slug}`} className="guide-inline-card">
+                    <span className="eyebrow-chip">{blog.category?.name || "Guide"}</span>
+                    <strong>{blog.title}</strong>
+                    <p>{blog.excerpt}</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </>
       ) : null}
     </main>
   );

@@ -7,6 +7,10 @@ const { env } = require("./config/env");
 const { attachRequestContext } = require("./middlewares/request-context");
 const { notFoundHandler, errorHandler } = require("./middlewares/error-handler");
 const { apiRouter } = require("./routes");
+const { createPublicSeoRouter } = require("./modules/seo/seo.routes");
+const {
+  createPublicGoogleMerchantRouter
+} = require("./modules/google-merchant/google-merchant.routes");
 
 function createApp() {
   const app = express();
@@ -38,6 +42,8 @@ function createApp() {
     });
   });
 
+  app.use(createPublicSeoRouter());
+  app.use(createPublicGoogleMerchantRouter());
   app.use("/api", apiRouter);
   app.use(notFoundHandler);
   app.use(errorHandler);

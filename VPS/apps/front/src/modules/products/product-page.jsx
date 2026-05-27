@@ -84,6 +84,8 @@ export function ProductPage() {
   const { customer, isAuthenticated } = useCustomerSession();
   const [product, setProduct] = useState(null);
   const [breadcrumb, setBreadcrumb] = useState([]);
+  const [pageSeo, setPageSeo] = useState(null);
+  const [structuredData, setStructuredData] = useState(null);
   const [recommendations, setRecommendations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -105,6 +107,8 @@ export function ProductPage() {
     setRecommendationError("");
     setShipping(null);
     setShippingError("");
+    setPageSeo(null);
+    setStructuredData(null);
 
     getProduct(slug)
       .then((data) => {
@@ -138,6 +142,8 @@ export function ProductPage() {
         if (Array.isArray(bundle.breadcrumb) && bundle.breadcrumb.length > 0) {
           setBreadcrumb(bundle.breadcrumb);
         }
+        setPageSeo(bundle?.seo || null);
+        setStructuredData(bundle?.structuredData || null);
         if (bundle?.recommendations) {
           setRecommendations(bundle.recommendations);
         }
@@ -167,6 +173,13 @@ export function ProductPage() {
       mounted = false;
     };
   }, [slug]);
+
+  useEffect(() => {
+    const nextTitle = pageSeo?.metaTitle || product?.title;
+    if (nextTitle) {
+      document.title = nextTitle;
+    }
+  }, [pageSeo?.metaTitle, product?.title]);
 
   useEffect(() => {
     if (!product?.id || !isAuthenticated) {
@@ -232,6 +245,25 @@ export function ProductPage() {
 
   return (
     <main className="front-shell product-view">
+      {structuredData?.product ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData.product) }}
+        />
+      ) : null}
+      {structuredData?.offer ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData.offer) }}
+        />
+      ) : null}
+      {structuredData?.breadcrumb ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData.breadcrumb) }}
+        />
+      ) : null}
+
       <header className="compact-header">
         <Link to="/" className="back-link">
           Back
@@ -525,18 +557,20 @@ export function ProductPage() {
           <h3>Helpful guides</h3>
         </div>
         <div className="guide-track">
-          {(guides.length > 0
-            ? guides
-            : [
-                { id: "guide-1", title: "How to select CCTV for a retail store?" },
-                { id: "guide-2", title: "IP camera setup checklist for first-time buyers." }
-              ]
-          ).map((guide) => (
-            <article key={guide.id} className="guide-card">
-              <strong>{guide.title}</strong>
-              <p>Knowledge base content will be integrated in Phase 13.</p>
+          {guides.length > 0 ? (
+            guides.map((guide) => (
+              <Link key={guide.id} to={`/guides/${guide.slug}`} className="guide-card guide-card-link">
+                <span className="eyebrow-chip">{guide.category?.name || "Guide"}</span>
+                <strong>{guide.title}</strong>
+                <p>{guide.excerpt || "Read the full guide for buying, installation, and troubleshooting help."}</p>
+              </Link>
+            ))
+          ) : (
+            <article className="guide-card">
+              <strong>No linked guides yet</strong>
+              <p>Blog content will appear here when a guide is linked to this product or category.</p>
             </article>
-          ))}
+          )}
         </div>
       </section>
     </main>

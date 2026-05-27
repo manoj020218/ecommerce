@@ -18,6 +18,9 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/inventory")) {
     return "Inventory";
   }
+  if (pathname.startsWith("/blogs")) {
+    return "Blogs / Knowledge Base";
+  }
   return "Catalogue Overview";
 }
 
@@ -98,7 +101,7 @@ export function AdminLayout() {
         <header className="topbar">
           <div>
             <h1>{titleFromPath(location.pathname)}</h1>
-            <p>Phase 3 admin wiring aligned to PROJECT.md</p>
+            <p>Admin workspace aligned to PROJECT.md phases</p>
           </div>
           <div className="topbar-user">
             <span>{session?.admin?.role || "staff"}</span>

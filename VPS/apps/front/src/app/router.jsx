@@ -2,6 +2,8 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { CustomerAccountLoginPage } from "../modules/account/account-login-page";
 import { CustomerAccountPage } from "../modules/account/account-page";
 import { CustomerOrderPage } from "../modules/account/account-order-page";
+import { BlogPage } from "../modules/blogs/blog-page";
+import { BlogsListPage } from "../modules/blogs/blogs-list-page";
 import { ProductsListPage } from "../modules/products/products-list-page";
 import { ProductPage } from "../modules/products/product-page";
 import { RecoveryPage } from "../modules/recovery/recovery-page";
@@ -36,6 +38,8 @@ export function AppRouter() {
   return (
     <Routes>
       <Route path="/" element={<ProductsListPage />} />
+      <Route path="/guides" element={<BlogsListPage />} />
+      <Route path="/guides/:slug" element={<BlogPage />} />
       <Route path="/products/:slug" element={<ProductPage />} />
       <Route path="/recover/:recoveryToken" element={<RecoveryPage />} />
       <Route path="/account/login" element={<CustomerAccountLoginPage />} />

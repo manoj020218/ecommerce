@@ -1809,7 +1809,7 @@ Regression tests:
   "invoiceDate": "",
   "seller": {},
   "buyer": {},
-  "items": [],
+  "items": [],after 
   "taxSummary": [],
   "shippingLine": {},
   "discountLine": {},
@@ -1947,8 +1947,8 @@ Codex must update this section after each phase.
 [x] Phase 10 â€” GST Invoice, Tally Export, Invoice Settings
 [x] Phase 11 â€” Customer Profile and Order History
 [x] Phase 12 â€” Abandoned Cart and Customer Recovery
-[ ] Phase 13 â€” Blog / Knowledge Base
-[ ] Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
+[x] Phase 13 â€” Blog / Knowledge Base
+[x] Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
 [ ] Phase 15 â€” Website Buyer Lead Form
 [ ] Phase 16 â€” Reports
 [ ] Phase 17 â€” Marketing, Offers, Templates, Notifications
@@ -1959,7 +1959,7 @@ Codex must update this section after each phase.
 
 ---
 
-### Backend-First Execution Log (VPS) — Updated May 23, 2026
+### Backend-First Execution Log (VPS) — Updated May 27, 2026
 
 Phase 0 (Backend scope) status: `[x]`
 
@@ -2237,7 +2237,7 @@ Pending files/tasks after Phase 6 closure:
   - autocomplete experience
   - search suggestion UI and query chip journey
   - zero-result recovery prompts on storefront
-- Helpful guides/blog links currently placeholder content until Phase 13 content module lands
+- Helpful guides/blog links are now backed by the Phase 13 blog/knowledge-base module
 
 Phase 7 (Backend scope: Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation) status: `[x]`
 
@@ -2504,6 +2504,119 @@ Validation completed after Phase 11:
 - `node node_modules\eslint\bin\eslint.js backend\src` passed
 - `node node_modules\vite\bin\vite.js build` passed in `VPS/apps/front`
 - `node backend\src\checks\run-regression-checks.js` passed with Phase 11 assertions enabled
+
+Phase 13 (Backend + Front + Admin scope: Blog / Knowledge Base) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/database/content-store.js`
+- `VPS/backend/src/modules/blogs/blogs.model.js`
+- `VPS/backend/src/modules/blogs/blogs.validator.js`
+- `VPS/backend/src/modules/blogs/blogs.permissions.js`
+- `VPS/backend/src/modules/blogs/blogs.service.js`
+- `VPS/backend/src/modules/blogs/blogs.controller.js`
+- `VPS/backend/src/modules/blogs/blogs.routes.js`
+- `VPS/backend/src/modules/blogs/regression-checklist.md`
+- `VPS/backend/src/modules/products/products.service.js`
+- `VPS/backend/src/modules/search/search.service.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.model.js`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/app.js`
+- `VPS/backend/src/config/env.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/.env.example`
+- `VPS/apps/front/src/modules/blogs/blogs.api.js`
+- `VPS/apps/front/src/modules/blogs/blogs-list-page.jsx`
+- `VPS/apps/front/src/modules/blogs/blog-page.jsx`
+- `VPS/apps/front/src/modules/products/products.api.js`
+- `VPS/apps/front/src/modules/products/products-list-page.jsx`
+- `VPS/apps/front/src/modules/products/product-page.jsx`
+- `VPS/apps/front/src/app/router.jsx`
+- `VPS/apps/front/src/styles.css`
+- `VPS/apps/admin-panel/src/modules/blogs/blogs.api.js`
+- `VPS/apps/admin-panel/src/modules/blogs/blogs-page.jsx`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/shared/components/status-badge.jsx`
+
+Delivered APIs (Phase 13):
+- `GET /sitemap.xml`
+- `GET /api/admin/blogs/categories`
+- `GET /api/admin/blogs`
+- `GET /api/admin/blogs/:blogId`
+- `POST /api/admin/blogs`
+- `PATCH /api/admin/blogs/:blogId`
+- `DELETE /api/admin/blogs/:blogId`
+- `GET /api/blogs/categories`
+- `GET /api/blogs`
+- `GET /api/blogs/:slug`
+
+Phase 13 outcomes delivered:
+- Added a dedicated blog / knowledge-base backend module with seeded guide categories and draft/published/archived content workflow.
+- Public guide detail now includes related products, related catalogue categories, related blogs, FAQ content, Article JSON-LD, and FAQ schema payloads.
+- Published guide URLs are now included in `/sitemap.xml`.
+- Product-page helpful guides are now powered by linked blogs instead of placeholder content.
+- Storefront search now returns mixed product/blog results, and search suggestions include published guide titles.
+- Added front-end knowledge-base routes:
+  - `/guides`
+  - `/guides/:slug`
+- Added admin blog management route:
+  - `/blogs`
+- Blog linking supports:
+  - `linkedProductIds`
+  - `linkedCategoryIds`
+  - `relatedBlogIds`
+
+Validation completed after Phase 13:
+- `node backend/src/checks/run-regression-checks.js` passed
+- `node node_modules/eslint/bin/eslint.js backend/src` passed
+- `node node_modules/vite/bin/vite.js build` passed in `VPS/apps/front`
+- `node node_modules/vite/bin/vite.js build` passed in `VPS/apps/admin-panel`
+
+Phase 14 (Backend + Storefront SEO/feed scope) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/app.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/backend/src/modules/products/products.service.js`
+- `VPS/backend/src/modules/seo/seo.model.js`
+- `VPS/backend/src/modules/seo/seo.validator.js`
+- `VPS/backend/src/modules/seo/seo.service.js`
+- `VPS/backend/src/modules/seo/seo.controller.js`
+- `VPS/backend/src/modules/seo/seo.routes.js`
+- `VPS/backend/src/modules/seo/regression-checklist.md`
+- `VPS/backend/src/modules/google-merchant/google-merchant.model.js`
+- `VPS/backend/src/modules/google-merchant/google-merchant.validator.js`
+- `VPS/backend/src/modules/google-merchant/google-merchant.service.js`
+- `VPS/backend/src/modules/google-merchant/google-merchant.controller.js`
+- `VPS/backend/src/modules/google-merchant/google-merchant.routes.js`
+- `VPS/backend/src/modules/google-merchant/regression-checklist.md`
+- `VPS/apps/front/src/modules/products/product-page.jsx`
+
+Delivered APIs (Phase 14):
+- `GET /sitemap.xml`
+- `GET /sitemaps/products.xml`
+- `GET /sitemaps/categories.xml`
+- `GET /sitemaps/blogs.xml`
+- `GET /google-merchant-feed.xml`
+
+Phase 14 outcomes delivered:
+- Replaced the single guide-only sitemap with a sitemap index plus dedicated product, category, and blog sitemaps.
+- Added a Google Merchant XML feed for active products with merchant-ready title/description, price and sale price, availability, shipping weight, category/type, and identifier flags.
+- Product page payloads now include SEO metadata plus Product, Offer, and Breadcrumb JSON-LD for storefront rendering.
+- Offer structured data now includes a conditional no-return policy signal when invoice terms explicitly mark goods as non-returnable.
+- Storefront product pages now render the product structured-data scripts and use the SEO payload title.
+- Regression coverage now verifies product schema payloads, active-only merchant feed output, website/feed price alignment, separate shipping estimate behavior, shipping weight, sitemap coverage, and out-of-stock availability.
+
+Validation completed after Phase 14:
+- `node backend/src/checks/run-regression-checks.js` passed
+- `node node_modules/eslint/bin/eslint.js backend/src` passed
+- `node node_modules/vite/bin/vite.js build` passed in `VPS/apps/front`
+
+Pending files/tasks after Phase 14 closure:
+- Replace current URL-based blog image fields with upload workflow if content editors need asset management inside admin
+- Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
+- Add Facebook product feed when marketing/feed work is expanded in a later phase
 
 ---
 ## 13. First Codex Execution Prompt

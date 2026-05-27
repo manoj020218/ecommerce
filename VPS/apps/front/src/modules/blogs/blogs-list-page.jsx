@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listBlogCategories, listBlogs } from "./blogs.api";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
+import { listBlogCategories, listBlogs } from "./blogs.api";
 
 function formatDate(value) {
   if (!value) {
@@ -22,7 +23,7 @@ function GuideCard({ blog }) {
         <div className="hero-kicker-row">
           <span className="eyebrow-chip">{blog.category?.name || "Guide"}</span>
           <span className="guide-meta-text">
-            {formatDate(blog.publishedAt)} · {blog.readingTimeMinutes} min read
+            {formatDate(blog.publishedAt)} - {blog.readingTimeMinutes} min read
           </span>
         </div>
         <h3>{blog.title}</h3>
@@ -138,11 +139,14 @@ export function BlogsListPage() {
       {error ? <div className="state-box error">{error}</div> : null}
 
       {!loading && !error ? (
-        <section className="guide-list-grid">
-          {blogs.map((blog) => (
-            <GuideCard key={blog.id} blog={blog} />
-          ))}
-        </section>
+        <>
+          <section className="guide-list-grid">
+            {blogs.map((blog) => (
+              <GuideCard key={blog.id} blog={blog} />
+            ))}
+          </section>
+          <WebsiteBuyerLeadSection />
+        </>
       ) : null}
     </main>
   );

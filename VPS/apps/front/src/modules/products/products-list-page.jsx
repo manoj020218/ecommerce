@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listProducts, searchStorefront } from "./products.api";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -169,6 +170,8 @@ export function ProductsListPage() {
               </div>
             </section>
           ) : null}
+
+          <WebsiteBuyerLeadSection />
         </>
       ) : null}
     </main>

@@ -8,6 +8,7 @@ import {
   getProductPageBundle,
   getProductRecommendations
 } from "./products.api";
+import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -573,6 +574,8 @@ export function ProductPage() {
           )}
         </div>
       </section>
+
+      <WebsiteBuyerLeadSection />
     </main>
   );
 }

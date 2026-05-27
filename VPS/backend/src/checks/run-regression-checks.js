@@ -8,6 +8,9 @@ const { resetRecoveryStoreForRegression } = require("../database/recovery-store"
 const { resetSearchStoreForRegression } = require("../database/search-store");
 const { resetShippingStoreForRegression } = require("../database/shipping-store");
 const { resetContentStoreForRegression } = require("../database/content-store");
+const {
+  resetWebsiteLeadsStoreForRegression
+} = require("../database/website-leads-store");
 const { jsonFileStore } = require("../database/json-file-store");
 const { resetAuthStoreForRegression } = require("../database/auth-store");
 const { ensureAuthBootstrap } = require("../modules/auth/auth.service");
@@ -53,6 +56,7 @@ async function run() {
   await resetSearchStoreForRegression();
   await resetShippingStoreForRegression();
   await resetContentStoreForRegression();
+  await resetWebsiteLeadsStoreForRegression();
   await resetAuthStoreForRegression();
   await ensureAuthBootstrap();
 
@@ -880,6 +884,60 @@ async function run() {
         (option) => Number(option.shippingCharge || 0) > 0
       ),
       true
+    );
+
+    const createWebsiteLead = await requestJson(baseUrl, "/api/website-leads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "Amit Singh",
+        mobile: "+919900001111",
+        email: "amit.lead@example.com",
+        businessName: "Amit Security Solutions",
+        businessType: "Security Integrator",
+        city: "Delhi",
+        currentWebsite: "https://amit-security.example.com",
+        monthlyOrders: 180,
+        productCount: 350,
+        message: "Need the same type of webapp for our catalogue and dealer workflow.",
+        sourcePage: `/guides/${publishedBlogSlug}`
+      })
+    });
+    assert.equal(createWebsiteLead.response.status, 201);
+    assert.equal(createWebsiteLead.json.data.status, "new");
+    const createdWebsiteLeadId = createWebsiteLead.json.data.id;
+
+    const adminWebsiteLeads = await requestJson(
+      baseUrl,
+      "/api/admin/website-leads?limit=20",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(adminWebsiteLeads.response.status, 200);
+    const createdWebsiteLead = adminWebsiteLeads.json.data.find(
+      (row) => row.id === createdWebsiteLeadId
+    );
+    assert.equal(Boolean(createdWebsiteLead), true);
+    assert.equal(createdWebsiteLead.sourcePage, `/guides/${publishedBlogSlug}`);
+
+    const updateWebsiteLeadStatus = await requestJson(
+      baseUrl,
+      `/api/admin/website-leads/${createdWebsiteLeadId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          status: "demo_scheduled",
+          notes: "Qualified lead. Demo booked for next Tuesday."
+        })
+      }
+    );
+    assert.equal(updateWebsiteLeadStatus.response.status, 200);
+    assert.equal(updateWebsiteLeadStatus.json.data.status, "demo_scheduled");
+    assert.equal(
+      updateWebsiteLeadStatus.json.data.notes,
+      "Qualified lead. Demo booked for next Tuesday."
     );
 
     const phase7GuestAdd = await requestJson(baseUrl, "/api/cart/items", {

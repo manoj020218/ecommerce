@@ -44,5 +44,16 @@ export const ADMIN_NAV_ITEMS = [
         permission: "blogs.view"
       }
     ]
+  },
+  {
+    group: "Marketing",
+    items: [
+      {
+        key: "website-leads",
+        label: "Website Leads",
+        path: "/website-leads",
+        permission: "website_leads.view"
+      }
+    ]
   }
 ];

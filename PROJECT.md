@@ -1,4 +1,4 @@
-﻿# Jenix Commerce PROJECT.md
+# Jenix Commerce PROJECT.md
 
 ## 0. Purpose
 
@@ -358,7 +358,7 @@ Settings
 
 Codex must execute phase-wise. Do not jump randomly.
 
-### Phase 0 â€” Project Bootstrap
+### Phase 0 - Project Bootstrap
 
 Goal: Create clean monorepo and base tooling.
 
@@ -384,7 +384,7 @@ Acceptance checks:
 
 ---
 
-### Phase 1 â€” Core Settings, Branding, Store Profile
+### Phase 1 - Core Settings, Branding, Store Profile
 
 Goal: Create settings foundation used by invoice, email, SEO, bank transfer, contact page.
 
@@ -466,7 +466,7 @@ Regression tests:
 
 ---
 
-### Phase 2 â€” Auth, Staff, Permission Groups
+### Phase 2 - Auth, Staff, Permission Groups
 
 Goal: Create secure admin and customer authentication.
 
@@ -515,7 +515,7 @@ Regression tests:
 
 ---
 
-### Phase 3 â€” Catalogue, Categories, Products, HSN, Inventory
+### Phase 3 - Catalogue, Categories, Products, HSN, Inventory
 
 Goal: Build product catalogue for 500+ products.
 
@@ -602,7 +602,7 @@ Regression tests:
 
 ---
 
-### Phase 4 â€” Product Migration from Existing Site
+### Phase 4 - Product Migration from Existing Site
 
 Goal: Migrate public product data from `jenixindia.com` because website builder does not provide CSV export.
 
@@ -678,7 +678,7 @@ Regression tests:
 
 ---
 
-### Phase 5 â€” Buyer-Intent Search
+### Phase 5 - Buyer-Intent Search
 
 Goal: Search must work like problem-to-product mapping, not only technical product name search.
 
@@ -745,7 +745,7 @@ Regression tests:
 
 ---
 
-### Phase 6 â€” Product Page UX and Recommendations
+### Phase 6 - Product Page UX and Recommendations
 
 Goal: Product page should sell, educate, and cross-sell.
 
@@ -792,7 +792,7 @@ Regression tests:
 
 ---
 
-### Phase 7 â€” Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
+### Phase 7 - Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
 
 Goal: Accurate cart calculation and stock safety.
 
@@ -846,7 +846,7 @@ Regression tests:
 
 ---
 
-### Phase 8 â€” Shipping Calculation and Courier Tracking
+### Phase 8 - Shipping Calculation and Courier Tracking
 
 Goal: Transparent cart-level shipping and manual tracking with future aggregator API readiness.
 
@@ -938,7 +938,7 @@ Regression tests:
 
 ---
 
-### Phase 9 â€” Multi Payment Gateway and Manual Bank Transfer
+### Phase 9 - Multi Payment Gateway and Manual Bank Transfer
 
 Goal: Avoid vendor lock-in to Razorpay.
 
@@ -1003,7 +1003,7 @@ Regression tests:
 
 ---
 
-### Phase 10 â€” GST Invoice, Tally Export, Invoice Settings
+### Phase 10 - GST Invoice, Tally Export, Invoice Settings
 
 Goal: GST-compliant invoice and accounting export.
 
@@ -1084,7 +1084,7 @@ Regression tests:
 
 ---
 
-### Phase 11 â€” Customer Profile and Order History
+### Phase 11 - Customer Profile and Order History
 
 Goal: Customer self-service area.
 
@@ -1140,7 +1140,7 @@ Reorder:
 Regression tests:
 
 1. Customer can see own orders.
-2. Customer cannot see another userâ€™s order.
+2. Customer cannot see another user's order.
 3. Customer can download own invoice.
 4. Guest order links only after verified mobile/email.
 5. Reorder recalculates current prices.
@@ -1148,7 +1148,7 @@ Regression tests:
 
 ---
 
-### Phase 12 â€” Abandoned Cart and Customer Recovery
+### Phase 12 - Abandoned Cart and Customer Recovery
 
 Goal: Recover carts and understand payment friction.
 
@@ -1207,7 +1207,7 @@ Regression tests:
 
 ---
 
-### Phase 13 â€” Blog / Knowledge Base
+### Phase 13 - Blog / Knowledge Base
 
 Goal: Education-to-product funnel and SEO.
 
@@ -1272,7 +1272,7 @@ Regression tests:
 
 ---
 
-### Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
+### Phase 14 - Google Shopping, SEO, Feeds, Sitemap
 
 Goal: Products appear in Google Shopping / merchant surfaces.
 
@@ -1330,7 +1330,7 @@ Regression tests:
 
 ---
 
-### Phase 15 â€” Website Buyer Lead Form
+### Phase 15 - Website Buyer Lead Form
 
 Goal: Use Jenix site as demo to sell same webapp to others.
 
@@ -1375,7 +1375,7 @@ Regression tests:
 
 ---
 
-### Phase 16 â€” Reports
+### Phase 16 - Reports
 
 Goal: Admin can download useful business data.
 
@@ -1446,7 +1446,7 @@ Regression tests:
 
 ---
 
-### Phase 17 â€” Marketing, Offers, Templates, Notifications
+### Phase 17 - Marketing, Offers, Templates, Notifications
 
 Goal: Communication and promotion control.
 
@@ -1539,7 +1539,7 @@ Regression tests:
 
 ---
 
-### Phase 18 â€” B2B Dealer / Stockist Workflow
+### Phase 18 - B2B Dealer / Stockist Workflow
 
 Goal: Approved customers get dealer/stockist pricing and offline order flow.
 
@@ -1608,7 +1608,7 @@ Note: Dealer mobile app is future phase after web platform stabilizes.
 
 ---
 
-### Phase 19 â€” Walk-in Orders / Manual Orders
+### Phase 19 - Walk-in Orders / Manual Orders
 
 Goal: Admin can create offline/walk-in order.
 
@@ -1657,7 +1657,7 @@ Regression tests:
 
 ---
 
-### Phase 20 â€” Installer, Setup Wizard, Productization
+### Phase 20 - Installer, Setup Wizard, Productization
 
 Goal: Same project can be sold to other businesses.
 
@@ -1724,7 +1724,7 @@ Regression tests:
 
 ---
 
-## 8. Data Models â€” Minimum Draft
+## 8. Data Models - Minimum Draft
 
 ### Product
 
@@ -1934,32 +1934,32 @@ For each phase, Codex must:
 Codex must update this section after each phase.
 
 ```text
-[x] Phase 0 â€” Project Bootstrap
-[x] Phase 1 â€” Core Settings, Branding, Store Profile
-[x] Phase 2 â€” Auth, Staff, Permission Groups
-[x] Phase 3 â€” Catalogue, Categories, Products, HSN, Inventory
-[~] Phase 4 â€” Product Migration from Existing Site (Deferred)
-[x] Phase 5 â€” Buyer-Intent Search
-[x] Phase 6 â€” Product Page UX and Recommendations
-[x] Phase 7 â€” Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
-[x] Phase 8 â€” Shipping Calculation and Courier Tracking
-[x] Phase 9 â€” Multi Payment Gateway and Manual Bank Transfer
-[x] Phase 10 â€” GST Invoice, Tally Export, Invoice Settings
-[x] Phase 11 â€” Customer Profile and Order History
-[x] Phase 12 â€” Abandoned Cart and Customer Recovery
-[x] Phase 13 â€” Blog / Knowledge Base
-[x] Phase 14 â€” Google Shopping, SEO, Feeds, Sitemap
-[ ] Phase 15 â€” Website Buyer Lead Form
-[ ] Phase 16 â€” Reports
-[ ] Phase 17 â€” Marketing, Offers, Templates, Notifications
-[ ] Phase 18 â€” B2B Dealer / Stockist Workflow
-[ ] Phase 19 â€” Walk-in Orders / Manual Orders
-[ ] Phase 20 â€” Installer, Setup Wizard, Productization
+[x] Phase 0 - Project Bootstrap
+[x] Phase 1 - Core Settings, Branding, Store Profile
+[x] Phase 2 - Auth, Staff, Permission Groups
+[x] Phase 3 - Catalogue, Categories, Products, HSN, Inventory
+[~] Phase 4 - Product Migration from Existing Site (Deferred)
+[x] Phase 5 - Buyer-Intent Search
+[x] Phase 6 - Product Page UX and Recommendations
+[x] Phase 7 - Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
+[x] Phase 8 - Shipping Calculation and Courier Tracking
+[x] Phase 9 - Multi Payment Gateway and Manual Bank Transfer
+[x] Phase 10 - GST Invoice, Tally Export, Invoice Settings
+[x] Phase 11 - Customer Profile and Order History
+[x] Phase 12 - Abandoned Cart and Customer Recovery
+[x] Phase 13 - Blog / Knowledge Base
+[x] Phase 14 - Google Shopping, SEO, Feeds, Sitemap
+[x] Phase 15 - Website Buyer Lead Form
+[ ] Phase 16 - Reports
+[ ] Phase 17 - Marketing, Offers, Templates, Notifications
+[ ] Phase 18 - B2B Dealer / Stockist Workflow
+[ ] Phase 19 - Walk-in Orders / Manual Orders
+[ ] Phase 20 - Installer, Setup Wizard, Productization
 ```
 
 ---
 
-### Backend-First Execution Log (VPS) — Updated May 27, 2026
+### Backend-First Execution Log (VPS) - Updated May 27, 2026
 
 Phase 0 (Backend scope) status: `[x]`
 
@@ -2618,6 +2618,59 @@ Pending files/tasks after Phase 14 closure:
 - Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
 - Add Facebook product feed when marketing/feed work is expanded in a later phase
 
+Phase 15 (Backend + Storefront + Admin lead capture scope) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/config/env.js`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/database/website-leads-store.js`
+- `VPS/backend/src/modules/roles-permissions/roles-permissions.model.js`
+- `VPS/backend/src/modules/website-leads/website-leads.model.js`
+- `VPS/backend/src/modules/website-leads/website-leads.validator.js`
+- `VPS/backend/src/modules/website-leads/website-leads.permissions.js`
+- `VPS/backend/src/modules/website-leads/website-leads.service.js`
+- `VPS/backend/src/modules/website-leads/website-leads.controller.js`
+- `VPS/backend/src/modules/website-leads/website-leads.routes.js`
+- `VPS/backend/src/modules/website-leads/regression-checklist.md`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/.env.example`
+- `VPS/apps/front/src/modules/products/products-list-page.jsx`
+- `VPS/apps/front/src/modules/products/product-page.jsx`
+- `VPS/apps/front/src/modules/blogs/blogs-list-page.jsx`
+- `VPS/apps/front/src/modules/blogs/blog-page.jsx`
+- `VPS/apps/front/src/modules/website-leads/website-leads.api.js`
+- `VPS/apps/front/src/modules/website-leads/website-buyer-lead-section.jsx`
+- `VPS/apps/front/src/styles.css`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/modules/website-leads/website-leads.api.js`
+- `VPS/apps/admin-panel/src/modules/website-leads/website-leads-page.jsx`
+- `VPS/apps/admin-panel/src/shared/components/status-badge.jsx`
+
+Delivered APIs (Phase 15):
+- `POST /api/website-leads`
+- `GET /api/admin/website-leads`
+- `PATCH /api/admin/website-leads/:leadId`
+
+Phase 15 outcomes delivered:
+- Added a dedicated website-buyer-leads backend module with validation, JSON persistence, admin permissions, and activity-log hooks.
+- Public storefront pages now render a reusable buyer lead form section and submit the current route as `sourcePage`.
+- Admin panel now includes a Website Buyer Leads screen with search, status filtering, and lead status/notes updates.
+- Regression coverage now verifies public lead submission, admin visibility, `sourcePage` capture, and admin status/note updates.
+- Normalized the guide-page mojibake in the storefront files touched during this phase.
+
+Validation completed after Phase 15:
+- `node backend/src/checks/run-regression-checks.js` passed
+- `node node_modules/eslint/bin/eslint.js backend/src` passed
+- `node node_modules/vite/bin/vite.js build` passed in `VPS/apps/front`
+- `node node_modules/vite/bin/vite.js build` passed in `VPS/apps/admin-panel`
+
+Pending files/tasks after Phase 15 closure:
+- Replace current URL-based blog image fields with upload workflow if content editors need asset management inside admin
+- Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
+- Add Facebook product feed when marketing/feed work is expanded in a later phase
+
 ---
 ## 13. First Codex Execution Prompt
 
@@ -2661,7 +2714,7 @@ After implementation, run basic start/build checks and report results.
 ```text
 Continue Jenix Commerce from PROJECT.md.
 
-Implement Phase 1 â€” Core Settings, Branding, Store Profile.
+Implement Phase 1 - Core Settings, Branding, Store Profile.
 
 Backend:
 - settings module
@@ -2701,7 +2754,6 @@ Future dealer app can reuse:
 - self pickup/dispatch status
 
 Do not block web development waiting for mobile app.
-
 
 
 

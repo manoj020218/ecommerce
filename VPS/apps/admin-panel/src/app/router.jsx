@@ -8,6 +8,7 @@ import { CategoriesPage } from "../modules/categories/categories-page";
 import { ProductsPage } from "../modules/products/products-page";
 import { HsnTaxPage } from "../modules/hsn-tax/hsn-tax-page";
 import { InventoryPage } from "../modules/inventory/inventory-page";
+import { WebsiteLeadsPage } from "../modules/website-leads/website-leads-page";
 
 export function AppRouter() {
   return (
@@ -23,6 +24,7 @@ export function AppRouter() {
           <Route path="hsn-tax" element={<HsnTaxPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="blogs" element={<BlogsPage />} />
+          <Route path="website-leads" element={<WebsiteLeadsPage />} />
         </Route>
       </Route>
 

@@ -21,6 +21,9 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/blogs")) {
     return "Blogs / Knowledge Base";
   }
+  if (pathname.startsWith("/website-leads")) {
+    return "Website Buyer Leads";
+  }
   return "Catalogue Overview";
 }
 
@@ -37,7 +40,7 @@ export function AdminLayout() {
   }, [session]);
 
   const mobileItems = useMemo(() => {
-    return visibleGroups.flatMap((group) => group.items).slice(0, 5);
+    return visibleGroups.flatMap((group) => group.items);
   }, [visibleGroups]);
 
   const adminName = session?.admin?.name || "Admin User";

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getBlog } from "./blogs.api";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
+import { getBlog } from "./blogs.api";
 
 function formatDate(value) {
   if (!value) {
@@ -104,9 +105,15 @@ export function BlogPage() {
 
   return (
     <main className="front-shell guide-shell">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(payload.structuredData?.article || {}) }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(payload.structuredData?.article || {}) }}
+      />
       {payload.structuredData?.faq ? (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(payload.structuredData.faq) }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(payload.structuredData.faq) }}
+        />
       ) : null}
 
       <header className="front-header">
@@ -120,7 +127,7 @@ export function BlogPage() {
         </div>
         <div className="guide-title-block">
           <p className="guide-meta-text">
-            {formatDate(article.publishedAt)} · {article.readingTimeMinutes} min read · {article.author}
+            {formatDate(article.publishedAt)} - {article.readingTimeMinutes} min read - {article.author}
           </p>
           <h1>{article.title}</h1>
           <p>{article.excerpt}</p>
@@ -210,6 +217,8 @@ export function BlogPage() {
           </div>
         </section>
       ) : null}
+
+      <WebsiteBuyerLeadSection />
     </main>
   );
 }

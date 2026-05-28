@@ -485,6 +485,78 @@ tbody tr:hover {
   color: var(--muted);
 }
 
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subsection-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.two-column {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-list-button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-list-button strong {
+  font-size: 13px;
+}
+
+.template-list-button span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.template-list-button.active {
+  border-color: #fca5a5;
+  background: #fff7f7;
+}
+
+.template-preview {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f9fafb;
+  padding: 12px;
+}
+
+.template-preview strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.template-preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
 .module-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -816,6 +888,10 @@ tbody tr:hover {
 
   .form-grid,
   .form-grid.wide {
+    grid-template-columns: 1fr;
+  }
+
+  .two-column {
     grid-template-columns: 1fr;
   }
 

@@ -46,6 +46,9 @@ const env = {
   websiteLeadsStorePath:
     process.env.WEBSITE_LEADS_STORE_PATH ||
     "backend/src/database/json/website-leads-store.json",
+  marketingStorePath:
+    process.env.MARKETING_STORE_PATH ||
+    "backend/src/database/json/marketing-store.json",
   otpDevDefaultCode: process.env.OTP_DEV_DEFAULT_CODE || "123456",
   cartStockReservationMinutes: Number.parseInt(
     process.env.CART_STOCK_RESERVATION_MINUTES || "15",

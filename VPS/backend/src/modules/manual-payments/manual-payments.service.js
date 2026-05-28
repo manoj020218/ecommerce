@@ -21,6 +21,9 @@ const {
   trackRecoveryCompleted
 } = require("../abandoned-cart/abandoned-cart.service");
 const {
+  safeSendTemplateNotification
+} = require("../marketing/marketing.service");
+const {
   MANUAL_PAYMENT_STATUSES,
   sanitizeManualPaymentSubmission
 } = require("./manual-payments.model");
@@ -114,6 +117,35 @@ function mapOrderSummary(order) {
     manualPaymentStatus: order.manualPaymentStatus || "",
     createdAt: order.createdAt || null
   };
+}
+
+function resolveNotificationEmail(order) {
+  const shippingEmail = String(order?.shippingAddress?.email || "")
+    .trim()
+    .toLowerCase();
+  if (shippingEmail) {
+    return shippingEmail;
+  }
+
+  return String(order?.billingAddress?.email || "")
+    .trim()
+    .toLowerCase();
+}
+
+function resolveNotificationCustomerName(order) {
+  return (
+    order?.billingAddress?.companyName ||
+    order?.billingAddress?.name ||
+    order?.shippingAddress?.companyName ||
+    order?.shippingAddress?.name ||
+    "Customer"
+  );
+}
+
+function formatOrderItems(order) {
+  return ensureArray(order?.items)
+    .map((item) => `${item.title || item.productId} x${Number(item.qty || 0)}`)
+    .join(", ");
 }
 
 function resolveStockStatus(product) {
@@ -230,6 +262,17 @@ async function submitManualPayment(context, payload, fullFilePath) {
       orderId: order.id
     }
   });
+  await safeSendTemplateNotification({
+    templateKey: "manual_payment_submitted",
+    toEmail: resolveNotificationEmail(order),
+    relatedResourceType: "order",
+    relatedResourceId: order.id,
+    variables: {
+      customerName: resolveNotificationCustomerName(order),
+      orderNo: order.orderNo || "",
+      cartItems: formatOrderItems(order)
+    }
+  });
 
   return {
     submission: sanitizeManualPaymentSubmission(submission),
@@ -303,6 +346,17 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
         submission.rejectionReason
       );
     }
+    await safeSendTemplateNotification({
+      templateKey: "payment_failed",
+      toEmail: resolveNotificationEmail(order),
+      relatedResourceType: "order",
+      relatedResourceId: order.id,
+      variables: {
+        customerName: resolveNotificationCustomerName(order),
+        orderNo: order.orderNo || "",
+        cartItems: formatOrderItems(order)
+      }
+    });
 
     await addActivityLog({
       action: "manual_payment.rejected",
@@ -368,6 +422,31 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
 
   const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
     source: "manual_payment_verification"
+  });
+  await safeSendTemplateNotification({
+    templateKey: "manual_payment_verified",
+    toEmail: resolveNotificationEmail(order),
+    invoiceId: invoiceResult.invoice?.id || order.invoiceId || null,
+    relatedResourceType: "order",
+    relatedResourceId: order.id,
+    variables: {
+      customerName: resolveNotificationCustomerName(order),
+      orderNo: order.orderNo || "",
+      invoiceNo: invoiceResult.invoice?.invoiceNumber || order.invoiceNumber || ""
+    }
+  });
+  await safeSendTemplateNotification({
+    templateKey: "order_placed",
+    toEmail: resolveNotificationEmail(order),
+    invoiceId: invoiceResult.invoice?.id || order.invoiceId || null,
+    relatedResourceType: "order",
+    relatedResourceId: order.id,
+    variables: {
+      customerName: resolveNotificationCustomerName(order),
+      orderNo: order.orderNo || "",
+      invoiceNo: invoiceResult.invoice?.invoiceNumber || order.invoiceNumber || "",
+      cartItems: formatOrderItems(order)
+    }
   });
 
   await addActivityLog({

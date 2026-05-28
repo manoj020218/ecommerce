@@ -9,6 +9,9 @@ const { resetSearchStoreForRegression } = require("../database/search-store");
 const { resetShippingStoreForRegression } = require("../database/shipping-store");
 const { resetContentStoreForRegression } = require("../database/content-store");
 const {
+  resetMarketingStoreForRegression
+} = require("../database/marketing-store");
+const {
   resetWebsiteLeadsStoreForRegression
 } = require("../database/website-leads-store");
 const { jsonFileStore } = require("../database/json-file-store");
@@ -56,6 +59,7 @@ async function run() {
   await resetSearchStoreForRegression();
   await resetShippingStoreForRegression();
   await resetContentStoreForRegression();
+  await resetMarketingStoreForRegression();
   await resetWebsiteLeadsStoreForRegression();
   await resetAuthStoreForRegression();
   await ensureAuthBootstrap();
@@ -2714,6 +2718,221 @@ async function run() {
     );
     assert.equal(phase9CartBackToOnline.response.status, 200);
     assert.equal(phase9CartBackToOnline.json.data.pricing.discountAmount, 0);
+
+    const phase17TemplateUpdate = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/email-templates/order_placed",
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          subject: "Order {{orderNo}} confirmed",
+          body: "Hello {{customerName}}, invoice {{invoiceNo}} is ready."
+        })
+      }
+    );
+    assert.equal(phase17TemplateUpdate.response.status, 200);
+    assert.equal(
+      phase17TemplateUpdate.json.data.subject,
+      "Order {{orderNo}} confirmed"
+    );
+
+    const phase17TemplatePreview = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/email-templates/order_placed/preview",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          variables: {
+            customerName: "Preview Buyer",
+            orderNo: "JNX-ORD-PREVIEW",
+            invoiceNo: "INV-PREVIEW"
+          }
+        })
+      }
+    );
+    assert.equal(phase17TemplatePreview.response.status, 200);
+    assert.equal(
+      phase17TemplatePreview.json.data.subject,
+      "Order JNX-ORD-PREVIEW confirmed"
+    );
+    assert.equal(
+      phase17TemplatePreview.json.data.body.includes("Preview Buyer"),
+      true
+    );
+
+    const phase17OfferCreate = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/offers",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          name: "May Dealer Push",
+          type: "amount_based",
+          amountOff: 250,
+          minOrderValue: 1000,
+          customerType: "retail",
+          productIds: [createdProductId],
+          startsAt: "2026-05-01T00:00:00.000Z",
+          endsAt: "2026-05-31T23:59:59.000Z",
+          isActive: true
+        })
+      }
+    );
+    assert.equal(phase17OfferCreate.response.status, 201);
+
+    const phase17Logs = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/notification-logs?limit=200",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase17Logs.response.status, 200);
+    assert.equal(
+      phase17Logs.json.data.some((row) => row.templateKey === "order_placed"),
+      true
+    );
+    assert.equal(
+      phase17Logs.json.data.some((row) => row.templateKey === "payment_failed"),
+      true
+    );
+    assert.equal(
+      phase17Logs.json.data.some(
+        (row) =>
+          row.templateKey === "tracking_detail_update" &&
+          row.relatedResourceId === phase8ShipmentId
+      ),
+      true
+    );
+
+    const phase16SalesReport = await requestJson(
+      baseUrl,
+      "/api/admin/reports/sales?period=monthly&month=2026-05&limit=200",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase16SalesReport.response.status, 200);
+    assert.equal(phase16SalesReport.json.data.rowCount >= 4, true);
+    const phase16SalesOrderRow = phase16SalesReport.json.data.rows.find(
+      (row) => row.orderNo === phase10InvoiceForOnlineOrder.json.data.orderNo
+    );
+    assert.equal(Boolean(phase16SalesOrderRow), true);
+    assert.equal(
+      phase16SalesOrderRow.invoiceNo,
+      phase10InvoiceForOnlineOrder.json.data.invoiceNumber
+    );
+    assert.equal(
+      phase16SalesOrderRow.grandTotal,
+      phase10InvoiceForOnlineOrder.json.data.pricing.grandTotal
+    );
+
+    const phase16SalesCsv = await requestText(
+      baseUrl,
+      "/api/admin/reports/sales/export?period=monthly&month=2026-05&format=csv",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase16SalesCsv.response.status, 200);
+    assert.equal(
+      String(phase16SalesCsv.response.headers.get("content-disposition") || "").includes(
+        "sales-2026-05.csv"
+      ),
+      true
+    );
+    assert.equal(
+      phase16SalesCsv.text.includes(phase10InvoiceForOnlineOrder.json.data.invoiceNumber),
+      true
+    );
+
+    const phase16CityPincodeReport = await requestJson(
+      baseUrl,
+      "/api/admin/reports/sales?period=monthly&month=2026-05&city=New%20Delhi&pincode=110015&limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase16CityPincodeReport.response.status, 200);
+    assert.equal(phase16CityPincodeReport.json.data.rows.length, 1);
+    assert.equal(
+      phase16CityPincodeReport.json.data.rows[0].orderNo,
+      phase10InvoiceForOnlineOrder.json.data.orderNo
+    );
+
+    const phase16InvoiceExcel = await requestText(
+      baseUrl,
+      "/api/admin/reports/invoices/export?period=yearly&year=2026&format=excel",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase16InvoiceExcel.response.status, 200);
+    assert.equal(
+      String(phase16InvoiceExcel.response.headers.get("content-disposition") || "").includes(
+        "invoices-2026.xls"
+      ),
+      true
+    );
+    assert.equal(
+      phase16InvoiceExcel.text.includes(phase10InvoiceForOnlineOrder.json.data.invoiceNumber),
+      true
+    );
+
+    const phase16OfferReport = await requestJson(
+      baseUrl,
+      "/api/admin/reports/marketing-offers?period=monthly&month=2026-05&limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase16OfferReport.response.status, 200);
+    assert.equal(phase16OfferReport.json.data.rowCount >= 1, true);
+
+    const phase16OpsStaffCreate = await requestJson(baseUrl, "/api/admin/staff", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        name: "Ops Viewer",
+        email: "ops.viewer@example.com",
+        mobile: "+919000000111",
+        password: "OpsViewer@123",
+        permissionGroupId: "group_ops_staff"
+      })
+    });
+    assert.equal(phase16OpsStaffCreate.response.status, 201);
+
+    const phase16OpsLogin = await requestJson(baseUrl, "/api/auth/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "ops.viewer@example.com",
+        password: "OpsViewer@123"
+      })
+    });
+    assert.equal(phase16OpsLogin.response.status, 200);
+    const phase16OpsToken = phase16OpsLogin.json.data.accessToken;
+
+    const phase16OpsViewReport = await requestJson(
+      baseUrl,
+      "/api/admin/reports/sales?period=monthly&month=2026-05&limit=20",
+      {
+        headers: authHeaders(phase16OpsToken)
+      }
+    );
+    assert.equal(phase16OpsViewReport.response.status, 200);
+
+    const phase16OpsExportDenied = await requestText(
+      baseUrl,
+      "/api/admin/reports/sales/export?period=monthly&month=2026-05&format=csv",
+      {
+        headers: authHeaders(phase16OpsToken)
+      }
+    );
+    assert.equal(phase16OpsExportDenied.response.status, 403);
 
     const archiveProduct = await requestJson(
       baseUrl,

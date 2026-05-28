@@ -31,6 +31,9 @@ const {
   trackRecoveryCompleted
 } = require("../abandoned-cart/abandoned-cart.service");
 const {
+  safeSendTemplateNotification
+} = require("../marketing/marketing.service");
+const {
   CART_OWNER_TYPES,
   PAYMENT_METHODS,
   SHIPPING_METHODS,
@@ -701,6 +704,72 @@ function createOrderFromSession(authStore, session, options = {}) {
     shippingAddress: session.shippingAddress || {},
     createdAt: nowIso()
   };
+}
+
+function resolveNotificationEmail(addressA, addressB) {
+  const primary = String(addressA?.email || "")
+    .trim()
+    .toLowerCase();
+  if (primary) {
+    return primary;
+  }
+
+  return String(addressB?.email || "")
+    .trim()
+    .toLowerCase();
+}
+
+function resolveNotificationCustomerName(addressA, addressB) {
+  return (
+    addressA?.companyName ||
+    addressA?.name ||
+    addressB?.companyName ||
+    addressB?.name ||
+    "Customer"
+  );
+}
+
+function formatNotificationItems(items) {
+  return ensureArray(items)
+    .map((item) => `${item.title || item.productId} x${Number(item.qty || 0)}`)
+    .join(", ");
+}
+
+async function notifyOrderPlaced(order, invoice) {
+  return safeSendTemplateNotification({
+    templateKey: "order_placed",
+    toEmail: resolveNotificationEmail(order.billingAddress, order.shippingAddress),
+    invoiceId: invoice?.id || order.invoiceId || null,
+    relatedResourceType: "order",
+    relatedResourceId: order.id,
+    variables: {
+      customerName: resolveNotificationCustomerName(
+        order.billingAddress,
+        order.shippingAddress
+      ),
+      orderNo: order.orderNo || "",
+      invoiceNo: invoice?.invoiceNumber || order.invoiceNumber || "",
+      cartItems: formatNotificationItems(order.items)
+    }
+  });
+}
+
+async function notifyPaymentFailure(session, attempt) {
+  return safeSendTemplateNotification({
+    templateKey: "payment_failed",
+    toEmail: resolveNotificationEmail(session.billingAddress, session.shippingAddress),
+    relatedResourceType: "payment_attempt",
+    relatedResourceId: attempt?.id || session.id,
+    variables: {
+      customerName: resolveNotificationCustomerName(
+        session.billingAddress,
+        session.shippingAddress
+      ),
+      orderNo: "",
+      paymentLink: attempt?.gatewayPaymentLink || "",
+      cartItems: formatNotificationItems(session.cart?.items)
+    }
+  });
 }
 
 function clearOwnerCart(authStore, owner) {
@@ -1779,6 +1848,7 @@ async function processPaymentWebhook(gatewayCode, payload) {
       attempt,
       attempt.failureReason
     );
+    await notifyPaymentFailure(session, attempt);
 
     await addActivityLog({
       action: "payments.webhook.failed",
@@ -1907,6 +1977,7 @@ async function processPaymentWebhook(gatewayCode, payload) {
     { id: "system", role: "system" },
     { source: "payment_webhook_success" }
   );
+  await notifyOrderPlaced(order, invoiceResult.invoice);
 
   await addActivityLog({
     action: "payments.webhook.success",

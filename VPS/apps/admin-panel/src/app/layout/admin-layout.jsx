@@ -18,8 +18,14 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/inventory")) {
     return "Inventory";
   }
+  if (pathname.startsWith("/reports")) {
+    return "Reports";
+  }
   if (pathname.startsWith("/blogs")) {
     return "Blogs / Knowledge Base";
+  }
+  if (pathname.startsWith("/marketing")) {
+    return "Marketing";
   }
   if (pathname.startsWith("/website-leads")) {
     return "Website Buyer Leads";

@@ -11,6 +11,9 @@ const {
 } = require("../../database/shipping-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const {
+  safeSendTemplateNotification
+} = require("../marketing/marketing.service");
+const {
   createShippingProvider
 } = require("../../integrations/shipping-providers/shipping-provider.adapter");
 const {
@@ -366,6 +369,16 @@ function resolveOrderContactEmail(order, authStore) {
   }
 
   return "";
+}
+
+function resolveOrderContactName(order) {
+  return (
+    order?.billingAddress?.companyName ||
+    order?.billingAddress?.name ||
+    order?.shippingAddress?.companyName ||
+    order?.shippingAddress?.name ||
+    "Customer"
+  );
 }
 
 function sanitizeTrackingEmailLog(log) {
@@ -868,6 +881,19 @@ async function updateShipmentTracking(shipmentId, payload, actor) {
   applyOrderShipmentStatus(order, shipment.shipmentStatus);
 
   await Promise.all([writeAuthStore(authStore), writeShippingStore(shippingStore)]);
+  await safeSendTemplateNotification({
+    templateKey: "tracking_detail_update",
+    toEmail: resolveOrderContactEmail(order, authStore),
+    relatedResourceType: "shipment",
+    relatedResourceId: shipment.id,
+    variables: {
+      customerName: resolveOrderContactName(order),
+      orderNo: order?.orderNo || "",
+      trackingId: shipment.trackingId || "",
+      trackingUrl: shipment.trackingUrl || "",
+      courierName: shipment.courierName || shipment.courierCode || ""
+    }
+  });
 
   await addActivityLog({
     action: "shipping.tracking.updated",

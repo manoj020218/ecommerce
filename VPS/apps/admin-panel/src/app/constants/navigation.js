@@ -46,8 +46,25 @@ export const ADMIN_NAV_ITEMS = [
     ]
   },
   {
+    group: "Operations",
+    items: [
+      {
+        key: "reports",
+        label: "Reports",
+        path: "/reports",
+        permission: "reports.view"
+      }
+    ]
+  },
+  {
     group: "Marketing",
     items: [
+      {
+        key: "marketing",
+        label: "Marketing",
+        path: "/marketing",
+        permission: "marketing.view"
+      },
       {
         key: "website-leads",
         label: "Website Leads",

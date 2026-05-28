@@ -1,0 +1,4 @@
+- [ ] Offer can be created and edited from the admin API.
+- [ ] Email template can be edited.
+- [ ] Email template preview renders substituted variables.
+- [ ] Order placed, payment failed, and tracking update events create notification logs.

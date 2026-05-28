@@ -72,5 +72,16 @@ export const ADMIN_NAV_ITEMS = [
         permission: "website_leads.view"
       }
     ]
+  },
+  {
+    group: "Setup",
+    items: [
+      {
+        key: "settings",
+        label: "Settings",
+        path: "/settings",
+        permission: "settings.view"
+      }
+    ]
   }
 ];

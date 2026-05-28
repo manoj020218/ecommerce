@@ -76,6 +76,14 @@ textarea {
   font-size: 30px;
 }
 
+.hero-support-copy {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.7;
+  font-size: 14px;
+}
+
 .front-search {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1227,6 +1235,72 @@ textarea {
   justify-content: flex-start;
 }
 
+.storefront-footer-shell {
+  padding: 0 0 28px;
+}
+
+.storefront-footer {
+  gap: 14px;
+}
+
+.storefront-footer-top,
+.storefront-footer-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.storefront-footer-top {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(232, 35, 26, 0.08), rgba(23, 92, 211, 0.06)), var(--surface);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.storefront-brand {
+  display: grid;
+  gap: 12px;
+}
+
+.storefront-brand h2 {
+  margin: 4px 0 0;
+  font-size: 26px;
+}
+
+.storefront-brand-logo {
+  max-width: 180px;
+  max-height: 56px;
+  object-fit: contain;
+}
+
+.footer-card {
+  display: grid;
+  gap: 10px;
+}
+
+.footer-detail-list {
+  display: grid;
+  gap: 10px;
+}
+
+.footer-detail-list p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.footer-detail-list strong {
+  color: var(--text);
+}
+
+.footer-link-grid {
+  grid-template-columns: 1fr;
+}
+
+.footer-link-card {
+  min-height: 100%;
+}
+
 @media (min-width: 900px) {
   .front-shell {
     padding: 24px 22px 56px;
@@ -1280,5 +1354,14 @@ textarea {
 
   .buyer-lead-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .storefront-brand {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+
+  .storefront-footer-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

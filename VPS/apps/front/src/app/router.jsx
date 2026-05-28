@@ -7,6 +7,7 @@ import { BlogsListPage } from "../modules/blogs/blogs-list-page";
 import { ProductsListPage } from "../modules/products/products-list-page";
 import { ProductPage } from "../modules/products/product-page";
 import { RecoveryPage } from "../modules/recovery/recovery-page";
+import { StorefrontLayout } from "../modules/settings/storefront-layout";
 import { useCustomerSession } from "../shared/auth/customer-session";
 
 function CustomerProtectedRoute({ children }) {
@@ -37,29 +38,31 @@ function CustomerProtectedRoute({ children }) {
 export function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<ProductsListPage />} />
-      <Route path="/guides" element={<BlogsListPage />} />
-      <Route path="/guides/:slug" element={<BlogPage />} />
-      <Route path="/products/:slug" element={<ProductPage />} />
-      <Route path="/recover/:recoveryToken" element={<RecoveryPage />} />
-      <Route path="/account/login" element={<CustomerAccountLoginPage />} />
-      <Route
-        path="/account"
-        element={
-          <CustomerProtectedRoute>
-            <CustomerAccountPage />
-          </CustomerProtectedRoute>
-        }
-      />
-      <Route
-        path="/account/orders/:orderId"
-        element={
-          <CustomerProtectedRoute>
-            <CustomerOrderPage />
-          </CustomerProtectedRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route element={<StorefrontLayout />}>
+        <Route path="/" element={<ProductsListPage />} />
+        <Route path="/guides" element={<BlogsListPage />} />
+        <Route path="/guides/:slug" element={<BlogPage />} />
+        <Route path="/products/:slug" element={<ProductPage />} />
+        <Route path="/recover/:recoveryToken" element={<RecoveryPage />} />
+        <Route path="/account/login" element={<CustomerAccountLoginPage />} />
+        <Route
+          path="/account"
+          element={
+            <CustomerProtectedRoute>
+              <CustomerAccountPage />
+            </CustomerProtectedRoute>
+          }
+        />
+        <Route
+          path="/account/orders/:orderId"
+          element={
+            <CustomerProtectedRoute>
+              <CustomerOrderPage />
+            </CustomerProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
     </Routes>
   );
 }

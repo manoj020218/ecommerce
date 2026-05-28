@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listProducts, searchStorefront } from "./products.api";
+import { usePublicSettings } from "../settings/public-settings-context";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 
@@ -10,6 +11,45 @@ function currency(amount) {
     currency: "INR",
     maximumFractionDigits: 0
   }).format(Number(amount || 0));
+}
+
+function upsertMetaTag(name, content, attribute = "name") {
+  if (!content) {
+    return;
+  }
+
+  let tag = document.head.querySelector(`meta[${attribute}="${name}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute(attribute, name);
+    document.head.append(tag);
+  }
+
+  tag.setAttribute("content", content);
+}
+
+function upsertCanonical(url) {
+  if (!url) {
+    return;
+  }
+
+  let tag = document.head.querySelector('link[rel="canonical"]');
+  if (!tag) {
+    tag = document.createElement("link");
+    tag.setAttribute("rel", "canonical");
+    document.head.append(tag);
+  }
+
+  tag.setAttribute("href", url);
+}
+
+function buildWhatsAppLink(number, message) {
+  const digits = String(number || "").replace(/[^\d]/g, "");
+  if (!digits) {
+    return "";
+  }
+
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 function ProductCard({ product }) {
@@ -40,6 +80,7 @@ function ProductCard({ product }) {
 
 export function ProductsListPage() {
   const { customer, isAuthenticated } = useCustomerSession();
+  const { settings: publicSettings } = usePublicSettings();
   const [query, setQuery] = useState("");
   const [searchText, setSearchText] = useState("");
   const [products, setProducts] = useState([]);
@@ -96,7 +137,58 @@ export function ProductsListPage() {
     };
   }, [query]);
 
+  useEffect(() => {
+    const seoDefaults = publicSettings.seoDefaults || {};
+    const homeMetaTitle = seoDefaults.homeMetaTitle || publicSettings.storeProfile.storeName;
+    const canonicalRoot = String(seoDefaults.canonicalDomain || "").replace(/\/+$/, "");
+
+    if (homeMetaTitle) {
+      document.title = homeMetaTitle;
+      upsertMetaTag("og:title", homeMetaTitle, "property");
+    }
+
+    if (seoDefaults.homeMetaDescription) {
+      upsertMetaTag("description", seoDefaults.homeMetaDescription);
+      upsertMetaTag("og:description", seoDefaults.homeMetaDescription, "property");
+    }
+
+    if (seoDefaults.defaultOgImageUrl) {
+      upsertMetaTag("og:image", seoDefaults.defaultOgImageUrl, "property");
+    }
+
+    if (seoDefaults.searchConsoleVerification) {
+      upsertMetaTag(
+        "google-site-verification",
+        seoDefaults.searchConsoleVerification
+      );
+    }
+
+    if (seoDefaults.bingVerification) {
+      upsertMetaTag("msvalidate.01", seoDefaults.bingVerification);
+    }
+
+    if (canonicalRoot) {
+      upsertCanonical(`${canonicalRoot}/`);
+    }
+  }, [publicSettings]);
+
   const total = useMemo(() => products.length + blogs.length, [products, blogs]);
+  const storeProfile = publicSettings.storeProfile || {};
+  const contactInformation = publicSettings.contactInformation || {};
+  const storeName = storeProfile.storeName || "Jenix India";
+  const heroTitle =
+    publicSettings.seoDefaults.homeMetaTitle === storeName
+      ? "Security Product Store"
+      : publicSettings.seoDefaults.homeMetaTitle || "Security Product Store";
+  const heroDescription =
+    publicSettings.seoDefaults.homeMetaDescription ||
+    "Browse CCTV, networking, access control, and automation products.";
+  const supportPhone =
+    contactInformation.publicPhone || storeProfile.supportMobile || "";
+  const supportWhatsApp =
+    contactInformation.publicWhatsApp || storeProfile.whatsappNumber || "";
+  const supportTiming =
+    contactInformation.supportTiming || storeProfile.businessHours || "";
 
   return (
     <main className="front-shell">
@@ -110,14 +202,36 @@ export function ProductsListPage() {
           </Link>
         </div>
         <div className="brand-block">
-          <p>Jenix India</p>
-          <h1>Security Product Store</h1>
+          <p>{storeName}</p>
+          <h1>{heroTitle}</h1>
+          <span className="hero-support-copy">
+            {heroDescription}
+            {supportTiming ? ` Support timing: ${supportTiming}.` : ""}
+          </span>
         </div>
 
         <div className="chip-row">
           <Link to="/guides" className="inline-link">
             Browse Guides
           </Link>
+          {supportPhone ? (
+            <a href={`tel:${supportPhone}`} className="inline-link">
+              Call Store
+            </a>
+          ) : null}
+          {supportWhatsApp ? (
+            <a
+              href={buildWhatsAppLink(
+                supportWhatsApp,
+                `Need help choosing products from ${storeName}.`
+              )}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-link"
+            >
+              WhatsApp Help
+            </a>
+          ) : null}
         </div>
 
         <form

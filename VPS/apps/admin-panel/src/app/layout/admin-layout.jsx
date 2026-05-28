@@ -30,6 +30,9 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/website-leads")) {
     return "Website Buyer Leads";
   }
+  if (pathname.startsWith("/settings")) {
+    return "Settings";
+  }
   return "Catalogue Overview";
 }
 

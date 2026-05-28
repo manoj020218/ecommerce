@@ -12,7 +12,7 @@ This workspace follows `PROJECT.md` with a backend-first execution path.
 ## Current implementation status
 
 - Phase 0 (backend-first bootstrap): in progress
-- Phase 1 backend (settings module): in progress
+- Phase 1 full-stack settings foundation: complete
 
 ## Run locally
 

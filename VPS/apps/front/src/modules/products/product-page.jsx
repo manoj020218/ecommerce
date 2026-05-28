@@ -6,7 +6,8 @@ import {
   estimateShipping,
   getProduct,
   getProductPageBundle,
-  getProductRecommendations
+  getProductRecommendations,
+  requestNotifyWhenAvailable
 } from "./products.api";
 import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 
@@ -100,6 +101,14 @@ export function ProductPage() {
   const [saved, setSaved] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [notifyForm, setNotifyForm] = useState({
+    customerName: "",
+    email: "",
+    mobile: ""
+  });
+  const [notifyLoading, setNotifyLoading] = useState(false);
+  const [notifyError, setNotifyError] = useState("");
+  const [notifyNotice, setNotifyNotice] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -110,6 +119,8 @@ export function ProductPage() {
     setShippingError("");
     setPageSeo(null);
     setStructuredData(null);
+    setNotifyError("");
+    setNotifyNotice("");
 
     getProduct(slug)
       .then((data) => {
@@ -208,6 +219,14 @@ export function ProductPage() {
     };
   }, [isAuthenticated, product?.id]);
 
+  useEffect(() => {
+    setNotifyForm((current) => ({
+      customerName: current.customerName || customer?.name || "",
+      email: current.email || customer?.email || "",
+      mobile: current.mobile || customer?.mobile || ""
+    }));
+  }, [customer?.email, customer?.mobile, customer?.name]);
+
   const effectiveBulkSlabs = useMemo(() => {
     if (!product) {
       return [];
@@ -228,6 +247,31 @@ export function ProductPage() {
   const recentSearches = recommendations?.recently?.searches || [];
   const recentViewed = recommendations?.recently?.viewedProducts || [];
   const guides = Array.isArray(recommendations?.guides) ? recommendations.guides : [];
+  const showNotifyWhenAvailable = product?.stockStatus === "out_of_stock";
+
+  const submitNotifyRequest = async (event) => {
+    event.preventDefault();
+    setNotifyLoading(true);
+    setNotifyError("");
+    setNotifyNotice("");
+
+    try {
+      await requestNotifyWhenAvailable({
+        productId: product.id,
+        customerName: notifyForm.customerName,
+        email: notifyForm.email,
+        mobile: notifyForm.mobile,
+        sourcePage: location.pathname
+      });
+      setNotifyNotice("Availability request saved. We will email you when this product is back.");
+    } catch (requestError) {
+      setNotifyError(
+        requestError.message || "Failed to save your availability request."
+      );
+    } finally {
+      setNotifyLoading(false);
+    }
+  };
 
   if (loading) {
     return <main className="front-shell"><div className="state-box">Loading product...</div></main>;
@@ -410,6 +454,55 @@ export function ProductPage() {
           <a className="btn whatsapp" href={`https://wa.me/?text=${encodeURIComponent(`Need details for ${product.title}`)}`}>
             WhatsApp Enquiry
           </a>
+
+          {showNotifyWhenAvailable ? (
+            <form className="shipping-box" onSubmit={submitNotifyRequest}>
+              <h4>Notify when available</h4>
+              <p className="muted-text">
+                This product is out of stock right now. Leave your email and we will send an availability update.
+              </p>
+              <div className="shipping-input-row">
+                <input
+                  value={notifyForm.customerName}
+                  onChange={(event) =>
+                    setNotifyForm((current) => ({
+                      ...current,
+                      customerName: event.target.value
+                    }))
+                  }
+                  placeholder="Your name"
+                />
+                <input
+                  type="email"
+                  value={notifyForm.email}
+                  onChange={(event) =>
+                    setNotifyForm((current) => ({
+                      ...current,
+                      email: event.target.value
+                    }))
+                  }
+                  placeholder="Email address"
+                />
+              </div>
+              <div className="shipping-input-row">
+                <input
+                  value={notifyForm.mobile}
+                  onChange={(event) =>
+                    setNotifyForm((current) => ({
+                      ...current,
+                      mobile: event.target.value
+                    }))
+                  }
+                  placeholder="Mobile number (optional)"
+                />
+                <button type="submit" className="btn secondary" disabled={notifyLoading}>
+                  {notifyLoading ? "Saving..." : "Notify Me"}
+                </button>
+              </div>
+              {notifyError ? <p className="muted-error">{notifyError}</p> : null}
+              {notifyNotice ? <p className="muted-text">{notifyNotice}</p> : null}
+            </form>
+          ) : null}
 
           <form
             className="shipping-box"

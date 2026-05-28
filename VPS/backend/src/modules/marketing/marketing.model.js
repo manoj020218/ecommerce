@@ -53,6 +53,12 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "pickupInstructions"
 ]);
 
+const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([
+  "pending",
+  "notified",
+  "cancelled"
+]);
+
 function createDefaultTemplate(key) {
   return {
     key,
@@ -169,15 +175,37 @@ function sanitizeNotificationLog(log) {
   };
 }
 
+function sanitizeNotifySubscription(subscription) {
+  return {
+    id: subscription.id,
+    productId: subscription.productId,
+    productSlug: subscription.productSlug || "",
+    productTitle: subscription.productTitle || "",
+    customerId: subscription.customerId || "",
+    customerName: subscription.customerName || "",
+    email: subscription.email || "",
+    mobile: subscription.mobile || "",
+    status: subscription.status || "pending",
+    sourcePage: subscription.sourcePage || "",
+    requestedAt: subscription.requestedAt || subscription.createdAt || null,
+    notifiedAt: subscription.notifiedAt || null,
+    lastAttemptAt: subscription.lastAttemptAt || null,
+    lastAttemptStatus: subscription.lastAttemptStatus || "",
+    updatedAt: subscription.updatedAt || null
+  };
+}
+
 module.exports = {
   OFFER_TYPES,
   TEMPLATE_KEYS,
   TEMPLATE_VARIABLES,
+  NOTIFY_SUBSCRIPTION_STATUSES,
   createDefaultTemplate,
   cloneDefaultMarketingStore,
   ensureTemplateCoverage,
   fillTemplateText,
   sanitizeOffer,
   sanitizeTemplate,
-  sanitizeNotificationLog
+  sanitizeNotificationLog,
+  sanitizeNotifySubscription
 };

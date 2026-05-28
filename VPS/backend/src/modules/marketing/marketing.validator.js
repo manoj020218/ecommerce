@@ -1,6 +1,10 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
-const { OFFER_TYPES, TEMPLATE_KEYS } = require("./marketing.model");
+const {
+  OFFER_TYPES,
+  TEMPLATE_KEYS,
+  NOTIFY_SUBSCRIPTION_STATUSES
+} = require("./marketing.model");
 
 const isoDateSchema = z.string().datetime({ offset: true });
 
@@ -50,6 +54,20 @@ const offersQuerySchema = z.object({
   includeInactive: z.coerce.boolean().optional().default(true)
 });
 
+const notifySubscriptionPayloadSchema = z.object({
+  productId: z.string().trim().min(2).max(160),
+  customerName: z.string().trim().max(160).optional().default(""),
+  email: z.string().trim().email().max(180).optional().or(z.literal("")).default(""),
+  mobile: z.string().trim().max(32).optional().default(""),
+  sourcePage: z.string().trim().max(400).optional().default("")
+});
+
+const notifySubscriptionsQuerySchema = z.object({
+  productId: z.string().trim().min(2).max(160).optional(),
+  status: z.enum(NOTIFY_SUBSCRIPTION_STATUSES).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50)
+});
+
 function ensureObject(payload, label) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new HttpError(400, `${label} payload must be an object.`);
@@ -88,6 +106,15 @@ function parseTemplateKey(value) {
   return z.enum(TEMPLATE_KEYS).parse(value);
 }
 
+function parseNotifySubscriptionPayload(payload) {
+  ensureObject(payload, "Notify subscription");
+  return notifySubscriptionPayloadSchema.parse(payload);
+}
+
+function parseNotifySubscriptionsQuery(query) {
+  return notifySubscriptionsQuerySchema.parse(query || {});
+}
+
 module.exports = {
   parseOfferPayload,
   parseOfferPatch,
@@ -95,5 +122,7 @@ module.exports = {
   parsePreviewPayload,
   parseNotificationLogsQuery,
   parseOffersQuery,
-  parseTemplateKey
+  parseTemplateKey,
+  parseNotifySubscriptionPayload,
+  parseNotifySubscriptionsQuery
 };

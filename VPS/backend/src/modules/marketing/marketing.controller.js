@@ -9,7 +9,9 @@ const {
   parsePreviewPayload,
   parseNotificationLogsQuery,
   parseOffersQuery,
-  parseTemplateKey
+  parseTemplateKey,
+  parseNotifySubscriptionPayload,
+  parseNotifySubscriptionsQuery
 } = require("./marketing.validator");
 
 function mapValidationError(error) {
@@ -66,6 +68,33 @@ const adminListNotificationLogs = asyncHandler(async (req, res) => {
   return ok(res, await service.listNotificationLogs(parseNotificationLogsQuery(req.query || {})), "Notification logs fetched.");
 });
 
+const adminListNotifySubscriptions = asyncHandler(async (req, res) => {
+  return ok(
+    res,
+    await service.listNotifySubscriptions(parseNotifySubscriptionsQuery(req.query || {})),
+    "Notify subscriptions fetched."
+  );
+});
+
+const adminSendNotifySubscription = asyncHandler(async (req, res) => {
+  return ok(
+    res,
+    await service.sendNotifySubscription(req.params.subscriptionId, req.actor),
+    "Availability notification sent."
+  );
+});
+
+const publicCreateNotifySubscription = asyncHandler(async (req, res) => {
+  const payload = parseNotifySubscriptionPayload(req.body);
+  return created(
+    res,
+    await service.createNotifySubscription(payload, {
+      customerId: req.customer?.id || null
+    }),
+    "Notify subscription saved."
+  );
+});
+
 module.exports = {
   adminGetMarketingOverview,
   adminListOffers,
@@ -75,5 +104,8 @@ module.exports = {
   adminGetEmailTemplate,
   adminUpdateEmailTemplate,
   adminPreviewEmailTemplate,
-  adminListNotificationLogs
+  adminListNotificationLogs,
+  adminListNotifySubscriptions,
+  adminSendNotifySubscription,
+  publicCreateNotifySubscription
 };

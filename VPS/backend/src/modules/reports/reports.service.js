@@ -673,6 +673,10 @@ function buildZipArchive(files) {
   return Buffer.concat([...localParts, centralDirectory, endRecord]);
 }
 
+function formatMoneyValue(value) {
+  return Number(value || 0).toFixed(2);
+}
+
 function toSummaryLines(report) {
   const lines = [];
 
@@ -687,6 +691,42 @@ function toSummaryLines(report) {
   lines.push(`Rows: ${report.rowCount}`);
   lines.push(`Period: ${report.filters.dateFrom} to ${report.filters.dateTo}`);
   return lines;
+}
+
+function buildInvoicePdf(invoice) {
+  const buyer = invoice?.buyer || {};
+  const seller = invoice?.seller || {};
+  const pricing = invoice?.pricing || {};
+  const items = ensureArray(invoice?.items);
+
+  const lines = [
+    `Invoice No: ${invoice?.invoiceNumber || ""}`,
+    `Invoice Date: ${invoice?.invoiceDate || ""}`,
+    `Order No: ${invoice?.orderNo || ""}`,
+    `Customer: ${buyer.companyName || buyer.name || "Customer"}`,
+    `GSTIN: ${buyer.gstin || ""}`,
+    `City: ${buyer.city || ""}  State: ${buyer.state || buyer.stateCode || ""}`,
+    `Seller: ${seller.legalBusinessName || seller.storeName || "Jenix India"}`,
+    `Payment Method: ${invoice?.paymentMethod || ""}`,
+    `Payment Status: ${invoice?.paymentStatus || ""}`,
+    `Product Total: INR ${formatMoneyValue(pricing.productSubtotal)}`,
+    `Discount: INR ${formatMoneyValue(pricing.discountAmount)}`,
+    `Taxable Value: INR ${formatMoneyValue(pricing.taxableValue)}`,
+    `GST Total: INR ${formatMoneyValue(pricing.gstTotal)}`,
+    `Shipping: INR ${formatMoneyValue(pricing.shippingCharge)}`,
+    `Round Off: INR ${formatMoneyValue(pricing.roundOff)}`,
+    `Grand Total: INR ${formatMoneyValue(pricing.grandTotal)}`,
+    `Amount In Words: ${pricing.amountInWords || ""}`,
+    "Items:"
+  ];
+
+  items.slice(0, 20).forEach((item, index) => {
+    lines.push(
+      `${index + 1}. ${item.title || item.sku || "Item"} | Qty ${item.qty || 0} | GST ${item.gstRate || 0}% | Total INR ${formatMoneyValue(item.lineTotal)}`
+    );
+  });
+
+  return buildSimplePdf(`Invoice ${invoice?.invoiceNumber || ""}`, lines);
 }
 
 function buildExportFileName(report, extension) {
@@ -795,16 +835,29 @@ function buildSalesReport(context, filters, window) {
   };
 }
 
-function buildInvoicesReport(context, filters, window) {
-  const rows = ensureArray(context.invoiceStore.invoices)
+function buildFilteredInvoiceEntries(context, filters, window) {
+  return ensureArray(context.invoiceStore.invoices)
     .filter((invoice) => isWithinWindow(invoice.invoiceDate, window, { treatAsDateOnly: true }))
     .map((invoice) => {
       const order = ensureArray(context.authStore.orders).find((row) => row.id === invoice.orderId);
       const shipment = order ? context.shipmentByOrderId.get(order.id) : null;
+
       if (order && !matchesOrderFilters(order, shipment, filters)) {
         return null;
       }
 
+      return {
+        invoice,
+        order,
+        shipment
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildInvoicesReport(context, filters, window) {
+  const rows = buildFilteredInvoiceEntries(context, filters, window)
+    .map(({ invoice }) => {
       return {
         invoiceNo: invoice.invoiceNumber || "",
         invoiceDate: invoice.invoiceDate || "",
@@ -822,7 +875,6 @@ function buildInvoicesReport(context, filters, window) {
         grandTotal: Number(invoice.pricing?.grandTotal || 0)
       };
     })
-    .filter(Boolean)
     .sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
 
   const summary = rows.reduce(
@@ -871,15 +923,8 @@ function buildInvoicesReport(context, filters, window) {
 }
 
 function buildGstReport(context, filters, window) {
-  const rows = ensureArray(context.invoiceStore.invoices)
-    .filter((invoice) => isWithinWindow(invoice.invoiceDate, window, { treatAsDateOnly: true }))
-    .map((invoice) => {
-      const order = ensureArray(context.authStore.orders).find((row) => row.id === invoice.orderId);
-      const shipment = order ? context.shipmentByOrderId.get(order.id) : null;
-      if (order && !matchesOrderFilters(order, shipment, filters)) {
-        return null;
-      }
-
+  const rows = buildFilteredInvoiceEntries(context, filters, window)
+    .map(({ invoice }) => {
       return {
         invoiceNo: invoice.invoiceNumber || "",
         invoiceDate: invoice.invoiceDate || "",
@@ -894,7 +939,6 @@ function buildGstReport(context, filters, window) {
         grandTotal: Number(invoice.pricing?.grandTotal || 0)
       };
     })
-    .filter(Boolean)
     .sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
 
   const summary = rows.reduce(
@@ -1460,12 +1504,12 @@ async function exportReport(reportKey, filters, actor, format) {
       throw new HttpError(400, "Invoice ZIP export is available only for the invoice report.");
     }
 
-    const matchingInvoices = ensureArray(context.invoiceStore.invoices).filter((invoice) =>
-      isWithinWindow(invoice.invoiceDate, window, { treatAsDateOnly: true })
+    const matchingInvoices = buildFilteredInvoiceEntries(context, filters, window).map(
+      ({ invoice }) => invoice
     );
     const files = matchingInvoices.map((invoice) => ({
-      name: `${String(invoice.invoiceNumber || invoice.id).replace(/[^a-zA-Z0-9._-]+/g, "-")}.json`,
-      content: JSON.stringify(invoice, null, 2)
+      name: `${String(invoice.invoiceNumber || invoice.id).replace(/[^a-zA-Z0-9._-]+/g, "-")}.pdf`,
+      content: buildInvoicePdf(invoice)
     }));
 
     contentType = "application/zip";
@@ -1479,8 +1523,8 @@ async function exportReport(reportKey, filters, actor, format) {
       );
     }
 
-    const matchingInvoices = ensureArray(context.invoiceStore.invoices).filter((invoice) =>
-      isWithinWindow(invoice.invoiceDate, window, { treatAsDateOnly: true })
+    const matchingInvoices = buildFilteredInvoiceEntries(context, filters, window).map(
+      ({ invoice }) => invoice
     );
     const tallyRows = buildTallyRows(matchingInvoices, window.period);
 

@@ -11,6 +11,9 @@ const { createPublicSeoRouter } = require("./modules/seo/seo.routes");
 const {
   createPublicGoogleMerchantRouter
 } = require("./modules/google-merchant/google-merchant.routes");
+const {
+  createPublicFacebookFeedRouter
+} = require("./modules/facebook-feed/facebook-feed.routes");
 
 function createApp() {
   const app = express();
@@ -44,6 +47,7 @@ function createApp() {
 
   app.use(createPublicSeoRouter());
   app.use(createPublicGoogleMerchantRouter());
+  app.use(createPublicFacebookFeedRouter());
   app.use("/api", apiRouter);
   app.use(notFoundHandler);
   app.use(errorHandler);

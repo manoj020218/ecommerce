@@ -57,7 +57,10 @@ const {
   createAdminWebsiteLeadsRouter,
   createPublicWebsiteLeadsRouter
 } = require("../modules/website-leads/website-leads.routes");
-const { createAdminMarketingRouter } = require("../modules/marketing/marketing.routes");
+const {
+  createAdminMarketingRouter,
+  createPublicMarketingRouter
+} = require("../modules/marketing/marketing.routes");
 const { createReportsRouter } = require("../modules/reports/reports.routes");
 
 function createApiRouter() {
@@ -97,6 +100,7 @@ function createApiRouter() {
   router.use("/recovery", createPublicRecoveryRouter());
   router.use("/blogs", createPublicBlogsRouter());
   router.use("/website-leads", createPublicWebsiteLeadsRouter());
+  router.use("/marketing", createPublicMarketingRouter());
 
   return router;
 }

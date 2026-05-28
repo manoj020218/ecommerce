@@ -56,8 +56,29 @@ function createAdminMarketingRouter() {
     requireAdminPermission(MARKETING_PERMISSIONS.VIEW),
     controller.adminListNotificationLogs
   );
+  router.get(
+    "/notify-subscriptions",
+    requireAdminPermission(MARKETING_PERMISSIONS.VIEW),
+    controller.adminListNotifySubscriptions
+  );
+  router.post(
+    "/notify-subscriptions/:subscriptionId/send",
+    requireAdminPermission(MARKETING_PERMISSIONS.EDIT_TEMPLATES),
+    controller.adminSendNotifySubscription
+  );
 
   return router;
 }
 
-module.exports = { createAdminMarketingRouter };
+function createPublicMarketingRouter() {
+  const router = express.Router();
+
+  router.post(
+    "/notify-when-available",
+    controller.publicCreateNotifySubscription
+  );
+
+  return router;
+}
+
+module.exports = { createAdminMarketingRouter, createPublicMarketingRouter };

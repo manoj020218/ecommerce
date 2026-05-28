@@ -17,8 +17,10 @@ import {
   fetchEmailTemplates,
   fetchMarketingOverview,
   fetchNotificationLogs,
+  fetchNotifySubscriptions,
   fetchOffers,
   previewEmailTemplate,
+  sendNotifySubscription,
   updateEmailTemplate,
   updateOffer
 } from "./marketing.api";
@@ -136,6 +138,7 @@ export function MarketingPage() {
   const [offers, setOffers] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [notifySubscriptions, setNotifySubscriptions] = useState([]);
   const [selectedTemplateKey, setSelectedTemplateKey] = useState("");
   const [templateForm, setTemplateForm] = useState({
     subject: "",
@@ -153,19 +156,24 @@ export function MarketingPage() {
   const [editingOffer, setEditingOffer] = useState(null);
   const [offerForm, setOfferForm] = useState(EMPTY_OFFER_FORM);
   const [savingOffer, setSavingOffer] = useState(false);
+  const [sendingNotifyId, setSendingNotifyId] = useState("");
 
   const loadAll = async () => {
-    const [overviewData, offersData, templatesData, logsData] = await Promise.all([
+    const [overviewData, offersData, templatesData, logsData, notifySubscriptionsData] = await Promise.all([
       fetchMarketingOverview(),
       fetchOffers({ includeInactive: true }),
       fetchEmailTemplates(),
-      fetchNotificationLogs(logsFilter)
+      fetchNotificationLogs(logsFilter),
+      fetchNotifySubscriptions({ limit: 12 })
     ]);
 
     setOverview(overviewData);
     setOffers(Array.isArray(offersData) ? offersData : []);
     setTemplates(Array.isArray(templatesData) ? templatesData : []);
     setLogs(Array.isArray(logsData) ? logsData : []);
+    setNotifySubscriptions(
+      Array.isArray(notifySubscriptionsData) ? notifySubscriptionsData : []
+    );
 
     const initialTemplateKey =
       selectedTemplateKey || templatesData?.[0]?.key || "";
@@ -302,6 +310,30 @@ export function MarketingPage() {
     }
   };
 
+  const onSendNotifySubscription = async (subscription) => {
+    setSendingNotifyId(subscription.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const result = await sendNotifySubscription(subscription.id);
+      await loadAll();
+      setNotice(
+        `Availability notification ${result?.subscription?.status === "notified" ? "sent" : "attempted"} for ${subscription.productTitle}`
+      );
+    } catch (apiError) {
+      setError(apiError.message || "Failed to send availability notification.");
+    } finally {
+      setSendingNotifyId("");
+    }
+  };
+
+  const customerSegments = Array.isArray(overview?.customerSegments?.segments)
+    ? overview.customerSegments.segments
+    : [];
+  const notifySummary = overview?.notifyWhenAvailable || {};
+  const recoverySummary = overview?.abandonedCartRecovery || {};
+
   if (loading) {
     return <LoadingBlock label="Loading marketing workspace..." />;
   }
@@ -314,7 +346,7 @@ export function MarketingPage() {
     <section className="stack">
       <PageHeader
         title="Marketing"
-        description="Phase 17 offers, email templates, analytics/feed references, and notification logs."
+        description="Phase 17 offers, templates, customer segments, recovery visibility, notify backlog, and channel/feed controls."
         actions={
           canEditOffers ? (
             <button type="button" className="btn btn-primary" onClick={() => openOfferModal()}>
@@ -334,21 +366,123 @@ export function MarketingPage() {
           <span>Tag manager: {overview?.analytics?.googleTagManagerId || "Not set"}</span>
         </article>
         <article className="summary-card">
-          <p>Facebook Pixel</p>
-          <h3>{overview?.analytics?.facebookPixelId || "Not set"}</h3>
-          <span>Merchant feed linked below</span>
+          <p>Customer Segments</p>
+          <h3>{overview?.customerSegments?.totalCustomers || 0}</h3>
+          <span>{customerSegments.length} generated audience groups</span>
         </article>
         <article className="summary-card">
-          <p>Merchant Feed</p>
-          <h3>{offers.length}</h3>
-          <span>{overview?.feeds?.merchantFeedUrl || "Not set"}</span>
+          <p>Notify Backlog</p>
+          <h3>{notifySummary.pendingCount || 0}</h3>
+          <span>Ready to send: {notifySummary.readyToNotifyCount || 0}</span>
         </article>
         <article className="summary-card">
-          <p>Sitemap</p>
-          <h3>{templates.length}</h3>
-          <span>{overview?.feeds?.sitemapUrl || "Not set"}</span>
+          <p>Abandoned Cart Recovery</p>
+          <h3>{recoverySummary.dueReminders || 0}</h3>
+          <span>Total tracked: {recoverySummary.total || 0}</span>
         </article>
       </div>
+
+      <section className="summary-card">
+        <div className="section-head">
+          <div>
+            <h3 className="subsection-title">Customer Segments</h3>
+            <p className="muted">Derived customer groups that can be targeted with templates, offers, and future channel campaigns.</p>
+          </div>
+        </div>
+
+        <div className="table-wrap desktop-only">
+          <table>
+            <thead>
+              <tr>
+                <th>Segment</th>
+                <th>Description</th>
+                <th>Customers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customerSegments.map((segment) => (
+                <tr key={segment.key}>
+                  <td>
+                    <strong>{segment.label}</strong>
+                    <p className="row-sub">{segment.key}</p>
+                  </td>
+                  <td>{segment.description}</td>
+                  <td>{segment.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mobile-cards">
+          {customerSegments.map((segment) => (
+            <article key={segment.key} className="card">
+              <div className="card-head">
+                <h4>{segment.label}</h4>
+                <strong>{segment.count}</strong>
+              </div>
+              <p className="muted">{segment.key}</p>
+              <p className="muted">{segment.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="summary-card">
+        <div className="section-head">
+          <div>
+            <h3 className="subsection-title">Channels & Feeds</h3>
+            <p className="muted">Operational references for WhatsApp chat, analytics tags, recovery reminders, and public product feeds.</p>
+          </div>
+        </div>
+
+        <div className="summary-grid">
+          <article className="summary-card">
+            <p>WhatsApp Chat</p>
+            <h3>{overview?.whatsappChat?.number || "Not set"}</h3>
+            <span>{overview?.whatsappChat?.supportTiming || "Support timing not set"}</span>
+          </article>
+          <article className="summary-card">
+            <p>Facebook Pixel</p>
+            <h3>{overview?.analytics?.facebookPixelId || "Not set"}</h3>
+            <span>{overview?.feeds?.facebookProductFeedUrl || "Feed URL unavailable"}</span>
+          </article>
+          <article className="summary-card">
+            <p>Merchant Feed</p>
+            <h3>{overview?.feeds?.merchantFeedUrl ? "Published" : "Not set"}</h3>
+            <span>{overview?.feeds?.merchantFeedUrl || "Not set"}</span>
+          </article>
+          <article className="summary-card">
+            <p>Notification Templates</p>
+            <h3>{overview?.library?.activeTemplateCount || 0}</h3>
+            <span>Total logs: {overview?.library?.notificationLogCount || 0}</span>
+          </article>
+          <article className="summary-card">
+            <p>Facebook Product Feed</p>
+            <h3>{overview?.feeds?.facebookProductFeedUrl ? "Published" : "Not set"}</h3>
+            <span>{overview?.feeds?.facebookProductFeedUrl || "Not set"}</span>
+          </article>
+          <article className="summary-card">
+            <p>Sitemap</p>
+            <h3>{overview?.feeds?.sitemapEnabled ? "Enabled" : "Disabled"}</h3>
+            <span>{overview?.feeds?.sitemapUrl || "Not set"}</span>
+          </article>
+          <article className="summary-card">
+            <p>Abandoned Cart Recovery</p>
+            <h3>{recoverySummary.byStage?.abandoned || 0} abandoned</h3>
+            <span>
+              Reminder schedule: {Array.isArray(recoverySummary.reminderScheduleMinutes)
+                ? recoverySummary.reminderScheduleMinutes.join(" / ")
+                : "--"} min
+            </span>
+          </article>
+          <article className="summary-card">
+            <p>Notify When Available</p>
+            <h3>{notifySummary.totalCount || 0} requests</h3>
+            <span>Sent: {notifySummary.notifiedCount || 0}</span>
+          </article>
+        </div>
+      </section>
 
       <section className="summary-card">
         <div className="section-head">
@@ -507,6 +641,109 @@ export function MarketingPage() {
               </div>
             ) : null}
           </form>
+        </div>
+      </section>
+
+      <section className="summary-card">
+        <div className="section-head">
+          <div>
+            <h3 className="subsection-title">Notify When Available</h3>
+            <p className="muted">Customers can register for out-of-stock products, and notifications can be sent once the product is available again.</p>
+          </div>
+        </div>
+
+        <div className="table-wrap desktop-only">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Availability</th>
+                <th>Last Attempt</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {notifySubscriptions.map((subscription) => (
+                <tr key={subscription.id}>
+                  <td>
+                    <strong>{subscription.productTitle}</strong>
+                    <p className="row-sub">{subscription.productSlug}</p>
+                  </td>
+                  <td>
+                    <strong>{subscription.customerName || "Customer"}</strong>
+                    <p className="row-sub">{subscription.email}</p>
+                  </td>
+                  <td>
+                    <StatusBadge value={subscription.status} />
+                  </td>
+                  <td>
+                    <StatusBadge value={subscription.productStatus} />
+                    <p className="row-sub">
+                      {subscription.productIsAvailable ? "Ready to notify" : "Still unavailable"}
+                    </p>
+                  </td>
+                  <td>
+                    <p className="row-sub">
+                      {subscription.lastAttemptAt
+                        ? formatDateTime(subscription.lastAttemptAt)
+                        : "No attempt yet"}
+                    </p>
+                    <p className="row-sub">{subscription.lastAttemptStatus || "n/a"}</p>
+                  </td>
+                  <td className="row-actions">
+                    {canEditTemplates &&
+                    subscription.status === "pending" &&
+                    subscription.productIsAvailable ? (
+                      <button
+                        type="button"
+                        className="btn-link"
+                        onClick={() => onSendNotifySubscription(subscription)}
+                        disabled={sendingNotifyId === subscription.id}
+                      >
+                        {sendingNotifyId === subscription.id ? "Sending..." : "Send"}
+                      </button>
+                    ) : (
+                      <span className="row-sub">No action</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mobile-cards">
+          {notifySubscriptions.map((subscription) => (
+            <article key={subscription.id} className="card">
+              <div className="card-head">
+                <h4>{subscription.productTitle}</h4>
+                <StatusBadge value={subscription.status} />
+              </div>
+              <p className="muted">{subscription.email}</p>
+              <p className="muted">
+                {subscription.productIsAvailable ? "Ready to notify" : "Still unavailable"}
+              </p>
+              <p className="muted">
+                {subscription.lastAttemptStatus || "No delivery attempt yet"}
+              </p>
+              {canEditTemplates &&
+              subscription.status === "pending" &&
+              subscription.productIsAvailable ? (
+                <div className="card-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => onSendNotifySubscription(subscription)}
+                    disabled={sendingNotifyId === subscription.id}
+                  >
+                    {sendingNotifyId === subscription.id ? "Sending..." : "Send Notification"}
+                  </button>
+                </div>
+              ) : null}
+            </article>
+          ))}
         </div>
       </section>
 

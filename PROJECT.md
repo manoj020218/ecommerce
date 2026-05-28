@@ -1950,8 +1950,8 @@ Codex must update this section after each phase.
 [x] Phase 13 - Blog / Knowledge Base
 [x] Phase 14 - Google Shopping, SEO, Feeds, Sitemap
 [x] Phase 15 - Website Buyer Lead Form
-[ ] Phase 16 - Reports
-[ ] Phase 17 - Marketing, Offers, Templates, Notifications
+[x] Phase 16 - Reports
+[x] Phase 17 - Marketing, Offers, Templates, Notifications
 [ ] Phase 18 - B2B Dealer / Stockist Workflow
 [ ] Phase 19 - Walk-in Orders / Manual Orders
 [ ] Phase 20 - Installer, Setup Wizard, Productization
@@ -2622,7 +2622,7 @@ Validation completed after Phase 14:
 Pending files/tasks after Phase 14 closure:
 - Replace current URL-based blog image fields with upload workflow if content editors need asset management inside admin
 - Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
-- Add Facebook product feed when marketing/feed work is expanded in a later phase
+- Facebook product feed completed later in Phase 17
 
 Phase 15 (Backend + Storefront + Admin lead capture scope) status: `[x]`
 
@@ -2675,7 +2675,80 @@ Validation completed after Phase 15:
 Pending files/tasks after Phase 15 closure:
 - Replace current URL-based blog image fields with upload workflow if content editors need asset management inside admin
 - Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
-- Add Facebook product feed when marketing/feed work is expanded in a later phase
+- Facebook product feed completed later in Phase 17
+
+Phase 16 (Backend + Admin scope: Reports) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/modules/reports/reports.model.js`
+- `VPS/backend/src/modules/reports/reports.validator.js`
+- `VPS/backend/src/modules/reports/reports.permissions.js`
+- `VPS/backend/src/modules/reports/reports.service.js`
+- `VPS/backend/src/modules/reports/reports.controller.js`
+- `VPS/backend/src/modules/reports/reports.routes.js`
+- `VPS/backend/src/modules/reports/regression-checklist.md`
+- `VPS/apps/admin-panel/src/modules/reports/reports.api.js`
+- `VPS/apps/admin-panel/src/modules/reports/reports-page.jsx`
+
+Phase 16 outcomes delivered:
+- Added admin reports APIs for sales, invoices, GST, payments, shipping, dealer sales, product sales, city/pincode orders, abandoned carts, marketing offers, and inventory
+- Added report filters for monthly, yearly, custom date range, city, pincode, state, courier, customer type, payment status, order status, shipment status, and result limit
+- Added report exports for CSV, Excel, JSON, PDF summary, invoice ZIP, and Tally CSV/XML where applicable
+- Fixed invoice ZIP exports to package generated invoice PDFs instead of raw JSON payloads
+- Fixed invoice ZIP and Tally exports to respect the same filtered invoice set as the visible report output
+- Added the admin Reports screen with live summaries, desktop/mobile views, and permission-gated export actions
+
+Validation completed after Phase 16:
+- `node backend/src/checks/run-regression-checks.js` passed with Phase 16 report assertions, including filtered invoice ZIP export coverage
+
+Phase 17 (Backend + Admin + Storefront scope: Marketing, Offers, Templates, Notifications) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/app.js`
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/modules/marketing/marketing.model.js`
+- `VPS/backend/src/modules/marketing/marketing.validator.js`
+- `VPS/backend/src/modules/marketing/marketing.controller.js`
+- `VPS/backend/src/modules/marketing/marketing.routes.js`
+- `VPS/backend/src/modules/marketing/marketing.service.js`
+- `VPS/backend/src/modules/facebook-feed/facebook-feed.model.js`
+- `VPS/backend/src/modules/facebook-feed/facebook-feed.validator.js`
+- `VPS/backend/src/modules/facebook-feed/facebook-feed.controller.js`
+- `VPS/backend/src/modules/facebook-feed/facebook-feed.routes.js`
+- `VPS/backend/src/modules/facebook-feed/facebook-feed.service.js`
+- `VPS/backend/src/modules/facebook-feed/regression-checklist.md`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/apps/admin-panel/src/modules/marketing/marketing.api.js`
+- `VPS/apps/admin-panel/src/modules/marketing/marketing-page.jsx`
+- `VPS/apps/front/src/modules/products/products.api.js`
+- `VPS/apps/front/src/modules/products/product-page.jsx`
+
+Delivered APIs (Phase 17):
+- `GET /api/admin/marketing/overview`
+- `GET /api/admin/marketing/offers`
+- `POST /api/admin/marketing/offers`
+- `PATCH /api/admin/marketing/offers/:offerId`
+- `GET /api/admin/marketing/email-templates`
+- `PATCH /api/admin/marketing/email-templates/:templateKey`
+- `POST /api/admin/marketing/email-templates/:templateKey/preview`
+- `GET /api/admin/marketing/notification-logs`
+- `GET /api/admin/marketing/notify-subscriptions`
+- `POST /api/admin/marketing/notify-subscriptions/:subscriptionId/send`
+- `POST /api/marketing/notify-when-available`
+- `GET /facebook-product-feed.xml`
+
+Phase 17 outcomes delivered:
+- Extended the marketing overview so the admin workspace now exposes customer segments, WhatsApp chat configuration, abandoned-cart recovery summary, notify-when-available backlog, analytics IDs, merchant feed, Facebook product feed, and sitemap references
+- Added a real notify-when-available workflow: customers can register interest for out-of-stock products from the storefront, admins can review the waitlist, and send the `notify_when_available` email template once stock is available again
+- Added a public Facebook product feed XML endpoint alongside the existing merchant feed so marketing surfaces now have both feed URLs available in the admin panel
+- Expanded the admin Marketing screen with customer segments, channels/feed references, notify-subscription operations, and the existing offers/templates/logs workspace
+- Updated the storefront product page to capture availability requests directly when a product is out of stock
+- Regression coverage now verifies Facebook feed output, marketing overview data, public notify subscription creation, admin send flow for availability notifications, and notification log persistence for the `notify_when_available` template
+
+Validation completed after Phase 17:
+- `node backend/src/checks/run-regression-checks.js` passed
+- `pnpm --filter @jenix/admin-panel build` passed
+- `pnpm --filter @jenix/front build` passed
 
 ---
 ## 13. First Codex Execution Prompt
@@ -2760,7 +2833,3 @@ Future dealer app can reuse:
 - self pickup/dispatch status
 
 Do not block web development waiting for mobile app.
-
-
-
-

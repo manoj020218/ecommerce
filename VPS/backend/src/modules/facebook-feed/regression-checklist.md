@@ -1,0 +1,2 @@
+- [ ] `GET /facebook-product-feed.xml` contains active products only.
+- [ ] Feed product links resolve to storefront product URLs.

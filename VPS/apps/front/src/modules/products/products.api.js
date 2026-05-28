@@ -53,3 +53,11 @@ export function estimateShipping(slug, payload) {
     body: payload
   });
 }
+
+export function requestNotifyWhenAvailable(payload) {
+  return apiFetch("/marketing/notify-when-available", {
+    method: "POST",
+    auth: true,
+    body: payload
+  });
+}

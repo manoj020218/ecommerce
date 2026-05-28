@@ -62,3 +62,16 @@ export function fetchNotificationLogs(params = {}) {
   const suffix = query ? `?${query}` : "";
   return apiFetch(`/admin/marketing/notification-logs${suffix}`);
 }
+
+export function fetchNotifySubscriptions(params = {}) {
+  const query = buildQuery(params);
+  const suffix = query ? `?${query}` : "";
+  return apiFetch(`/admin/marketing/notify-subscriptions${suffix}`);
+}
+
+export function sendNotifySubscription(subscriptionId) {
+  return apiFetch(`/admin/marketing/notify-subscriptions/${subscriptionId}/send`, {
+    method: "POST",
+    body: {}
+  });
+}

@@ -30,6 +30,13 @@ async function requestText(baseUrl, path, options = {}) {
   return { response, text };
 }
 
+async function requestBuffer(baseUrl, path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, options);
+  const arrayBuffer = await response.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  return { response, buffer };
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -278,6 +285,8 @@ async function run() {
       })
     });
     assert.equal(createOutOfStockProduct.response.status, 201);
+    const outOfStockProductId = createOutOfStockProduct.json.data.id;
+    const outOfStockProductSlug = createOutOfStockProduct.json.data.slug;
     const outOfStockProductSku = createOutOfStockProduct.json.data.sku;
 
     const createSearchSynonym = await requestJson(
@@ -840,6 +849,24 @@ async function run() {
     assert.equal(
       outOfStockMerchantItem.includes("<g:availability>out of stock</g:availability>"),
       true
+    );
+
+    const facebookFeed = await requestText(baseUrl, "/facebook-product-feed.xml");
+    assert.equal(facebookFeed.response.status, 200);
+    const primaryFacebookItem = extractMerchantItem(
+      facebookFeed.text,
+      createdProductSku
+    );
+    assert.equal(Boolean(primaryFacebookItem), true);
+    assert.equal(
+      primaryFacebookItem.includes(
+        `<link>https://jenixindia.com/products/${createdProductSlug}</link>`
+      ),
+      true
+    );
+    assert.equal(
+      facebookFeed.text.includes(`<g:id>${inactiveRelatedSku}</g:id>`),
+      false
     );
 
     const sitemap = await requestText(baseUrl, "/sitemap.xml");
@@ -2783,6 +2810,96 @@ async function run() {
     );
     assert.equal(phase17OfferCreate.response.status, 201);
 
+    const phase17NotifySubscriptionCreate = await requestJson(
+      baseUrl,
+      "/api/marketing/notify-when-available",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productId: outOfStockProductId,
+          customerName: "Waitlist Buyer",
+          email: "waitlist@example.com",
+          sourcePage: `/products/${outOfStockProductSlug}`
+        })
+      }
+    );
+    assert.equal(phase17NotifySubscriptionCreate.response.status, 201);
+    assert.equal(
+      phase17NotifySubscriptionCreate.json.data.productIsAvailable,
+      false
+    );
+
+    const phase17Overview = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/overview",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase17Overview.response.status, 200);
+    assert.equal(
+      phase17Overview.json.data.customerSegments.totalCustomers >= 1,
+      true
+    );
+    assert.equal(
+      phase17Overview.json.data.notifyWhenAvailable.pendingCount >= 1,
+      true
+    );
+    assert.equal(
+      String(
+        phase17Overview.json.data.feeds.facebookProductFeedUrl || ""
+      ).includes("/facebook-product-feed.xml"),
+      true
+    );
+
+    const phase17NotifySubscriptions = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/notify-subscriptions?limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase17NotifySubscriptions.response.status, 200);
+    const phase17NotifySubscription = phase17NotifySubscriptions.json.data.find(
+      (row) => row.email === "waitlist@example.com"
+    );
+    assert.equal(Boolean(phase17NotifySubscription), true);
+    assert.equal(phase17NotifySubscription.productIsAvailable, false);
+
+    const phase17RestockProduct = await requestJson(
+      baseUrl,
+      `/api/admin/inventory/products/${outOfStockProductId}/adjust`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          deltaQty: 3,
+          reason: "phase17_restock"
+        })
+      }
+    );
+    assert.equal(phase17RestockProduct.response.status, 200);
+    assert.equal(
+      phase17RestockProduct.json.data.inventory.stockStatus !== "out_of_stock",
+      true
+    );
+
+    const phase17SendNotify = await requestJson(
+      baseUrl,
+      `/api/admin/marketing/notify-subscriptions/${phase17NotifySubscription.id}/send`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({})
+      }
+    );
+    assert.equal(phase17SendNotify.response.status, 200);
+    assert.equal(
+      phase17SendNotify.json.data.subscription.status,
+      "notified"
+    );
+
     const phase17Logs = await requestJson(
       baseUrl,
       "/api/admin/marketing/notification-logs?limit=200",
@@ -2804,6 +2921,14 @@ async function run() {
         (row) =>
           row.templateKey === "tracking_detail_update" &&
           row.relatedResourceId === phase8ShipmentId
+      ),
+      true
+    );
+    assert.equal(
+      phase17Logs.json.data.some(
+        (row) =>
+          row.templateKey === "notify_when_available" &&
+          row.relatedResourceId === outOfStockProductId
       ),
       true
     );
@@ -2880,6 +3005,39 @@ async function run() {
     assert.equal(
       phase16InvoiceExcel.text.includes(phase10InvoiceForOnlineOrder.json.data.invoiceNumber),
       true
+    );
+
+    const phase16InvoiceZip = await requestBuffer(
+      baseUrl,
+      "/api/admin/reports/invoices/export?period=yearly&year=2026&city=New%20Delhi&pincode=110015&format=invoice-zip",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase16InvoiceZip.response.status, 200);
+    assert.equal(
+      String(phase16InvoiceZip.response.headers.get("content-disposition") || "").includes(
+        "invoices-2026.zip"
+      ),
+      true
+    );
+    assert.equal(phase16InvoiceZip.buffer.subarray(0, 2).toString("utf-8"), "PK");
+    const phase16InvoiceZipText = phase16InvoiceZip.buffer.toString("utf-8");
+    assert.equal(
+      phase16InvoiceZipText.includes(
+        `${String(
+          phase10InvoiceForOnlineOrder.json.data.invoiceNumber
+        ).replace(/[^a-zA-Z0-9._-]+/g, "-")}.pdf`
+      ),
+      true
+    );
+    assert.equal(
+      phase16InvoiceZipText.includes(
+        `${String(
+          phase10InvoiceForManualOrder.json.data.invoiceNumber
+        ).replace(/[^a-zA-Z0-9._-]+/g, "-")}.pdf`
+      ),
+      false
     );
 
     const phase16OfferReport = await requestJson(

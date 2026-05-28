@@ -7,7 +7,18 @@ const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-
 const { readPaymentStore, writePaymentStore } = require("../../database/payment-store");
 const { readShippingStore } = require("../../database/shipping-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
-const { calculateAvailableQty } = require("../products/products.model");
+const {
+  ensureCustomerAccountShape
+} = require("../customer-account/customer-account.model");
+const {
+  buildCustomerPricingContext,
+  B2B_ORDER_STATUSES,
+  ORDER_MODES
+} = require("../customers/customers.model");
+const {
+  calculateAvailableQty,
+  resolveProductUnitPrice
+} = require("../products/products.model");
 const {
   createPaymentGateway
 } = require("../../integrations/payment-gateways/payment-gateway.adapter");
@@ -69,6 +80,9 @@ function getReservationTtlMinutes() {
 }
 
 function ensurePhase7StoreShape(store) {
+  if (!Array.isArray(store.users)) {
+    store.users = [];
+  }
   if (!Array.isArray(store.guestCarts)) {
     store.guestCarts = [];
   }
@@ -92,6 +106,10 @@ function ensurePhase7StoreShape(store) {
   }
   if (!Array.isArray(store.orders)) {
     store.orders = [];
+  }
+
+  for (const user of store.users) {
+    ensureCustomerAccountShape(user);
   }
 }
 
@@ -165,53 +183,43 @@ function findActiveProductOrThrow(catalogStore, productId) {
   return row;
 }
 
-function buildBulkPriceRule(product, qty) {
-  const baseUnitPrice = Number(product.salePrice || product.basePrice || 0);
-  const slabs = ensureArray(product.bulkPriceSlabs)
-    .map((slab) => ({
-      minQty: Number(slab.minQty),
-      unitPrice: Number(slab.unitPrice)
-    }))
-    .filter((slab) => slab.minQty > 0)
-    .sort((a, b) => a.minQty - b.minQty);
-
-  if (!product.bulkPricingEnabled || slabs.length === 0) {
-    return {
-      unitPrice: baseUnitPrice,
-      bulkApplied: false,
-      bulkRule: null
-    };
-  }
-
-  let selected = null;
-  for (const slab of slabs) {
-    if (qty >= slab.minQty) {
-      selected = slab;
-    }
-  }
-
-  if (!selected) {
-    return {
-      unitPrice: baseUnitPrice,
-      bulkApplied: false,
-      bulkRule: null
-    };
-  }
-
-  return {
-    unitPrice: Number(selected.unitPrice),
-    bulkApplied: true,
-    bulkRule: {
-      minQty: Number(selected.minQty),
-      unitPrice: Number(selected.unitPrice)
-    }
-  };
-}
-
 function computeEffectiveAvailableQty(product, reservedForCurrentCheckout = 0) {
   const stockQty = Number(product.stockQty || 0);
   const reservedQty = Number(product.reservedQty || 0);
   return Math.max(0, stockQty - reservedQty + Number(reservedForCurrentCheckout || 0));
+}
+
+function resolveCustomerPricingContextForOwner(authStore, owner) {
+  if (!owner || owner.ownerType !== CART_OWNER_TYPES.CUSTOMER) {
+    return null;
+  }
+
+  const customer = ensureArray(authStore.users).find((row) => row.id === owner.ownerId);
+  if (!customer) {
+    return null;
+  }
+
+  ensureCustomerAccountShape(customer);
+  return buildCustomerPricingContext(customer);
+}
+
+function enrichOrderAddressSnapshot(address = {}, customerPricingContext = null) {
+  return {
+    ...address,
+    companyName:
+      address.companyName ||
+      customerPricingContext?.companyName ||
+      "",
+    gstin:
+      String(
+        address.gstin ||
+          address.gstNumber ||
+          customerPricingContext?.gstin ||
+          ""
+      )
+        .trim()
+        .toUpperCase()
+  };
 }
 
 function buildCartLineFromItem(catalogStore, item, options = {}) {
@@ -239,7 +247,11 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     throw new HttpError(409, "Requested quantity is not available right now.");
   }
 
-  const { unitPrice, bulkApplied, bulkRule } = buildBulkPriceRule(product, qty);
+  const pricing = resolveProductUnitPrice(product, {
+    qty,
+    customerPricingContext: options.customerPricingContext || null
+  });
+  const unitPrice = Number(pricing.unitPrice || 0);
   const lineSubtotal = roundMoney(unitPrice * qty);
   const quoteRequiredAboveQty =
     product.quoteRequiredAboveQty === null || product.quoteRequiredAboveQty === undefined
@@ -257,13 +269,16 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     gstRate: Number(product.gstRate || 0),
     unitPrice: Number(unitPrice),
     finalUnitPriceAfterDiscount: Number(unitPrice),
+    priceSource: pricing.priceSource || "base",
+    compareAtUnitPrice:
+      pricing.retailDisplayPrice > unitPrice ? Number(pricing.retailDisplayPrice) : null,
     discountAmount: 0,
     taxableValue: lineSubtotal,
     gstAmount: 0,
     lineTotal: 0,
     lineSubtotal,
-    bulkApplied,
-    bulkRule,
+    bulkApplied: Boolean(pricing.bulkApplied),
+    bulkRule: pricing.bulkRule || null,
     quoteRequired:
       quoteRequiredAboveQty !== null && qty >= Number(quoteRequiredAboveQty || 0),
     quoteRequiredAboveQty,
@@ -418,7 +433,8 @@ function buildStrictCartLines(catalogStore, cartItems, options = {}) {
     lines.push(
       buildCartLineFromItem(catalogStore, item, {
         enforceStockCheck: Boolean(options.enforceStockCheck),
-        reservedForCurrentCheckout
+        reservedForCurrentCheckout,
+        customerPricingContext: options.customerPricingContext || null
       })
     );
   }
@@ -663,6 +679,21 @@ function findOrderById(authStore, orderId) {
 function createOrderFromSession(authStore, session, options = {}) {
   const paymentStatus = options.paymentStatus || "paid";
   const orderStatus = options.orderStatus || "placed";
+  const customerSnapshot = options.customerPricingContext || session.customerSnapshot || null;
+  const isB2BOrderRequest = options.orderFlow === "b2b_offline_request";
+  const shipmentStatus =
+    options.shipmentStatus ||
+    (session.shippingMethod === SHIPPING_METHODS.SELF_PICKUP
+      ? "ready_for_pickup"
+      : "pending_packing");
+  const billingAddress = enrichOrderAddressSnapshot(
+    session.billingAddress || {},
+    customerSnapshot
+  );
+  const shippingAddress = enrichOrderAddressSnapshot(
+    session.shippingAddress || {},
+    customerSnapshot
+  );
 
   return {
     id: generateId("order"),
@@ -672,7 +703,25 @@ function createOrderFromSession(authStore, session, options = {}) {
     ownerId: session.ownerId,
     userId:
       session.ownerType === CART_OWNER_TYPES.CUSTOMER ? session.ownerId : null,
-    customerType: "retail",
+    customerType: customerSnapshot?.customerType || "retail",
+    priceGroup: customerSnapshot?.priceGroup || "",
+    isB2BApproved: Boolean(customerSnapshot?.isB2BApproved),
+    companyName:
+      billingAddress.companyName ||
+      shippingAddress.companyName ||
+      customerSnapshot?.companyName ||
+      "",
+    gstin:
+      billingAddress.gstin ||
+      shippingAddress.gstin ||
+      customerSnapshot?.gstin ||
+      "",
+    creditAllowed: Boolean(customerSnapshot?.creditAllowed),
+    bankTransferOnly: Boolean(customerSnapshot?.bankTransferOnly),
+    pickupAllowed: Boolean(customerSnapshot?.pickupAllowed),
+    orderMode: customerSnapshot?.orderMode || ORDER_MODES.ONLINE,
+    isB2BOrderRequest,
+    requiresAdminApproval: Boolean(options.requiresAdminApproval),
     items: session.cart.items.map((item) => ({
       productId: item.productId,
       title: item.title,
@@ -680,6 +729,7 @@ function createOrderFromSession(authStore, session, options = {}) {
       hsnCode: item.hsnCode || "",
       qty: item.qty,
       finalUnitPrice: item.finalUnitPriceAfterDiscount,
+      priceSource: item.priceSource || "base",
       bulkApplied: Boolean(item.bulkApplied),
       bulkRule: item.bulkRule || null,
       gstRate: item.gstRate,
@@ -696,12 +746,16 @@ function createOrderFromSession(authStore, session, options = {}) {
     grandTotal: Number(session.cart.pricing.grandTotal || 0),
     paymentStatus,
     orderStatus,
-    shipmentStatus: "pending_packing",
+    shipmentStatus,
     invoiceId: null,
     paymentMethod: session.paymentMethod,
     shippingMethod: session.shippingMethod,
-    billingAddress: session.billingAddress || {},
-    shippingAddress: session.shippingAddress || {},
+    billingAddress,
+    shippingAddress,
+    orderRequestReceivedAt: isB2BOrderRequest ? nowIso() : null,
+    approvedAt: null,
+    approvedBy: null,
+    paymentVerifiedAt: null,
     createdAt: nowIso()
   };
 }
@@ -804,6 +858,7 @@ async function getCart(context, query) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
 
@@ -814,7 +869,8 @@ async function getCart(context, query) {
   for (const item of ensureArray(cart.items)) {
     try {
       const line = buildCartLineFromItem(catalogStore, item, {
-        enforceStockCheck: false
+        enforceStockCheck: false,
+        customerPricingContext
       });
       validItems.push({
         productId: item.productId,
@@ -870,6 +926,7 @@ async function addCartItem(context, payload) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
 
@@ -885,7 +942,8 @@ async function addCartItem(context, payload) {
   }
 
   const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
 
   cart.updatedAt = nowIso();
@@ -926,6 +984,7 @@ async function updateCartItem(context, productId, payload) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
 
@@ -941,7 +1000,8 @@ async function updateCartItem(context, productId, payload) {
   };
 
   const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
   cart.updatedAt = nowIso();
   changed = true;
@@ -981,6 +1041,7 @@ async function deleteCartItem(context, productId, query) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
   const cart = ensureCartRecord(authStore, owner, true);
@@ -994,7 +1055,8 @@ async function deleteCartItem(context, productId, query) {
   cart.updatedAt = nowIso();
   changed = true;
   const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
   const pricing = await calculatePricing(
     lines,
@@ -1016,6 +1078,11 @@ async function deleteCartItem(context, productId, query) {
 }
 
 async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
+  const owner = {
+    ownerType: CART_OWNER_TYPES.CUSTOMER,
+    ownerId: customerId
+  };
+
   const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
     readAuthStore(),
     readCatalogStore(),
@@ -1024,13 +1091,9 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
-
-  const owner = {
-    ownerType: CART_OWNER_TYPES.CUSTOMER,
-    ownerId: customerId
-  };
 
   const userCart = ensureCartRecord(authStore, owner, true);
   const guestCart = ensureCartRecord(
@@ -1047,7 +1110,8 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
     for (const item of ensureArray(items)) {
       try {
         buildCartLineFromItem(catalogStore, item, {
-          enforceStockCheck: false
+          enforceStockCheck: false,
+          customerPricingContext
         });
         rows.push({
           productId: item.productId,
@@ -1073,7 +1137,8 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
 
   if (!guestCart || guestCart.items.length === 0) {
     const lines = buildStrictCartLines(catalogStore, cleanUserItems, {
-      enforceStockCheck: true
+      enforceStockCheck: true,
+      customerPricingContext
     });
     const pricing = await calculatePricing(
       lines,
@@ -1113,7 +1178,8 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
     qty
   }));
   const lines = buildStrictCartLines(catalogStore, combinedItems, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
 
   userCart.items = combinedItems;
@@ -1161,11 +1227,13 @@ async function createCartShare(context, payload) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
   const cart = ensureCartRecord(authStore, owner, true);
   const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
 
   if (lines.length === 0) {
@@ -1236,8 +1304,15 @@ async function getSharedCart(shareToken) {
     throw error;
   }
 
+  const shareOwner = {
+    ownerType: share?.sourceOwnerType,
+    ownerId: share?.sourceOwnerId
+  };
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, shareOwner);
+
   const lines = buildStrictCartLines(catalogStore, share.items, {
-    enforceStockCheck: false
+    enforceStockCheck: false,
+    customerPricingContext
   });
   const pricing = await calculatePricing(
     lines,
@@ -1285,6 +1360,10 @@ async function claimSharedCart(context, shareToken, payload) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(
+    authStore,
+    targetOwner
+  );
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
   let share;
@@ -1327,7 +1406,8 @@ async function claimSharedCart(context, shareToken, payload) {
   }
 
   const lines = buildStrictCartLines(catalogStore, targetCart.items, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
   const pricing = await calculatePricing(
     lines,
@@ -1377,6 +1457,8 @@ async function startCheckout(context, payload) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+  const usesOfflineOrderRequest = Boolean(customerPricingContext?.usesOfflineOrderRequest);
 
   let changed = cleanupExpiredReservations(authStore, catalogStore);
   const cart = ensureCartRecord(authStore, owner, true);
@@ -1386,8 +1468,35 @@ async function startCheckout(context, payload) {
   }
 
   const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true
+    enforceStockCheck: true,
+    customerPricingContext
   });
+
+  if (usesOfflineOrderRequest && payload.paymentMethod === PAYMENT_METHODS.ONLINE) {
+    throw new HttpError(
+      409,
+      "Approved B2B accounts must place offline order requests instead of online payment orders."
+    );
+  }
+
+  if (
+    usesOfflineOrderRequest &&
+    customerPricingContext?.bankTransferOnly &&
+    payload.paymentMethod !== PAYMENT_METHODS.DIRECT_BANK_TRANSFER
+  ) {
+    throw new HttpError(
+      409,
+      "This account is configured for bank transfer payments only."
+    );
+  }
+
+  if (
+    usesOfflineOrderRequest &&
+    payload.shippingMethod === SHIPPING_METHODS.SELF_PICKUP &&
+    !customerPricingContext?.pickupAllowed
+  ) {
+    throw new HttpError(409, "Self pickup is not enabled for this customer account.");
+  }
 
   if (
     payload.paymentMethod === PAYMENT_METHODS.DIRECT_BANK_TRANSFER ||
@@ -1440,9 +1549,16 @@ async function startCheckout(context, payload) {
       reservationId: null,
       reservationExpiresAt: null,
       orderId: null,
+      customerSnapshot: customerPricingContext,
       cart: buildCartView(owner, cart, lines, pricing),
-      billingAddress: payload.billingAddress || {},
-      shippingAddress: payload.shippingAddress || {},
+      billingAddress: enrichOrderAddressSnapshot(
+        payload.billingAddress || {},
+        customerPricingContext
+      ),
+      shippingAddress: enrichOrderAddressSnapshot(
+        payload.shippingAddress || {},
+        customerPricingContext
+      ),
       createdAt: now,
       updatedAt: now
     };
@@ -1485,9 +1601,16 @@ async function startCheckout(context, payload) {
     reservationId: null,
     reservationExpiresAt: null,
     orderId: null,
+    customerSnapshot: customerPricingContext,
     cart: buildCartView(owner, cart, lines, pricing),
-    billingAddress: payload.billingAddress || {},
-    shippingAddress: payload.shippingAddress || {},
+    billingAddress: enrichOrderAddressSnapshot(
+      payload.billingAddress || {},
+      customerPricingContext
+    ),
+    shippingAddress: enrichOrderAddressSnapshot(
+      payload.shippingAddress || {},
+      customerPricingContext
+    ),
     createdAt: now,
     updatedAt: now
   };
@@ -1511,18 +1634,25 @@ async function startCheckout(context, payload) {
   ) {
     checkoutOrder = createOrderFromSession(authStore, session, {
       paymentStatus: "pending",
-      orderStatus: "payment_pending"
+      orderStatus: usesOfflineOrderRequest
+        ? B2B_ORDER_STATUSES.AWAITING_ADMIN_APPROVAL
+        : "payment_pending",
+      shipmentStatus: "pending_packing",
+      customerPricingContext,
+      orderFlow: usesOfflineOrderRequest ? "b2b_offline_request" : "standard",
+      requiresAdminApproval: usesOfflineOrderRequest
     });
-    checkoutOrder.manualPaymentStatus = "awaiting_submission";
+    checkoutOrder.manualPaymentStatus = usesOfflineOrderRequest
+      ? "approval_pending"
+      : "awaiting_submission";
     authStore.orders.push(checkoutOrder);
 
     session.orderId = checkoutOrder.id;
     session.status = CHECKOUT_STATUSES.PAYMENT_PENDING;
 
-    manualPaymentInstructions = getManualPaymentInstructions(
-      payload.paymentMethod,
-      paymentStore
-    );
+    manualPaymentInstructions = usesOfflineOrderRequest
+      ? null
+      : getManualPaymentInstructions(payload.paymentMethod, paymentStore);
     clearOwnerCart(authStore, owner);
   }
 
@@ -1545,6 +1675,26 @@ async function startCheckout(context, payload) {
   }
 
   await trackCheckoutStarted(owner, session, checkoutOrder);
+
+  if (checkoutOrder?.isB2BOrderRequest) {
+    await safeSendTemplateNotification({
+      templateKey: "dealer_order_request_received",
+      toEmail: resolveNotificationEmail(
+        checkoutOrder.billingAddress,
+        checkoutOrder.shippingAddress
+      ),
+      relatedResourceType: "order",
+      relatedResourceId: checkoutOrder.id,
+      variables: {
+        customerName: resolveNotificationCustomerName(
+          checkoutOrder.billingAddress,
+          checkoutOrder.shippingAddress
+        ),
+        orderNo: checkoutOrder.orderNo || "",
+        cartItems: formatNotificationItems(checkoutOrder.items)
+      }
+    });
+  }
 
   return {
     checkoutBlocked: false,
@@ -1642,8 +1792,10 @@ async function createPaymentAttempt(context, payload) {
   }
 
   if (!reservation || reservation.status !== RESERVATION_STATUSES.ACTIVE) {
+    const customerPricingContext = session.customerSnapshot || null;
     const lines = buildStrictCartLines(catalogStore, cartItems, {
-      enforceStockCheck: true
+      enforceStockCheck: true,
+      customerPricingContext
     });
     reservation = reserveStockForCheckout(authStore, catalogStore, {
       owner,
@@ -1658,7 +1810,8 @@ async function createPaymentAttempt(context, payload) {
     const reservedByProduct = mapReservationItemsByProduct(reservation);
     buildStrictCartLines(catalogStore, cartItems, {
       enforceStockCheck: true,
-      reservedByProduct
+      reservedByProduct,
+      customerPricingContext: session.customerSnapshot || null
     });
   }
 
@@ -1900,7 +2053,8 @@ async function processPaymentWebhook(gatewayCode, payload) {
   const reservedByProduct = mapReservationItemsByProduct(reservation);
   const lines = buildStrictCartLines(catalogStore, cartItems, {
     enforceStockCheck: true,
-    reservedByProduct
+    reservedByProduct,
+    customerPricingContext: session.customerSnapshot || null
   });
 
   let activeReservation = reservation;

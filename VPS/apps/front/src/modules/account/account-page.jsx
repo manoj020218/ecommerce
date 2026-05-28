@@ -51,6 +51,10 @@ function MetricCard({ value, label, meta }) {
   );
 }
 
+function visibleProductPrice(product) {
+  return Number(product?.pricing?.visiblePrice ?? product?.salePrice ?? 0);
+}
+
 export function CustomerAccountPage() {
   const navigate = useNavigate();
   const { customer, session, setSession, clearSession } = useCustomerSession();
@@ -310,6 +314,7 @@ export function CustomerAccountPage() {
   const recentSearches = Array.isArray(dashboard?.recentSearches) ? dashboard.recentSearches : [];
   const recentlyViewed = Array.isArray(dashboard?.recentlyViewed) ? dashboard.recentlyViewed : [];
   const support = dashboard?.support || {};
+  const profile = dashboard?.profile || {};
 
   return (
     <main className="front-shell account-shell">
@@ -340,6 +345,18 @@ export function CustomerAccountPage() {
               <span className="eyebrow-chip">
                 {dashboard?.profile?.verifiedMobile ? "Verified mobile" : "Mobile not verified"}
               </span>
+              <span className="eyebrow-chip">{humanizeStatus(profile.customerType || "retail")}</span>
+              {profile.isB2BApproved ? <span className="eyebrow-chip">B2B Approved</span> : null}
+              {profile.priceGroup ? (
+                <span className="eyebrow-chip">
+                  Price Group: {humanizeStatus(profile.priceGroup)}
+                </span>
+              ) : null}
+              {profile.orderMode ? (
+                <span className="eyebrow-chip">
+                  Order Mode: {humanizeStatus(profile.orderMode)}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="hero-stat-grid">
@@ -388,7 +405,11 @@ export function CustomerAccountPage() {
             <div key={order.id} className="list-card">
               <div className="list-card-head">
                 <div><strong>{order.orderNo}</strong><p>{formatDate(order.orderDate)}</p></div>
-                <div className="list-card-meta"><span className="eyebrow-chip">{humanizeStatus(order.paymentStatus)}</span><span className="eyebrow-chip">{humanizeStatus(order.shipmentStatus)}</span></div>
+                <div className="list-card-meta">
+                  <span className="eyebrow-chip">{humanizeStatus(order.paymentStatus)}</span>
+                  <span className="eyebrow-chip">{humanizeStatus(order.orderStatus)}</span>
+                  <span className="eyebrow-chip">{humanizeStatus(order.shipmentStatus)}</span>
+                </div>
               </div>
               <div className="detail-pairs compact">
                 <div><span>Total</span><strong>{formatCurrency(order.orderTotal)}</strong></div>
@@ -496,7 +517,8 @@ export function CustomerAccountPage() {
                 <div className="saved-product-media">{Array.isArray(product.images) && product.images[0] ? <img src={product.images[0]} alt={product.title} loading="lazy" /> : <span>No image</span>}</div>
                 <div className="saved-product-body">
                   <strong>{product.title}</strong>
-                  <span>{formatCurrency(product.salePrice)}</span>
+                  <span>{formatCurrency(visibleProductPrice(product))}</span>
+                  {product?.pricing?.isB2BPrice ? <small>Approved dealer price</small> : null}
                   <div className="action-row">
                     <Link to={`/products/${product.slug}`} className="btn secondary">Open</Link>
                     <button type="button" className="btn secondary" onClick={() => handleRemoveSaved(product.id)} disabled={busy === `saved:${product.id}`}>{busy === `saved:${product.id}` ? "Removing..." : "Remove"}</button>
@@ -512,7 +534,11 @@ export function CustomerAccountPage() {
           <div className="saved-products-grid compact-grid">
             {recentlyViewed.length ? recentlyViewed.map((product) => (
               <Link key={product.id} to={`/products/${product.slug}`} className="saved-product-card compact-card">
-                <div className="saved-product-body"><strong>{product.title}</strong><span>{formatCurrency(product.salePrice)}</span></div>
+                <div className="saved-product-body">
+                  <strong>{product.title}</strong>
+                  <span>{formatCurrency(visibleProductPrice(product))}</span>
+                  {product?.pricing?.isB2BPrice ? <small>Approved dealer price</small> : null}
+                </div>
               </Link>
             )) : <div className="empty-panel">No viewing history yet.</div>}
           </div>

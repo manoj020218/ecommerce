@@ -2933,6 +2933,685 @@ async function run() {
       true
     );
 
+    const phase18DealerRegister = await requestJson(
+      baseUrl,
+      "/api/auth/customer/register-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Phase 18 Dealer",
+          email: "phase18.dealer@example.com",
+          password: "Phase18Dealer@123"
+        })
+      }
+    );
+    assert.equal(phase18DealerRegister.response.status, 201);
+    const phase18DealerToken = phase18DealerRegister.json.data.accessToken;
+    const phase18DealerCustomerId = phase18DealerRegister.json.data.customer.id;
+
+    const phase18SpecialRegister = await requestJson(
+      baseUrl,
+      "/api/auth/customer/register-email",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "Phase 18 Special Dealer",
+          email: "phase18.special@example.com",
+          password: "Phase18Special@123"
+        })
+      }
+    );
+    assert.equal(phase18SpecialRegister.response.status, 201);
+    const phase18SpecialToken = phase18SpecialRegister.json.data.accessToken;
+    const phase18SpecialCustomerId = phase18SpecialRegister.json.data.customer.id;
+
+    const phase18B2BProductCreate = await requestJson(
+      baseUrl,
+      "/api/admin/products",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          title: "Phase 18 Dealer Camera Kit",
+          categoryId,
+          hsnCode: "8525",
+          basePrice: 6200,
+          salePrice: 5800,
+          moq: 2,
+          stockQty: 40,
+          lowStockThreshold: 4,
+          shortDescription: "Dealer workflow regression product.",
+          priceGroupPrices: [
+            {
+              priceGroup: "dealer",
+              unitPrice: 5100
+            }
+          ],
+          customerSpecificPrices: [
+            {
+              customerId: phase18SpecialCustomerId,
+              unitPrice: 4700
+            }
+          ]
+        })
+      }
+    );
+    assert.equal(phase18B2BProductCreate.response.status, 201);
+    const phase18B2BProductId = phase18B2BProductCreate.json.data.id;
+    const phase18B2BProductSlug = phase18B2BProductCreate.json.data.slug;
+
+    const phase18DealerCustomerPatch = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase18DealerCustomerId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          customerType: "dealer",
+          priceGroup: "dealer",
+          isB2BApproved: true,
+          gstin: "08ABCDE1234F1Z5",
+          companyName: "Phase 18 Dealer LLP",
+          creditAllowed: false,
+          bankTransferOnly: true,
+          pickupAllowed: true,
+          orderMode: "offline_request"
+        })
+      }
+    );
+    assert.equal(phase18DealerCustomerPatch.response.status, 200);
+    assert.equal(phase18DealerCustomerPatch.json.data.isB2BApproved, true);
+
+    const phase18SpecialCustomerPatch = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase18SpecialCustomerId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          customerType: "dealer",
+          priceGroup: "dealer",
+          isB2BApproved: true,
+          gstin: "24ABCDE1234F1Z5",
+          companyName: "Phase 18 Special Projects",
+          creditAllowed: false,
+          bankTransferOnly: true,
+          pickupAllowed: false,
+          orderMode: "offline_request"
+        })
+      }
+    );
+    assert.equal(phase18SpecialCustomerPatch.response.status, 200);
+    assert.equal(phase18SpecialCustomerPatch.json.data.isB2BApproved, true);
+
+    const phase18GuestProduct = await requestJson(
+      baseUrl,
+      `/api/products/${phase18B2BProductSlug}`
+    );
+    assert.equal(phase18GuestProduct.response.status, 200);
+    assert.equal(phase18GuestProduct.json.data.pricing.visiblePrice, 5800);
+    assert.equal(phase18GuestProduct.json.data.pricing.isB2BPrice, false);
+
+    const phase18DealerProduct = await requestJson(
+      baseUrl,
+      `/api/products/${phase18B2BProductSlug}`,
+      {
+        headers: authHeaders(phase18DealerToken)
+      }
+    );
+    assert.equal(phase18DealerProduct.response.status, 200);
+    assert.equal(phase18DealerProduct.json.data.pricing.visiblePrice, 5100);
+    assert.equal(phase18DealerProduct.json.data.pricing.priceSource, "price_group");
+    assert.equal(phase18DealerProduct.json.data.pricing.usesOrderRequestFlow, true);
+
+    const phase18SpecialProduct = await requestJson(
+      baseUrl,
+      `/api/products/${phase18B2BProductSlug}`,
+      {
+        headers: authHeaders(phase18SpecialToken)
+      }
+    );
+    assert.equal(phase18SpecialProduct.response.status, 200);
+    assert.equal(phase18SpecialProduct.json.data.pricing.visiblePrice, 4700);
+    assert.equal(
+      phase18SpecialProduct.json.data.pricing.priceSource,
+      "customer_specific"
+    );
+
+    const phase18DealerSearch = await requestJson(
+      baseUrl,
+      `/api/search?q=${encodeURIComponent("Phase 18 Dealer Camera Kit")}&limit=5`,
+      {
+        headers: authHeaders(phase18DealerToken)
+      }
+    );
+    assert.equal(phase18DealerSearch.response.status, 200);
+    const phase18DealerSearchMatch = phase18DealerSearch.json.data.results.find(
+      (row) => row.id === phase18B2BProductId
+    );
+    assert.equal(Boolean(phase18DealerSearchMatch), true);
+    assert.equal(phase18DealerSearchMatch.product.pricing.visiblePrice, 5100);
+
+    const phase18DealerCartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase18DealerToken),
+      body: JSON.stringify({
+        productId: phase18B2BProductId,
+        qty: 2
+      })
+    });
+    assert.equal(phase18DealerCartAdd.response.status, 201);
+
+    const phase18DealerCart = await requestJson(
+      baseUrl,
+      "/api/cart?paymentMethod=direct_bank_transfer&shippingMethod=self_pickup",
+      {
+        headers: authHeaders(phase18DealerToken)
+      }
+    );
+    assert.equal(phase18DealerCart.response.status, 200);
+    const phase18DealerCartLine = phase18DealerCart.json.data.items.find(
+      (row) => row.productId === phase18B2BProductId
+    );
+    assert.equal(Boolean(phase18DealerCartLine), true);
+    assert.equal(phase18DealerCartLine.priceSource, "price_group");
+    assert.equal(phase18DealerCartLine.compareAtUnitPrice, 5800);
+    assert.equal(phase18DealerCartLine.finalUnitPriceAfterDiscount, 4998);
+
+    const phase18DealerOnlineBlocked = await requestJson(
+      baseUrl,
+      "/api/checkout/start",
+      {
+        method: "POST",
+        headers: authHeaders(phase18DealerToken),
+        body: JSON.stringify({
+          paymentMethod: "online",
+          shippingMethod: "self_pickup",
+          billingAddress: {
+            name: "Phase 18 Dealer",
+            companyName: "Phase 18 Dealer LLP",
+            email: "phase18.dealer@example.com",
+            mobile: "+91-9811111111",
+            gstin: "08ABCDE1234F1Z5",
+            addressLine1: "Warehouse 12",
+            city: "Jaipur",
+            state: "Rajasthan",
+            stateCode: "RJ",
+            pincode: "302001"
+          },
+          shippingAddress: {
+            name: "Phase 18 Dealer",
+            companyName: "Phase 18 Dealer LLP",
+            email: "phase18.dealer@example.com",
+            mobile: "+91-9811111111",
+            gstin: "08ABCDE1234F1Z5",
+            addressLine1: "Warehouse 12",
+            city: "Jaipur",
+            state: "Rajasthan",
+            stateCode: "RJ",
+            pincode: "302001"
+          }
+        })
+      }
+    );
+    assert.equal(phase18DealerOnlineBlocked.response.status, 409);
+
+    const phase18DealerManualUpiBlocked = await requestJson(
+      baseUrl,
+      "/api/checkout/start",
+      {
+        method: "POST",
+        headers: authHeaders(phase18DealerToken),
+        body: JSON.stringify({
+          paymentMethod: "manual_upi",
+          shippingMethod: "self_pickup",
+          billingAddress: {
+            name: "Phase 18 Dealer",
+            companyName: "Phase 18 Dealer LLP",
+            email: "phase18.dealer@example.com",
+            mobile: "+91-9811111111",
+            gstin: "08ABCDE1234F1Z5",
+            addressLine1: "Warehouse 12",
+            city: "Jaipur",
+            state: "Rajasthan",
+            stateCode: "RJ",
+            pincode: "302001"
+          },
+          shippingAddress: {
+            name: "Phase 18 Dealer",
+            companyName: "Phase 18 Dealer LLP",
+            email: "phase18.dealer@example.com",
+            mobile: "+91-9811111111",
+            gstin: "08ABCDE1234F1Z5",
+            addressLine1: "Warehouse 12",
+            city: "Jaipur",
+            state: "Rajasthan",
+            stateCode: "RJ",
+            pincode: "302001"
+          }
+        })
+      }
+    );
+    assert.equal(phase18DealerManualUpiBlocked.response.status, 409);
+
+    const phase18DealerCheckout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase18DealerToken),
+      body: JSON.stringify({
+        paymentMethod: "direct_bank_transfer",
+        shippingMethod: "self_pickup",
+        billingAddress: {
+          name: "Phase 18 Dealer",
+          companyName: "Phase 18 Dealer LLP",
+          email: "phase18.dealer@example.com",
+          mobile: "+91-9811111111",
+          gstin: "08ABCDE1234F1Z5",
+          addressLine1: "Warehouse 12",
+          city: "Jaipur",
+          state: "Rajasthan",
+          stateCode: "RJ",
+          pincode: "302001"
+        },
+        shippingAddress: {
+          name: "Phase 18 Dealer",
+          companyName: "Phase 18 Dealer LLP",
+          email: "phase18.dealer@example.com",
+          mobile: "+91-9811111111",
+          gstin: "08ABCDE1234F1Z5",
+          addressLine1: "Warehouse 12",
+          city: "Jaipur",
+          state: "Rajasthan",
+          stateCode: "RJ",
+          pincode: "302001"
+        }
+      })
+    });
+    assert.equal(phase18DealerCheckout.response.status, 200);
+    assert.equal(
+      phase18DealerCheckout.json.data.order.orderStatus,
+      "awaiting_admin_approval"
+    );
+    const phase18DealerOrderId = phase18DealerCheckout.json.data.order.id;
+
+    const phase18DealerEarlyPaymentForm = new FormData();
+    phase18DealerEarlyPaymentForm.append("orderId", phase18DealerOrderId);
+    phase18DealerEarlyPaymentForm.append("paymentMethod", "direct_bank_transfer");
+    phase18DealerEarlyPaymentForm.append("utrNumber", "UTR-PHASE18-EARLY");
+    phase18DealerEarlyPaymentForm.append("note", "Attempted before admin approval.");
+    phase18DealerEarlyPaymentForm.append(
+      "file",
+      new Blob([tinyPngBytes], { type: "image/png" }),
+      "phase18-early-proof.png"
+    );
+
+    const phase18DealerEarlyPaymentResponse = await fetch(
+      `${baseUrl}/api/payments/manual/submit`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${phase18DealerToken}`
+        },
+        body: phase18DealerEarlyPaymentForm
+      }
+    );
+    const phase18DealerEarlyPaymentJson =
+      await phase18DealerEarlyPaymentResponse.json();
+    assert.equal(phase18DealerEarlyPaymentResponse.status, 409);
+    assert.equal(
+      phase18DealerEarlyPaymentJson.message.includes("after admin approval"),
+      true
+    );
+
+    const phase18OrderRequests = await requestJson(
+      baseUrl,
+      "/api/admin/customers/order-requests/list?status=awaiting_admin_approval&limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase18OrderRequests.response.status, 200);
+    assert.equal(
+      phase18OrderRequests.json.data.some((row) => row.id === phase18DealerOrderId),
+      true
+    );
+
+    const phase18DealerApprove = await requestJson(
+      baseUrl,
+      `/api/admin/customers/order-requests/${phase18DealerOrderId}/approve`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          paymentMethod: "direct_bank_transfer",
+          approvalNote: "Approved for offline bank transfer."
+        })
+      }
+    );
+    assert.equal(phase18DealerApprove.response.status, 200);
+    assert.equal(
+      phase18DealerApprove.json.data.orderStatus,
+      "awaiting_bank_payment"
+    );
+
+    const phase18DealerOrderAwaitingPayment = await requestJson(
+      baseUrl,
+      `/api/customer/account/orders/${phase18DealerOrderId}`,
+      {
+        headers: authHeaders(phase18DealerToken)
+      }
+    );
+    assert.equal(phase18DealerOrderAwaitingPayment.response.status, 200);
+    assert.equal(
+      phase18DealerOrderAwaitingPayment.json.data.orderStatus,
+      "awaiting_bank_payment"
+    );
+    assert.equal(
+      Object.keys(
+        phase18DealerOrderAwaitingPayment.json.data.manualPaymentInstructions
+          ?.instructions || {}
+      ).length > 0,
+      true
+    );
+
+    const phase18DealerPaymentForm = new FormData();
+    phase18DealerPaymentForm.append("orderId", phase18DealerOrderId);
+    phase18DealerPaymentForm.append("paymentMethod", "direct_bank_transfer");
+    phase18DealerPaymentForm.append("utrNumber", "UTR-PHASE18-DEALER-001");
+    phase18DealerPaymentForm.append("note", "Dealer payment submitted.");
+    phase18DealerPaymentForm.append(
+      "file",
+      new Blob([tinyPngBytes], { type: "image/png" }),
+      "phase18-dealer-proof.png"
+    );
+
+    const phase18DealerPaymentResponse = await fetch(
+      `${baseUrl}/api/payments/manual/submit`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${phase18DealerToken}`
+        },
+        body: phase18DealerPaymentForm
+      }
+    );
+    const phase18DealerPaymentJson = await phase18DealerPaymentResponse.json();
+    assert.equal(phase18DealerPaymentResponse.status, 201);
+    assert.equal(
+      phase18DealerPaymentJson.data.order.manualPaymentStatus,
+      "submitted"
+    );
+    const phase18DealerSubmissionId = phase18DealerPaymentJson.data.submission.id;
+
+    const phase18DealerManualQueue = await requestJson(
+      baseUrl,
+      "/api/admin/manual-payments?status=pending_verification&limit=50",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase18DealerManualQueue.response.status, 200);
+    assert.equal(
+      phase18DealerManualQueue.json.data.some(
+        (row) => row.id === phase18DealerSubmissionId
+      ),
+      true
+    );
+
+    const phase18DealerVerifyPayment = await requestJson(
+      baseUrl,
+      `/api/admin/manual-payments/${phase18DealerSubmissionId}/verify`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          action: "approve",
+          gatewayTxnId: "phase18_dealer_bank_txn",
+          verificationNote: "Dealer transfer verified."
+        })
+      }
+    );
+    assert.equal(phase18DealerVerifyPayment.response.status, 200);
+    assert.equal(phase18DealerVerifyPayment.json.data.order.paymentStatus, "paid");
+    assert.equal(
+      phase18DealerVerifyPayment.json.data.order.orderStatus,
+      "payment_received"
+    );
+    assert.equal(Boolean(phase18DealerVerifyPayment.json.data.invoice?.id), true);
+
+    const phase18DealerReadyForPickup = await requestJson(
+      baseUrl,
+      `/api/admin/customers/order-requests/${phase18DealerOrderId}/status`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          orderStatus: "ready_for_pickup",
+          adminNote: "Pickup window starts at 4 PM."
+        })
+      }
+    );
+    assert.equal(phase18DealerReadyForPickup.response.status, 200);
+    assert.equal(
+      phase18DealerReadyForPickup.json.data.shipmentStatus,
+      "ready_for_pickup"
+    );
+
+    const phase18DealerPickedUp = await requestJson(
+      baseUrl,
+      `/api/admin/customers/order-requests/${phase18DealerOrderId}/status`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          orderStatus: "picked_up",
+          adminNote: "Collected by warehouse representative."
+        })
+      }
+    );
+    assert.equal(phase18DealerPickedUp.response.status, 200);
+    assert.equal(phase18DealerPickedUp.json.data.orderStatus, "picked_up");
+    assert.equal(phase18DealerPickedUp.json.data.shipmentStatus, "picked_up");
+
+    const phase18DealerFinalDetail = await requestJson(
+      baseUrl,
+      `/api/customer/account/orders/${phase18DealerOrderId}`,
+      {
+        headers: authHeaders(phase18DealerToken)
+      }
+    );
+    assert.equal(phase18DealerFinalDetail.response.status, 200);
+    assert.equal(
+      phase18DealerFinalDetail.json.data.items[0].unitPriceUsed,
+      phase18DealerCartLine.finalUnitPriceAfterDiscount
+    );
+    assert.equal(phase18DealerFinalDetail.json.data.orderStatus, "picked_up");
+    assert.equal(
+      phase18DealerFinalDetail.json.data.shipmentTimeline.some(
+        (row) => row.code === "picked_up"
+      ),
+      true
+    );
+
+    const phase18SpecialCartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase18SpecialToken),
+      body: JSON.stringify({
+        productId: phase18B2BProductId,
+        qty: 2
+      })
+    });
+    assert.equal(phase18SpecialCartAdd.response.status, 201);
+
+    const phase18SpecialCart = await requestJson(
+      baseUrl,
+      "/api/cart?paymentMethod=direct_bank_transfer&shippingMethod=standard",
+      {
+        headers: authHeaders(phase18SpecialToken)
+      }
+    );
+    assert.equal(phase18SpecialCart.response.status, 200);
+    const phase18SpecialCartLine = phase18SpecialCart.json.data.items.find(
+      (row) => row.productId === phase18B2BProductId
+    );
+    assert.equal(Boolean(phase18SpecialCartLine), true);
+    assert.equal(phase18SpecialCartLine.priceSource, "customer_specific");
+    assert.equal(phase18SpecialCartLine.compareAtUnitPrice, 5800);
+    assert.equal(phase18SpecialCartLine.finalUnitPriceAfterDiscount, 4606);
+
+    const phase18SpecialCheckout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase18SpecialToken),
+      body: JSON.stringify({
+        paymentMethod: "direct_bank_transfer",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Phase 18 Special Dealer",
+          companyName: "Phase 18 Special Projects",
+          email: "phase18.special@example.com",
+          mobile: "+91-9822222222",
+          gstin: "24ABCDE1234F1Z5",
+          addressLine1: "Plot 88 Industrial Road",
+          city: "Ahmedabad",
+          state: "Gujarat",
+          stateCode: "GJ",
+          pincode: "380001"
+        },
+        shippingAddress: {
+          name: "Phase 18 Special Dealer",
+          companyName: "Phase 18 Special Projects",
+          email: "phase18.special@example.com",
+          mobile: "+91-9822222222",
+          gstin: "24ABCDE1234F1Z5",
+          addressLine1: "Plot 88 Industrial Road",
+          city: "Ahmedabad",
+          state: "Gujarat",
+          stateCode: "GJ",
+          pincode: "380001"
+        }
+      })
+    });
+    assert.equal(phase18SpecialCheckout.response.status, 200);
+    assert.equal(
+      phase18SpecialCheckout.json.data.order.orderStatus,
+      "awaiting_admin_approval"
+    );
+    const phase18SpecialOrderId = phase18SpecialCheckout.json.data.order.id;
+
+    const phase18SpecialApprove = await requestJson(
+      baseUrl,
+      `/api/admin/customers/order-requests/${phase18SpecialOrderId}/approve`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          paymentMethod: "direct_bank_transfer",
+          approvalNote: "Approved for dispatch workflow."
+        })
+      }
+    );
+    assert.equal(phase18SpecialApprove.response.status, 200);
+    assert.equal(
+      phase18SpecialApprove.json.data.orderStatus,
+      "awaiting_bank_payment"
+    );
+
+    const phase18SpecialPaymentForm = new FormData();
+    phase18SpecialPaymentForm.append("orderId", phase18SpecialOrderId);
+    phase18SpecialPaymentForm.append("paymentMethod", "direct_bank_transfer");
+    phase18SpecialPaymentForm.append("utrNumber", "UTR-PHASE18-SPECIAL-001");
+    phase18SpecialPaymentForm.append("note", "Project payment submitted.");
+    phase18SpecialPaymentForm.append(
+      "file",
+      new Blob([tinyPngBytes], { type: "image/png" }),
+      "phase18-special-proof.png"
+    );
+
+    const phase18SpecialPaymentResponse = await fetch(
+      `${baseUrl}/api/payments/manual/submit`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${phase18SpecialToken}`
+        },
+        body: phase18SpecialPaymentForm
+      }
+    );
+    const phase18SpecialPaymentJson = await phase18SpecialPaymentResponse.json();
+    assert.equal(phase18SpecialPaymentResponse.status, 201);
+    const phase18SpecialSubmissionId = phase18SpecialPaymentJson.data.submission.id;
+
+    const phase18SpecialVerify = await requestJson(
+      baseUrl,
+      `/api/admin/manual-payments/${phase18SpecialSubmissionId}/verify`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          action: "approve",
+          gatewayTxnId: "phase18_special_bank_txn",
+          verificationNote: "Special dealer transfer verified."
+        })
+      }
+    );
+    assert.equal(phase18SpecialVerify.response.status, 200);
+    assert.equal(
+      phase18SpecialVerify.json.data.order.orderStatus,
+      "payment_received"
+    );
+
+    const phase18SpecialDispatched = await requestJson(
+      baseUrl,
+      `/api/admin/customers/order-requests/${phase18SpecialOrderId}/status`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          orderStatus: "dispatched",
+          adminNote: "Sent via approved transport."
+        })
+      }
+    );
+    assert.equal(phase18SpecialDispatched.response.status, 200);
+    assert.equal(phase18SpecialDispatched.json.data.shipmentStatus, "shipped");
+
+    const phase18SpecialDelivered = await requestJson(
+      baseUrl,
+      `/api/admin/customers/order-requests/${phase18SpecialOrderId}/status`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          orderStatus: "delivered",
+          adminNote: "Delivered at site."
+        })
+      }
+    );
+    assert.equal(phase18SpecialDelivered.response.status, 200);
+    assert.equal(phase18SpecialDelivered.json.data.shipmentStatus, "delivered");
+
+    const phase18SpecialFinalDetail = await requestJson(
+      baseUrl,
+      `/api/customer/account/orders/${phase18SpecialOrderId}`,
+      {
+        headers: authHeaders(phase18SpecialToken)
+      }
+    );
+    assert.equal(phase18SpecialFinalDetail.response.status, 200);
+    assert.equal(
+      phase18SpecialFinalDetail.json.data.items[0].unitPriceUsed,
+      phase18SpecialCartLine.finalUnitPriceAfterDiscount
+    );
+    assert.equal(phase18SpecialFinalDetail.json.data.orderStatus, "delivered");
+    assert.equal(phase18SpecialFinalDetail.json.data.shipmentStatus, "delivered");
+    assert.equal(
+      phase18SpecialFinalDetail.json.data.shipmentTimeline.some(
+        (row) => row.code === "delivered"
+      ),
+      true
+    );
+
     const phase16SalesReport = await requestJson(
       baseUrl,
       "/api/admin/reports/sales?period=monthly&month=2026-05&limit=200",

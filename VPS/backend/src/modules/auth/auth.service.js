@@ -19,6 +19,9 @@ const {
   sanitizeCustomerUser
 } = require("./auth.model");
 const {
+  ensureCustomerAccountShape
+} = require("../customer-account/customer-account.model");
+const {
   addGuestCartItemLegacy,
   getGuestCartLegacy,
   getCustomerCartLegacy
@@ -282,6 +285,7 @@ async function issueAdminTokens(store, staffUser) {
 }
 
 async function issueCustomerTokens(store, customerUser, guestSessionId) {
+  ensureCustomerAccountShape(customerUser);
   const mergedGuestCart = mergeGuestCartIntoUser(
     store,
     guestSessionId,

@@ -1,4 +1,8 @@
 const { sanitizeCustomerUser } = require("../auth/auth.model");
+const {
+  ensureCustomerB2BFields,
+  buildCustomerPricingContext
+} = require("../customers/customers.model");
 
 const REORDER_MODES = Object.freeze({
   REPLACE: "replace",
@@ -57,6 +61,16 @@ function ensureCustomerAccountShape(user) {
     changed = true;
   }
 
+  if (ensureCustomerB2BFields(user)) {
+    changed = true;
+  }
+
+  const nextGstin = String(user.gstin || user.gstDetails?.gstin || "").trim().toUpperCase();
+  if ((user.gstDetails.gstin || "") !== nextGstin) {
+    user.gstDetails.gstin = nextGstin;
+    changed = true;
+  }
+
   return changed;
 }
 
@@ -74,6 +88,7 @@ function sanitizeGstDetails(gstDetails) {
 
 function sanitizeCustomerAccountProfile(user) {
   const safeUser = sanitizeCustomerUser(user);
+  const customerPricingContext = buildCustomerPricingContext(safeUser) || {};
 
   return {
     id: safeUser.id,
@@ -84,6 +99,14 @@ function sanitizeCustomerAccountProfile(user) {
     verifiedEmail: Boolean(safeUser.verifiedEmail),
     verifiedMobile: Boolean(safeUser.verifiedMobile),
     authProviders: ensureArray(safeUser.authProviders),
+    customerType: customerPricingContext.customerType || "retail",
+    priceGroup: customerPricingContext.priceGroup || "",
+    isB2BApproved: Boolean(customerPricingContext.isB2BApproved),
+    gstin: customerPricingContext.gstin || "",
+    creditAllowed: Boolean(customerPricingContext.creditAllowed),
+    bankTransferOnly: Boolean(customerPricingContext.bankTransferOnly),
+    pickupAllowed: Boolean(customerPricingContext.pickupAllowed),
+    orderMode: customerPricingContext.orderMode || "online",
     savedAddresses: ensureArray(safeUser.savedAddresses).map(sanitizeCustomerAddress),
     gstDetails: sanitizeGstDetails(safeUser.gstDetails),
     savedProductsCount: ensureArray(safeUser.savedProductIds).length,

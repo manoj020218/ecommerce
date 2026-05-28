@@ -3,16 +3,25 @@ const { generateId } = require("../../common/identity");
 const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
 const { readCatalogStore } = require("../../database/catalog-store");
 const { readInvoiceStore } = require("../../database/invoice-store");
+const { readPaymentStore } = require("../../database/payment-store");
 const { readShippingStore } = require("../../database/shipping-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const { PAYMENT_METHODS } = require("../cart-checkout/cart-checkout.model");
 const { getCart } = require("../cart-checkout/cart-checkout.service");
 const { getInvoiceDownload } = require("../invoices/invoices.service");
+const {
+  getManualPaymentInstructions
+} = require("../payment-gateways/payment-gateways.model");
 const { toPublicProductCard } = require("../products/products.model");
 const {
   listCustomerSearchHistory,
   listCustomerViewedHistory
 } = require("../search/search.service");
 const { getPublicSettingsBundle } = require("../settings/settings.service");
+const {
+  B2B_ORDER_STATUSES,
+  buildCustomerPricingContext
+} = require("../customers/customers.model");
 const {
   REORDER_MODES,
   ensureArray,
@@ -187,17 +196,72 @@ function buildShipmentTimeline(order, shipment) {
     description: `Order ${order.orderNo || order.id} was created.`
   });
 
+  if (order.isB2BOrderRequest) {
+    timeline.push({
+      code: B2B_ORDER_STATUSES.ORDER_REQUEST_RECEIVED,
+      label: "Order request received",
+      at: order.orderRequestReceivedAt || order.createdAt || null,
+      description: "Offline dealer order request was submitted for admin review."
+    });
+
+    timeline.push({
+      code: B2B_ORDER_STATUSES.AWAITING_ADMIN_APPROVAL,
+      label: "Awaiting admin approval",
+      at: order.orderRequestReceivedAt || order.createdAt || null,
+      description: "Request is waiting for admin approval before payment collection."
+    });
+  }
+
+  if (order.approvedAt) {
+    timeline.push({
+      code: B2B_ORDER_STATUSES.AWAITING_BANK_PAYMENT,
+      label: "Awaiting bank payment",
+      at: order.approvedAt,
+      description: "Admin approved the order and requested offline payment proof."
+    });
+  }
+
+  if (order.manualPaymentSubmittedAt) {
+    timeline.push({
+      code: "manual_payment_submitted",
+      label: "Manual payment submitted",
+      at: order.manualPaymentSubmittedAt,
+      description: "Payment proof is pending admin verification."
+    });
+  }
+
   if (order.paymentVerifiedAt) {
     timeline.push({
-      code: "payment_confirmed",
-      label: "Payment confirmed",
+      code: order.isB2BOrderRequest
+        ? B2B_ORDER_STATUSES.PAYMENT_RECEIVED
+        : "payment_confirmed",
+      label: order.isB2BOrderRequest ? "Payment received" : "Payment confirmed",
       at: order.paymentVerifiedAt,
       description: `Payment status: ${order.paymentStatus || "paid"}.`
     });
   }
 
+  if (
+    [
+      B2B_ORDER_STATUSES.PACKING_STARTED,
+      B2B_ORDER_STATUSES.READY_FOR_PICKUP,
+      B2B_ORDER_STATUSES.DISPATCHED,
+      B2B_ORDER_STATUSES.DELIVERED,
+      B2B_ORDER_STATUSES.PICKED_UP,
+      B2B_ORDER_STATUSES.COMPLETED,
+      B2B_ORDER_STATUSES.CANCELLED
+    ].includes(order.orderStatus)
+  ) {
+    timeline.push({
+      code: order.orderStatus,
+      label: order.orderStatus.replace(/_/g, " "),
+      at: order.fulfilmentUpdatedAt || order.updatedAt || order.paymentVerifiedAt || null,
+      description: `Order status is now ${order.orderStatus.replace(/_/g, " ")}.`
+    });
+  }
+
   if (!shipment) {
-    return timeline;
+    return timeline.sort((a, b) => Date.parse(a.at || "") - Date.parse(b.at || ""));
   }
 
   timeline.push({
@@ -254,6 +318,8 @@ function buildOrderSummary(order, shipment, invoice) {
     orderDate: order.createdAt || null,
     orderTotal: Number(order.grandTotal || 0),
     paymentStatus: order.paymentStatus || "",
+    orderStatus: order.orderStatus || "",
+    manualPaymentStatus: order.manualPaymentStatus || "",
     invoiceStatus: resolveInvoiceStatus(order, invoice),
     invoiceId: invoice?.id || order.invoiceId || null,
     invoiceNumber: invoice?.invoiceNumber || order.invoiceNumber || "",
@@ -261,11 +327,14 @@ function buildOrderSummary(order, shipment, invoice) {
     courierName: shipment?.courierName || "",
     trackingId: shipment?.trackingId || "",
     trackingUrl: shipment?.trackingUrl || "",
-    paymentMethod: order.paymentMethod || ""
+    paymentMethod: order.paymentMethod || "",
+    customerType: order.customerType || "retail",
+    priceGroup: order.priceGroup || "",
+    isB2BOrderRequest: Boolean(order.isB2BOrderRequest)
   };
 }
 
-function buildOrderDetail(order, shipment, invoice) {
+function buildOrderDetail(order, shipment, invoice, options = {}) {
   return {
     ...buildOrderSummary(order, shipment, invoice),
     billingAddress: order.billingAddress || {},
@@ -317,7 +386,8 @@ function buildOrderDetail(order, shipment, invoice) {
             podStatus: shipment.podStatus || "pending",
             podFileUrl: shipment.podFileUrl || ""
           },
-    shipmentTimeline: buildShipmentTimeline(order, shipment)
+    shipmentTimeline: buildShipmentTimeline(order, shipment),
+    manualPaymentInstructions: options.manualPaymentInstructions || null
   };
 }
 
@@ -349,6 +419,7 @@ function buildTrackingSummary(order, shipment, invoice) {
 }
 
 function buildSavedProducts(customer, catalogStore) {
+  const customerPricingContext = buildCustomerPricingContext(customer);
   const byId = new Map(
     ensureArray(catalogStore.products)
       .filter((product) => product.isActive)
@@ -358,7 +429,11 @@ function buildSavedProducts(customer, catalogStore) {
   return ensureArray(customer.savedProductIds)
     .map((productId) => byId.get(productId))
     .filter(Boolean)
-    .map(toPublicProductCard);
+    .map((product) =>
+      toPublicProductCard(product, {
+        customerPricingContext
+      })
+    );
 }
 
 function resolveOrderContact(order) {
@@ -528,10 +603,11 @@ async function listCustomerOrders(customerId, filters) {
 }
 
 async function getCustomerOrderDetail(customerId, orderId) {
-  const [authStore, invoiceStore, shippingStore] = await Promise.all([
+  const [authStore, invoiceStore, shippingStore, paymentStore] = await Promise.all([
     readAuthStore(),
     readInvoiceStore(),
-    readShippingStore()
+    readShippingStore(),
+    readPaymentStore()
   ]);
   ensureAuthStoreShape(authStore);
   ensureInvoiceStoreShape(invoiceStore);
@@ -540,8 +616,18 @@ async function getCustomerOrderDetail(customerId, orderId) {
   const order = findAccessibleOrderOrThrow(authStore, customerId, orderId);
   const shipment = buildLatestShipmentMap(shippingStore).get(order.id) || null;
   const invoice = buildInvoiceByOrderIdMap(invoiceStore).get(order.id) || null;
+  const manualPaymentInstructions =
+    order.orderStatus === B2B_ORDER_STATUSES.AWAITING_BANK_PAYMENT &&
+    [
+      PAYMENT_METHODS.DIRECT_BANK_TRANSFER,
+      PAYMENT_METHODS.MANUAL_UPI
+    ].includes(order.paymentMethod)
+      ? getManualPaymentInstructions(order.paymentMethod, paymentStore)
+      : null;
 
-  return buildOrderDetail(order, shipment, invoice);
+  return buildOrderDetail(order, shipment, invoice, {
+    manualPaymentInstructions
+  });
 }
 
 async function listCustomerInvoices(customerId, filters) {
@@ -761,6 +847,11 @@ async function updateCustomerGstDetails(customerId, payload) {
       ? { contactName: payload.contactName || "" }
       : {})
   };
+  customer.gstin = String(
+    payload.gstin !== undefined ? payload.gstin || "" : customer.gstin || customer.gstDetails.gstin || ""
+  )
+    .trim()
+    .toUpperCase();
   customer.updatedAt = nowIso();
 
   await persistAuthStore(authStore);

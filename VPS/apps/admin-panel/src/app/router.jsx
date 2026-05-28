@@ -5,6 +5,7 @@ import { BlogsPage } from "../modules/blogs/blogs-page";
 import { LoginPage } from "../modules/auth/login-page";
 import { CataloguePage } from "../modules/catalogue/catalogue-page";
 import { CategoriesPage } from "../modules/categories/categories-page";
+import { CustomersPage } from "../modules/customers/customers-page";
 import { ProductsPage } from "../modules/products/products-page";
 import { HsnTaxPage } from "../modules/hsn-tax/hsn-tax-page";
 import { InventoryPage } from "../modules/inventory/inventory-page";
@@ -26,6 +27,7 @@ export function AppRouter() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="hsn-tax" element={<HsnTaxPage />} />
           <Route path="inventory" element={<InventoryPage />} />
+          <Route path="customers" element={<CustomersPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="blogs" element={<BlogsPage />} />
           <Route path="marketing" element={<MarketingPage />} />

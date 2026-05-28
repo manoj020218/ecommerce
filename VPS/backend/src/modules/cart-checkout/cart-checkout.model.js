@@ -64,6 +64,11 @@ function sanitizeCartLine(line) {
     gstRate: Number(line.gstRate || 0),
     unitPrice: Number(line.unitPrice || 0),
     finalUnitPriceAfterDiscount: Number(line.finalUnitPriceAfterDiscount || line.unitPrice || 0),
+    priceSource: line.priceSource || "base",
+    compareAtUnitPrice:
+      line.compareAtUnitPrice === null || line.compareAtUnitPrice === undefined
+        ? null
+        : Number(line.compareAtUnitPrice),
     discountAmount: Number(line.discountAmount || 0),
     taxableValue: Number(line.taxableValue || 0),
     gstAmount: Number(line.gstAmount || 0),

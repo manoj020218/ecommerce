@@ -1,6 +1,7 @@
 const path = require("node:path");
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
+const { readAuthStore } = require("../../database/auth-store");
 const { env } = require("../../config/env");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { readShippingStore } = require("../../database/shipping-store");
@@ -14,9 +15,17 @@ const { buildProductPageSeoPayload } = require("../seo/seo.service");
 const { trackCustomerProductView } = require("../search/search.service");
 const { SHIPPING_METHODS } = require("../shipping/shipping.model");
 const {
+  ensureCustomerAccountShape
+} = require("../customer-account/customer-account.model");
+const {
+  buildCustomerPricingContext
+} = require("../customers/customers.model");
+const {
   PRODUCT_RELATION_TYPES,
   calculateAvailableQty,
   createEmptyProductRelations,
+  sanitizeCustomerSpecificPrices,
+  sanitizePriceGroupPrices,
   sanitizeProductRelations,
   sanitizeAdminProduct,
   toPublicProduct,
@@ -235,7 +244,11 @@ function buildRelatedGroupCards(productById, relationIds, options) {
       continue;
     }
 
-    rows.push(toPublicProductCard(product));
+    rows.push(
+      toPublicProductCard(product, {
+        customerPricingContext: options.customerPricingContext || null
+      })
+    );
   }
 
   return rows;
@@ -265,7 +278,9 @@ function buildTopClickedCards(productById, searchStore, options, excludeProductI
     }
 
     rows.push({
-      ...toPublicProductCard(product),
+      ...toPublicProductCard(product, {
+        customerPricingContext: options.customerPricingContext || null
+      }),
       score: Number(signal.clickCount || 0)
     });
   }
@@ -304,7 +319,9 @@ function buildTopViewedCards(productById, searchStore, options, excludeProductId
     }
 
     rows.push({
-      ...toPublicProductCard(product),
+      ...toPublicProductCard(product, {
+        customerPricingContext: options.customerPricingContext || null
+      }),
       score
     });
   }
@@ -379,6 +396,24 @@ function buildRecommendationGroups(product, productById, searchStore, options) {
   };
 }
 
+async function resolveCustomerPricingContext(customerId) {
+  if (!customerId) {
+    return null;
+  }
+
+  const authStore = await readAuthStore();
+  const customer = Array.isArray(authStore.users)
+    ? authStore.users.find((row) => row.id === customerId)
+    : null;
+
+  if (!customer) {
+    return null;
+  }
+
+  ensureCustomerAccountShape(customer);
+  return buildCustomerPricingContext(customer);
+}
+
 function createProductRecordFromPayload(store, payload) {
   const hsn = resolveHsnRecord(store, payload.hsnCode);
   ensureCategoryExists(store, payload.categoryId || null, "categoryId");
@@ -435,6 +470,10 @@ function createProductRecordFromPayload(store, payload) {
     moq: Number(payload.moq || 1),
     bulkPricingEnabled: Boolean(payload.bulkPricingEnabled),
     bulkPriceSlabs: normalizeBulkPriceSlabs(payload.bulkPriceSlabs || []),
+    priceGroupPrices: sanitizePriceGroupPrices(payload.priceGroupPrices || []),
+    customerSpecificPrices: sanitizeCustomerSpecificPrices(
+      payload.customerSpecificPrices || []
+    ),
     quoteRequiredAboveQty:
       payload.quoteRequiredAboveQty === null ||
       payload.quoteRequiredAboveQty === undefined
@@ -575,6 +614,14 @@ async function updateProduct(productId, patch, actor) {
       patch.bulkPriceSlabs === undefined
         ? current.bulkPriceSlabs
         : normalizeBulkPriceSlabs(patch.bulkPriceSlabs),
+    priceGroupPrices:
+      patch.priceGroupPrices === undefined
+        ? sanitizePriceGroupPrices(current.priceGroupPrices)
+        : sanitizePriceGroupPrices(patch.priceGroupPrices),
+    customerSpecificPrices:
+      patch.customerSpecificPrices === undefined
+        ? sanitizeCustomerSpecificPrices(current.customerSpecificPrices)
+        : sanitizeCustomerSpecificPrices(patch.customerSpecificPrices),
     quoteRequiredAboveQty:
       patch.quoteRequiredAboveQty === undefined
         ? current.quoteRequiredAboveQty
@@ -703,26 +750,35 @@ async function updateProductRelations(productId, relationsPatch, actor) {
   return sanitizeAdminProduct(next);
 }
 
-async function listPublicProducts(filters) {
+async function listPublicProducts(filters, options = {}) {
   const store = await readCatalogStore();
+  const customerPricingContext = await resolveCustomerPricingContext(options.customerId);
   let rows = store.products.filter((product) => product.isActive);
   rows = filterProducts(rows, filters);
-  return sortProducts(rows).map(toPublicProduct);
+  return sortProducts(rows).map((product) =>
+    toPublicProduct(product, {
+      customerPricingContext
+    })
+  );
 }
 
-async function getPublicProductBySlug(slug) {
+async function getPublicProductBySlug(slug, options = {}) {
   const store = await readCatalogStore();
   const row = findActiveProductBySlug(store, slug);
   if (!row) {
     throw new HttpError(404, "Product not found.");
   }
-  return toPublicProduct(row);
+  const customerPricingContext = await resolveCustomerPricingContext(options.customerId);
+  return toPublicProduct(row, {
+    customerPricingContext
+  });
 }
 
 async function getPublicProductRecommendations(slug, options) {
-  const [catalogStore, searchStore] = await Promise.all([
+  const [catalogStore, searchStore, customerPricingContext] = await Promise.all([
     readCatalogStore(),
-    readSearchStore()
+    readSearchStore(),
+    resolveCustomerPricingContext(options.customerId)
   ]);
 
   const product = findActiveProductBySlug(catalogStore, slug);
@@ -738,7 +794,8 @@ async function getPublicProductRecommendations(slug, options) {
     productById,
     searchStore,
     {
-      limit: options.limitPerGroup
+      limit: options.limitPerGroup,
+      customerPricingContext
     }
   );
 
@@ -777,7 +834,10 @@ async function getPublicProductPage(slug, options) {
 
   const recommendations = await getPublicProductRecommendations(slug, options);
   const breadcrumb = buildBreadcrumb(store, product);
-  const publicProduct = toPublicProduct(product);
+  const customerPricingContext = await resolveCustomerPricingContext(options.customerId);
+  const publicProduct = toPublicProduct(product, {
+    customerPricingContext
+  });
   const seoPayload = await buildProductPageSeoPayload(product, breadcrumb);
 
   return {

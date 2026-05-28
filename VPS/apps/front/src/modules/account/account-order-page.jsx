@@ -4,7 +4,8 @@ import { useCustomerSession } from "../../shared/auth/customer-session";
 import {
   downloadCustomerInvoice,
   getCustomerOrderDetail,
-  reorderCustomerOrder
+  reorderCustomerOrder,
+  submitManualPaymentProof
 } from "./account.api";
 import {
   downloadInvoicePayload,
@@ -14,6 +15,13 @@ import {
   formatDateTime,
   humanizeStatus
 } from "./account.utils";
+
+function humanizeInstructionKey(value) {
+  return String(value || "")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
 
 export function CustomerOrderPage() {
   const { orderId } = useParams();
@@ -25,6 +33,11 @@ export function CustomerOrderPage() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState("");
   const [reorderSummary, setReorderSummary] = useState(null);
+  const [manualPaymentForm, setManualPaymentForm] = useState({
+    utrNumber: "",
+    note: "",
+    file: null
+  });
 
   function redirectToLogin(requestError) {
     if (requestError?.status !== 401) {
@@ -89,6 +102,41 @@ export function CustomerOrderPage() {
     }
   }
 
+  async function handleManualPaymentSubmit(event) {
+    event.preventDefault();
+    if (!manualPaymentForm.file) {
+      setError("Payment screenshot is required.");
+      return;
+    }
+
+    setBusy("manual-payment");
+    setError("");
+    setNotice("");
+
+    try {
+      const formData = new FormData();
+      formData.append("orderId", order.id);
+      formData.append("paymentMethod", order.paymentMethod || "direct_bank_transfer");
+      formData.append("utrNumber", manualPaymentForm.utrNumber);
+      formData.append("note", manualPaymentForm.note);
+      formData.append("file", manualPaymentForm.file);
+      await submitManualPaymentProof(formData);
+      setManualPaymentForm({
+        utrNumber: "",
+        note: "",
+        file: null
+      });
+      setNotice("Payment proof submitted for admin verification.");
+      await loadOrder();
+    } catch (requestError) {
+      if (!redirectToLogin(requestError)) {
+        setError(requestError.message || "Payment proof submission failed.");
+      }
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (loading) {
     return <main className="front-shell"><div className="state-box">Loading order detail...</div></main>;
   }
@@ -104,6 +152,9 @@ export function CustomerOrderPage() {
 
   const timeline = Array.isArray(order.shipmentTimeline) ? order.shipmentTimeline : [];
   const tracking = order.trackingDetails;
+  const manualInstructions = order.manualPaymentInstructions?.instructions || {};
+  const manualInstructionEntries = Object.entries(manualInstructions).filter(([, value]) => Boolean(value));
+  const canSubmitManualPayment = order.orderStatus === "awaiting_bank_payment";
 
   return (
     <main className="front-shell account-shell">
@@ -124,12 +175,18 @@ export function CustomerOrderPage() {
           </div>
           <div className="list-card-meta">
             <span className="eyebrow-chip">{humanizeStatus(order.paymentStatus)}</span>
+            <span className="eyebrow-chip">{humanizeStatus(order.orderStatus)}</span>
+            {order.manualPaymentStatus ? (
+              <span className="eyebrow-chip">{humanizeStatus(order.manualPaymentStatus)}</span>
+            ) : null}
             <span className="eyebrow-chip">{humanizeStatus(order.shipmentStatus)}</span>
           </div>
         </div>
         <div className="detail-pairs">
           <div><span>Grand Total</span><strong>{formatCurrency(order.orderTotal)}</strong></div>
           <div><span>Payment Method</span><strong>{humanizeStatus(order.paymentMethod)}</strong></div>
+          <div><span>Customer Type</span><strong>{humanizeStatus(order.customerType)}</strong></div>
+          <div><span>Price Group</span><strong>{humanizeStatus(order.priceGroup || "retail")}</strong></div>
           <div><span>Invoice</span><strong>{order.invoice?.invoiceNumber || "Pending"}</strong></div>
           <div><span>Tracking</span><strong>{tracking?.trackingId || "Awaiting shipment"}</strong></div>
         </div>
@@ -139,6 +196,75 @@ export function CustomerOrderPage() {
           <button type="button" className="btn secondary" onClick={handleDownloadInvoice} disabled={!order.invoice?.id}>Download Invoice</button>
         </div>
       </section>
+
+      {canSubmitManualPayment ? (
+        <section className="section-card">
+          <div className="section-head">
+            <h3>Submit Bank Transfer Proof</h3>
+            <p>Admin approval is complete. Upload your UTR and payment screenshot for verification.</p>
+          </div>
+          {manualInstructionEntries.length ? (
+            <div className="detail-pairs">
+              {manualInstructionEntries.map(([key, value]) => (
+                <div key={key}>
+                  <span>{humanizeInstructionKey(key)}</span>
+                  <strong>{String(value)}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-panel">Payment instructions are not configured yet. Contact support before transferring funds.</div>
+          )}
+          <form className="stack-form" onSubmit={handleManualPaymentSubmit}>
+            <div className="field-grid">
+              <label>
+                <span>UTR / Reference Number</span>
+                <input
+                  value={manualPaymentForm.utrNumber}
+                  onChange={(event) =>
+                    setManualPaymentForm((current) => ({
+                      ...current,
+                      utrNumber: event.target.value
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                <span>Payment Screenshot</span>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(event) =>
+                    setManualPaymentForm((current) => ({
+                      ...current,
+                      file: event.target.files?.[0] || null
+                    }))
+                  }
+                  required
+                />
+              </label>
+              <label className="field-span-2">
+                <span>Note</span>
+                <textarea
+                  value={manualPaymentForm.note}
+                  onChange={(event) =>
+                    setManualPaymentForm((current) => ({
+                      ...current,
+                      note: event.target.value
+                    }))
+                  }
+                  rows={3}
+                  placeholder="Optional payment note"
+                />
+              </label>
+            </div>
+            <button type="submit" className="btn primary" disabled={busy === "manual-payment"}>
+              {busy === "manual-payment" ? "Submitting..." : "Submit Proof"}
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="account-grid">
         <article className="section-card">
@@ -235,4 +361,3 @@ export function CustomerOrderPage() {
     </main>
   );
 }
-

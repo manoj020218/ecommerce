@@ -10,7 +10,7 @@ export function listProducts(params = {}) {
   }
 
   const suffix = query.size ? `?${query.toString()}` : "";
-  return apiFetch(`/products${suffix}`);
+  return apiFetch(`/products${suffix}`, { auth: true });
 }
 
 export function searchStorefront(params = {}) {
@@ -30,7 +30,7 @@ export function searchStorefront(params = {}) {
 }
 
 export function getProduct(slug) {
-  return apiFetch(`/products/${slug}`);
+  return apiFetch(`/products/${slug}`, { auth: true });
 }
 
 export function getProductPageBundle(slug) {
@@ -56,6 +56,41 @@ export function estimateShipping(slug, payload) {
 
 export function requestNotifyWhenAvailable(payload) {
   return apiFetch("/marketing/notify-when-available", {
+    method: "POST",
+    auth: true,
+    body: payload
+  });
+}
+
+export function getCustomerCart() {
+  return apiFetch("/cart", { auth: true });
+}
+
+export function addCartItem(payload) {
+  return apiFetch("/cart/items", {
+    method: "POST",
+    auth: true,
+    body: payload
+  });
+}
+
+export function updateCartItem(productId, payload) {
+  return apiFetch(`/cart/items/${productId}`, {
+    method: "PATCH",
+    auth: true,
+    body: payload
+  });
+}
+
+export function deleteCartItem(productId) {
+  return apiFetch(`/cart/items/${productId}`, {
+    method: "DELETE",
+    auth: true
+  });
+}
+
+export function startCheckout(payload) {
+  return apiFetch("/checkout/start", {
     method: "POST",
     auth: true,
     body: payload

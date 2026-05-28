@@ -10,6 +10,16 @@ const bulkPriceSlabSchema = z.object({
   unitPrice: positiveMoneySchema
 });
 
+const priceGroupPriceSchema = z.object({
+  priceGroup: z.string().trim().min(2).max(120),
+  unitPrice: positiveMoneySchema
+});
+
+const customerSpecificPriceSchema = z.object({
+  customerId: z.string().trim().min(2).max(160),
+  unitPrice: positiveMoneySchema
+});
+
 const downloadItemSchema = z.object({
   title: z.string().trim().min(2).max(200),
   url: z.string().trim().min(3).max(1000)
@@ -79,6 +89,8 @@ const createProductSchema = z.object({
   moq: z.coerce.number().int().min(1).max(100000).optional().default(1),
   bulkPricingEnabled: z.boolean().optional().default(false),
   bulkPriceSlabs: z.array(bulkPriceSlabSchema).optional().default([]),
+  priceGroupPrices: z.array(priceGroupPriceSchema).optional().default([]),
+  customerSpecificPrices: z.array(customerSpecificPriceSchema).optional().default([]),
   quoteRequiredAboveQty: z.coerce
     .number()
     .int()
@@ -133,6 +145,8 @@ const updateProductSchema = z.object({
   moq: z.coerce.number().int().min(1).max(100000).optional(),
   bulkPricingEnabled: z.boolean().optional(),
   bulkPriceSlabs: z.array(bulkPriceSlabSchema).optional(),
+  priceGroupPrices: z.array(priceGroupPriceSchema).optional(),
+  customerSpecificPrices: z.array(customerSpecificPriceSchema).optional(),
   quoteRequiredAboveQty: z.coerce.number().int().min(1).optional().nullable(),
   deadWeightKg: z.coerce.number().min(0).max(5000).optional(),
   lengthCm: z.coerce.number().min(0).max(5000).optional().nullable(),

@@ -49,6 +49,12 @@ export const ADMIN_NAV_ITEMS = [
     group: "Operations",
     items: [
       {
+        key: "customers",
+        label: "Customers",
+        path: "/customers",
+        permission: "customers.view"
+      },
+      {
         key: "reports",
         label: "Reports",
         path: "/reports",

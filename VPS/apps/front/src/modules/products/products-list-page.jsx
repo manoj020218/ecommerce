@@ -52,8 +52,23 @@ function buildWhatsAppLink(number, message) {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
+function visiblePrice(product) {
+  return Number(product?.pricing?.visiblePrice ?? product?.salePrice ?? 0);
+}
+
+function compareAtPrice(product) {
+  if (product?.pricing?.compareAtPrice !== null && product?.pricing?.compareAtPrice !== undefined) {
+    return Number(product.pricing.compareAtPrice);
+  }
+  const basePrice = Number(product?.basePrice || 0);
+  const salePrice = Number(product?.salePrice || 0);
+  return basePrice > salePrice ? basePrice : null;
+}
+
 function ProductCard({ product }) {
   const imageUrl = Array.isArray(product.images) && product.images[0] ? product.images[0] : null;
+  const nextVisiblePrice = visiblePrice(product);
+  const nextCompareAtPrice = compareAtPrice(product);
 
   return (
     <Link to={`/products/${product.slug}`} className="product-card">
@@ -68,11 +83,12 @@ function ProductCard({ product }) {
         <p className="product-card-brand">{product.brand || "Jenix India"}</p>
         <h3>{product.title}</h3>
         <div className="product-card-price-row">
-          <strong>{currency(product.salePrice)}</strong>
-          {Number(product.basePrice || 0) > Number(product.salePrice || 0) ? (
-            <span>{currency(product.basePrice)}</span>
+          <strong>{currency(nextVisiblePrice)}</strong>
+          {nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice ? (
+            <span>{currency(nextCompareAtPrice)}</span>
           ) : null}
         </div>
+        {product?.pricing?.isB2BPrice ? <p className="product-card-brand">Approved dealer price</p> : null}
       </div>
     </Link>
   );

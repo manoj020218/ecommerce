@@ -45,6 +45,7 @@ const { createTallyExportRouter } = require("../modules/tally-export/tally-expor
 const {
   createCustomerAccountRouter
 } = require("../modules/customer-account/customer-account.routes");
+const { createCustomersRouter } = require("../modules/customers/customers.routes");
 const {
   createAdminAbandonedCartRouter,
   createPublicRecoveryRouter
@@ -86,6 +87,7 @@ function createApiRouter() {
   router.use("/payments", createPaymentsRouter());
   router.use("/payments/manual", createPublicManualPaymentsRouter());
   router.use("/customer/account", createCustomerAccountRouter());
+  router.use("/admin/customers", createCustomersRouter());
   router.use("/admin/abandoned-carts", createAdminAbandonedCartRouter());
   router.use("/admin/payment-gateways", createPaymentGatewaysRouter());
   router.use("/admin/manual-payments", createAdminManualPaymentsRouter());

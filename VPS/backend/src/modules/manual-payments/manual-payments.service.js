@@ -10,8 +10,13 @@ const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const {
   CART_OWNER_TYPES,
   PAYMENT_ATTEMPT_STATUSES,
-  PAYMENT_METHODS
+  PAYMENT_METHODS,
+  CHECKOUT_STATUSES,
+  SHIPPING_METHODS
 } = require("../cart-checkout/cart-checkout.model");
+const {
+  B2B_ORDER_STATUSES
+} = require("../customers/customers.model");
 const {
   ensurePaymentStoreShape
 } = require("../payment-gateways/payment-gateways.service");
@@ -228,6 +233,16 @@ async function submitManualPayment(context, payload, fullFilePath) {
     throw new HttpError(409, "Order is already paid.");
   }
 
+  if (
+    order.isB2BOrderRequest &&
+    order.orderStatus !== B2B_ORDER_STATUSES.AWAITING_BANK_PAYMENT
+  ) {
+    throw new HttpError(
+      409,
+      "Payment proof can be submitted only after admin approval for this order request."
+    );
+  }
+
   const screenshotUrl = buildPublicUploadUrl(fullFilePath);
   const submission = {
     id: generateId("manual_pay"),
@@ -249,6 +264,8 @@ async function submitManualPayment(context, payload, fullFilePath) {
 
   paymentStore.manualPaymentSubmissions.push(submission);
   order.manualPaymentStatus = "submitted";
+  order.manualPaymentSubmittedAt = submission.submittedAt;
+  order.updatedAt = submission.submittedAt;
 
   await Promise.all([writeAuthStore(authStore), writePaymentStore(paymentStore)]);
 
@@ -332,6 +349,7 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
     submission.verifiedAt = nowIso();
     submission.verifiedBy = actor.id;
     order.manualPaymentStatus = "rejected";
+    order.updatedAt = nowIso();
 
     await Promise.all([writeAuthStore(authStore), writePaymentStore(paymentStore)]);
 
@@ -383,10 +401,13 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
   if (String(order.paymentStatus || "").toLowerCase() !== "paid") {
     consumeStockForOrder(order, catalogStore);
     order.paymentStatus = "paid";
-    order.orderStatus = "placed";
+    order.orderStatus = order.isB2BOrderRequest
+      ? B2B_ORDER_STATUSES.PAYMENT_RECEIVED
+      : "placed";
     order.manualPaymentStatus = "verified";
     order.paymentVerifiedAt = nowIso();
     order.gatewayTxnId = payload.gatewayTxnId || submission.utrNumber;
+    order.updatedAt = nowIso();
 
     authStore.paymentAttempts.push({
       id: generateId("pay_attempt"),
@@ -401,6 +422,11 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
       gatewayTxnId: order.gatewayTxnId,
       failureReason: ""
     });
+  }
+
+  if (checkoutSession) {
+    checkoutSession.status = CHECKOUT_STATUSES.PAID;
+    checkoutSession.updatedAt = nowIso();
   }
 
   await Promise.all([

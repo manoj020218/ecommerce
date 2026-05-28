@@ -44,6 +44,8 @@ const EMPTY_FORM = {
   moq: 1,
   bulkPricingEnabled: false,
   bulkPriceSlabsText: "",
+  priceGroupPricesText: "",
+  customerSpecificPricesText: "",
   quoteRequiredAboveQty: "",
   deadWeightKg: 0,
   lengthCm: "",
@@ -100,6 +102,38 @@ function bulkPriceSlabsToText(slabs) {
   return slabs.map((slab) => `${slab.minQty}:${slab.unitPrice}`).join(", ");
 }
 
+function parseStructuredPrices(text, keyName) {
+  if (!text || !text.trim()) {
+    return [];
+  }
+
+  return text
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const [keyRaw, unitPriceRaw] = part.split(":").map((value) => value.trim());
+      const unitPrice = Number(unitPriceRaw);
+      if (!keyRaw || Number.isNaN(unitPrice) || unitPrice < 0) {
+        throw new Error(
+          `Invalid ${keyName} format. Use ${keyName}:price, e.g. dealer:4100`
+        );
+      }
+      return {
+        [keyName]: keyRaw,
+        unitPrice
+      };
+    });
+}
+
+function structuredPricesToText(rows, keyName) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "";
+  }
+
+  return rows.map((row) => `${row[keyName]}:${row.unitPrice}`).join(", ");
+}
+
 function formFromProduct(product) {
   return {
     title: product.title || "",
@@ -124,6 +158,11 @@ function formFromProduct(product) {
     moq: Number(product.moq || 1),
     bulkPricingEnabled: Boolean(product.bulkPricingEnabled),
     bulkPriceSlabsText: bulkPriceSlabsToText(product.bulkPriceSlabs),
+    priceGroupPricesText: structuredPricesToText(product.priceGroupPrices, "priceGroup"),
+    customerSpecificPricesText: structuredPricesToText(
+      product.customerSpecificPrices,
+      "customerId"
+    ),
     quoteRequiredAboveQty:
       product.quoteRequiredAboveQty === null || product.quoteRequiredAboveQty === undefined
         ? ""
@@ -176,6 +215,11 @@ function buildPayload(form) {
     moq: Number(form.moq || 1),
     bulkPricingEnabled: Boolean(form.bulkPricingEnabled),
     bulkPriceSlabs: parseBulkPriceSlabs(form.bulkPriceSlabsText),
+    priceGroupPrices: parseStructuredPrices(form.priceGroupPricesText, "priceGroup"),
+    customerSpecificPrices: parseStructuredPrices(
+      form.customerSpecificPricesText,
+      "customerId"
+    ),
     quoteRequiredAboveQty:
       form.quoteRequiredAboveQty === "" || form.quoteRequiredAboveQty === null
         ? null
@@ -779,6 +823,24 @@ export function ProductsPage() {
               value={form.bulkPriceSlabsText}
               onChange={onFormChange}
               placeholder="Format: 10:2450, 25:2300"
+            />
+          </label>
+          <label className="field field-full">
+            <span>Price Group Prices</span>
+            <input
+              name="priceGroupPricesText"
+              value={form.priceGroupPricesText}
+              onChange={onFormChange}
+              placeholder="Format: dealer:4100, stockist:3950"
+            />
+          </label>
+          <label className="field field-full">
+            <span>Customer Specific Prices</span>
+            <input
+              name="customerSpecificPricesText"
+              value={form.customerSpecificPricesText}
+              onChange={onFormChange}
+              placeholder="Format: user_abc123:3890, user_xyz789:3750"
             />
           </label>
 

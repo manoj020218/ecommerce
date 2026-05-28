@@ -1,5 +1,6 @@
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
+const { readAuthStore } = require("../../database/auth-store");
 const {
   readSearchStore,
   writeSearchStore
@@ -7,6 +8,12 @@ const {
 const { readCatalogStore } = require("../../database/catalog-store");
 const { readContentStore } = require("../../database/content-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const {
+  ensureCustomerAccountShape
+} = require("../customer-account/customer-account.model");
+const {
+  buildCustomerPricingContext
+} = require("../customers/customers.model");
 const { toPublicProduct } = require("../products/products.model");
 const { isBlogPublished, toPublicBlogCard } = require("../blogs/blogs.model");
 const {
@@ -264,7 +271,7 @@ function computeProductScore({
   return { score, reasons };
 }
 
-function createSearchResultEntry(product, scoreEntry) {
+function createSearchResultEntry(product, scoreEntry, customerPricingContext = null) {
   return {
     id: product.id,
     entityType: "product",
@@ -273,7 +280,9 @@ function createSearchResultEntry(product, scoreEntry) {
     publicPath: `/products/${product.slug}`,
     score: Number(scoreEntry.score.toFixed(3)),
     reasons: scoreEntry.reasons,
-    product: toPublicProduct(product)
+    product: toPublicProduct(product, {
+      customerPricingContext
+    })
   };
 }
 
@@ -350,14 +359,33 @@ function ensureProductIdsExist(productIds, catalogStore) {
   }
 }
 
+async function resolveCustomerPricingContext(customerId) {
+  if (!customerId) {
+    return null;
+  }
+
+  const authStore = await readAuthStore();
+  const customer = Array.isArray(authStore.users)
+    ? authStore.users.find((row) => row.id === customerId)
+    : null;
+
+  if (!customer) {
+    return null;
+  }
+
+  ensureCustomerAccountShape(customer);
+  return buildCustomerPricingContext(customer);
+}
+
 async function performSearch(input) {
   const normalizedQuery = normalizeSearchText(input.q);
   const queryTokens = tokenizeSearchText(normalizedQuery);
 
-  const [catalogStore, contentStore, searchStore] = await Promise.all([
+  const [catalogStore, contentStore, searchStore, customerPricingContext] = await Promise.all([
     readCatalogStore(),
     readContentStore(),
-    readSearchStore()
+    readSearchStore(),
+    resolveCustomerPricingContext(input.customerId)
   ]);
   ensureSearchStoreShape(searchStore);
 
@@ -440,7 +468,11 @@ async function performSearch(input) {
           return null;
         }
 
-        return createSearchResultEntry(product, scoreEntry);
+        return createSearchResultEntry(
+          product,
+          scoreEntry,
+          customerPricingContext
+        );
       })
       .filter(Boolean);
 

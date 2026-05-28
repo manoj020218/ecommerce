@@ -82,12 +82,16 @@ const adminUploadProductImage = asyncHandler(async (req, res) => {
 
 const publicListProducts = asyncHandler(async (req, res) => {
   const filters = parseListPublicProductsQuery(req.query || {});
-  const data = await service.listPublicProducts(filters);
+  const data = await service.listPublicProducts(filters, {
+    customerId: req.customer?.id || null
+  });
   return ok(res, data, "Public products fetched.");
 });
 
 const publicGetProductBySlug = asyncHandler(async (req, res) => {
-  const data = await service.getPublicProductBySlug(req.params.slug);
+  const data = await service.getPublicProductBySlug(req.params.slug, {
+    customerId: req.customer?.id || null
+  });
   return ok(res, data, "Public product fetched.");
 });
 

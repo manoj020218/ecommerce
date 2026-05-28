@@ -1952,14 +1952,14 @@ Codex must update this section after each phase.
 [x] Phase 15 - Website Buyer Lead Form
 [x] Phase 16 - Reports
 [x] Phase 17 - Marketing, Offers, Templates, Notifications
-[ ] Phase 18 - B2B Dealer / Stockist Workflow
+[x] Phase 18 - B2B Dealer / Stockist Workflow
 [ ] Phase 19 - Walk-in Orders / Manual Orders
 [ ] Phase 20 - Installer, Setup Wizard, Productization
 ```
 
 ---
 
-### Backend-First Execution Log (VPS) - Updated May 27, 2026
+### Backend-First Execution Log (VPS) - Updated May 28, 2026
 
 Phase 0 (Backend scope) status: `[x]`
 
@@ -2749,6 +2749,60 @@ Validation completed after Phase 17:
 - `node backend/src/checks/run-regression-checks.js` passed
 - `pnpm --filter @jenix/admin-panel build` passed
 - `pnpm --filter @jenix/front build` passed
+
+Phase 18 (Backend + Admin + Storefront scope: B2B Dealer / Stockist Workflow) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/backend/src/modules/auth/auth.service.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.model.js`
+- `VPS/backend/src/modules/cart-checkout/cart-checkout.service.js`
+- `VPS/backend/src/modules/customer-account/customer-account.model.js`
+- `VPS/backend/src/modules/customer-account/customer-account.service.js`
+- `VPS/backend/src/modules/customers/customers.model.js`
+- `VPS/backend/src/modules/customers/customers.permissions.js`
+- `VPS/backend/src/modules/customers/customers.validator.js`
+- `VPS/backend/src/modules/customers/customers.service.js`
+- `VPS/backend/src/modules/customers/customers.controller.js`
+- `VPS/backend/src/modules/customers/customers.routes.js`
+- `VPS/backend/src/modules/manual-payments/manual-payments.service.js`
+- `VPS/backend/src/modules/products/products.model.js`
+- `VPS/backend/src/modules/products/products.validator.js`
+- `VPS/backend/src/modules/products/products.controller.js`
+- `VPS/backend/src/modules/products/products.service.js`
+- `VPS/backend/src/modules/search/search.service.js`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/modules/customers/customers.api.js`
+- `VPS/apps/admin-panel/src/modules/customers/customers-page.jsx`
+- `VPS/apps/admin-panel/src/modules/products/products-page.jsx`
+- `VPS/apps/front/src/modules/account/account.api.js`
+- `VPS/apps/front/src/modules/account/account-order-page.jsx`
+- `VPS/apps/front/src/modules/account/account-page.jsx`
+- `VPS/apps/front/src/modules/products/product-page.jsx`
+- `VPS/apps/front/src/modules/products/products.api.js`
+- `VPS/apps/front/src/modules/products/products-list-page.jsx`
+
+Delivered APIs (Phase 18):
+- `GET /api/admin/customers`
+- `PATCH /api/admin/customers/:customerId`
+- `GET /api/admin/customers/order-requests/list`
+- `POST /api/admin/customers/order-requests/:orderId/approve`
+- `PATCH /api/admin/customers/order-requests/:orderId/status`
+
+Phase 18 outcomes delivered:
+- Added B2B customer fields and pricing context support for `dealer`, `stockist`, and other approved customer types, including price-group and customer-specific pricing priority over bulk/sale/base pricing.
+- Extended public product and search responses so authenticated approved customers see dealer pricing while guest and retail users continue to see retail pricing.
+- Added admin customer management and dealer order-request handling, including B2B approval, price-group assignment, bank-transfer-only enforcement, and fulfilment status updates for pickup and dispatched flows.
+- Added offline B2B checkout behavior: approved dealer accounts create order requests instead of normal online orders, admin approval unlocks bank-transfer proof upload, and verified payment continues into invoice generation and fulfilment.
+- Updated the storefront product page for dealer order requests and updated the customer account/order pages to show B2B status, dealer pricing context, manual payment instructions, and proof upload.
+- Regression coverage now verifies dealer/customer-specific pricing, offline approval flow, blocked pre-approval proof upload, admin payment verification, and pickup/dispatched B2B fulfilment transitions.
+
+Validation completed after Phase 18:
+- `cmd /c pnpm run check:backend` passed
+- `cmd /c pnpm run build:front` passed
+- `cmd /c pnpm run build:admin` passed
 
 ---
 ## 13. First Codex Execution Prompt

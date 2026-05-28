@@ -172,3 +172,10 @@ export function removeSavedProduct(productId) {
   });
 }
 
+export function submitManualPaymentProof(formData) {
+  return apiFetch("/payments/manual/submit", {
+    method: "POST",
+    auth: true,
+    body: formData
+  });
+}

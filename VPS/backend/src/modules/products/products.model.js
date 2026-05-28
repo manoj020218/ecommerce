@@ -4,6 +4,17 @@ function calculateAvailableQty(product) {
   return Math.max(0, stockQty - reservedQty);
 }
 
+function roundMoney(value) {
+  return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function normalizePriceKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
 const PRODUCT_RELATION_TYPES = Object.freeze([
   "related",
   "accessory",
@@ -66,14 +77,227 @@ function sanitizeDownloads(downloads) {
     .filter((row) => row.title && row.url);
 }
 
+function sanitizePriceGroupPrices(rows) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  const deduped = new Map();
+
+  for (const row of rows) {
+    const priceGroup = normalizePriceKey(row?.priceGroup);
+    const unitPrice = Number(row?.unitPrice);
+    if (!priceGroup || Number.isNaN(unitPrice) || unitPrice < 0) {
+      continue;
+    }
+    deduped.set(priceGroup, {
+      priceGroup,
+      unitPrice: roundMoney(unitPrice)
+    });
+  }
+
+  return [...deduped.values()].sort((a, b) => a.priceGroup.localeCompare(b.priceGroup));
+}
+
+function sanitizeCustomerSpecificPrices(rows) {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  const deduped = new Map();
+
+  for (const row of rows) {
+    const customerId = String(row?.customerId || "").trim();
+    const unitPrice = Number(row?.unitPrice);
+    if (!customerId || Number.isNaN(unitPrice) || unitPrice < 0) {
+      continue;
+    }
+    deduped.set(customerId, {
+      customerId,
+      unitPrice: roundMoney(unitPrice)
+    });
+  }
+
+  return [...deduped.values()].sort((a, b) => a.customerId.localeCompare(b.customerId));
+}
+
+function getRetailDisplayPrice(product) {
+  const basePrice = Number(product.basePrice || 0);
+  const salePrice = Number(product.salePrice || 0);
+
+  if (salePrice > 0) {
+    return salePrice;
+  }
+
+  return basePrice;
+}
+
+function buildBulkPriceRule(product, qty) {
+  const baseUnitPrice = getRetailDisplayPrice(product);
+  const slabs = Array.isArray(product.bulkPriceSlabs)
+    ? [...product.bulkPriceSlabs]
+        .map((slab) => ({
+          minQty: Number(slab.minQty),
+          unitPrice: roundMoney(slab.unitPrice)
+        }))
+        .filter((slab) => slab.minQty > 0 && !Number.isNaN(slab.unitPrice))
+        .sort((a, b) => a.minQty - b.minQty)
+    : [];
+
+  if (!product.bulkPricingEnabled || slabs.length === 0) {
+    return {
+      unitPrice: baseUnitPrice,
+      bulkApplied: false,
+      bulkRule: null
+    };
+  }
+
+  let selected = null;
+  for (const slab of slabs) {
+    if (qty >= slab.minQty) {
+      selected = slab;
+    }
+  }
+
+  if (!selected) {
+    return {
+      unitPrice: baseUnitPrice,
+      bulkApplied: false,
+      bulkRule: null
+    };
+  }
+
+  return {
+    unitPrice: roundMoney(selected.unitPrice),
+    bulkApplied: true,
+    bulkRule: {
+      minQty: Number(selected.minQty),
+      unitPrice: roundMoney(selected.unitPrice)
+    }
+  };
+}
+
+function resolveRetailPriceSource(product) {
+  const basePrice = Number(product.basePrice || 0);
+  const salePrice = Number(product.salePrice || 0);
+  if (salePrice > 0 && salePrice < basePrice) {
+    return "sale";
+  }
+  return "base";
+}
+
+function resolveProductUnitPrice(product, options = {}) {
+  const qty = Math.max(1, Number(options.qty || 1));
+  const customerPricingContext = options.customerPricingContext || null;
+  const customerSpecificPrices = sanitizeCustomerSpecificPrices(
+    product.customerSpecificPrices
+  );
+  const priceGroupPrices = sanitizePriceGroupPrices(product.priceGroupPrices);
+  const retailDisplayPrice = getRetailDisplayPrice(product);
+
+  if (
+    customerPricingContext?.isB2BApproved &&
+    customerPricingContext.customerId
+  ) {
+    const customerSpecificPrice = customerSpecificPrices.find(
+      (row) => row.customerId === customerPricingContext.customerId
+    );
+
+    if (customerSpecificPrice) {
+      return {
+        unitPrice: roundMoney(customerSpecificPrice.unitPrice),
+        priceSource: "customer_specific",
+        bulkApplied: false,
+        bulkRule: null,
+        retailDisplayPrice
+      };
+    }
+
+    const nextPriceGroup = normalizePriceKey(
+      customerPricingContext.priceGroup || customerPricingContext.customerType || ""
+    );
+    const priceGroupPrice = priceGroupPrices.find(
+      (row) => row.priceGroup === nextPriceGroup
+    );
+
+    if (priceGroupPrice) {
+      return {
+        unitPrice: roundMoney(priceGroupPrice.unitPrice),
+        priceSource: "price_group",
+        bulkApplied: false,
+        bulkRule: null,
+        retailDisplayPrice
+      };
+    }
+  }
+
+  const bulkPrice = buildBulkPriceRule(product, qty);
+  if (bulkPrice.bulkApplied) {
+    return {
+      unitPrice: roundMoney(bulkPrice.unitPrice),
+      priceSource: "bulk",
+      bulkApplied: true,
+      bulkRule: bulkPrice.bulkRule,
+      retailDisplayPrice
+    };
+  }
+
+  return {
+    unitPrice: roundMoney(retailDisplayPrice),
+    priceSource: resolveRetailPriceSource(product),
+    bulkApplied: false,
+    bulkRule: null,
+    retailDisplayPrice
+  };
+}
+
+function buildPublicPricing(product, customerPricingContext, qty = 1) {
+  const resolved = resolveProductUnitPrice(product, {
+    qty,
+    customerPricingContext
+  });
+  const retailDisplayPrice = roundMoney(resolved.retailDisplayPrice);
+  const basePrice = roundMoney(product.basePrice);
+
+  let compareAtPrice = null;
+  if (retailDisplayPrice > resolved.unitPrice) {
+    compareAtPrice = retailDisplayPrice;
+  } else if (basePrice > resolved.unitPrice) {
+    compareAtPrice = basePrice;
+  }
+
+  return {
+    visiblePrice: roundMoney(resolved.unitPrice),
+    compareAtPrice: compareAtPrice === null ? null : roundMoney(compareAtPrice),
+    priceSource: resolved.priceSource,
+    isB2BPrice: ["customer_specific", "price_group"].includes(resolved.priceSource),
+    bulkApplied: Boolean(resolved.bulkApplied),
+    bulkRule: resolved.bulkRule || null,
+    customerType: customerPricingContext?.customerType || "retail",
+    priceGroup: customerPricingContext?.priceGroup || "",
+    isB2BApproved: Boolean(customerPricingContext?.isB2BApproved),
+    usesOrderRequestFlow: Boolean(customerPricingContext?.usesOfflineOrderRequest)
+  };
+}
+
 function sanitizeAdminProduct(product) {
   return {
     ...product,
+    priceGroupPrices: sanitizePriceGroupPrices(product.priceGroupPrices),
+    customerSpecificPrices: sanitizeCustomerSpecificPrices(
+      product.customerSpecificPrices
+    ),
     availableQty: calculateAvailableQty(product)
   };
 }
 
-function toPublicProduct(product) {
+function toPublicProduct(product, options = {}) {
+  const pricing = buildPublicPricing(
+    product,
+    options.customerPricingContext || null,
+    options.qty || 1
+  );
+
   return {
     id: product.id,
     title: product.title,
@@ -89,6 +313,7 @@ function toPublicProduct(product) {
     gstRate: Number(product.gstRate || 0),
     basePrice: Number(product.basePrice || 0),
     salePrice: Number(product.salePrice || 0),
+    pricing,
     images: Array.isArray(product.images) ? [...product.images] : [],
     shortDescription: product.shortDescription || "",
     fullDescription: product.fullDescription || "",
@@ -110,6 +335,8 @@ function toPublicProduct(product) {
     bulkPriceSlabs: Array.isArray(product.bulkPriceSlabs)
       ? [...product.bulkPriceSlabs]
       : [],
+    priceGroupPrices: sanitizePriceGroupPrices(product.priceGroupPrices),
+    customerSpecificPrices: [],
     quoteRequiredAboveQty:
       product.quoteRequiredAboveQty === null ||
       product.quoteRequiredAboveQty === undefined
@@ -144,8 +371,13 @@ function toPublicProduct(product) {
   };
 }
 
-function toPublicProductCard(product) {
+function toPublicProductCard(product, options = {}) {
   const images = Array.isArray(product.images) ? [...product.images] : [];
+  const pricing = buildPublicPricing(
+    product,
+    options.customerPricingContext || null,
+    options.qty || 1
+  );
   return {
     id: product.id,
     title: product.title,
@@ -154,6 +386,7 @@ function toPublicProductCard(product) {
     brand: product.brand || "",
     basePrice: Number(product.basePrice || 0),
     salePrice: Number(product.salePrice || 0),
+    pricing,
     images,
     stockStatus: product.stockStatus || "in_stock",
     isPurchasable:
@@ -164,6 +397,10 @@ function toPublicProductCard(product) {
 module.exports = {
   PRODUCT_RELATION_TYPES,
   calculateAvailableQty,
+  sanitizePriceGroupPrices,
+  sanitizeCustomerSpecificPrices,
+  resolveProductUnitPrice,
+  buildPublicPricing,
   createEmptyProductRelations,
   sanitizeProductRelations,
   sanitizeAdminProduct,

@@ -1938,7 +1938,7 @@ Codex must update this section after each phase.
 [x] Phase 1 - Core Settings, Branding, Store Profile
 [x] Phase 2 - Auth, Staff, Permission Groups
 [x] Phase 3 - Catalogue, Categories, Products, HSN, Inventory
-[~] Phase 4 - Product Migration from Existing Site (Deferred)
+[x] Phase 4 - Product Migration from Existing Site (Complete — Jun 4, 2026)
 [x] Phase 5 - Buyer-Intent Search
 [x] Phase 6 - Product Page UX and Recommendations
 [x] Phase 7 - Cart, Checkout, MOQ, Bulk Pricing, Stock Reservation
@@ -1953,8 +1953,8 @@ Codex must update this section after each phase.
 [x] Phase 16 - Reports
 [x] Phase 17 - Marketing, Offers, Templates, Notifications
 [x] Phase 18 - B2B Dealer / Stockist Workflow
-[ ] Phase 19 - Walk-in Orders / Manual Orders
-[ ] Phase 20 - Installer, Setup Wizard, Productization
+[x] Phase 19 - Walk-in Orders / Manual Orders
+[x] Phase 20 - Installer, Setup Wizard, Productization
 ```
 
 ---
@@ -2156,12 +2156,25 @@ Pending files/tasks after Phase 3 admin UI scope:
 - Add import/export workflow UI for CSV validation and upload in Phase 4
 - Replace placeholder import API in backend once Phase 4 migration tooling is implemented
 
-Phase 4 status update: `[~] Deferred` (by user decision on May 23, 2026)
+Phase 4 status update: `[x] Complete` (Jun 4, 2026)
 
-Deferred notes:
-- Full-site product migration crawler for `jenixindia.com` is deferred to final migration window.
-- Phase 5+ backend development continues first to avoid blocking execution velocity.
-- Phase 4 remains mandatory before go-live cutover and SEO redirect validation.
+Completed:
+- Built Node.js + Playwright + Cheerio + Sharp crawler in `VPS/scripts/migration/`
+- Crawled all 384 products from `jenixindia.com` — 0 failures
+- Handled commmerce.com builder specifics: dual-price container, React SSR, CDN SSL, side-img gallery selectors
+- All images converted to WebP at 3 sizes (thumbnail 300px / medium 800px / large 1200px)
+- Output files: `products_raw.json`, `products_clean.csv`, `products_import.json`, `migration_report.json`
+- Reusable generic crawler saved to `VPS/scripts/commmerce-crawler/` (ready to sell as product)
+
+**Next steps before go-live:**
+1. Open `VPS/scripts/migration/output/products_clean.csv` in Excel
+2. Fill `hsnCode` column for each product (required for GST invoices)
+3. Fill `gstRate` column (typically 18 for electronics/security equipment)
+4. Verify / correct `category` column where breadcrumb was missing
+5. Run MongoDB import: `db.collection("products").insertMany(require("./products_import.json"))`
+6. Configure 301 redirects: map each product's `oldUrl` → new site slug URL (critical for SEO)
+7. Validate redirects with `curl -I https://jenixindia.com/products/<old-slug>` after DNS cutover
+8. Remove `_migrated: true` flag from products after validating live data is correct
 
 Phase 5 (Backend scope: Buyer-Intent Search) status: `[x]`
 
@@ -2803,6 +2816,94 @@ Validation completed after Phase 18:
 - `cmd /c pnpm run check:backend` passed
 - `cmd /c pnpm run build:front` passed
 - `cmd /c pnpm run build:admin` passed
+
+Phase 19 (Backend + Admin scope: Walk-in Orders / Manual Orders) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/backend/src/modules/walkin-orders/walkin-orders.model.js`
+- `VPS/backend/src/modules/walkin-orders/walkin-orders.validator.js`
+- `VPS/backend/src/modules/walkin-orders/walkin-orders.permissions.js`
+- `VPS/backend/src/modules/walkin-orders/walkin-orders.service.js`
+- `VPS/backend/src/modules/walkin-orders/walkin-orders.controller.js`
+- `VPS/backend/src/modules/walkin-orders/walkin-orders.routes.js`
+- `VPS/backend/src/modules/walkin-orders/regression-checklist.md`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/modules/walkin-orders/walkin-orders.api.js`
+- `VPS/apps/admin-panel/src/modules/walkin-orders/walkin-orders-page.jsx`
+- `VPS/apps/admin-panel/src/shared/components/status-badge.jsx`
+- `VPS/apps/admin-panel/src/styles.css`
+
+Delivered APIs (Phase 19):
+- `GET /api/admin/walkin-orders`
+- `GET /api/admin/walkin-orders/customers`
+- `GET /api/admin/walkin-orders/products`
+- `GET /api/admin/walkin-orders/categories`
+- `POST /api/admin/walkin-orders`
+- `POST /api/admin/walkin-orders/:orderId/confirm-payment`
+- `POST /api/admin/walkin-orders/:orderId/generate-invoice`
+- `PATCH /api/admin/walkin-orders/:orderId/status`
+
+Phase 19 outcomes delivered:
+- Added a dedicated walk-in orders backend module for offline counter sales, including customer lookup/creation, product search by name/SKU/category, GST-aware pricing, payment-mode capture, invoice generation, and manual fulfilment status updates.
+- Added an admin Walk-in Orders workspace with customer search/selection, manual customer entry, product selection, retail/dealer/stockist/custom pricing controls, shipping/self-pickup controls, payment confirmation, invoice generation, and fulfilment actions.
+- Kept invoice generation locked behind confirmed payment and split cancellation from generic order editing so `orders.cancel` is enforced separately from `orders.edit`.
+- Regression coverage now verifies walk-in customer creation, existing-customer selection, product search, GST calculation, payment-mode persistence, invoice blocking before payment, invoice generation after payment confirmation, manual fulfilment update, and cancel-permission enforcement.
+
+Validation completed after Phase 19:
+- `cmd /c pnpm run check:backend` passed
+- `cmd /c pnpm run build:admin` passed
+
+Phase 20 (Backend + Admin + VPS scope: Installer / Setup Wizard / Productization) status: `[x]`
+
+Completed files:
+- `VPS/backend/src/routes/index.js`
+- `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/backend/src/modules/settings/settings.model.js`
+- `VPS/backend/src/modules/setup-wizard/setup-wizard.model.js`
+- `VPS/backend/src/modules/setup-wizard/setup-wizard.validator.js`
+- `VPS/backend/src/modules/setup-wizard/setup-wizard.service.js`
+- `VPS/backend/src/modules/setup-wizard/setup-wizard.controller.js`
+- `VPS/backend/src/modules/setup-wizard/setup-wizard.routes.js`
+- `VPS/backend/src/modules/setup-wizard/regression-checklist.md`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/modules/setup-wizard/setup-wizard.api.js`
+- `VPS/apps/admin-panel/src/modules/setup-wizard/setup-wizard-page.jsx`
+- `VPS/apps/admin-panel/src/styles.css`
+- `VPS/scripts/install.sh`
+- `VPS/scripts/setup-vps.sh`
+- `VPS/scripts/setup-nginx.sh`
+- `VPS/scripts/setup-ssl.sh`
+- `VPS/scripts/backup.sh`
+- `VPS/scripts/restore.sh`
+- `VPS/scripts/health-check.sh`
+- `VPS/scripts/seed-admin.js`
+- `VPS/scripts/generate-env.js`
+- `VPS/scripts/backup-runner.js`
+- `VPS/scripts/restore-runner.js`
+- `VPS/scripts/health-check.js`
+- `VPS/scripts/render-nginx-config.js`
+
+Delivered APIs (Phase 20):
+- `GET /api/setup-wizard/bootstrap`
+- `GET /api/admin/setup-wizard`
+- `PUT /api/admin/setup-wizard/steps/:stepKey`
+- `POST /api/admin/setup-wizard/complete`
+
+Phase 20 outcomes delivered:
+- Added a production setup wizard backend that persists deployment domains, invoice settings, super-admin handoff, SMTP readiness, Google login/OTP launch decisions, payment/manual bank setup, courier defaults, Merchant Center metadata, SEO tags, backup policy, and launch checklist progress.
+- Added an admin Setup Wizard workspace with per-step save actions, progress tracking, completion gating, recommended domains, and direct handoff to the existing settings workspace for asset uploads.
+- Replaced placeholder VPS productization scripts with usable installers and helpers for environment generation, super-admin seeding, backup creation, restore, health checks, SSL/Nginx config rendering, and VPS bootstrap flow.
+- Extended regression coverage so Phase 20 now verifies public/admin setup-wizard routes, completion blocking and completion success, environment generation, backup/restore execution, seeded admin creation, health-check success, and SSL-enabled Nginx config rendering.
+
+Validation completed after Phase 20:
+- `cmd /c pnpm run build:admin` passed
+- `cmd /c pnpm run check:backend` passed
 
 ---
 ## 13. First Codex Execution Prompt

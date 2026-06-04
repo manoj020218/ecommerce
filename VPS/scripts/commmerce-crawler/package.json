@@ -1,0 +1,21 @@
+{
+  "name": "commmerce-site-crawler",
+  "version": "1.0.0",
+  "description": "Plug-and-play product crawler for any store built on the commmerce.com website builder. Discovers all product URLs via sitemap + category crawl, scrapes title/price/images/description, converts images to WebP at 3 sizes, and exports CSV + MongoDB-ready JSON.",
+  "type": "module",
+  "scripts": {
+    "discover": "node run.js --mode discover",
+    "test:crawl": "node run.js --mode crawl --limit 10",
+    "crawl": "node run.js --mode crawl",
+    "export": "node run.js --mode export",
+    "full": "node run.js --mode discover && node run.js --mode crawl && node run.js --mode export"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "csv-stringify": "^6.5.1",
+    "dotenv": "^17.0.0",
+    "playwright": "^1.44.0",
+    "sharp": "^0.33.4",
+    "slugify": "^1.6.6"
+  }
+}

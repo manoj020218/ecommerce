@@ -246,37 +246,32 @@ function IntegrationCard({ meta, config, onToggle, onConfigure, saving }) {
     <div style={{
       background: "var(--surface)",
       border: `1.5px solid ${isEnabled ? "var(--success)" : "var(--border)"}`,
-      borderRadius: 12, padding: "16px 16px 14px",
-      display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
+      borderRadius: 12, padding: "12px 12px 14px",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      position: "relative", minWidth: 0, minHeight: 140,
       transition: "border-color 0.2s, box-shadow 0.2s",
       boxShadow: isEnabled ? "0 0 0 3px rgba(22,163,74,0.08)" : "none"
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10, background: "var(--bg)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, flexShrink: 0, border: "1px solid var(--border)"
-          }}>{meta.logo}</div>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{meta.label}</div>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{meta.description}</div>
-          </div>
-        </div>
+      <div style={{ position: "absolute", top: 10, right: 10 }}>
         <Toggle checked={isEnabled} onChange={onToggle} disabled={saving} />
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{
+        width: 52, height: 52, borderRadius: 12, background: "var(--bg)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 26, border: "1px solid var(--border)", marginTop: 8, marginBottom: 8, flexShrink: 0
+      }}>{meta.logo}</div>
+      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", textAlign: "center", marginBottom: 2 }}>{meta.label}</div>
+      <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "center", marginBottom: 8, lineHeight: 1.3 }}>{meta.description}</div>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
         <span style={{
-          fontSize: 11, padding: "2px 8px", borderRadius: 20, fontWeight: 500,
-          background: isEnabled ? "rgba(22,163,74,0.1)" : isConfigured ? "rgba(37,99,235,0.08)" : "var(--bg)",
-          color: isEnabled ? "var(--success)" : isConfigured ? "var(--info)" : "var(--muted)"
+          fontSize: 10, color: isEnabled ? "var(--success)" : isConfigured ? "var(--info)" : "var(--muted)", fontWeight: 500
         }}>
           {isEnabled ? "Active" : isConfigured ? "Configured" : hasConfig ? "Not configured" : "Ready"}
         </span>
         {hasConfig && (
           <button type="button" onClick={onConfigure} style={{
             fontSize: 11, fontWeight: 600, color: "var(--brand)",
-            background: "none", border: "none", cursor: "pointer", padding: "3px 0", textDecoration: "underline"
+            background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
           }}>Configure</button>
         )}
       </div>
@@ -290,47 +285,46 @@ function PaymentGatewayCard({ gateway, onToggle, onConfigure, saving }) {
   const ui = GATEWAY_UI[gateway.code] || { logo: "💳", label: gateway.label, description: "" };
   const isEnabled = gateway.isEnabled;
   const hasFields = (ui.credentialFields || ui.instructionFields || []).length > 0;
-  const isConfigured = gateway.credentialsConfigured || Object.keys(gateway.instructions || {}).some(k => gateway.instructions[k]);
+  const isConfigured = gateway.credentialsConfigured || Object.keys(gateway.instructions || {}).some((k) => gateway.instructions[k]);
   const isManual = gateway.gatewayType === "manual";
+  const isStatic = gateway._static;
 
   return (
     <div style={{
       background: "var(--surface)",
       border: `1.5px solid ${isEnabled ? (isManual ? "var(--info)" : "var(--success)") : "var(--border)"}`,
-      borderRadius: 12, padding: "16px 16px 14px",
-      display: "flex", flexDirection: "column", gap: 10, minWidth: 0,
+      borderRadius: 12, padding: "12px 12px 14px",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      position: "relative", minWidth: 0, minHeight: 140,
       transition: "border-color 0.2s, box-shadow 0.2s",
-      boxShadow: isEnabled ? `0 0 0 3px ${isManual ? "rgba(37,99,235,0.08)" : "rgba(22,163,74,0.08)"}` : "none"
+      boxShadow: isEnabled ? `0 0 0 3px ${isManual ? "rgba(37,99,235,0.08)" : "rgba(22,163,74,0.08)"}` : "none",
+      opacity: isStatic ? 0.65 : 1
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10, background: "var(--bg)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, flexShrink: 0, border: "1px solid var(--border)"
-          }}>{ui.logo}</div>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{ui.label || gateway.label}</div>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{ui.description}</div>
-          </div>
-        </div>
-        <Toggle checked={isEnabled} onChange={onToggle} disabled={saving} />
+      <div style={{ position: "absolute", top: 10, right: 10 }}>
+        <Toggle checked={isEnabled} onChange={isStatic ? undefined : onToggle} disabled={saving || isStatic} />
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{
-          fontSize: 11, padding: "2px 8px", borderRadius: 20, fontWeight: 500,
-          background: isEnabled
-            ? (isManual ? "rgba(37,99,235,0.1)" : "rgba(22,163,74,0.1)")
-            : isConfigured ? "rgba(37,99,235,0.08)" : "var(--bg)",
-          color: isEnabled ? (isManual ? "var(--info)" : "var(--success)") : isConfigured ? "var(--info)" : "var(--muted)"
-        }}>
-          {isEnabled ? "Active" : isConfigured ? "Configured" : "Not configured"}
-          {isManual && isEnabled ? " · Manual" : ""}
-        </span>
-        {hasFields && (
+      <div style={{
+        width: 52, height: 52, borderRadius: 12, background: "var(--bg)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 26, border: "1px solid var(--border)", marginTop: 8, marginBottom: 8, flexShrink: 0
+      }}>{ui.logo}</div>
+      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", textAlign: "center", marginBottom: 2 }}>{ui.label || gateway.label}</div>
+      <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "center", marginBottom: 8, lineHeight: 1.3 }}>{ui.description}</div>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+        {isStatic ? (
+          <span style={{ fontSize: 10, color: "var(--muted)" }}>Restart backend to load</span>
+        ) : (
+          <span style={{
+            fontSize: 10, fontWeight: 500,
+            color: isEnabled ? (isManual ? "var(--info)" : "var(--success)") : isConfigured ? "var(--info)" : "var(--muted)"
+          }}>
+            {isEnabled ? "Active" : isConfigured ? "Configured" : "Not configured"}
+          </span>
+        )}
+        {hasFields && !isStatic && (
           <button type="button" onClick={onConfigure} style={{
             fontSize: 11, fontWeight: 600, color: "var(--brand)",
-            background: "none", border: "none", cursor: "pointer", padding: "3px 0", textDecoration: "underline"
+            background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
           }}>Configure</button>
         )}
       </div>
@@ -427,7 +421,7 @@ function IntegrationSection({ title, subtitle, children }) {
         <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>{title}</h3>
         {subtitle && <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--muted)" }}>{subtitle}</p>}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(175px, 1fr))", gap: 14 }}>
         {children}
       </div>
     </div>
@@ -500,14 +494,20 @@ export function IntegrationsPage() {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      try {
-        const [intData, pgData] = await Promise.all([
-          fetchIntegrations(),
-          fetchPaymentGateways()
-        ]);
-        setConfigs(intData.integrations || {});
-        // sort by display order, filter out mock_online
-        const gws = (Array.isArray(pgData?.gateways) ? pgData.gateways : [])
+      // Use allSettled so one API failure doesn't blank the other section
+      const [intResult, pgResult] = await Promise.allSettled([
+        fetchIntegrations(),
+        fetchPaymentGateways()
+      ]);
+
+      if (intResult.status === "fulfilled") {
+        setConfigs(intResult.value?.integrations || {});
+      } else {
+        setError("Integration settings unavailable: " + (intResult.reason?.message || "Network error"));
+      }
+
+      if (pgResult.status === "fulfilled") {
+        const gws = (Array.isArray(pgResult.value?.gateways) ? pgResult.value.gateways : [])
           .filter((g) => g.code !== "mock_online");
         gws.sort((a, b) => {
           const ai = GATEWAY_DISPLAY_ORDER.indexOf(a.code);
@@ -515,11 +515,25 @@ export function IntegrationsPage() {
           return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
         });
         setPaymentGateways(gws);
-      } catch (err) {
-        setError(err.message || "Failed to load integrations.");
-      } finally {
-        setLoading(false);
+      } else {
+        // Fallback: show static catalog cards so the section is never blank
+        const MANUAL_CODES = ["cod", "direct_bank_transfer", "manual_upi"];
+        setPaymentGateways(
+          GATEWAY_DISPLAY_ORDER
+            .filter((code) => GATEWAY_UI[code])
+            .map((code) => ({
+              code,
+              label: GATEWAY_UI[code].label,
+              gatewayType: MANUAL_CODES.includes(code) ? "manual" : "online",
+              isEnabled: false,
+              credentialsConfigured: false,
+              instructions: {},
+              _static: true
+            }))
+        );
       }
+
+      setLoading(false);
     })();
   }, []);
 

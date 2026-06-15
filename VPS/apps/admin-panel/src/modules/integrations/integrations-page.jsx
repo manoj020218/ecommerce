@@ -8,7 +8,7 @@ import {
   fetchPaymentGateways,
   updatePaymentGatewayConfig
 } from "../payment-gateways/payment-gateways.api";
-import { fetchIntegrations, updateIntegration } from "./integrations.api";
+import { addCourier, deleteCourier, fetchCouriers, fetchIntegrations, updateCourier, updateIntegration } from "./integrations.api";
 
 // ── Shipping / Others integration catalogue ───────────────────────────────────
 
@@ -528,6 +528,147 @@ function ConfigureModal({ meta, config, onSave, onClose, saving, error }) {
   );
 }
 
+// ── Custom courier card ───────────────────────────────────────────────────────
+
+function CustomCourierCard({ courier, onToggle, onEdit, onDelete, saving }) {
+  const initials = courier.name.slice(0, 2).toUpperCase();
+  return (
+    <div style={{
+      background: "var(--surface)",
+      border: `1.5px solid ${courier.isActive ? "var(--success)" : "var(--border)"}`,
+      borderRadius: 12, padding: "12px 12px 14px",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      position: "relative", minWidth: 0, minHeight: 140,
+      transition: "border-color 0.2s, box-shadow 0.2s",
+      boxShadow: courier.isActive ? "0 0 0 3px rgba(22,163,74,0.08)" : "none"
+    }}>
+      <div style={{ position: "absolute", top: 10, right: 10 }}>
+        <Toggle checked={courier.isActive} onChange={onToggle} disabled={saving} />
+      </div>
+      <div style={{
+        width: 52, height: 52, borderRadius: 12,
+        background: courier.isActive ? "rgba(22,163,74,0.12)" : "var(--bg)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontWeight: 700, fontSize: 17, color: courier.isActive ? "var(--success)" : "var(--muted)",
+        border: "1px solid var(--border)", marginTop: 8, marginBottom: 8, flexShrink: 0
+      }}>{initials}</div>
+      <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", textAlign: "center", marginBottom: 2 }}>{courier.name}</div>
+      {courier.phone && (
+        <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "center", marginBottom: 4 }}>{courier.phone}</div>
+      )}
+      {courier.trackingUrl && (
+        <div style={{
+          fontSize: 9, color: "var(--muted)", textAlign: "center", marginBottom: 6,
+          maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+        }} title={courier.trackingUrl}>{courier.trackingUrl}</div>
+      )}
+      <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        <button type="button" onClick={onEdit} style={{
+          fontSize: 11, fontWeight: 600, color: "var(--brand)",
+          background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
+        }}>Edit</button>
+        <button type="button" onClick={onDelete} style={{
+          fontSize: 11, fontWeight: 600, color: "var(--danger)",
+          background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
+        }}>Delete</button>
+      </div>
+    </div>
+  );
+}
+
+// ── "+" Add courier card ──────────────────────────────────────────────────────
+
+function AddCourierCard({ onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      background: "var(--surface)", border: "2px dashed var(--border)", borderRadius: 12,
+      padding: "12px", display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", minHeight: 140, cursor: "pointer", width: "100%",
+      transition: "border-color 0.2s, background 0.2s", gap: 8
+    }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--brand)"; e.currentTarget.style.background = "rgba(232,35,26,0.04)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; }}
+    >
+      <div style={{
+        width: 36, height: 36, borderRadius: "50%", border: "2px dashed var(--brand)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 22, color: "var(--brand)", fontWeight: 300, lineHeight: 1
+      }}>+</div>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--brand)" }}>Add Courier</span>
+      <span style={{ fontSize: 10, color: "var(--muted)", textAlign: "center" }}>Custom courier partner</span>
+    </button>
+  );
+}
+
+// ── Add / Edit courier modal ──────────────────────────────────────────────────
+
+const EMPTY_COURIER_FORM = { name: "", trackingUrl: "", phone: "", isActive: true };
+
+function CourierModal({ initial, onSave, onClose, saving, error }) {
+  const [form, setForm] = useState(initial || EMPTY_COURIER_FORM);
+  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+  const isEdit = Boolean(initial?.id);
+
+  return (
+    <Modal title={isEdit ? "Edit Courier Partner" : "Add Courier Partner"} open onClose={onClose} width="480px">
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Courier Name <span style={{ color: "var(--danger)" }}>*</span></span>
+          <input
+            type="text" value={form.name} placeholder="e.g. Shree Maruti Courier"
+            onChange={(e) => set("name", e.target.value)}
+            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+          />
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Tracking URL Template</span>
+          <input
+            type="text" value={form.trackingUrl}
+            placeholder="https://courier.com/track?id={trackingId}"
+            onChange={(e) => set("trackingUrl", e.target.value)}
+            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+          />
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            Use <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4 }}>{"{trackingId}"}</code> as placeholder — it will be replaced with the actual tracking number when sending to customer.
+          </span>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Contact / Phone (optional)</span>
+          <input
+            type="text" value={form.phone} placeholder="e.g. 1800-123-4567"
+            onChange={(e) => set("phone", e.target.value)}
+            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+          />
+        </label>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={form.isActive}
+            onChange={(e) => set("isActive", e.target.checked)}
+            style={{ width: 15, height: 15 }}
+          />
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>Active — show in order processing dropdown</span>
+        </label>
+
+        {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button" className="btn btn-primary"
+            disabled={saving || !form.name.trim()}
+            onClick={() => onSave(form)}
+          >
+            {saving ? "Saving…" : isEdit ? "Save Changes" : "Add Courier"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function IntegrationsPage() {
@@ -547,21 +688,39 @@ export function IntegrationsPage() {
   const [pgConfiguring, setPgConfiguring] = useState(null);
   const [pgSaveError, setPgSaveError] = useState("");
 
+  // custom courier state
+  const [couriers, setCouriers] = useState([]);
+  const [courierModal, setCourierModal] = useState(null); // null | "add" | courier object
+  const [courierSaving, setCourierSaving] = useState(false);
+  const [courierError, setCourierError] = useState("");
+  const [courierDeleting, setCourierDeleting] = useState(null);
+
   const showNotice = (msg) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       // Use allSettled so one API failure doesn't blank the other section
-      const [intResult, pgResult] = await Promise.allSettled([
+      const [intResult, pgResult, courierResult] = await Promise.allSettled([
         fetchIntegrations(),
-        fetchPaymentGateways()
+        fetchPaymentGateways(),
+        fetchCouriers()
       ]);
 
       if (intResult.status === "fulfilled") {
         setConfigs(intResult.value?.integrations || {});
+        // customCouriers may be bundled in the integrations response
+        if (Array.isArray(intResult.value?.customCouriers)) {
+          setCouriers(intResult.value.customCouriers);
+        }
       } else {
         setError("Integration settings unavailable: " + (intResult.reason?.message || "Network error"));
+      }
+
+      // Dedicated couriers endpoint result takes precedence if successful
+      if (courierResult.status === "fulfilled") {
+        const rows = Array.isArray(courierResult.value?.couriers) ? courierResult.value.couriers : [];
+        if (rows.length > 0 || courierResult.value?.couriers) setCouriers(rows);
       }
 
       if (pgResult.status === "fulfilled") {
@@ -594,6 +753,56 @@ export function IntegrationsPage() {
       setLoading(false);
     })();
   }, []);
+
+  // ── handlers: custom couriers ──────────────────────────────────────────────
+
+  const handleCourierToggle = async (courier) => {
+    const next = !courier.isActive;
+    setCouriers((list) => list.map((c) => c.id === courier.id ? { ...c, isActive: next } : c));
+    try {
+      const updated = await updateCourier(courier.id, { isActive: next });
+      setCouriers((list) => list.map((c) => c.id === courier.id ? updated : c));
+      showNotice(`${courier.name} ${next ? "activated" : "deactivated"}.`);
+    } catch (err) {
+      setCouriers((list) => list.map((c) => c.id === courier.id ? { ...c, isActive: !next } : c));
+      setError(err.message || "Failed to update courier.");
+    }
+  };
+
+  const handleCourierSave = async (form) => {
+    setCourierSaving(true);
+    setCourierError("");
+    try {
+      if (courierModal?.id) {
+        const updated = await updateCourier(courierModal.id, form);
+        setCouriers((list) => list.map((c) => c.id === courierModal.id ? updated : c));
+        showNotice("Courier updated.");
+      } else {
+        const created = await addCourier(form);
+        setCouriers((list) => [...list, created]);
+        showNotice(`${form.name} added as courier partner.`);
+      }
+      setCourierModal(null);
+    } catch (err) {
+      setCourierError(err.message || "Failed to save courier.");
+    } finally {
+      setCourierSaving(false);
+    }
+  };
+
+  const handleCourierDelete = async (courier) => {
+    if (!window.confirm(`Delete "${courier.name}"? This cannot be undone.`)) return;
+    setCourierDeleting(courier.id);
+    try {
+      await deleteCourier(courier.id);
+      setCouriers((list) => list.filter((c) => c.id !== courier.id));
+      showNotice(`${courier.name} removed.`);
+    } catch (err) {
+      setError(err.message || "Failed to delete courier.");
+    } finally {
+      setCourierDeleting(null);
+    }
+  };
 
   // ── handlers: shipping/others integrations ──────────────────────────────────
 
@@ -739,6 +948,17 @@ export function IntegrationsPage() {
             saving={saving === meta.code}
           />
         ))}
+        {couriers.map((courier) => (
+          <CustomCourierCard
+            key={courier.id}
+            courier={courier}
+            onToggle={() => handleCourierToggle(courier)}
+            onEdit={() => { setCourierModal(courier); setCourierError(""); }}
+            onDelete={() => handleCourierDelete(courier)}
+            saving={courierDeleting === courier.id}
+          />
+        ))}
+        <AddCourierCard onClick={() => { setCourierModal("add"); setCourierError(""); }} />
       </IntegrationSection>
 
       {/* ── Payment Gateways (Online) ── */}
@@ -802,6 +1022,16 @@ export function IntegrationsPage() {
           saving={pgSaving === pgConfiguring.code}
           error={pgSaveError}
           isStatic={pgConfiguring._static}
+        />
+      )}
+
+      {courierModal && (
+        <CourierModal
+          initial={courierModal === "add" ? null : courierModal}
+          onSave={handleCourierSave}
+          onClose={() => { setCourierModal(null); setCourierError(""); }}
+          saving={courierSaving}
+          error={courierError}
         />
       )}
     </div>

@@ -5,6 +5,7 @@ const { env } = require("../config/env");
 const integrationsStorePath = path.resolve(process.cwd(), env.integrationsStorePath);
 
 const DEFAULT_INTEGRATIONS_STORE = Object.freeze({
+  customCouriers: [],
   integrations: {
     shiprocket: { enabled: false, email: "", password: "", defaultWarehouse: "" },
     delhivery: { enabled: false, apiKey: "", warehouseName: "", clientName: "" },
@@ -48,13 +49,19 @@ async function ensureIntegrationsStoreFile() {
 async function readIntegrationsStore() {
   await ensureIntegrationsStoreFile();
   const raw = await fs.readFile(integrationsStorePath, "utf-8");
+  let parsed;
   try {
-    return JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch {
-    const fallback = cloneDefaultIntegrationsStore();
-    await fs.writeFile(integrationsStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+    parsed = cloneDefaultIntegrationsStore();
+    await fs.writeFile(integrationsStorePath, JSON.stringify(parsed, null, 2), "utf-8");
+    return parsed;
   }
+  // Migrate existing stores that predate customCouriers
+  if (!Array.isArray(parsed.customCouriers)) {
+    parsed.customCouriers = [];
+  }
+  return parsed;
 }
 
 async function writeIntegrationsStore(store) {

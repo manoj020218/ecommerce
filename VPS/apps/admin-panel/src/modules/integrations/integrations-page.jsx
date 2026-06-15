@@ -100,11 +100,11 @@ const INTEGRATIONS = {
       code: "whatsapp",
       label: "WhatsApp Business",
       logo: "💬",
-      description: "Send order & shipping updates via WhatsApp",
+      description: "wa.me links for orders & live chat — no API purchase needed",
       fields: [
-        { key: "phoneNumberId", label: "Phone Number ID", type: "text" },
-        { key: "accessToken", label: "Access Token", type: "password" },
-        { key: "businessAccountId", label: "Business Account ID", type: "text" }
+        { key: "phoneNumber", label: "WhatsApp Number (with country code)", type: "tel", placeholder: "919876543210 (no + or spaces)" },
+        { key: "enableLiveChat", label: "Show live chat widget on storefront", type: "checkbox" },
+        { key: "liveChatMessage", label: "Pre-fill chat message (optional)", type: "text", placeholder: "Hi! I have a query about my order." }
       ]
     }
   ]
@@ -283,7 +283,7 @@ function IntegrationCard({ meta, config, onToggle, onConfigure, saving }) {
   const isEnabled = config?.enabled || false;
   const hasConfig = meta.fields.length > 0;
   const isConfigured = hasConfig && meta.fields.some(
-    (f) => f.type !== "select" && f.type !== "number" && (config?.[f.key] || "").trim()
+    (f) => f.type === "checkbox" ? Boolean(config?.[f.key]) : (f.type !== "select" && f.type !== "number" && (config?.[f.key] || "").trim())
   );
   return (
     <div style={{
@@ -491,30 +491,69 @@ function IntegrationSection({ title, subtitle, children }) {
 function ConfigureModal({ meta, config, onSave, onClose, saving, error }) {
   const [localForm, setLocalForm] = useState(() => {
     const init = {};
-    for (const f of meta.fields) init[f.key] = config?.[f.key] ?? (f.type === "number" ? 60 : "");
+    for (const f of meta.fields) {
+      if (f.type === "checkbox") init[f.key] = Boolean(config?.[f.key]);
+      else init[f.key] = config?.[f.key] ?? (f.type === "number" ? 60 : "");
+    }
     return init;
   });
   const onChange = (key, value) => setLocalForm((cur) => ({ ...cur, [key]: value }));
+
+  const isWhatsApp = meta.code === "whatsapp";
+
   return (
     <Modal title={`Configure — ${meta.label}`} open onClose={onClose} width="520px">
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {isWhatsApp && (
+          <div style={{
+            background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.3)",
+            borderRadius: 8, padding: "10px 14px"
+          }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#166534", fontWeight: 500 }}>
+              No API purchase needed — WhatsApp icons will use <strong>wa.me/</strong> links.
+              Clicking them opens WhatsApp with the customer's number and a pre-filled message.
+              Enable the toggle above to activate WhatsApp features throughout the admin panel.
+            </p>
+          </div>
+        )}
         {meta.fields.map((f) => (
-          <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{f.label}</span>
-            {f.type === "textarea" ? (
-              <textarea
-                value={localForm[f.key] || ""} onChange={(e) => onChange(f.key, e.target.value)}
-                rows={3} placeholder={f.label}
-                style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, resize: "vertical", fontFamily: "inherit" }}
-              />
-            ) : (
-              <input
-                type={f.type || "text"} value={localForm[f.key] ?? ""}
-                onChange={(e) => onChange(f.key, e.target.value)} placeholder={f.label}
-                style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
-              />
-            )}
-          </label>
+          f.type === "checkbox" ? (
+            <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "6px 0" }}>
+              <div
+                role="switch" aria-checked={Boolean(localForm[f.key])}
+                onClick={() => onChange(f.key, !localForm[f.key])}
+                style={{
+                  width: 40, height: 22, borderRadius: 11, border: "none", cursor: "pointer",
+                  background: localForm[f.key] ? "var(--success)" : "#d1d5db",
+                  position: "relative", transition: "background 0.2s", flexShrink: 0
+                }}
+              >
+                <span style={{
+                  position: "absolute", top: 3, left: localForm[f.key] ? 21 : 3,
+                  width: 16, height: 16, borderRadius: "50%",
+                  background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s"
+                }} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>{f.label}</span>
+            </label>
+          ) : (
+            <label key={f.key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{f.label}</span>
+              {f.type === "textarea" ? (
+                <textarea
+                  value={localForm[f.key] || ""} onChange={(e) => onChange(f.key, e.target.value)}
+                  rows={3} placeholder={f.placeholder || f.label}
+                  style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, resize: "vertical", fontFamily: "inherit" }}
+                />
+              ) : (
+                <input
+                  type={f.type || "text"} value={localForm[f.key] ?? ""}
+                  onChange={(e) => onChange(f.key, e.target.value)} placeholder={f.placeholder || f.label}
+                  style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+                />
+              )}
+            </label>
+          )
         ))}
         {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>

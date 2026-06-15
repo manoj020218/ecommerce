@@ -39,7 +39,7 @@ const DEFAULT_INTEGRATIONS_STORE = Object.freeze({
     facebookPixel: { enabled: false, pixelId: "" },
     googleAnalytics: { enabled: false, measurementId: "" },
     googleTagManager: { enabled: false, gtmId: "" },
-    whatsapp: { enabled: false, phoneNumberId: "", accessToken: "", businessAccountId: "" },
+    whatsapp: { enabled: false, phoneNumber: "", enableLiveChat: false, liveChatMessage: "" },
     abandonedCart: { enabled: false, delayMinutes: 60, templateMessage: "" }
   },
   meta: { updatedAt: null, updatedBy: null }

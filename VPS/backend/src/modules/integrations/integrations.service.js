@@ -4,6 +4,8 @@ const {
   readIntegrationsStore,
   writeIntegrationsStore
 } = require("../../database/integrations-store");
+const { jsonFileStore } = require("../../database/json-file-store");
+const { cloneDefaultSettingsDocument } = require("../settings/settings.model");
 
 const ALLOWED_CODES = new Set([
   "shiprocket", "delhivery", "shiprazor",
@@ -287,6 +289,22 @@ async function deleteCustomCourier(id, adminEmail) {
   await writeIntegrationsStore(store);
 }
 
+async function syncWhatsAppToPublicSettings(config) {
+  try {
+    const doc = await jsonFileStore.readSettingsDocument();
+    if (!doc.contactInformation) {
+      doc.contactInformation = cloneDefaultSettingsDocument().contactInformation;
+    }
+    const phoneNumber = config.enabled && config.enableLiveChat && config.phoneNumber
+      ? String(config.phoneNumber).replace(/[^\d+]/g, "")
+      : "";
+    doc.contactInformation.publicWhatsApp = phoneNumber;
+    await jsonFileStore.writeSettingsDocument(doc);
+  } catch {
+    // Non-critical sync — don't fail the main request
+  }
+}
+
 async function updateIntegration(code, patch, adminEmail) {
   if (!ALLOWED_CODES.has(code)) {
     throw new HttpError(404, `Integration "${code}" not found.`);
@@ -302,6 +320,9 @@ async function updateIntegration(code, patch, adminEmail) {
   store.integrations[code] = updated;
   store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
   await writeIntegrationsStore(store);
+  if (code === "whatsapp") {
+    await syncWhatsAppToPublicSettings(updated);
+  }
   return updated;
 }
 

@@ -32,6 +32,8 @@ function mergeIntegration(existing, patch) {
   return result;
 }
 
+// ── Courier helpers ────────────────────────────────────────────────────────────
+
 function makeCourierId() {
   return `courier_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -41,12 +43,176 @@ function sanitizeCourier(raw) {
     id: String(raw.id || ""),
     name: String(raw.name || "").trim(),
     trackingUrl: String(raw.trackingUrl || "").trim(),
+    trackingApiUrl: String(raw.trackingApiUrl || "").trim(),
+    apiHeaders: (raw.apiHeaders && typeof raw.apiHeaders === "object" && !Array.isArray(raw.apiHeaders))
+      ? raw.apiHeaders
+      : {},
     phone: String(raw.phone || "").trim(),
     isActive: Boolean(raw.isActive ?? true),
     createdAt: raw.createdAt || nowIso(),
     updatedAt: raw.updatedAt || null
   };
 }
+
+// ── Tracking response decoder ──────────────────────────────────────────────────
+
+const STATUS_LABELS = {
+  DELIVERED: "Delivered",
+  OUT_FOR_DELIVERY: "Out for Delivery",
+  IN_TRANSIT: "In Transit",
+  INSCANNED_AT_CP: "Arrived at Delivery Center",
+  INSCAN_AT_HUB: "Arrived at Hub",
+  OUTSCAN_AT_HUB: "Departed from Hub",
+  ORDER_CONFIRMED: "Order Confirmed",
+  READY_FOR_DISPATCH: "Ready for Dispatch",
+  PICKUP_DONE: "Pickup Done",
+  PENDING: "Pending",
+  CANCELLED: "Cancelled",
+  RTO_INITIATED: "Return Initiated",
+  RTO_DELIVERED: "Return Delivered",
+  FAILED_DELIVERY: "Delivery Failed",
+  UNDELIVERED: "Undelivered",
+  LOST: "Lost / Damaged"
+};
+
+function normalizeCategory(raw) {
+  return String(raw || "")
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+}
+
+function decodeInnofulfill(data) {
+  const info = data.orderInformation || {};
+  const statuses = Array.isArray(data.statuses) ? data.statuses : [];
+  const latest = statuses[0] || {};
+  const category = normalizeCategory(latest.category || latest.status || "UNKNOWN");
+
+  return {
+    format: "innofulfill",
+    trackingId: info.trackingId || "",
+    currentStatus: category,
+    currentStatusLabel: STATUS_LABELS[category] || latest.subcategory || latest.status || "Unknown",
+    currentLocation: latest.location || "",
+    isDelivered: category === "DELIVERED",
+    origin: {
+      city: info.sourceLocation?.city || "",
+      state: info.sourceLocation?.state || "",
+      pincode: info.sourceLocation?.pincode || ""
+    },
+    destination: {
+      city: info.destinationLocation?.city || "",
+      state: info.destinationLocation?.state || "",
+      pincode: info.destinationLocation?.pincode || ""
+    },
+    sender: info.senderDetails?.sender_name || "",
+    receiver: info.receiverDetails?.receiver_name || "",
+    podLinks: Array.isArray(info.pod_links) ? info.pod_links : [],
+    events: statuses.map((s) => {
+      const cat = normalizeCategory(s.category || s.status);
+      return {
+        status: s.status || "",
+        category: cat,
+        label: s.subcategory || STATUS_LABELS[cat] || s.status || "",
+        location: s.location || "",
+        timestamp: s.statusTimestamp
+          ? new Date(s.statusTimestamp).toISOString()
+          : (s.createdAt || null),
+        timestampMs: s.statusTimestamp || null
+      };
+    })
+  };
+}
+
+function decodeGeneric(data) {
+  const status = data.status || data.tracking_status || data.currentStatus || "UNKNOWN";
+  const location = data.location || data.current_location || "";
+  const rawEvents = data.events || data.history || data.tracking || data.Shipment?.Activity || [];
+  const cat = normalizeCategory(status);
+
+  return {
+    format: "generic",
+    trackingId: data.trackingId || data.awb || data.awbNumber || "",
+    currentStatus: cat,
+    currentStatusLabel: STATUS_LABELS[cat] || String(status),
+    currentLocation: String(location),
+    isDelivered: String(status).toLowerCase().includes("deliver"),
+    origin: {},
+    destination: {},
+    podLinks: [],
+    events: Array.isArray(rawEvents)
+      ? rawEvents.map((e) => ({
+          status: e.status || e.activity || e.Activity || "",
+          category: normalizeCategory(e.category || e.status),
+          label: e.description || e.subcategory || e.activity || e.Activity || e.status || "",
+          location: e.location || e.Location || e.city || "",
+          timestamp: e.timestamp || e.date || e.Date || e.createdAt || null,
+          timestampMs: null
+        }))
+      : []
+  };
+}
+
+function decodeCourierResponse(data) {
+  if (!data || typeof data !== "object") {
+    throw new HttpError(502, "Courier API returned an unexpected response format.");
+  }
+  if (data.orderInformation || Array.isArray(data.statuses)) {
+    return decodeInnofulfill(data);
+  }
+  return decodeGeneric(data);
+}
+
+// ── External fetch helper ──────────────────────────────────────────────────────
+
+async function fetchExternalJson(url, extraHeaders = {}) {
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: { Accept: "application/json", ...extraHeaders },
+      signal: AbortSignal.timeout(10000)
+    });
+  } catch (err) {
+    throw new HttpError(502, `Could not reach courier API: ${err.message}`);
+  }
+  const text = await res.text();
+  if (!res.ok) {
+    throw new HttpError(502, `Courier API returned HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new HttpError(502, "Courier API returned non-JSON response.");
+  }
+}
+
+// ── Tracking functions ────────────────────────────────────────────────────────
+
+async function probeTracking({ trackingApiUrl, trackingId, apiHeaders }) {
+  if (!trackingApiUrl) throw new HttpError(400, "Tracking API URL is required.");
+  if (!trackingId) throw new HttpError(400, "Tracking ID is required.");
+
+  const url = trackingApiUrl.replace(/\{trackingId\}/gi, encodeURIComponent(String(trackingId).trim()));
+  const raw = await fetchExternalJson(url, apiHeaders || {});
+  const decoded = decodeCourierResponse(raw);
+  return { ...decoded, raw };
+}
+
+async function fetchCourierTracking(courierId, trackingId) {
+  const couriers = await getCustomCouriers();
+  const courier = couriers.find((c) => c.id === courierId);
+  if (!courier) throw new HttpError(404, "Courier not found.");
+  if (!courier.trackingApiUrl) throw new HttpError(400, `"${courier.name}" has no tracking API configured.`);
+
+  const decoded = await probeTracking({
+    trackingApiUrl: courier.trackingApiUrl,
+    trackingId,
+    apiHeaders: courier.apiHeaders || {}
+  });
+  return { courierId: courier.id, courierName: courier.name, ...decoded };
+}
+
+// ── Integrations CRUD ─────────────────────────────────────────────────────────
 
 async function getAllIntegrations() {
   const store = await readIntegrationsStore();
@@ -75,6 +241,8 @@ async function addCustomCourier(data, adminEmail) {
     id: makeCourierId(),
     name,
     trackingUrl: data.trackingUrl || "",
+    trackingApiUrl: data.trackingApiUrl || "",
+    apiHeaders: data.apiHeaders || {},
     phone: data.phone || "",
     isActive: data.isActive !== false
   });
@@ -94,6 +262,8 @@ async function updateCustomCourier(id, patch, adminEmail) {
     ...current,
     name: patch.name !== undefined ? patch.name : current.name,
     trackingUrl: patch.trackingUrl !== undefined ? patch.trackingUrl : current.trackingUrl,
+    trackingApiUrl: patch.trackingApiUrl !== undefined ? patch.trackingApiUrl : current.trackingApiUrl,
+    apiHeaders: patch.apiHeaders !== undefined ? patch.apiHeaders : current.apiHeaders,
     phone: patch.phone !== undefined ? patch.phone : current.phone,
     isActive: patch.isActive !== undefined ? patch.isActive : current.isActive,
     updatedAt: nowIso()
@@ -123,16 +293,13 @@ async function updateIntegration(code, patch, adminEmail) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
     throw new HttpError(400, "Payload must be an object.");
   }
-
   const store = await readIntegrationsStore();
   const defaults = cloneDefaultIntegrationsStore().integrations;
   const current = Object.assign({}, defaults[code] || {}, store.integrations?.[code] || {});
   const updated = mergeIntegration(current, patch);
-
   store.integrations = store.integrations || {};
   store.integrations[code] = updated;
   store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
-
   await writeIntegrationsStore(store);
   return updated;
 }
@@ -143,5 +310,7 @@ module.exports = {
   getCustomCouriers,
   addCustomCourier,
   updateCustomCourier,
-  deleteCustomCourier
+  deleteCustomCourier,
+  probeTracking,
+  fetchCourierTracking
 };

@@ -12,6 +12,8 @@ function createIntegrationsRouter() {
   // Custom courier routes — must come before /:code to avoid pattern conflict
   router.get("/couriers", controller.adminListCouriers);
   router.post("/couriers", controller.adminAddCourier);
+  router.post("/couriers/probe-tracking", controller.adminProbeTracking);
+  router.get("/couriers/:id/track", controller.adminGetCourierTracking);
   router.patch("/couriers/:id", controller.adminUpdateCourier);
   router.delete("/couriers/:id", controller.adminDeleteCourier);
 

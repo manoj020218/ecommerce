@@ -28,3 +28,13 @@ export function updateCourier(id, payload) {
 export function deleteCourier(id) {
   return apiFetch(`/admin/integrations/couriers/${id}`, { method: "DELETE" });
 }
+
+// Test a tracking API without saving the courier first
+export function probeTracking(payload) {
+  return apiFetch("/admin/integrations/couriers/probe-tracking", { method: "POST", body: payload });
+}
+
+// Fetch live tracking for a saved courier
+export function fetchCourierTracking(courierId, trackingId) {
+  return apiFetch(`/admin/integrations/couriers/${courierId}/track?trackingId=${encodeURIComponent(trackingId)}`);
+}

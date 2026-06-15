@@ -8,7 +8,7 @@ import {
   fetchPaymentGateways,
   updatePaymentGatewayConfig
 } from "../payment-gateways/payment-gateways.api";
-import { addCourier, deleteCourier, fetchCouriers, fetchIntegrations, updateCourier, updateIntegration } from "./integrations.api";
+import { addCourier, deleteCourier, fetchCouriers, fetchIntegrations, probeTracking, updateCourier, updateIntegration } from "./integrations.api";
 
 // ── Shipping / Others integration catalogue ───────────────────────────────────
 
@@ -602,46 +602,188 @@ function AddCourierCard({ onClick }) {
 
 // ── Add / Edit courier modal ──────────────────────────────────────────────────
 
-const EMPTY_COURIER_FORM = { name: "", trackingUrl: "", phone: "", isActive: true };
+const EMPTY_COURIER_FORM = { name: "", trackingUrl: "", trackingApiUrl: "", phone: "", isActive: true };
+
+// Renders the decoded tracking result from the backend
+function TrackingResult({ result }) {
+  if (!result) return null;
+  const statusColors = {
+    DELIVERED: { bg: "rgba(22,163,74,0.1)", color: "var(--success)", border: "rgba(22,163,74,0.3)" },
+    OUT_FOR_DELIVERY: { bg: "rgba(37,99,235,0.08)", color: "var(--info)", border: "rgba(37,99,235,0.2)" },
+    IN_TRANSIT: { bg: "rgba(245,158,11,0.08)", color: "#b45309", border: "rgba(245,158,11,0.3)" },
+  };
+  const sc = statusColors[result.currentStatus] || { bg: "var(--bg)", color: "var(--muted)", border: "var(--border)" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Status pill */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        background: sc.bg, border: `1px solid ${sc.border}`,
+        borderRadius: 10, padding: "10px 14px"
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: sc.color }}>{result.currentStatusLabel}</div>
+          {result.currentLocation && (
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Last location: {result.currentLocation}</div>
+          )}
+        </div>
+        {result.isDelivered && <span style={{ fontSize: 18 }}>✅</span>}
+      </div>
+
+      {/* Origin → Destination */}
+      {(result.origin?.city || result.destination?.city) && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
+          <span>{result.origin?.city}{result.origin?.state ? `, ${result.origin.state}` : ""}</span>
+          <span>→</span>
+          <span>{result.destination?.city}{result.destination?.state ? `, ${result.destination.state}` : ""}</span>
+        </div>
+      )}
+
+      {/* POD images */}
+      {result.podLinks?.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {result.podLinks.map((url, i) => (
+            <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{
+              fontSize: 11, color: "var(--brand)", textDecoration: "underline"
+            }}>View POD {i + 1}</a>
+          ))}
+        </div>
+      )}
+
+      {/* Events timeline */}
+      {result.events?.length > 0 && (
+        <div style={{ maxHeight: 220, overflowY: "auto", borderRadius: 8, border: "1px solid var(--border)" }}>
+          {result.events.map((ev, i) => (
+            <div key={i} style={{
+              display: "flex", gap: 10, padding: "8px 12px",
+              borderBottom: i < result.events.length - 1 ? "1px solid var(--border)" : "none",
+              background: i === 0 ? "rgba(22,163,74,0.04)" : "transparent"
+            }}>
+              <div style={{
+                width: 8, height: 8, borderRadius: "50%", marginTop: 5, flexShrink: 0,
+                background: i === 0 ? "var(--success)" : "var(--border)"
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{ev.label}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>
+                  {ev.location && <span>{ev.location} · </span>}
+                  {ev.timestamp && <span>{new Date(ev.timestamp).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CourierModal({ initial, onSave, onClose, saving, error }) {
   const [form, setForm] = useState(initial || EMPTY_COURIER_FORM);
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const isEdit = Boolean(initial?.id);
 
+  const [testId, setTestId] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState("");
+
+  const handleTest = async () => {
+    if (!form.trackingApiUrl || !testId.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+    setTestError("");
+    try {
+      const res = await probeTracking({ trackingApiUrl: form.trackingApiUrl, trackingId: testId.trim() });
+      setTestResult(res);
+    } catch (err) {
+      setTestError(err.message || "Failed to fetch tracking.");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const field = (label, key, type = "text", placeholder = "", hint = null, required = false) => (
+    <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
+        {label}{required && <span style={{ color: "var(--danger)" }}> *</span>}
+      </span>
+      <input
+        type={type} value={form[key] || ""} placeholder={placeholder}
+        onChange={(e) => set(key, e.target.value)}
+        style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+      />
+      {hint && <span style={{ fontSize: 11, color: "var(--muted)" }}>{hint}</span>}
+    </label>
+  );
+
   return (
-    <Modal title={isEdit ? "Edit Courier Partner" : "Add Courier Partner"} open onClose={onClose} width="480px">
+    <Modal title={isEdit ? "Edit Courier Partner" : "Add Courier Partner"} open onClose={onClose} width="560px">
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Courier Name <span style={{ color: "var(--danger)" }}>*</span></span>
-          <input
-            type="text" value={form.name} placeholder="e.g. Shree Maruti Courier"
-            onChange={(e) => set("name", e.target.value)}
-            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
-          />
-        </label>
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Tracking URL Template</span>
-          <input
-            type="text" value={form.trackingUrl}
-            placeholder="https://courier.com/track?id={trackingId}"
-            onChange={(e) => set("trackingUrl", e.target.value)}
-            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
-          />
-          <span style={{ fontSize: 11, color: "var(--muted)" }}>
-            Use <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4 }}>{"{trackingId}"}</code> as placeholder — it will be replaced with the actual tracking number when sending to customer.
-          </span>
-        </label>
+        {field("Courier Name", "name", "text", "e.g. Shree Maruti Courier", null, true)}
+        {field("Contact / Phone", "phone", "text", "e.g. 1800-123-4567")}
 
-        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Contact / Phone (optional)</span>
-          <input
-            type="text" value={form.phone} placeholder="e.g. 1800-123-4567"
-            onChange={(e) => set("phone", e.target.value)}
-            style={{ padding: "8px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
-          />
-        </label>
+        {/* Divider */}
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Tracking Configuration</div>
+
+          {field(
+            "Customer Tracking URL",
+            "trackingUrl",
+            "text",
+            "https://courier.com/track?awb={trackingId}",
+            <span>Use <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4 }}>{"{trackingId}"}</code> — replaced with the AWB when emailing the customer.</span>
+          )}
+
+          {field(
+            "Live Tracking API URL",
+            "trackingApiUrl",
+            "text",
+            "https://apis-hubops.innofulfill.com/tracking/v2/{trackingId}",
+            <span>REST API endpoint that returns JSON tracking data. Use <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4 }}>{"{trackingId}"}</code> as placeholder.</span>
+          )}
+        </div>
+
+        {/* Test panel — only shown when API URL is filled */}
+        {form.trackingApiUrl && (
+          <div style={{
+            background: "var(--bg)", border: "1px solid var(--border)",
+            borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1 }}>
+              Test Live Tracking
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="text" value={testId}
+                placeholder="Enter AWB / Tracking number"
+                onChange={(e) => setTestId(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleTest()}
+                style={{
+                  flex: 1, padding: "7px 10px", fontSize: 13,
+                  border: "1px solid var(--border)", borderRadius: 7
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={testing || !testId.trim()}
+                style={{
+                  padding: "7px 14px", fontSize: 12, fontWeight: 600,
+                  background: "var(--brand)", color: "#fff", border: "none",
+                  borderRadius: 7, cursor: "pointer", whiteSpace: "nowrap",
+                  opacity: (testing || !testId.trim()) ? 0.6 : 1
+                }}
+              >
+                {testing ? "Fetching…" : "Fetch Status"}
+              </button>
+            </div>
+            {testError && <p style={{ color: "var(--danger)", fontSize: 12, margin: 0 }}>{testError}</p>}
+            {testResult && <TrackingResult result={testResult} />}
+          </div>
+        )}
 
         <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
           <input

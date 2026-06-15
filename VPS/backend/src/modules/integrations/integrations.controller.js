@@ -4,7 +4,9 @@ const {
   getCustomCouriers,
   addCustomCourier,
   updateCustomCourier,
-  deleteCustomCourier
+  deleteCustomCourier,
+  probeTracking,
+  fetchCourierTracking
 } = require("./integrations.service");
 
 async function adminGetIntegrations(req, res) {
@@ -44,11 +46,31 @@ async function adminDeleteCourier(req, res) {
   res.json({ success: true });
 }
 
+// Test a tracking API URL without saving — used from the Add/Edit modal
+async function adminProbeTracking(req, res) {
+  const { trackingApiUrl, trackingId, apiHeaders } = req.body;
+  const result = await probeTracking({ trackingApiUrl, trackingId, apiHeaders });
+  res.json(result);
+}
+
+// Fetch live tracking for a saved courier by ID
+async function adminGetCourierTracking(req, res) {
+  const { id } = req.params;
+  const { trackingId } = req.query;
+  if (!trackingId) {
+    return res.status(400).json({ success: false, message: "trackingId query param is required." });
+  }
+  const result = await fetchCourierTracking(id, trackingId);
+  res.json(result);
+}
+
 module.exports = {
   adminGetIntegrations,
   adminUpdateIntegration,
   adminListCouriers,
   adminAddCourier,
   adminUpdateCourier,
-  adminDeleteCourier
+  adminDeleteCourier,
+  adminProbeTracking,
+  adminGetCourierTracking
 };

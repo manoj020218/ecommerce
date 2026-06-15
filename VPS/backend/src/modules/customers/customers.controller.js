@@ -1,9 +1,10 @@
 const { ZodError } = require("zod");
 const { HttpError } = require("../../common/http-error");
-const { ok } = require("../../common/http-response");
+const { ok, created } = require("../../common/http-response");
 const service = require("./customers.service");
 const {
   parseListCustomersQuery,
+  parseCreateCustomerPayload,
   parseUpdateCustomerPayload,
   parseListOrderRequestsQuery,
   parseApproveOrderRequestPayload,
@@ -33,6 +34,17 @@ const adminListCustomers = asyncHandler(async (req, res) => {
   return ok(res, data, "Customers fetched.");
 });
 
+const adminCreateCustomer = asyncHandler(async (req, res) => {
+  const payload = parseCreateCustomerPayload(req.body);
+  const data = await service.createCustomer(payload, req.actor);
+  return created(res, data, "Customer created.");
+});
+
+const adminGetCustomerOrders = asyncHandler(async (req, res) => {
+  const data = await service.listCustomerOrders(req.params.customerId);
+  return ok(res, data, "Customer orders fetched.");
+});
+
 const adminUpdateCustomer = asyncHandler(async (req, res) => {
   const payload = parseUpdateCustomerPayload(req.body);
   const data = await service.updateCustomer(req.params.customerId, payload, req.actor);
@@ -59,6 +71,8 @@ const adminUpdateB2BOrderStatus = asyncHandler(async (req, res) => {
 
 module.exports = {
   adminListCustomers,
+  adminCreateCustomer,
+  adminGetCustomerOrders,
   adminUpdateCustomer,
   adminListOrderRequests,
   adminApproveOrderRequest,

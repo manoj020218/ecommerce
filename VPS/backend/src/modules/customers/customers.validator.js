@@ -66,8 +66,29 @@ function ensureObject(payload, label) {
   }
 }
 
+const createCustomerPayloadSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  email: z.string().trim().email("Valid email required").max(200).optional().or(z.literal("")).default(""),
+  mobile: z.string().trim().max(20).optional().default(""),
+  password: z.string().min(6, "Password must be at least 6 characters").max(128).optional(),
+  customerType: customerTypeSchema.optional().default("retail"),
+  companyName: z.string().trim().max(180).optional().default(""),
+  gstin: z.string().trim().max(25).optional().default(""),
+  priceGroup: z.string().trim().max(120).optional().default(""),
+  isB2BApproved: z.boolean().optional().default(false),
+  creditAllowed: z.boolean().optional().default(false),
+  bankTransferOnly: z.boolean().optional().default(false),
+  pickupAllowed: z.boolean().optional().default(false),
+  orderMode: z.enum(["online", "offline_request", "hybrid"]).optional().default("online")
+});
+
 function parseListCustomersQuery(query) {
   return listCustomersQuerySchema.parse(query || {});
+}
+
+function parseCreateCustomerPayload(payload) {
+  ensureObject(payload, "Create customer");
+  return createCustomerPayloadSchema.parse(payload);
 }
 
 function parseUpdateCustomerPayload(payload) {
@@ -91,6 +112,7 @@ function parseUpdateB2BOrderStatusPayload(payload) {
 
 module.exports = {
   parseListCustomersQuery,
+  parseCreateCustomerPayload,
   parseUpdateCustomerPayload,
   parseListOrderRequestsQuery,
   parseApproveOrderRequestPayload,

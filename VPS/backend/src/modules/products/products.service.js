@@ -9,6 +9,7 @@ const { readSearchStore } = require("../../database/search-store");
 const {
   createShippingProvider
 } = require("../../integrations/shipping-providers/shipping-provider.adapter");
+const { convertToWebp } = require("../../common/image-utils");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { listHelpfulGuidesForProduct } = require("../blogs/blogs.service");
 const { buildProductPageSeoPayload } = require("../seo/seo.service");
@@ -497,6 +498,13 @@ function createProductRecordFromPayload(store, payload) {
     googleShoppingDescription: payload.googleShoppingDescription || "",
     googleProductCategory: payload.googleProductCategory || "",
     productType: payload.productType || "",
+    videos: Array.isArray(payload.videos) && payload.videos.length
+      ? payload.videos
+      : payload.youtubeUrl ? [{ url: payload.youtubeUrl, label: "" }] : [],
+    videoUrls: [],
+    metaTitle: payload.metaTitle || "",
+    metaDescription: payload.metaDescription || "",
+    metaKeywords: payload.metaKeywords || "",
     stockQty: Number(payload.stockQty || 0),
     reservedQty: Number(payload.reservedQty || 0),
     stockStatus: payload.stockStatus || "in_stock",
@@ -680,11 +688,24 @@ async function addProductImage(productId, filePath, actor) {
     throw new HttpError(404, "Product not found.");
   }
 
-  const imageUrl = publicBaseUploadUrl(filePath);
+  // Convert to WebP and create thumbnail; falls back to original if sharp fails
+  let mainPath = filePath;
+  let thumbPath = null;
+  try {
+    const result = await convertToWebp(filePath);
+    mainPath = result.mainPath;
+    thumbPath = result.thumbPath;
+  } catch {
+    // keep original file if conversion fails
+  }
+
+  const imageUrl = publicBaseUploadUrl(mainPath);
+  const thumbnail = thumbPath ? publicBaseUploadUrl(thumbPath) : imageUrl;
+
   const currentImages = Array.isArray(store.products[index].images)
     ? [...store.products[index].images]
     : [];
-  currentImages.push(imageUrl);
+  currentImages.push({ url: imageUrl, thumbnail });
 
   store.products[index] = {
     ...store.products[index],
@@ -700,16 +721,84 @@ async function addProductImage(productId, filePath, actor) {
     actorRole: actor.role,
     resourceType: "product",
     resourceId: productId,
-    metadata: {
-      imageUrl
-    }
+    metadata: { imageUrl, thumbnail }
   });
 
-  return {
-    productId,
-    imageUrl,
-    imageCount: currentImages.length
-  };
+  return { productId, imageUrl, thumbnail, imageCount: currentImages.length };
+}
+
+async function deleteProductImage(productId, imageUrl, actor) {
+  const store = await readCatalogStore();
+  const index = store.products.findIndex((p) => p.id === productId);
+  if (index < 0) throw new HttpError(404, "Product not found.");
+
+  const current = store.products[index];
+  const images = Array.isArray(current.images)
+    ? current.images.filter((img) => {
+        const url = typeof img === "string" ? img : img.url;
+        return url !== imageUrl;
+      })
+    : [];
+  store.products[index] = { ...current, images, updatedAt: new Date().toISOString() };
+  await writeCatalogStore(store);
+  await addActivityLog({ action: "products.image.deleted", actorId: actor.id, actorRole: actor.role, resourceType: "product", resourceId: productId });
+  return { productId, imageCount: images.length };
+}
+
+async function addProductVideo(productId, filePath, actor) {
+  const store = await readCatalogStore();
+  const index = store.products.findIndex((p) => p.id === productId);
+  if (index < 0) throw new HttpError(404, "Product not found.");
+
+  const videoUrl = publicBaseUploadUrl(filePath);
+  const current = store.products[index];
+  const videoUrls = Array.isArray(current.videoUrls) ? [...current.videoUrls, videoUrl] : [videoUrl];
+  store.products[index] = { ...current, videoUrls, updatedAt: new Date().toISOString() };
+  await writeCatalogStore(store);
+  await addActivityLog({ action: "products.video.uploaded", actorId: actor.id, actorRole: actor.role, resourceType: "product", resourceId: productId });
+  return { productId, videoUrl, videoCount: videoUrls.length };
+}
+
+async function addProductDocument(productId, title, filePath, actor) {
+  const store = await readCatalogStore();
+  const index = store.products.findIndex((p) => p.id === productId);
+  if (index < 0) throw new HttpError(404, "Product not found.");
+
+  const url = publicBaseUploadUrl(filePath);
+  const current = store.products[index];
+  const downloads = normalizeDownloads([...(current.downloads || []), { title, url }]);
+  store.products[index] = { ...current, downloads, updatedAt: new Date().toISOString() };
+  await writeCatalogStore(store);
+  await addActivityLog({ action: "products.document.uploaded", actorId: actor.id, actorRole: actor.role, resourceType: "product", resourceId: productId });
+  return { productId, url, title, downloadCount: downloads.length };
+}
+
+async function exportGoogleShoppingFeed() {
+  const store = await readCatalogStore();
+  const active = store.products.filter((p) => p.isActive);
+
+  const headers = [
+    "id", "title", "description", "link", "image_link",
+    "price", "availability", "condition", "brand",
+    "google_product_category", "product_type"
+  ];
+
+  const escape = (v) => String(v || "").replace(/\t|\n|\r/g, " ");
+  const rows = active.map((p) => {
+    const price = `${Number(p.salePrice || p.basePrice || 0).toFixed(2)} INR`;
+    const availability = p.stockStatus === "out_of_stock" ? "out of stock" : "in stock";
+    const image = Array.isArray(p.images) && p.images[0] ? p.images[0] : "";
+    const link = `${env.publicBaseUrl}/products/${p.slug}`;
+    const title = escape(p.googleShoppingTitle || p.title);
+    const desc = escape(p.googleShoppingDescription || p.shortDescription || "");
+    return [
+      escape(p.sku || p.id), title, desc, link, escape(image),
+      price, availability, "new", escape(p.brand),
+      escape(p.googleProductCategory), escape(p.productType)
+    ].join("\t");
+  });
+
+  return [headers.join("\t"), ...rows].join("\n");
 }
 
 async function updateProductRelations(productId, relationsPatch, actor) {
@@ -975,6 +1064,165 @@ async function getProductInventoryView(productId) {
   };
 }
 
+async function bulkImportProducts(items) {
+  const store = await readCatalogStore();
+  const existingSlugs = new Set(store.products.map((p) => p.slug));
+  const now = new Date().toISOString();
+  let imported = 0;
+  let skipped = 0;
+
+  for (const item of items) {
+    const slug = item.slug ? slugify(item.slug) : slugify(item.title);
+    if (existingSlugs.has(slug)) {
+      skipped++;
+      continue;
+    }
+
+    const sku = generateSku(store);
+    const basePrice = Number(item.basePrice) || 0;
+    const salePrice =
+      item.salePrice === undefined || item.salePrice === null
+        ? basePrice
+        : Number(item.salePrice);
+
+    const product = {
+      id: generateId("prd"),
+      title: item.title,
+      slug,
+      sku,
+      oldUrl: item.oldUrl || "",
+      categoryId: null,
+      subcategoryId: null,
+      brand: "",
+      modelNumber: "",
+      mpn: "",
+      gtin: "",
+      hsnCode: "",
+      gstRate: Number(item.gstRate) || 18,
+      basePrice,
+      salePrice,
+      images: Array.isArray(item.images) ? item.images : [],
+      shortDescription: item.shortDescription || "",
+      fullDescription: item.fullDescription || "",
+      keyFeatures: normalizeKeyFeatures(item.keyFeatures || []),
+      specifications: item.specifications || {},
+      downloads: [],
+      technicalKeywords: [],
+      customerKeywords: [],
+      useCases: [],
+      problemStatements: [],
+      relations: createEmptyProductRelations(),
+      moq: 1,
+      bulkPricingEnabled: false,
+      bulkPriceSlabs: [],
+      priceGroupPrices: [],
+      customerSpecificPrices: [],
+      quoteRequiredAboveQty: null,
+      deadWeightKg: 0,
+      lengthCm: null,
+      widthCm: null,
+      heightCm: null,
+      shippingClass: "normal",
+      googleShoppingTitle: "",
+      googleShoppingDescription: "",
+      googleProductCategory: "",
+      productType: "",
+      stockQty: Number(item.stockQty) || 0,
+      reservedQty: 0,
+      stockStatus: item.stockStatus || "in_stock",
+      stockVisibility: "hide_quantity",
+      allowBackorder: false,
+      maxOrderQty: 1000,
+      lowStockThreshold: 0,
+      isActive: item.isActive !== false,
+      seoTitle: item.seoTitle || "",
+      seoDescription: item.seoDescription || "",
+      _migrated: true,
+      _migratedAt: item._migratedAt || now,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    store.products.push(product);
+    existingSlugs.add(slug);
+    imported++;
+  }
+
+  await writeCatalogStore(store);
+  return { imported, skipped, total: items.length };
+}
+
+async function bulkPatchProducts(updates, actor) {
+  const store = await readCatalogStore();
+  const now = new Date().toISOString();
+  let updated = 0;
+  const errors = [];
+
+  for (const update of updates) {
+    const index = store.products.findIndex((p) => p.id === update.id);
+    if (index < 0) {
+      errors.push({ id: update.id, error: "Not found" });
+      continue;
+    }
+
+    const current = store.products[index];
+    const patch = {};
+    let hasError = false;
+
+    if (update.sku !== undefined) patch.sku = String(update.sku || "").trim();
+    if (update.brand !== undefined) patch.brand = String(update.brand || "").trim();
+    if (update.modelNumber !== undefined) patch.modelNumber = String(update.modelNumber || "").trim();
+
+    if (update.categoryId !== undefined) {
+      if (update.categoryId) {
+        const cat = store.categories.find((c) => c.id === update.categoryId);
+        if (!cat) {
+          errors.push({ id: update.id, error: `Invalid categoryId: ${update.categoryId}` });
+          hasError = true;
+        }
+      }
+      if (!hasError) patch.categoryId = update.categoryId || null;
+    }
+
+    if (!hasError && update.hsnCode !== undefined && update.hsnCode) {
+      const hsnNorm = normalizeHsnCode(update.hsnCode);
+      const hsn = store.hsnTaxMaster.find((r) => r.hsnCode === hsnNorm);
+      if (!hsn) {
+        errors.push({ id: update.id, error: `Invalid hsnCode: ${update.hsnCode}` });
+        hasError = true;
+      } else {
+        patch.hsnCode = hsn.hsnCode;
+        patch.gstRate = hsn.gstRate;
+      }
+    }
+
+    if (hasError) continue;
+
+    if (update.stockQty !== undefined) patch.stockQty = Math.max(0, Number(update.stockQty) || 0);
+    if (update.stockStatus !== undefined) patch.stockStatus = update.stockStatus;
+    if (update.basePrice !== undefined) patch.basePrice = Number(update.basePrice);
+    if (update.salePrice !== undefined) patch.salePrice = Number(update.salePrice);
+    if (update.isActive !== undefined) patch.isActive = Boolean(update.isActive);
+
+    store.products[index] = { ...current, ...patch, updatedAt: now };
+    updated++;
+  }
+
+  await writeCatalogStore(store);
+
+  if (updated > 0) {
+    await addActivityLog({
+      action: "products.bulk_patched",
+      actorId: actor.id,
+      actorRole: actor.role,
+      resourceType: "product",
+      resourceId: `bulk:${updated}`
+    });
+  }
+
+  return { updated, errors };
+}
+
 module.exports = {
   listAdminProducts,
   getAdminProductById,
@@ -983,6 +1231,12 @@ module.exports = {
   updateProductRelations,
   archiveProduct,
   addProductImage,
+  deleteProductImage,
+  addProductVideo,
+  addProductDocument,
+  exportGoogleShoppingFeed,
+  bulkImportProducts,
+  bulkPatchProducts,
   listPublicProducts,
   getPublicProductBySlug,
   getPublicProductRecommendations,

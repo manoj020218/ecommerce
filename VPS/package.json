@@ -15,6 +15,12 @@
     "build:admin": "pnpm --filter @jenix/admin-panel build",
     "build:front": "pnpm --filter @jenix/front build",
     "check:backend": "node backend/src/checks/run-regression-checks.js",
+    "test:backend": "jest",
+    "test:backend:watch": "jest --watch",
+    "test:backend:coverage": "jest --coverage",
+    "test:admin": "pnpm --filter @jenix/admin-panel test",
+    "test:admin:coverage": "pnpm --filter @jenix/admin-panel test:coverage",
+    "test": "pnpm run test:backend && pnpm run test:admin",
     "lint": "eslint backend/src",
     "format:check": "prettier --check \"**/*.{js,json,md,yaml,yml}\"",
     "format": "prettier --write \"**/*.{js,json,md,yaml,yml}\"",
@@ -33,11 +39,17 @@
     "jsonwebtoken": "^9.0.3",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
+    "sharp": "^0.34.5",
     "zod": "^4.0.17"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["sharp"]
   },
   "devDependencies": {
     "eslint": "^8.57.0",
+    "jest": "^30.4.2",
     "pm2": "^7.0.1",
-    "prettier": "^3.8.3"
+    "prettier": "^3.8.3",
+    "supertest": "^7.2.2"
   }
 }

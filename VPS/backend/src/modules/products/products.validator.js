@@ -25,6 +25,11 @@ const downloadItemSchema = z.object({
   url: z.string().trim().min(3).max(1000)
 });
 
+const videoItemSchema = z.object({
+  url: z.string().trim().min(4).max(500),
+  label: z.string().trim().max(120).optional().default("")
+});
+
 const relationListSchema = z
   .array(z.string().trim().min(2).max(160))
   .max(200)
@@ -81,6 +86,7 @@ const createProductSchema = z.object({
   keyFeatures: z.array(z.string().trim().max(240)).optional().default([]),
   specifications: z.record(z.any()).optional().default({}),
   downloads: z.array(downloadItemSchema).optional().default([]),
+  videos: z.array(videoItemSchema).optional().default([]),
   technicalKeywords: z.array(z.string().trim().max(120)).optional().default([]),
   customerKeywords: z.array(z.string().trim().max(120)).optional().default([]),
   useCases: z.array(z.string().trim().max(200)).optional().default([]),
@@ -107,6 +113,10 @@ const createProductSchema = z.object({
   googleShoppingDescription: z.string().trim().max(5000).optional().default(""),
   googleProductCategory: z.string().trim().max(250).optional().default(""),
   productType: z.string().trim().max(250).optional().default(""),
+  youtubeUrl: z.string().trim().max(500).optional().default(""),
+  metaTitle: z.string().trim().max(120).optional().default(""),
+  metaDescription: z.string().trim().max(320).optional().default(""),
+  metaKeywords: z.string().trim().max(500).optional().default(""),
   isActive: z.boolean().optional().default(true),
   stockQty: qtySchema.optional().default(0),
   reservedQty: qtySchema.optional().default(0),
@@ -137,6 +147,7 @@ const updateProductSchema = z.object({
   keyFeatures: z.array(z.string().trim().max(240)).optional(),
   specifications: z.record(z.any()).optional(),
   downloads: z.array(downloadItemSchema).optional(),
+  videos: z.array(videoItemSchema).optional(),
   technicalKeywords: z.array(z.string().trim().max(120)).optional(),
   customerKeywords: z.array(z.string().trim().max(120)).optional(),
   useCases: z.array(z.string().trim().max(200)).optional(),
@@ -157,6 +168,10 @@ const updateProductSchema = z.object({
   googleShoppingDescription: z.string().trim().max(5000).optional(),
   googleProductCategory: z.string().trim().max(250).optional(),
   productType: z.string().trim().max(250).optional(),
+  youtubeUrl: z.string().trim().max(500).optional(),
+  metaTitle: z.string().trim().max(120).optional(),
+  metaDescription: z.string().trim().max(320).optional(),
+  metaKeywords: z.string().trim().max(500).optional(),
   isActive: z.boolean().optional()
 });
 

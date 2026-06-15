@@ -429,9 +429,90 @@ async function updateB2BOrderStatus(orderId, payload, actor) {
   return sanitizeB2BOrder(order, authStore.users.find((user) => user.id === order.userId));
 }
 
+async function createCustomer(payload, actor) {
+  const bcrypt = require("bcryptjs");
+  const { generateId } = require("../../common/identity");
+
+  const authStore = await readAuthStore();
+  ensureCustomersStoreShape(authStore);
+
+  if (payload.email) {
+    const dup = ensureArray(authStore.users).find(
+      (u) => u.email && u.email.toLowerCase() === payload.email.toLowerCase()
+    );
+    if (dup) {
+      throw new HttpError(409, `A customer with email ${payload.email} already exists.`);
+    }
+  }
+
+  if (payload.mobile) {
+    const dup = ensureArray(authStore.users).find((u) => u.mobile === payload.mobile);
+    if (dup) {
+      throw new HttpError(409, `A customer with mobile ${payload.mobile} already exists.`);
+    }
+  }
+
+  const customer = {
+    id: generateId("user"),
+    name: payload.name || "",
+    email: payload.email || "",
+    mobile: payload.mobile || "",
+    passwordHash: payload.password ? await bcrypt.hash(payload.password, 10) : "",
+    customerType: normalizeCustomerType(payload.customerType || "retail"),
+    companyName: payload.companyName || "",
+    gstin: String(payload.gstin || "").trim().toUpperCase(),
+    priceGroup: normalizePriceGroup(payload.priceGroup || ""),
+    isB2BApproved: Boolean(payload.isB2BApproved),
+    creditAllowed: Boolean(payload.creditAllowed),
+    bankTransferOnly: Boolean(payload.bankTransferOnly),
+    pickupAllowed: Boolean(payload.pickupAllowed),
+    orderMode: normalizeOrderMode(payload.orderMode || "online"),
+    verifiedEmail: false,
+    verifiedMobile: false,
+    createdByAdmin: true,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    lastLoginAt: null
+  };
+
+  ensureCustomerAccountShape(customer);
+  authStore.users.push(customer);
+  await writeAuthStore(authStore);
+
+  await addActivityLog({
+    action: "customers.created",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "customer",
+    resourceId: customer.id,
+    metadata: { name: customer.name, email: customer.email }
+  });
+
+  return sanitizeAdminCustomer(customer, authStore);
+}
+
+async function listCustomerOrders(customerId) {
+  const authStore = await readAuthStore();
+  ensureCustomersStoreShape(authStore);
+
+  const customer = findCustomerOrThrow(authStore, customerId);
+
+  const orders = ensureArray(authStore.orders)
+    .filter((order) => order.userId === customerId)
+    .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
+    .map((order) => sanitizeB2BOrder(order, customer));
+
+  return {
+    customer: sanitizeAdminCustomer(customer, authStore),
+    orders
+  };
+}
+
 module.exports = {
   listCustomers,
   updateCustomer,
+  createCustomer,
+  listCustomerOrders,
   listOrderRequests,
   approveOrderRequest,
   updateB2BOrderStatus

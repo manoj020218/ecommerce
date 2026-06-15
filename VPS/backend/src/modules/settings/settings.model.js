@@ -1,3 +1,7 @@
+const {
+  cloneDefaultSetupWizardSection
+} = require("../setup-wizard/setup-wizard.model");
+
 const SETTINGS_SECTION_MAP = Object.freeze({
   "store-profile": "storeProfile",
   branding: "branding",
@@ -93,6 +97,7 @@ const DEFAULT_SETTINGS_DOCUMENT = Object.freeze({
     showDiscountLine: true,
     customInvoiceFields: []
   },
+  setupWizard: cloneDefaultSetupWizardSection(),
   meta: {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

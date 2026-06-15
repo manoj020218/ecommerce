@@ -35,6 +35,50 @@ const upload = multer({
   }
 });
 
+const videoUpload = multer({
+  storage,
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
+  fileFilter: (_req, file, callback) => {
+    const allowed = ["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo"];
+    if (!allowed.includes(file.mimetype) && !file.originalname.match(/\.(mp4|webm|mov|avi)$/i)) {
+      callback(new Error("Only video files (mp4, webm, mov, avi) are allowed."));
+      return;
+    }
+    callback(null, true);
+  }
+});
+
+const documentUpload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  fileFilter: (_req, file, callback) => {
+    const allowed = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    const okExt = file.originalname.match(/\.(pdf|doc|docx)$/i);
+    if (!allowed.includes(file.mimetype) && !okExt) {
+      callback(new Error("Only PDF or Word documents are allowed."));
+      return;
+    }
+    callback(null, true);
+  }
+});
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max for import files
+  fileFilter: (_req, file, callback) => {
+    const ok = file.mimetype === "application/json" ||
+      file.mimetype === "text/csv" ||
+      file.mimetype === "text/plain" ||
+      file.originalname.endsWith(".json") ||
+      file.originalname.endsWith(".csv");
+    if (!ok) {
+      callback(new Error("Only .json or .csv files are accepted for import."));
+      return;
+    }
+    callback(null, true);
+  }
+});
+
 function createAdminProductsRouter() {
   const router = express.Router();
 
@@ -44,6 +88,22 @@ function createAdminProductsRouter() {
     "/",
     requireAdminPermission(PRODUCTS_PERMISSIONS.VIEW),
     controller.adminListProducts
+  );
+  router.post(
+    "/bulk-import",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.CREATE),
+    controller.adminBulkImportProducts
+  );
+  router.post(
+    "/import-file",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.CREATE),
+    importUpload.single("file"),
+    controller.adminImportProductsFile
+  );
+  router.patch(
+    "/bulk-patch",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
+    controller.adminBulkPatchProducts
   );
   router.get(
     "/:productId",
@@ -70,6 +130,28 @@ function createAdminProductsRouter() {
     requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
     upload.single("file"),
     controller.adminUploadProductImage
+  );
+  router.delete(
+    "/:productId/images",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
+    controller.adminDeleteProductImage
+  );
+  router.post(
+    "/:productId/videos",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
+    videoUpload.single("file"),
+    controller.adminUploadProductVideo
+  );
+  router.post(
+    "/:productId/documents",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
+    documentUpload.single("file"),
+    controller.adminUploadProductDocument
+  );
+  router.get(
+    "/google-shopping-export",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.VIEW),
+    controller.adminExportGoogleShopping
   );
   router.delete(
     "/:productId",

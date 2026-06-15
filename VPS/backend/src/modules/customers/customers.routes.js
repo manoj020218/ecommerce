@@ -30,6 +30,16 @@ function createCustomersRouter() {
     requireAdminPermission(CUSTOMERS_PERMISSIONS.VIEW),
     controller.adminListCustomers
   );
+  router.post(
+    "/",
+    requireCustomerManagePermission,
+    controller.adminCreateCustomer
+  );
+  router.get(
+    "/:customerId/orders",
+    requireAdminPermission(CUSTOMERS_PERMISSIONS.VIEW),
+    controller.adminGetCustomerOrders
+  );
   router.patch("/:customerId", requireCustomerManagePermission, controller.adminUpdateCustomer);
   router.get(
     "/order-requests/list",

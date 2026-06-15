@@ -63,6 +63,15 @@ const {
   createPublicMarketingRouter
 } = require("../modules/marketing/marketing.routes");
 const { createReportsRouter } = require("../modules/reports/reports.routes");
+const {
+  createPublicSetupWizardRouter,
+  createAdminSetupWizardRouter
+} = require("../modules/setup-wizard/setup-wizard.routes");
+const {
+  createWalkInOrdersRouter
+} = require("../modules/walkin-orders/walkin-orders.routes");
+const { createOrdersRouter } = require("../modules/orders/orders.routes");
+const { createIntegrationsRouter } = require("../modules/integrations/integrations.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -88,6 +97,7 @@ function createApiRouter() {
   router.use("/payments/manual", createPublicManualPaymentsRouter());
   router.use("/customer/account", createCustomerAccountRouter());
   router.use("/admin/customers", createCustomersRouter());
+  router.use("/admin/orders", createOrdersRouter());
   router.use("/admin/abandoned-carts", createAdminAbandonedCartRouter());
   router.use("/admin/payment-gateways", createPaymentGatewaysRouter());
   router.use("/admin/manual-payments", createAdminManualPaymentsRouter());
@@ -98,11 +108,15 @@ function createApiRouter() {
   router.use("/admin/website-leads", createAdminWebsiteLeadsRouter());
   router.use("/admin/marketing", createAdminMarketingRouter());
   router.use("/admin/reports", createReportsRouter());
+  router.use("/admin/walkin-orders", createWalkInOrdersRouter());
+  router.use("/admin/setup-wizard", createAdminSetupWizardRouter());
+  router.use("/admin/integrations", createIntegrationsRouter());
   router.use("/shipping", createPublicShippingRouter());
   router.use("/recovery", createPublicRecoveryRouter());
   router.use("/blogs", createPublicBlogsRouter());
   router.use("/website-leads", createPublicWebsiteLeadsRouter());
   router.use("/marketing", createPublicMarketingRouter());
+  router.use("/setup-wizard", createPublicSetupWizardRouter());
 
   return router;
 }

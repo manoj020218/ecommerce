@@ -10,8 +10,12 @@ const GATEWAY_MODES = Object.freeze({
   LIVE: "live"
 });
 
-const ONLINE_GATEWAY_CODES = Object.freeze(["razorpay", "mock_online"]);
-const MANUAL_GATEWAY_CODES = Object.freeze(["manual_upi", "direct_bank_transfer"]);
+const ONLINE_GATEWAY_CODES = Object.freeze([
+  "razorpay", "cashfree", "phonepe", "ccavenue", "payu", "paytm", "mock_online"
+]);
+const MANUAL_GATEWAY_CODES = Object.freeze([
+  "manual_upi", "direct_bank_transfer", "cod"
+]);
 
 function roundMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;

@@ -138,6 +138,12 @@ export const ADMIN_NAV_ITEMS = [
         permission: "marketing.view"
       },
       {
+        key: "discounts",
+        label: "Discounts & Coupons",
+        path: "/discounts",
+        permission: "payments.view"
+      },
+      {
         key: "google-merchant",
         label: "Google Merchant",
         path: "/google-merchant",

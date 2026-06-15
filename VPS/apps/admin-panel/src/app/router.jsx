@@ -28,6 +28,7 @@ import { StaffPage } from "../modules/staff/staff-page";
 import { TallyExportPage } from "../modules/tally-export/tally-export-page";
 import { WalkInOrdersPage } from "../modules/walkin-orders/walkin-orders-page";
 import { WebsiteLeadsPage } from "../modules/website-leads/website-leads-page";
+import { DiscountsPage } from "../modules/discounts/discounts-page";
 import { IntegrationsPage } from "../modules/integrations/integrations-page";
 
 export function AppRouter() {
@@ -65,6 +66,7 @@ export function AppRouter() {
           <Route path="seo" element={<SeoPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="integrations" element={<IntegrationsPage />} />
+          <Route path="discounts" element={<DiscountsPage />} />
         </Route>
       </Route>
 

@@ -200,12 +200,55 @@ const GATEWAY_UI = {
       { key: "upiId", label: "UPI ID", type: "text", placeholder: "name@bank" }
     ],
     hasMode: false
+  },
+  easebuzz: {
+    logo: "⚡", label: "Easebuzz",
+    description: "Low-cost Indian PG — from 1.5% per transaction",
+    credentialFields: [
+      { key: "key", label: "Merchant Key", type: "text", placeholder: "Your Easebuzz key" },
+      { key: "salt", label: "Merchant Salt", type: "password" },
+      { key: "env", label: "Environment", type: "text", placeholder: "prod / test" }
+    ],
+    hasMode: true
+  },
+  instamojo: {
+    logo: "💫", label: "Instamojo",
+    description: "Simple PG for small businesses — 2% fee",
+    credentialFields: [
+      { key: "apiKey", label: "API Key", type: "text" },
+      { key: "authToken", label: "Auth Token", type: "password" },
+      { key: "privateKey", label: "Private Salt (optional)", type: "password" }
+    ],
+    hasMode: true
+  },
+  stripe: {
+    logo: "🌐", label: "Stripe",
+    description: "Global payments — 2.9% + ₹2 per transaction",
+    credentialFields: [
+      { key: "publishableKey", label: "Publishable Key", type: "text", placeholder: "pk_live_..." },
+      { key: "secretKey", label: "Secret Key", type: "password", placeholder: "sk_live_..." },
+      { key: "webhookSecret", label: "Webhook Signing Secret", type: "password", placeholder: "whsec_..." }
+    ],
+    hasMode: true
+  },
+  juspay: {
+    logo: "🔐", label: "Juspay",
+    description: "Enterprise checkout & routing platform",
+    credentialFields: [
+      { key: "merchantId", label: "Merchant ID", type: "text" },
+      { key: "apiKey", label: "API Key", type: "password" },
+      { key: "clientId", label: "Client ID", type: "text" }
+    ],
+    hasMode: true
   }
 };
 
-// Priority order for displaying gateways (online first, then manual)
+const MANUAL_GATEWAY_CODES = ["cod", "direct_bank_transfer", "manual_upi"];
+
+// All gateways in display order — cards always render regardless of backend support
 const GATEWAY_DISPLAY_ORDER = [
   "razorpay", "cashfree", "phonepe", "ccavenue", "payu", "paytm",
+  "easebuzz", "instamojo", "stripe", "juspay",
   "direct_bank_transfer", "manual_upi", "cod"
 ];
 
@@ -334,7 +377,7 @@ function PaymentGatewayCard({ gateway, onToggle, onConfigure, saving }) {
 
 // ── Payment gateway configure modal ──────────────────────────────────────────
 
-function GatewayConfigModal({ gateway, onSave, onClose, saving, error }) {
+function GatewayConfigModal({ gateway, onSave, onClose, saving, error, isStatic }) {
   const ui = GATEWAY_UI[gateway.code] || {};
   const credFields = ui.credentialFields || [];
   const instrFields = ui.instructionFields || [];
@@ -375,6 +418,17 @@ function GatewayConfigModal({ gateway, onSave, onClose, saving, error }) {
   return (
     <Modal title={`Configure — ${ui.label || gateway.label}`} open onClose={onClose} width="520px">
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {isStatic && (
+          <div style={{
+            background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)",
+            borderRadius: 8, padding: "10px 14px"
+          }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#92400e", fontWeight: 500 }}>
+              Backend integration pending — fields below show what credentials will be required.
+              Once your backend developer adds support for this gateway, you can save and activate it.
+            </p>
+          </div>
+        )}
         {ui.hasMode && (
           <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Mode</span>
@@ -402,10 +456,14 @@ function GatewayConfigModal({ gateway, onSave, onClose, saving, error }) {
         {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn btn-primary" disabled={saving} onClick={handleSave}>
-            {saving ? "Saving…" : "Save"}
+          <button type="button" className="btn btn-secondary" onClick={onClose}>
+            {isStatic ? "Close" : "Cancel"}
           </button>
+          {!isStatic && (
+            <button type="button" className="btn btn-primary" disabled={saving} onClick={handleSave}>
+              {saving ? "Saving…" : "Save"}
+            </button>
+          )}
         </div>
       </div>
     </Modal>
@@ -594,14 +652,18 @@ export function IntegrationsPage() {
   };
 
   const handlePgConfigure = async (gateway) => {
-    // Fetch full config (with credentials) before opening modal
+    setPgSaveError("");
+    if (gateway._static) {
+      // Backend not yet implemented — open info-only modal
+      setPgConfiguring(gateway);
+      return;
+    }
     try {
       const full = await fetchPaymentGatewayConfig(gateway.code);
       setPgConfiguring(full);
     } catch {
       setPgConfiguring(gateway);
     }
-    setPgSaveError("");
   };
 
   const handlePgSaveConfig = async (patch) => {
@@ -631,8 +693,25 @@ export function IntegrationsPage() {
 
   if (loading) return <LoadingBlock />;
 
-  const onlineGateways = paymentGateways.filter((g) => g.gatewayType === "online");
-  const manualGateways = paymentGateways.filter((g) => g.gatewayType === "manual");
+  // Always show all GATEWAY_UI gateways — merge live API data where available
+  const allGatewayCards = GATEWAY_DISPLAY_ORDER
+    .filter((code) => GATEWAY_UI[code])
+    .map((code) => {
+      const live = paymentGateways.find((g) => g.code === code);
+      if (live) return { ...live, _static: false };
+      return {
+        code,
+        label: GATEWAY_UI[code].label,
+        gatewayType: MANUAL_GATEWAY_CODES.includes(code) ? "manual" : "online",
+        isEnabled: false,
+        credentialsConfigured: false,
+        instructions: {},
+        _static: true
+      };
+    });
+
+  const onlineGateways = allGatewayCards.filter((g) => g.gatewayType === "online");
+  const manualGateways = allGatewayCards.filter((g) => g.gatewayType === "manual");
 
   return (
     <div style={{ padding: "24px 28px", maxWidth: 1100 }}>
@@ -722,6 +801,7 @@ export function IntegrationsPage() {
           onClose={() => { setPgConfiguring(null); setPgSaveError(""); }}
           saving={pgSaving === pgConfiguring.code}
           error={pgSaveError}
+          isStatic={pgConfiguring._static}
         />
       )}
     </div>

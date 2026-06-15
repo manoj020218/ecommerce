@@ -606,6 +606,7 @@ export function ProductsPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState("");
   const [uploadingProductId, setUploadingProductId] = useState("");
   const [uploadingModalImage, setUploadingModalImage] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -730,6 +731,7 @@ export function ProductsPage() {
     setInlineCreate(null);
     setInlineForm({});
     setInlineError("");
+    setModalError("");
     setModalOpen(false);
     setSaving(false);
   };
@@ -805,7 +807,7 @@ export function ProductsPage() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    setNotice(""); setError("");
+    setNotice(""); setModalError("");
     try {
       const payload = buildPayload(form);
       if (editingId) {
@@ -826,7 +828,24 @@ export function ProductsPage() {
       closeModal();
       await loadProducts(filters);
     } catch (apiError) {
-      setError(apiError.message || "Failed to save product.");
+      const msg = apiError.message || "Failed to save product.";
+      setModalError(msg);
+      // Auto-focus the field mentioned in the error
+      const lower = msg.toLowerCase();
+      const fieldMap = [
+        ["title", "title"], ["slug", "slug"], ["sku", "sku"],
+        ["hsn", "hsnCode"], ["category", "categoryId"],
+        ["base price", "basePrice"], ["price", "basePrice"],
+        ["stock", "stockQty"], ["weight", "deadWeightKg"],
+        ["moq", "moq"], ["brand", "brand"], ["model", "modelNumber"]
+      ];
+      for (const [keyword, name] of fieldMap) {
+        if (lower.includes(keyword)) {
+          const el = document.querySelector(`[data-modal-form] [name="${name}"]`);
+          if (el) { el.focus(); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+          break;
+        }
+      }
     } finally { setSaving(false); }
   };
 
@@ -1403,7 +1422,7 @@ export function ProductsPage() {
         onClose={closeModal}
         width="980px"
       >
-        <form className="form-grid wide" onSubmit={onSubmit}>
+        <form className="form-grid wide" onSubmit={onSubmit} data-modal-form>
 
           {/* ── CORE ── */}
           <h4 className="form-section">Core Details</h4>
@@ -1717,6 +1736,15 @@ export function ProductsPage() {
           <label className="field"><span>Google Product Category</span><input name="googleProductCategory" value={form.googleProductCategory} onChange={onFormChange} placeholder="Electronics > Industrial" /></label>
           <label className="field"><span>Product Type</span><input name="productType" value={form.productType} onChange={onFormChange} placeholder="Relays > Power Relays" /></label>
 
+          {modalError && (
+            <div style={{
+              gridColumn: "1 / -1", padding: "10px 14px", borderRadius: 8,
+              background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.25)",
+              color: "var(--danger)", fontSize: 13, fontWeight: 500
+            }}>
+              {modalError}
+            </div>
+          )}
           <div className="form-actions">
             <button type="button" className="btn btn-secondary" onClick={closeModal}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : editingId ? "Update Product" : "Create Product"}</button>

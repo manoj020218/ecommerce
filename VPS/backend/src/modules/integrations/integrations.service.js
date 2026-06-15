@@ -39,7 +39,7 @@ function makeCourierId() {
 }
 
 function sanitizeCourier(raw) {
-  return {
+  const result = {
     id: String(raw.id || ""),
     name: String(raw.name || "").trim(),
     trackingUrl: String(raw.trackingUrl || "").trim(),
@@ -52,6 +52,8 @@ function sanitizeCourier(raw) {
     createdAt: raw.createdAt || nowIso(),
     updatedAt: raw.updatedAt || null
   };
+  if (raw._builtin) result._builtin = true;
+  return result;
 }
 
 // ── Tracking response decoder ──────────────────────────────────────────────────
@@ -277,11 +279,10 @@ async function updateCustomCourier(id, patch, adminEmail) {
 async function deleteCustomCourier(id, adminEmail) {
   if (!id) throw new HttpError(400, "Courier ID is required.");
   const store = await readIntegrationsStore();
-  const before = store.customCouriers.length;
+  const target = store.customCouriers.find((c) => c.id === id);
+  if (!target) throw new HttpError(404, `Courier "${id}" not found.`);
+  if (target._builtin) throw new HttpError(403, `"${target.name}" is a built-in courier and cannot be deleted.`);
   store.customCouriers = store.customCouriers.filter((c) => c.id !== id);
-  if (store.customCouriers.length === before) {
-    throw new HttpError(404, `Courier "${id}" not found.`);
-  }
   store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
   await writeIntegrationsStore(store);
 }

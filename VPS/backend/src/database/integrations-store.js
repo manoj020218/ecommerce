@@ -4,6 +4,23 @@ const { env } = require("../config/env");
 
 const integrationsStorePath = path.resolve(process.cwd(), env.integrationsStorePath);
 
+// Built-in couriers that always exist and cannot be deleted.
+// Add more here as the business grows.
+const BUILTIN_COURIERS = Object.freeze([
+  {
+    id: "courier_builtin_shreemaruti",
+    _builtin: true,
+    name: "Shree Maruti Courier",
+    phone: "1800-103-0400",
+    trackingUrl: "https://www.shreemaruticourier.com/tracking.php?awb={trackingId}",
+    trackingApiUrl: "https://apis-hubops.innofulfill.com/tracking/v2/{trackingId}",
+    apiHeaders: {},
+    isActive: false,
+    createdAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: null
+  }
+]);
+
 const DEFAULT_INTEGRATIONS_STORE = Object.freeze({
   customCouriers: [],
   integrations: {
@@ -32,17 +49,30 @@ function cloneDefaultIntegrationsStore() {
   return JSON.parse(JSON.stringify(DEFAULT_INTEGRATIONS_STORE));
 }
 
+// Merges any missing builtin couriers into the store's customCouriers array.
+// Builtin couriers are always placed at the front, preserving user edits (isActive, etc.)
+// Returns true if the store was modified (so caller can decide to persist).
+function mergeBuiltinCouriers(store) {
+  let dirty = false;
+  const existingIds = new Set(store.customCouriers.map((c) => c.id));
+  for (const builtin of [...BUILTIN_COURIERS].reverse()) {
+    if (!existingIds.has(builtin.id)) {
+      store.customCouriers.unshift({ ...builtin });
+      dirty = true;
+    }
+  }
+  return dirty;
+}
+
 async function ensureIntegrationsStoreFile() {
   const dir = path.dirname(integrationsStorePath);
   await fs.mkdir(dir, { recursive: true });
   try {
     await fs.access(integrationsStorePath);
   } catch {
-    await fs.writeFile(
-      integrationsStorePath,
-      JSON.stringify(cloneDefaultIntegrationsStore(), null, 2),
-      "utf-8"
-    );
+    const fresh = cloneDefaultIntegrationsStore();
+    mergeBuiltinCouriers(fresh);
+    await fs.writeFile(integrationsStorePath, JSON.stringify(fresh, null, 2), "utf-8");
   }
 }
 
@@ -54,13 +84,22 @@ async function readIntegrationsStore() {
     parsed = JSON.parse(raw);
   } catch {
     parsed = cloneDefaultIntegrationsStore();
+    mergeBuiltinCouriers(parsed);
     await fs.writeFile(integrationsStorePath, JSON.stringify(parsed, null, 2), "utf-8");
     return parsed;
   }
-  // Migrate existing stores that predate customCouriers
+
+  // Migrate stores that predate customCouriers
   if (!Array.isArray(parsed.customCouriers)) {
     parsed.customCouriers = [];
   }
+
+  // Auto-add any missing builtin couriers (e.g. new entries added in code)
+  const dirty = mergeBuiltinCouriers(parsed);
+  if (dirty) {
+    await fs.writeFile(integrationsStorePath, JSON.stringify(parsed, null, 2), "utf-8");
+  }
+
   return parsed;
 }
 
@@ -71,6 +110,7 @@ async function writeIntegrationsStore(store) {
 }
 
 module.exports = {
+  BUILTIN_COURIERS,
   cloneDefaultIntegrationsStore,
   readIntegrationsStore,
   writeIntegrationsStore

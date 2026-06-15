@@ -563,14 +563,22 @@ function CustomCourierCard({ courier, onToggle, onEdit, onDelete, saving }) {
         }} title={courier.trackingUrl}>{courier.trackingUrl}</div>
       )}
       <div style={{ marginTop: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        {courier._builtin && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase",
+            letterSpacing: 0.5, border: "1px solid var(--border)", borderRadius: 4, padding: "1px 5px"
+          }}>Built-in</span>
+        )}
         <button type="button" onClick={onEdit} style={{
           fontSize: 11, fontWeight: 600, color: "var(--brand)",
           background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
         }}>Edit</button>
-        <button type="button" onClick={onDelete} style={{
-          fontSize: 11, fontWeight: 600, color: "var(--danger)",
-          background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
-        }}>Delete</button>
+        {onDelete && (
+          <button type="button" onClick={onDelete} style={{
+            fontSize: 11, fontWeight: 600, color: "var(--danger)",
+            background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
+          }}>Delete</button>
+        )}
       </div>
     </div>
   );
@@ -1090,13 +1098,13 @@ export function IntegrationsPage() {
             saving={saving === meta.code}
           />
         ))}
-        {couriers.map((courier) => (
+        {[...couriers].sort((a, b) => (b._builtin ? 1 : 0) - (a._builtin ? 1 : 0)).map((courier) => (
           <CustomCourierCard
             key={courier.id}
             courier={courier}
             onToggle={() => handleCourierToggle(courier)}
             onEdit={() => { setCourierModal(courier); setCourierError(""); }}
-            onDelete={() => handleCourierDelete(courier)}
+            onDelete={courier._builtin ? null : () => handleCourierDelete(courier)}
             saving={courierDeleting === courier.id}
           />
         ))}

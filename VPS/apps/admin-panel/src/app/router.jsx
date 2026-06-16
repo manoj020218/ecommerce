@@ -17,6 +17,7 @@ import { InvoicesPage } from "../modules/invoices/invoices-page";
 import { MarketingPage } from "../modules/marketing/marketing-page";
 import { OrdersPage } from "../modules/orders/orders-page";
 import { OrderDetailPage } from "../modules/orders/order-detail-page";
+import { AddProductPage } from "../modules/products/add-product-page";
 import { PaymentGatewaysPage } from "../modules/payment-gateways/payment-gateways-page";
 import { PermissionGroupsPage } from "../modules/permission-groups/permission-groups-page";
 import { ReportsPage } from "../modules/reports/reports-page";
@@ -43,6 +44,7 @@ export function AppRouter() {
           <Route path="catalogue" element={<CataloguePage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="products" element={<ProductsPage />} />
+          <Route path="products/add" element={<AddProductPage />} />
           <Route path="hsn-tax" element={<HsnTaxPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="search" element={<SearchPage />} />

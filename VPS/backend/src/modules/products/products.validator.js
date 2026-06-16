@@ -117,6 +117,8 @@ const createProductSchema = z.object({
   metaTitle: z.string().trim().max(120).optional().default(""),
   metaDescription: z.string().trim().max(320).optional().default(""),
   metaKeywords: z.string().trim().max(500).optional().default(""),
+  tags: z.array(z.string().trim().max(80)).max(30).optional().default([]),
+  productLabel: z.string().trim().max(80).optional().default(""),
   isActive: z.boolean().optional().default(true),
   stockQty: qtySchema.optional().default(0),
   reservedQty: qtySchema.optional().default(0),
@@ -172,6 +174,8 @@ const updateProductSchema = z.object({
   metaTitle: z.string().trim().max(120).optional(),
   metaDescription: z.string().trim().max(320).optional(),
   metaKeywords: z.string().trim().max(500).optional(),
+  tags: z.array(z.string().trim().max(80)).max(30).optional(),
+  productLabel: z.string().trim().max(80).optional(),
   isActive: z.boolean().optional()
 });
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
@@ -588,6 +589,8 @@ function EditableCell({ rowId, field, value, type, options, missing, pending, ac
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export function ProductsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { session } = useAuthSession();
   const canCreate = hasPermission(session, "products.create");
   const canEdit = hasPermission(session, "products.edit");
@@ -699,6 +702,14 @@ export function ProductsPage() {
 
   useEffect(() => { bootstrap(); }, []);
 
+  // Pick up success notice from add-product-page navigation
+  useEffect(() => {
+    if (location.state?.notice) {
+      setNotice(location.state.notice);
+      window.history.replaceState({}, "");
+    }
+  }, []);
+
   // ── list view handlers ───────────────────────────────────────────────────────
 
   const onFilterSubmit = async (e) => { e.preventDefault(); await loadProducts(filters); };
@@ -709,12 +720,7 @@ export function ProductsPage() {
   };
 
   const openCreate = () => {
-    setEditingId(null);
-    setEditingProduct(null);
-    setForm({ ...EMPTY_FORM, hsnCode: hsnRecords[0]?.hsnCode || "" });
-    setDocTitle("");
-    clearPendingImages();
-    setModalOpen(true);
+    navigate("/products/add");
   };
 
   const openEdit = (row) => {

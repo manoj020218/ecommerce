@@ -86,6 +86,7 @@ function resolveCustomerSummary(order) {
     customerName,
     customerEmail: billingAddress.email || shippingAddress.email || "",
     customerMobile: billingAddress.mobile || shippingAddress.mobile || "",
+    customerCity: billingAddress.city || shippingAddress.city || "",
     companyName:
       order?.companyName ||
       billingAddress.companyName ||

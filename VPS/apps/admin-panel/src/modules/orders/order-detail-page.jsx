@@ -18,6 +18,7 @@ import {
   uploadShipmentPod,
   sendTrackingEmail
 } from "./orders.api";
+import { fetchSettings } from "../settings/settings.api";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +36,119 @@ function buildWaLink(phone, message) {
   const digits = String(phone || "").replace(/[^\d]/g, "");
   if (!digits) return "";
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
+
+// ── Shipping label ────────────────────────────────────────────────────────────
+
+function safeAddrStr(v) {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    return [v.addressLine1, v.addressLine2, v.city, v.state, v.pincode].filter(Boolean).join(", ");
+  }
+  return String(v);
+}
+
+function generateShippingLabelHtml(order, storeProfile, trackingInfo) {
+  const storeName = storeProfile?.storeName || "Jenix India";
+  const fromAddress = safeAddrStr(storeProfile?.pickupAddress || storeProfile?.address);
+
+  const toAddr = order.shippingAddress || order.billingAddress || {};
+  const toName = toAddr.name || order.customerName || "";
+  const toPhone = toAddr.mobile || order.customerMobile || "";
+  const toAddress = formatAddress(toAddr);
+
+  const items = (order.fulfillmentItems && order.fulfillmentItems.length > 0)
+    ? order.fulfillmentItems.map(i => ({ title: i.title, qty: i.fulfillQty ?? i.qty ?? 1 }))
+    : (order.items || []).map(i => ({ title: i.title, qty: i.qty ?? 1 }));
+
+  const itemRows = items.map(item =>
+    `<tr><td>${item.title || ""}</td><td class="qty">${item.qty}</td></tr>`
+  ).join("");
+
+  const trackingHtml = trackingInfo?.trackingId ? `
+    <div class="tracking">
+      <div class="sec-label">Tracking Details</div>
+      <div class="trow"><span>Courier:</span> <strong>${trackingInfo.courierName || "—"}</strong></div>
+      <div class="trow"><span>AWB / Tracking ID:</span> <strong>${trackingInfo.trackingId}</strong></div>
+      ${trackingInfo.expectedDeliveryDate ? `<div class="trow"><span>Expected Delivery:</span> <strong>${trackingInfo.expectedDeliveryDate}</strong></div>` : ""}
+    </div>` : "";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Shipping Label — Order #${order.orderNo || order.id}</title>
+<style>
+  @page { size: A6; margin: 6mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; }
+  .label { width: 100%; }
+  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
+  .header h2 { font-size: 11pt; font-weight: 700; letter-spacing: 1.5pt; }
+  .from-to { display: flex; gap: 0; border-bottom: 1.5px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
+  .from { flex: 1; padding-right: 3mm; border-right: 1px dashed #bbb; }
+  .to { flex: 1.2; padding-left: 3mm; }
+  .sec-label { font-size: 6.5pt; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5pt; border-bottom: 1px solid #ddd; padding-bottom: 0.5mm; margin-bottom: 1.5mm; }
+  .name { font-size: 9.5pt; font-weight: 700; margin-bottom: 1mm; line-height: 1.3; }
+  .addr { font-size: 8pt; line-height: 1.5; color: #222; }
+  .phone { font-size: 8pt; font-weight: 600; margin-top: 1mm; }
+  .order-box { border: 2px solid #000; border-radius: 2mm; padding: 2mm 3mm; margin-bottom: 3mm; text-align: center; }
+  .order-box .ol { font-size: 7pt; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5pt; }
+  .order-box .ov { font-size: 17pt; font-weight: 700; letter-spacing: 1.5pt; line-height: 1.2; }
+  table.items { width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 3mm; }
+  table.items th { text-align: left; font-size: 7pt; font-weight: 700; color: #555; border-bottom: 1px solid #aaa; padding-bottom: 1mm; }
+  table.items th.qty { text-align: center; width: 10mm; }
+  table.items td { padding: 1.5mm 0; border-bottom: 1px solid #eee; line-height: 1.4; vertical-align: top; }
+  table.items td.qty { text-align: center; font-weight: 700; }
+  .tracking { border-top: 1px dashed #aaa; padding-top: 2.5mm; margin-bottom: 2.5mm; }
+  .tracking .sec-label { margin-bottom: 1.5mm; }
+  .trow { font-size: 8pt; margin-bottom: 0.5mm; }
+  .footer { border-top: 1px solid #ddd; padding-top: 2mm; font-size: 7pt; color: #888; text-align: center; }
+  @media print { body { -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+<div class="label">
+  <div class="header"><h2>SHIPPING LABEL</h2></div>
+  <div class="from-to">
+    <div class="from">
+      <div class="sec-label">From</div>
+      <div class="name">${storeName}</div>
+      <div class="addr">${fromAddress}</div>
+    </div>
+    <div class="to">
+      <div class="sec-label">To</div>
+      <div class="name">${toName}</div>
+      <div class="addr">${toAddress}</div>
+      ${toPhone ? `<div class="phone">${toPhone}</div>` : ""}
+    </div>
+  </div>
+  <div class="order-box">
+    <div class="ol">Order No</div>
+    <div class="ov">${order.orderNo || order.id}</div>
+  </div>
+  <table class="items">
+    <thead><tr><th>Item Description</th><th class="qty">Qty</th></tr></thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+  ${trackingHtml}
+  <div class="footer">Generated ${new Date().toLocaleDateString("en-IN")} &nbsp;·&nbsp; ${storeName}</div>
+</div>
+<script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+}
+
+function printShippingLabel(order, storeProfile, trackingInfo) {
+  const html = generateShippingLabelHtml(order, storeProfile, trackingInfo || {});
+  const win = window.open("", "_blank", "width=580,height=760");
+  if (!win) {
+    alert("Pop-up blocked. Please allow pop-ups for this site to print the shipping label.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
 }
 
 // ── Status chip ───────────────────────────────────────────────────────────────
@@ -433,6 +547,8 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState(null);
   const [invoice, setInvoice] = useState(null);
   const [couriers, setCouriers] = useState([]);
+  const [storeProfile, setStoreProfile] = useState({});
+  const [resendingTracking, setResendingTracking] = useState(false);
 
   const [processingModal, setProcessingModal] = useState(false);
   const [processingError, setProcessingError] = useState("");
@@ -470,6 +586,12 @@ export function OrderDetailPage() {
         setCouriers(Array.isArray(cs) ? cs : []);
       } catch {
         setCouriers([]);
+      }
+      try {
+        const settings = await fetchSettings();
+        setStoreProfile(settings?.storeProfile || {});
+      } catch {
+        // non-fatal — label will show empty from address
       }
       setLoading(false);
     };
@@ -517,6 +639,28 @@ export function OrderDetailPage() {
     }
   };
 
+  const handleResendTracking = async () => {
+    const td = order?.trackingDetails;
+    if (!td?.trackingId) return;
+    const phone = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
+    if (phone) {
+      const waMsg = [
+        `Hi ${order.customerName || "there"}, here are your order #${order.orderNo} shipment details:`,
+        `Courier: ${td.courierName || ""}`,
+        `Tracking ID: ${td.trackingId}`,
+        td.expectedDeliveryDate ? `Expected Delivery: ${td.expectedDeliveryDate}` : "",
+        td.trackingUrl ? `Track here: ${td.trackingUrl}` : ""
+      ].filter(Boolean).join("\n");
+      const waLink = buildWaLink(phone, waMsg);
+      if (waLink) window.open(waLink, "_blank");
+    }
+    if (td.shipmentId) {
+      setResendingTracking(true);
+      try { await sendTrackingEmail(td.shipmentId, {}); } catch { /* non-fatal */ }
+      finally { setResendingTracking(false); }
+    }
+  };
+
   const handleFulfill = async (form) => {
     setFulfillSaving(true);
     setFulfillError("");
@@ -553,7 +697,14 @@ export function OrderDetailPage() {
         customerNote: form.customerNote
       });
 
-      // 5. WhatsApp notification to customer
+      // 5. Auto-download shipping label
+      printShippingLabel(order, storeProfile, {
+        courierName: selectedCourier?.courierName || "",
+        trackingId: form.trackingId,
+        expectedDeliveryDate: form.expectedDeliveryDate
+      });
+
+      // 6. WhatsApp notification to customer
       const phone = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
       if (phone && form.trackingId) {
         const courierName = selectedCourier?.courierName || "courier";
@@ -568,7 +719,7 @@ export function OrderDetailPage() {
         if (waLink) window.open(waLink, "_blank");
       }
 
-      // 6. Email notification
+      // 7. Email notification
       try { await sendTrackingEmail(shipment.id, {}); } catch { /* non-fatal */ }
 
       setFulfillModal(false);
@@ -736,23 +887,38 @@ export function OrderDetailPage() {
       {/* Tracking info */}
       {order.trackingDetails?.trackingId && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
-          <h4 style={{ margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Shipment & Tracking</h4>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+            <h4 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Shipment &amp; Tracking</h4>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button" className="btn btn-secondary btn-small"
+                onClick={() => printShippingLabel(order, storeProfile, order.trackingDetails)}
+              >
+                Download Shipping Label
+              </button>
+              <button
+                type="button" className="btn btn-secondary btn-small"
+                disabled={resendingTracking}
+                onClick={handleResendTracking}
+                style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="#25d366" style={{ flexShrink: 0 }}>
+                  <path d="M12 2a10 10 0 00-8.7 15l-1.2 5 5.1-1.3A10 10 0 1012 2zm5.1 13.4c-.2.6-1.2 1.2-1.7 1.3-.5.1-1.1.2-3.1-.6-2.4-1-4-3.5-4.1-3.7-.1-.2-1-1.4-1-2.7s.7-1.9.9-2.2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5.2.5.7 1.7.8 1.8.1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.3.3-.5.5-.2.2-.3.4-.1.7.2.3 1 1.7 2.4 2.7 1.8 1.3 3.3 1.7 3.7 1.9.4.2.7.1.9-.1.3-.3 1-.9 1.2-1.2.2-.3.4-.3.7-.2l1.8.9c.3.2.5.3.6.5.1.2.1.9-.1 1.4z" />
+                </svg>
+                {resendingTracking ? "Sending…" : "Resend to Customer"}
+              </button>
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13 }}>
             <span><strong>Courier:</strong> {order.trackingDetails.courierName || "—"}</span>
             <span><strong>Tracking ID:</strong> {order.trackingDetails.trackingId}</span>
             {order.trackingDetails.dispatchDate && <span><strong>Dispatched:</strong> {order.trackingDetails.dispatchDate}</span>}
             {order.trackingDetails.expectedDeliveryDate && <span><strong>Expected:</strong> {order.trackingDetails.expectedDeliveryDate}</span>}
           </div>
-          {customerPhone && order.trackingDetails.trackingId && (
-            <a
-              href={buildWaLink(customerPhone, `Hi ${order.customerName}, your order #${order.orderNo} tracking:\nCourier: ${order.trackingDetails.courierName}\nTracking ID: ${order.trackingDetails.trackingId}`)}
-              target="_blank" rel="noreferrer"
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 10, fontSize: 12, fontWeight: 600, color: "#25d366", textDecoration: "none" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2a10 10 0 00-8.7 15l-1.2 5 5.1-1.3A10 10 0 1012 2zm5.1 13.4c-.2.6-1.2 1.2-1.7 1.3-.5.1-1.1.2-3.1-.6-2.4-1-4-3.5-4.1-3.7-.1-.2-1-1.4-1-2.7s.7-1.9.9-2.2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5.2.5.7 1.7.8 1.8.1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.3.3-.5.5-.2.2-.3.4-.1.7.2.3 1 1.7 2.4 2.7 1.8 1.3 3.3 1.7 3.7 1.9.4.2.7.1.9-.1.3-.3 1-.9 1.2-1.2.2-.3.4-.3.7-.2l1.8.9c.3.2.5.3.6.5.1.2.1.9-.1 1.4z" />
-              </svg>
-              Share Tracking on WhatsApp
+          {order.trackingDetails.trackingUrl && (
+            <a href={order.trackingDetails.trackingUrl} target="_blank" rel="noreferrer"
+              style={{ display: "inline-block", marginTop: 8, fontSize: 12, color: "var(--brand)", textDecoration: "none", fontWeight: 600 }}>
+              Track shipment →
             </a>
           )}
         </div>

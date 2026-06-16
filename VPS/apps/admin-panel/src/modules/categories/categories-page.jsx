@@ -48,6 +48,7 @@ export function CategoriesPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [duplicateCategory, setDuplicateCategory] = useState(null);
 
   const categoryMap = useMemo(() => {
     return new Map(rows.map((row) => [row.id, row]));
@@ -86,6 +87,8 @@ export function CategoriesPage() {
     setEditingId(null);
     setForm(EMPTY_FORM);
     setNotice("");
+    setError("");
+    setDuplicateCategory(null);
     setModalOpen(true);
   };
 
@@ -101,12 +104,15 @@ export function CategoriesPage() {
       isActive: Boolean(row.isActive)
     });
     setNotice("");
+    setError("");
+    setDuplicateCategory(null);
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
     setSaving(false);
+    setDuplicateCategory(null);
   };
 
   const onFormChange = (event) => {
@@ -142,7 +148,15 @@ export function CategoriesPage() {
       closeModal();
       load(filters);
     } catch (apiError) {
-      setError(apiError.message || "Failed to save category.");
+      const msg = apiError.message || "";
+      if (!editingId && msg.toLowerCase().includes("already exists")) {
+        const existing = rows.find(
+          (r) => r.name.toLowerCase() === form.name.trim().toLowerCase()
+        );
+        setDuplicateCategory(existing || { name: form.name.trim() });
+      } else {
+        setError(msg || "Failed to save category.");
+      }
     } finally {
       setSaving(false);
     }
@@ -293,6 +307,35 @@ export function CategoriesPage() {
         open={modalOpen}
         onClose={closeModal}
       >
+        {duplicateCategory ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "8px 0" }}>
+            <div style={{
+              background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.4)",
+              borderRadius: 8, padding: "14px 16px"
+            }}>
+              <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
+                "{duplicateCategory.name}" already exists.
+              </p>
+              <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--muted)" }}>
+                A category with this name already exists. Would you like to edit the existing one, or exit?
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {duplicateCategory.id && canEdit ? (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => openEdit(duplicateCategory)}
+                >
+                  Edit Existing
+                </button>
+              ) : null}
+              <button type="button" className="btn btn-secondary" onClick={closeModal}>
+                Exit
+              </button>
+            </div>
+          </div>
+        ) : (
         <form className="form-grid" onSubmit={onSubmitForm}>
           <label className="field">
             <span>Name *</span>
@@ -367,6 +410,7 @@ export function CategoriesPage() {
             </button>
           </div>
         </form>
+        )}
       </Modal>
     </section>
   );

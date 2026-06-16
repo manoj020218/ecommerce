@@ -18,8 +18,35 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/inventory")) {
     return "Inventory";
   }
+  if (pathname.startsWith("/search")) {
+    return "Search";
+  }
+  if (pathname.startsWith("/orders")) {
+    return "Orders";
+  }
+  if (pathname.startsWith("/walk-in-orders")) {
+    return "Walk-in Orders";
+  }
+  if (pathname.startsWith("/invoices")) {
+    return "Invoices";
+  }
+  if (pathname.startsWith("/tally-export")) {
+    return "Tally Export";
+  }
+  if (pathname.startsWith("/shipping")) {
+    return "Shipping";
+  }
   if (pathname.startsWith("/reports")) {
     return "Reports";
+  }
+  if (pathname.startsWith("/audit-logs")) {
+    return "Audit Logs";
+  }
+  if (pathname.startsWith("/staff")) {
+    return "Staff";
+  }
+  if (pathname.startsWith("/permission-groups")) {
+    return "Permission Groups";
   }
   if (pathname.startsWith("/blogs")) {
     return "Blogs / Knowledge Base";
@@ -27,11 +54,29 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/marketing")) {
     return "Marketing";
   }
+  if (pathname.startsWith("/abandoned-carts")) {
+    return "Abandoned Carts";
+  }
+  if (pathname.startsWith("/google-merchant")) {
+    return "Google Merchant";
+  }
+  if (pathname.startsWith("/facebook-feed")) {
+    return "Facebook Feed";
+  }
   if (pathname.startsWith("/website-leads")) {
     return "Website Buyer Leads";
   }
+  if (pathname.startsWith("/setup-wizard")) {
+    return "Setup Wizard";
+  }
+  if (pathname.startsWith("/seo")) {
+    return "SEO";
+  }
   if (pathname.startsWith("/settings")) {
     return "Settings";
+  }
+  if (pathname.startsWith("/payment-gateways")) {
+    return "Payment Gateways";
   }
   return "Catalogue Overview";
 }
@@ -75,7 +120,7 @@ export function AdminLayout() {
           <span className="logo-dot small">J</span>
           <div>
             <strong>Jenix Admin</strong>
-            <p>Catalogue Workspace</p>
+            <p>Admin Workspace</p>
           </div>
         </div>
 

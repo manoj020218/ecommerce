@@ -260,14 +260,20 @@ function findCourierById(shippingStore, courierProfileId) {
   );
 }
 
-function assertPaidOrder(order) {
+function assertDispatchableOrder(order) {
   if (!order) {
     throw new HttpError(404, "Order not found.");
   }
-
-  if (String(order.paymentStatus || "").toLowerCase() !== "paid") {
-    throw new HttpError(409, "Shipment can be created only for paid orders.");
+  const payStatus = String(order.paymentStatus || "").toLowerCase();
+  const orderStatus = String(order.orderStatus || "").toLowerCase();
+  // Allow paid orders, processing orders, or COD orders
+  if (payStatus !== "paid" && orderStatus !== "processing" && order.paymentMethod !== "cod") {
+    throw new HttpError(409, "Shipment can only be created for paid or processing orders.");
   }
+}
+
+function assertPaidOrder(order) {
+  assertDispatchableOrder(order);
 }
 
 function mapOrderSummary(order) {

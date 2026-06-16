@@ -16,6 +16,7 @@ import { InventoryPage } from "../modules/inventory/inventory-page";
 import { InvoicesPage } from "../modules/invoices/invoices-page";
 import { MarketingPage } from "../modules/marketing/marketing-page";
 import { OrdersPage } from "../modules/orders/orders-page";
+import { OrderDetailPage } from "../modules/orders/order-detail-page";
 import { PaymentGatewaysPage } from "../modules/payment-gateways/payment-gateways-page";
 import { PermissionGroupsPage } from "../modules/permission-groups/permission-groups-page";
 import { ReportsPage } from "../modules/reports/reports-page";
@@ -46,6 +47,7 @@ export function AppRouter() {
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="orders" element={<OrdersPage />} />
+          <Route path="orders/:orderId" element={<OrderDetailPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="walk-in-orders" element={<WalkInOrdersPage />} />
           <Route path="invoices" element={<InvoicesPage />} />

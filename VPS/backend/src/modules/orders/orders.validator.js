@@ -15,7 +15,7 @@ const listOrdersQuerySchema = z.object({
     .union([z.enum(["generated", "pending"]), z.literal("")])
     .optional()
     .default(""),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(50)
+  limit: z.coerce.number().int().min(1).max(5000).optional().default(200)
 });
 
 const fulfillmentItemSchema = z.object({

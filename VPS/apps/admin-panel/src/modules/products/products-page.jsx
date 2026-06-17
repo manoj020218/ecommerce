@@ -1112,6 +1112,44 @@ export function ProductsPage() {
       {/* ── LIST VIEW ──────────────────────────────────────────────────────── */}
       {viewMode === "list" && (
         <>
+          {/* Category chips */}
+          {categories.length > 0 && (
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 12, paddingBottom: 2, scrollbarWidth: "none" }}>
+              {[{ id: "", name: `All` }, ...categories].map((c) => {
+                const active = filters.categoryId === c.id;
+                return (
+                  <button
+                    key={c.id || "__all"}
+                    type="button"
+                    onClick={() => {
+                      const next = { ...filters, categoryId: c.id };
+                      setFilters(next);
+                      setPage(1);
+                      loadProducts(next);
+                    }}
+                    style={{
+                      flexShrink: 0,
+                      padding: "6px 14px",
+                      borderRadius: 20,
+                      border: active ? "none" : "1px solid #e5e7eb",
+                      background: active ? "#E8231A" : "#fff",
+                      color: active ? "#fff" : "#4b5563",
+                      fontSize: 12,
+                      fontWeight: active ? 700 : 500,
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                      whiteSpace: "nowrap"
+                    }}
+                    onMouseEnter={(e) => { if (!active) { e.currentTarget.style.borderColor = "#E8231A"; e.currentTarget.style.color = "#E8231A"; } }}
+                    onMouseLeave={(e) => { if (!active) { e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.color = "#4b5563"; } }}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <form className="filter-bar" onSubmit={onFilterSubmit}>
             <input
               type="search"
@@ -1119,13 +1157,6 @@ export function ProductsPage() {
               value={filters.q}
               onChange={(e) => setFilters((cur) => ({ ...cur, q: e.target.value }))}
             />
-            <select
-              value={filters.categoryId}
-              onChange={(e) => setFilters((cur) => ({ ...cur, categoryId: e.target.value }))}
-            >
-              <option value="">All categories</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
             <label className="inline-check">
               <input
                 type="checkbox"

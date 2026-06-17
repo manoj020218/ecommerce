@@ -21,6 +21,8 @@ function createCheckoutRouter() {
   const router = express.Router();
 
   router.post("/start", controller.checkoutStart);
+  router.get("/:checkoutSessionId/follow-up", controller.checkoutGetFollowup);
+  router.get("/:checkoutSessionId/invoice", controller.checkoutDownloadInvoice);
   router.get("/:checkoutSessionId", controller.checkoutGetSession);
 
   return router;

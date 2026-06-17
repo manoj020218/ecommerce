@@ -1,16 +1,35 @@
 import { apiFetch } from "../../shared/api/http-client";
 
-export function listProducts(params = {}) {
+function buildQuery(params = {}) {
   const query = new URLSearchParams();
-  if (params.q) {
-    query.set("q", params.q);
-  }
-  if (params.categoryId) {
-    query.set("categoryId", params.categoryId);
-  }
 
-  const suffix = query.size ? `?${query.toString()}` : "";
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+
+    query.set(key, String(value));
+  });
+
+  return query.toString();
+}
+
+export function listProducts(params = {}) {
+  const suffix = (() => {
+    const query = new URLSearchParams();
+    if (params.q) {
+      query.set("q", params.q);
+    }
+    if (params.categoryId) {
+      query.set("categoryId", params.categoryId);
+    }
+    return query.size ? `?${query.toString()}` : "";
+  })();
   return apiFetch(`/products${suffix}`, { auth: true });
+}
+
+export function listCategories() {
+  return apiFetch("/categories");
 }
 
 export function searchStorefront(params = {}) {
@@ -62,8 +81,13 @@ export function requestNotifyWhenAvailable(payload) {
   });
 }
 
+export function getCart(params = {}) {
+  const query = buildQuery(params);
+  return apiFetch(query ? `/cart?${query}` : "/cart", { auth: true });
+}
+
 export function getCustomerCart() {
-  return apiFetch("/cart", { auth: true });
+  return getCart();
 }
 
 export function addCartItem(payload) {
@@ -82,15 +106,60 @@ export function updateCartItem(productId, payload) {
   });
 }
 
-export function deleteCartItem(productId) {
-  return apiFetch(`/cart/items/${productId}`, {
+export function deleteCartItem(productId, params = {}) {
+  const query = buildQuery(params);
+  return apiFetch(query ? `/cart/items/${productId}?${query}` : `/cart/items/${productId}`, {
     method: "DELETE",
     auth: true
   });
 }
 
+export function mergeGuestCart(guestSessionId) {
+  return apiFetch("/cart/merge", {
+    method: "POST",
+    auth: true,
+    body: { guestSessionId }
+  });
+}
+
 export function startCheckout(payload) {
   return apiFetch("/checkout/start", {
+    method: "POST",
+    auth: true,
+    body: payload
+  });
+}
+
+export function getCheckoutSession(checkoutSessionId, params = {}) {
+  const query = buildQuery(params);
+  return apiFetch(
+    query ? `/checkout/${checkoutSessionId}?${query}` : `/checkout/${checkoutSessionId}`,
+    { auth: true }
+  );
+}
+
+export function getCheckoutOrderFollowup(checkoutSessionId, params = {}) {
+  const query = buildQuery(params);
+  return apiFetch(
+    query
+      ? `/checkout/${checkoutSessionId}/follow-up?${query}`
+      : `/checkout/${checkoutSessionId}/follow-up`,
+    { auth: true }
+  );
+}
+
+export function downloadCheckoutInvoice(checkoutSessionId, params = {}) {
+  const query = buildQuery(params);
+  return apiFetch(
+    query
+      ? `/checkout/${checkoutSessionId}/invoice?${query}`
+      : `/checkout/${checkoutSessionId}/invoice`,
+    { auth: true }
+  );
+}
+
+export function createPaymentAttempt(payload) {
+  return apiFetch("/payments/create-attempt", {
     method: "POST",
     auth: true,
     body: payload

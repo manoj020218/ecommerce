@@ -91,6 +91,7 @@ function buildTemplateVariables(input = {}) {
     orderNo: input.orderNo || "",
     invoiceNo: input.invoiceNo || "",
     paymentLink: input.paymentLink || "",
+    resetPasswordUrl: input.resetPasswordUrl || "",
     trackingId: input.trackingId || "",
     trackingUrl: input.trackingUrl || "",
     courierName: input.courierName || "",

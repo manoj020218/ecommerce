@@ -24,6 +24,15 @@ const customerLoginEmailSchema = z.object({
   guestSessionId: z.string().trim().max(120).optional()
 });
 
+const customerForgotPasswordSchema = z.object({
+  email: z.string().trim().email().max(150)
+});
+
+const customerResetPasswordSchema = z.object({
+  token: z.string().trim().min(20).max(250),
+  password: z.string().min(8).max(120)
+});
+
 const customerGoogleLoginSchema = z.object({
   googleSub: z.string().trim().min(3).max(250),
   email: z.string().trim().email().max(150),
@@ -86,6 +95,16 @@ function parseCustomerLoginEmailPayload(payload) {
   return customerLoginEmailSchema.parse(payload);
 }
 
+function parseCustomerForgotPasswordPayload(payload) {
+  ensureObject(payload, "Customer forgot password");
+  return customerForgotPasswordSchema.parse(payload);
+}
+
+function parseCustomerResetPasswordPayload(payload) {
+  ensureObject(payload, "Customer reset password");
+  return customerResetPasswordSchema.parse(payload);
+}
+
 function parseCustomerGoogleLoginPayload(payload) {
   ensureObject(payload, "Google login");
   return customerGoogleLoginSchema.parse(payload);
@@ -120,6 +139,8 @@ module.exports = {
   parseRefreshPayload,
   parseCustomerRegisterEmailPayload,
   parseCustomerLoginEmailPayload,
+  parseCustomerForgotPasswordPayload,
+  parseCustomerResetPasswordPayload,
   parseCustomerGoogleLoginPayload,
   parseOtpRequestPayload,
   parseOtpVerifyPayload,

@@ -18,6 +18,11 @@ function createPaymentGatewaysRouter() {
     requireAdminPermission(PAYMENT_GATEWAYS_PERMISSIONS.VIEW),
     controller.adminListPaymentGateways
   );
+  router.get(
+    "/:gatewayCode",
+    requireAdminPermission(PAYMENT_GATEWAYS_PERMISSIONS.MANAGE),
+    controller.adminGetPaymentGateway
+  );
   router.patch(
     "/discount/direct-payment",
     requireAdminPermission(PAYMENT_GATEWAYS_PERMISSIONS.MANAGE),

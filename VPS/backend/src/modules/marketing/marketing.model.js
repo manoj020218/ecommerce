@@ -40,6 +40,7 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "orderNo",
   "invoiceNo",
   "paymentLink",
+  "resetPasswordUrl",
   "trackingId",
   "trackingUrl",
   "courierName",
@@ -77,6 +78,7 @@ function createDefaultTemplate(key) {
       "Tracking: {{trackingId}}",
       "Tracking URL: {{trackingUrl}}",
       "Payment link: {{paymentLink}}",
+      "Reset password URL: {{resetPasswordUrl}}",
       "Support: {{supportPhone}}",
       "",
       "Thank you."

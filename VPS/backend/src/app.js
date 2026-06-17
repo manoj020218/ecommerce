@@ -33,6 +33,14 @@ function createApp() {
     })
   );
 
+  app.use(
+    "/static/migration",
+    express.static(path.resolve(process.cwd(), "scripts/migration/output"), {
+      etag: true,
+      maxAge: "1d"
+    })
+  );
+
   app.get("/health", (_req, res) => {
     res.status(200).json({
       success: true,

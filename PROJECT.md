@@ -2058,7 +2058,6 @@ Completed files:
 
 Pending files/tasks before full Phase 2 closure:
 - Complete remaining staff/permission-group management screens in `apps/admin-panel` (admin login is now wired)
-- Integrate customer login/signup/OTP flows in `apps/front`
 - Replace mock Google/OTP verification with provider adapters in future integration phase
 - Add secure HttpOnly cookie strategy for refresh tokens in production deployment hardening
 
@@ -2192,9 +2191,12 @@ Completed files:
 - `VPS/backend/src/config/env.js`
 - `VPS/.env.example`
 - `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/apps/admin-panel/src/modules/search/search.api.js`
+- `VPS/apps/admin-panel/src/modules/search/search-page.jsx`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
 
 Pending files/tasks before full Phase 5 closure:
-- Build admin search management UI in `apps/admin-panel` for synonyms, phrase mappings, redirects, zero-result monitoring, and reindex controls
 - Build front search UX in `apps/front` (autocomplete, recent searches, recently viewed, suggested categories, direct product results)
 - Add click/cart/purchase blended ranking once cart/order modules stabilize in later phases
 - Add semantic/vector adapter integration (future-ready TODO)
@@ -2375,8 +2377,7 @@ Validation completed:
 - `pnpm run check:backend` passed (includes all Phase 8 regression assertions)
 
 Pending files/tasks after Phase 8 closure:
-- Wire admin shipping UI screens in `apps/admin-panel` (rate cards, couriers, queue, tracking, POD)
-- Wire front cart shipping estimator + tracking views in `apps/front`
+- Standalone cart/checkout storefront flow was completed in Jun 2026 with dedicated `/cart` and `/checkout` routes in `VPS/apps/front`
 - Add real courier API adapters in future phases (Shiprocket/Delhivery/DTDC/BlueDart)
 - Implement actual email provider integration for tracking notifications in later notification phase
 
@@ -2436,8 +2437,7 @@ Validation completed:
 - `pnpm run check:backend` passed (includes Phase 9 assertions for gateway controls, duplicate webhook idempotency, manual verification, and method-based discount rules)
 
 Pending files/tasks after Phase 9 closure:
-- Wire admin payment gateway and manual verification screens in `apps/admin-panel`
-- Wire customer manual payment upload and status visibility in `apps/front`
+- Dedicated admin payment-gateway configuration workspace was completed in Jun 2026 in `VPS/apps/admin-panel`
 - Replace current provider placeholders with production gateway credentials and signature verification hardening
 - Add refund workflow UI and settlement reconciliation reporting in later payment/report phases
 
@@ -2471,6 +2471,10 @@ Completed files:
 - `VPS/backend/src/config/env.js`
 - `VPS/.env.example`
 - `VPS/backend/src/checks/run-regression-checks.js`
+- `VPS/apps/admin-panel/src/modules/invoices/invoices.api.js`
+- `VPS/apps/admin-panel/src/modules/invoices/invoices-page.jsx`
+- `VPS/apps/admin-panel/src/modules/tally-export/tally-export.api.js`
+- `VPS/apps/admin-panel/src/modules/tally-export/tally-export-page.jsx`
 
 Delivered APIs (Phase 10):
 - `PUT /api/admin/settings/invoice-settings`
@@ -2492,6 +2496,7 @@ Phase 10 outcomes delivered:
 - Manual payment approval now auto-generates exactly one invoice after admin verification.
 - Invoice snapshot includes seller details, buyer details, GSTIN, place of supply, HSN, SKU, final unit price, taxable value, GST split, shipping line, discount line, round-off, grand total, amount in words, payment status, terms, and custom fields.
 - Tally CSV export added with selected date range filtering and monthly/yearly period support.
+- Admin panel now includes dedicated Invoices and Tally Export workspaces for filterable invoice lookup, manual invoice generation, invoice download, and export preview/download actions.
 - XML export remains future-ready TODO and is explicitly flagged as not yet enabled.
 
 Validation completed:
@@ -2499,7 +2504,6 @@ Validation completed:
 - `node backend/src/checks/run-regression-checks.js` passed (includes Phase 10 assertions for sequential invoice numbering, same-state vs inter-state GST split, invoice lock/idempotent regenerate, duplicate webhook invoice safety, custom fields, round-off, and Tally CSV totals)
 
 Pending files/tasks after Phase 10 closure:
-- Wire admin invoice settings, invoice list, and Tally export screens in `apps/admin-panel`
 - Replace current JSON placeholder invoice download payload with actual PDF/HTML invoice rendering
 
 Phase 11 outcomes delivered:
@@ -2635,7 +2639,6 @@ Validation completed after Phase 14:
 Pending files/tasks after Phase 14 closure:
 - Replace current URL-based blog image fields with upload workflow if content editors need asset management inside admin
 - Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
-- Facebook product feed completed later in Phase 17
 
 Phase 15 (Backend + Storefront + Admin lead capture scope) status: `[x]`
 
@@ -2688,7 +2691,6 @@ Validation completed after Phase 15:
 Pending files/tasks after Phase 15 closure:
 - Replace current URL-based blog image fields with upload workflow if content editors need asset management inside admin
 - Add explicit admin-configurable shipping/return policy settings if richer merchant structured data is needed later
-- Facebook product feed completed later in Phase 17
 
 Phase 16 (Backend + Admin scope: Reports) status: `[x]`
 
@@ -2905,8 +2907,46 @@ Validation completed after Phase 20:
 - `cmd /c pnpm run build:admin` passed
 - `cmd /c pnpm run check:backend` passed
 
+## 13. Admin Audit Gap Closure (Jun 14, 2026)
+
+Completed files:
+- `VPS/backend/src/modules/orders/orders.permissions.js`
+- `VPS/backend/src/modules/orders/orders.validator.js`
+- `VPS/backend/src/modules/orders/orders.service.js`
+- `VPS/backend/src/modules/orders/orders.controller.js`
+- `VPS/backend/src/modules/orders/orders.routes.js`
+- `VPS/backend/src/modules/orders/regression-checklist.md`
+- `VPS/apps/admin-panel/src/app/constants/navigation.js`
+- `VPS/apps/admin-panel/src/app/layout/admin-layout.jsx`
+- `VPS/apps/admin-panel/src/app/router.jsx`
+- `VPS/apps/admin-panel/src/modules/orders/orders.api.js`
+- `VPS/apps/admin-panel/src/modules/orders/orders-page.jsx`
+- `VPS/apps/admin-panel/src/modules/seo/seo-page.jsx`
+- `VPS/apps/admin-panel/src/modules/google-merchant/google-merchant-page.jsx`
+- `VPS/apps/admin-panel/src/modules/facebook-feed/facebook-feed-page.jsx`
+- `VPS/apps/admin-panel/src/shared/utils/public-urls.js`
+- `VPS/apps/admin-panel/src/shared/components/status-badge.jsx`
+- `VPS/apps/admin-panel/src/styles.css`
+
+Audit-gap outcomes delivered:
+- Surfaced the previously unlinked admin routes in sidebar/mobile navigation: Search, Invoices, Tally Export, Audit Logs, Abandoned Carts, Google Merchant, Facebook Feed, and SEO.
+- Fixed admin topbar title resolution for the newly surfaced routes so these screens no longer render under the generic catalogue heading.
+- Added a dedicated cross-channel Orders workspace and `/api/admin/orders` backend so storefront, B2B request, and walk-in orders are visible from one admin module instead of being split across unrelated screens.
+- Reworked the SEO, Google Merchant, and Facebook Feed pages to resolve sitemap/feed URLs directly from admin settings instead of depending on the broader marketing overview endpoint.
+- Expanded the mobile admin navigation to a horizontal scroll pattern so the larger menu remains usable on small screens.
+- Reports remains the dedicated admin reporting screen at `/reports`; the audit closure work here was navigation/discoverability around the wider admin surface, not a new stub page.
+
+Validation after audit-gap closure:
+- `cmd /c pnpm run build:admin` passed
+- `cmd /c pnpm run check:backend` passed
+- `cmd /c pnpm run build:front` passed
+
+Current remaining audit-sensitive gaps:
+- None from the Jun 14, 2026 audit list.
+- Follow-up closure added the cross-channel Orders backend/page, staff and permission-group admin screens, the dedicated payment-gateway admin workspace, printable HTML invoice downloads, the Phase 16 reports regression fix, and the standalone storefront cart/checkout flow.
+
 ---
-## 13. First Codex Execution Prompt
+## 14. First Codex Execution Prompt
 
 Use this prompt to start implementation:
 
@@ -2943,7 +2983,7 @@ After implementation, run basic start/build checks and report results.
 
 ---
 
-## 14. Second Codex Execution Prompt
+## 15. Second Codex Execution Prompt
 
 ```text
 Continue Jenix Commerce from PROJECT.md.
@@ -2973,7 +3013,7 @@ Update PROJECT.md progress.
 
 ---
 
-## 15. Notes for Future Dealer Mobile App
+## 16. Notes for Future Dealer Mobile App
 
 Dealer mobile app is **not Phase 1**. Build web platform first.
 

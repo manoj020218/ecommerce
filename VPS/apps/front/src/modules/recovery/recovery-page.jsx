@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import { getOrCreateGuestSessionId } from "../../shared/cart/guest-session";
+import {
+  StorefrontAlert,
+  StorefrontButton,
+  StorefrontCard,
+  StorefrontErrorState,
+  StorefrontInput,
+  StorefrontLoadingState,
+  StorefrontSectionHeader,
+  StorefrontStickyActionBar
+} from "../../shared/storefront/storefront-ui";
 import { formatCurrency, humanizeStatus, getSupportWhatsappLink } from "../account/account.utils";
 import {
   getRecoveryPreview,
@@ -111,19 +121,23 @@ export function RecoveryPage() {
 
   if (loading) {
     return (
-      <main className="front-shell">
-        <div className="state-box">Loading recovery link...</div>
+      <main className="proto-main-shell">
+        <StorefrontLoadingState label="Loading recovery link..." />
       </main>
     );
   }
 
   if (error && !preview) {
     return (
-      <main className="front-shell">
-        <div className="state-box error">{error}</div>
-        <Link to="/" className="back-link">
-          Back to storefront
-        </Link>
+      <main className="proto-main-shell">
+        <StorefrontErrorState
+          message={error}
+          action={
+            <StorefrontButton to="/" variant="light">
+              Back to storefront
+            </StorefrontButton>
+          }
+        />
       </main>
     );
   }
@@ -134,10 +148,10 @@ export function RecoveryPage() {
   const feedbackOptions = Array.isArray(preview?.feedbackOptions) ? preview.feedbackOptions : [];
 
   return (
-    <main className="front-shell account-shell">
-      <header className="front-header account-hero">
+    <main className="proto-main-shell account-shell recovery-shell">
+      <StorefrontCard className="front-header account-hero" elevated>
         <div className="hero-kicker-row">
-          <Link to="/" className="inline-link">Back to storefront</Link>
+          <StorefrontButton to="/" variant="light">Back to storefront</StorefrontButton>
           <span className="eyebrow-chip">Cart recovery</span>
         </div>
         <div className="account-hero-copy">
@@ -162,17 +176,17 @@ export function RecoveryPage() {
             </div>
           </div>
         </div>
-      </header>
+      </StorefrontCard>
 
-      {error ? <div className="state-box error">{error}</div> : null}
-      {notice ? <div className="state-box">{notice}</div> : null}
+      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+      {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
 
       <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head">
-            <h3>Saved Items</h3>
-            <p>Snapshot from the last tracked cart activity.</p>
-          </div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Saved Items"
+            description="Snapshot from the last tracked cart activity."
+          />
           <div className="card-list">
             {cartItems.length ? (
               cartItems.map((item) => (
@@ -204,20 +218,16 @@ export function RecoveryPage() {
               <div className="empty-panel">No saved items are available on this link.</div>
             )}
           </div>
-        </article>
+        </StorefrontCard>
 
-        <article className="section-card">
-          <div className="section-head">
-            <h3>Restore Cart</h3>
-            <p>
-              Use the link directly, or sign in first if you want the restore to land in your
-              account instead of this browser session.
-            </p>
-          </div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Restore Cart"
+            description="Use the link directly, or sign in first if you want the restore to land in your account instead of this browser session."
+          />
           <div className="stack-form">
-            <button
+            <StorefrontButton
               type="button"
-              className="btn primary"
               onClick={handleRestore}
               disabled={busy === "restore" || preview?.canRestore === false}
             >
@@ -226,53 +236,54 @@ export function RecoveryPage() {
                 : isAuthenticated
                   ? "Restore to My Account"
                   : "Restore to This Device"}
-            </button>
+            </StorefrontButton>
             {!isAuthenticated ? (
-              <Link
+              <StorefrontButton
                 to={`/account/login?redirect=${encodeURIComponent(`/recover/${recoveryToken}`)}`}
-                className="btn secondary"
+                variant="light"
               >
                 Login Before Restoring
-              </Link>
+              </StorefrontButton>
             ) : null}
           </div>
-        </article>
+        </StorefrontCard>
       </section>
 
       <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head">
-            <h3>What Stopped You?</h3>
-            <p>Save one feedback reason so the team can understand checkout friction.</p>
-          </div>
-          <label className="field-grid">
-            <span>Optional note</span>
-            <input
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="What Stopped You?"
+            description="Save one feedback reason so the team can understand checkout friction."
+          />
+          <div className="field-grid">
+            <StorefrontInput
+              label="Optional note"
               value={feedbackNote}
               onChange={(event) => setFeedbackNote(event.target.value)}
               placeholder="Any extra context"
             />
-          </label>
+          </div>
           <div className="feedback-grid">
             {feedbackOptions.map((reason) => (
-              <button
+              <StorefrontButton
                 key={reason}
                 type="button"
-                className="btn secondary feedback-btn"
+                variant="light"
+                className="feedback-btn"
                 onClick={() => handleFeedback(reason)}
                 disabled={busy === `feedback:${reason}`}
               >
                 {busy === `feedback:${reason}` ? "Saving..." : reason}
-              </button>
+              </StorefrontButton>
             ))}
           </div>
-        </article>
+        </StorefrontCard>
 
-        <article className="section-card">
-          <div className="section-head">
-            <h3>Need Help?</h3>
-            <p>Contact the support team directly from the recovery page.</p>
-          </div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Need Help?"
+            description="Contact the support team directly from the recovery page."
+          />
           <div className="detail-pairs">
             <div>
               <span>Store</span>
@@ -289,32 +300,55 @@ export function RecoveryPage() {
           </div>
           <div className="action-row">
             {support.supportEmail ? (
-              <a className="btn secondary" href={`mailto:${support.supportEmail}`}>
+              <StorefrontButton href={`mailto:${support.supportEmail}`} variant="light">
                 Email
-              </a>
+              </StorefrontButton>
             ) : null}
             {support.supportPhone ? (
-              <a className="btn secondary" href={`tel:${support.supportPhone}`}>
+              <StorefrontButton href={`tel:${support.supportPhone}`} variant="light">
                 Call
-              </a>
+              </StorefrontButton>
             ) : null}
             {support.supportWhatsApp ? (
-              <a
-                className="btn whatsapp"
+              <StorefrontButton
                 href={getSupportWhatsappLink(
                   support.supportWhatsApp,
                   "Need help completing my recovered cart."
                 )}
                 target="_blank"
                 rel="noreferrer"
+                variant="whatsapp"
               >
                 WhatsApp
-              </a>
+              </StorefrontButton>
             ) : null}
           </div>
-        </article>
+        </StorefrontCard>
       </section>
+
+      <StorefrontStickyActionBar className="proto-sticky-recovery-bar">
+        <div>
+          <span>Saved Cart</span>
+          <strong>{formatCurrency(recovery.cartValue)}</strong>
+        </div>
+        {preview?.canRestore === false ? (
+          <StorefrontButton to="/products" variant="light">
+            Browse Products
+          </StorefrontButton>
+        ) : (
+          <StorefrontButton
+            type="button"
+            onClick={handleRestore}
+            disabled={busy === "restore"}
+          >
+            {busy === "restore"
+              ? "Restoring..."
+              : isAuthenticated
+                ? "Restore to My Account"
+                : "Restore to This Device"}
+          </StorefrontButton>
+        )}
+      </StorefrontStickyActionBar>
     </main>
   );
 }
-

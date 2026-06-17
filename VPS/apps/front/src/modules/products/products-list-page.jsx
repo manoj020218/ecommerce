@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { listProducts, searchStorefront } from "./products.api";
-import { usePublicSettings } from "../settings/public-settings-context";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { buildCartContext, notifyStorefrontCartUpdated } from "../cart/cart.utils";
 import { useCustomerSession } from "../../shared/auth/customer-session";
-import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
+import {
+  StorefrontAlert,
+  StorefrontButton,
+  StorefrontChip,
+  StorefrontEmptyState,
+  StorefrontLoadingState,
+  StorefrontPageHeader,
+  StorefrontSelect
+} from "../../shared/storefront/storefront-ui";
+import {
+  addCartItem,
+  listCategories,
+  listProducts
+} from "./products.api";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -11,45 +23,6 @@ function currency(amount) {
     currency: "INR",
     maximumFractionDigits: 0
   }).format(Number(amount || 0));
-}
-
-function upsertMetaTag(name, content, attribute = "name") {
-  if (!content) {
-    return;
-  }
-
-  let tag = document.head.querySelector(`meta[${attribute}="${name}"]`);
-  if (!tag) {
-    tag = document.createElement("meta");
-    tag.setAttribute(attribute, name);
-    document.head.append(tag);
-  }
-
-  tag.setAttribute("content", content);
-}
-
-function upsertCanonical(url) {
-  if (!url) {
-    return;
-  }
-
-  let tag = document.head.querySelector('link[rel="canonical"]');
-  if (!tag) {
-    tag = document.createElement("link");
-    tag.setAttribute("rel", "canonical");
-    document.head.append(tag);
-  }
-
-  tag.setAttribute("href", url);
-}
-
-function buildWhatsAppLink(number, message) {
-  const digits = String(number || "").replace(/[^\d]/g, "");
-  if (!digits) {
-    return "";
-  }
-
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 function visiblePrice(product) {
@@ -60,250 +33,430 @@ function compareAtPrice(product) {
   if (product?.pricing?.compareAtPrice !== null && product?.pricing?.compareAtPrice !== undefined) {
     return Number(product.pricing.compareAtPrice);
   }
+
   const basePrice = Number(product?.basePrice || 0);
   const salePrice = Number(product?.salePrice || 0);
   return basePrice > salePrice ? basePrice : null;
 }
 
-function ProductCard({ product }) {
-  const imageUrl = Array.isArray(product.images) && product.images[0] ? product.images[0] : null;
-  const nextVisiblePrice = visiblePrice(product);
-  const nextCompareAtPrice = compareAtPrice(product);
+function ProductCard({ product, busy, onAddToCart }) {
+  const price = visiblePrice(product);
+  const comparePrice = compareAtPrice(product);
 
   return (
-    <Link to={`/products/${product.slug}`} className="product-card">
-      <div className="product-card-media">
-        {imageUrl ? (
-          <img src={imageUrl} alt={product.title} loading="lazy" />
+    <Link to={`/products/${product.slug}`} className="proto-product-card proto-product-card-grid">
+      <div className="proto-product-media proto-product-media-grid">
+        {Array.isArray(product.images) && product.images[0] ? (
+          <img src={product.images[0]} alt={product.title} loading="lazy" />
         ) : (
-          <div className="product-card-placeholder">No image</div>
+          <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
         )}
       </div>
-      <div className="product-card-body">
-        <p className="product-card-brand">{product.brand || "Jenix India"}</p>
+      <div className="proto-product-copy">
+        <p>{product.brand || "Jenix India"}</p>
         <h3>{product.title}</h3>
-        <div className="product-card-price-row">
-          <strong>{currency(nextVisiblePrice)}</strong>
-          {nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice ? (
-            <span>{currency(nextCompareAtPrice)}</span>
-          ) : null}
+        <div className="proto-price-row">
+          <strong>{currency(price)}</strong>
+          {comparePrice && comparePrice > price ? <span>{currency(comparePrice)}</span> : null}
         </div>
-        {product?.pricing?.isB2BPrice ? <p className="product-card-brand">Approved dealer price</p> : null}
+        <small>+{Number(product.gstRate || 18)}% GST</small>
+        <StorefrontButton
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            onAddToCart(product);
+          }}
+          disabled={busy}
+        >
+          {busy ? "Adding..." : "Add to Cart"}
+        </StorefrontButton>
       </div>
     </Link>
   );
 }
 
+function sortProducts(products, sortValue) {
+  const rows = [...products];
+
+  if (sortValue === "price_low") {
+    return rows.sort((left, right) => visiblePrice(left) - visiblePrice(right));
+  }
+
+  if (sortValue === "price_high") {
+    return rows.sort((left, right) => visiblePrice(right) - visiblePrice(left));
+  }
+
+  if (sortValue === "title") {
+    return rows.sort((left, right) => left.title.localeCompare(right.title));
+  }
+
+  return rows;
+}
+
 export function ProductsListPage() {
-  const { customer, isAuthenticated } = useCustomerSession();
-  const { settings: publicSettings } = usePublicSettings();
-  const [query, setQuery] = useState("");
-  const [searchText, setSearchText] = useState("");
+  const navigate = useNavigate();
+  const { slug } = useParams();
+  const { isAuthenticated } = useCustomerSession();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [categoryLoading, setCategoryLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busyProductId, setBusyProductId] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  const query = searchParams.get("q") || "";
+  const sortValue = searchParams.get("sort") || "relevance";
+  const inStockOnly = searchParams.get("availability") === "in_stock";
 
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    setError("");
+    let active = true;
 
-    const request = query
-      ? searchStorefront({ q: query, limit: 20 })
-      : listProducts({ q: "" });
-
-    request
-      .then((payload) => {
-        if (!mounted) {
-          return;
+    setCategoryLoading(true);
+    listCategories()
+      .then((rows) => {
+        if (active) {
+          setCategories(Array.isArray(rows) ? rows : []);
         }
-
-        if (query) {
-          const results = Array.isArray(payload?.results) ? payload.results : [];
-          setProducts(
-            results
-              .filter((row) => row.entityType === "product" && row.product)
-              .map((row) => row.product)
-          );
-          setBlogs(
-            results
-              .filter((row) => row.entityType === "blog" && row.blog)
-              .map((row) => row.blog)
-          );
-          return;
-        }
-
-        setProducts(Array.isArray(payload) ? payload : []);
-        setBlogs([]);
       })
-      .catch((err) => {
-        if (mounted) {
-          setError(err.message || "Failed to load products.");
+      .catch(() => {
+        if (active) {
+          setCategories([]);
         }
       })
       .finally(() => {
-        if (mounted) {
+        if (active) {
+          setCategoryLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activeCategory = useMemo(
+    () => categories.find((category) => category.slug === slug) || null,
+    [categories, slug]
+  );
+  const unknownCategory = Boolean(slug && !categoryLoading && !activeCategory);
+
+  useEffect(() => {
+    if (categoryLoading || unknownCategory) {
+      if (unknownCategory) {
+        setProducts([]);
+        setLoading(false);
+        setError("This category is not available in the current catalog.");
+      }
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    setError("");
+
+    listProducts({
+      q: query,
+      categoryId: activeCategory?.id || ""
+    })
+      .then((rows) => {
+        if (!active) {
+          return;
+        }
+
+        let nextProducts = Array.isArray(rows) ? rows : [];
+        if (inStockOnly) {
+          nextProducts = nextProducts.filter((product) => product.isPurchasable);
+        }
+        setProducts(sortProducts(nextProducts, sortValue));
+      })
+      .catch((requestError) => {
+        if (active) {
+          setError(requestError.message || "Failed to load products.");
+        }
+      })
+      .finally(() => {
+        if (active) {
           setLoading(false);
         }
       });
 
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [query]);
+  }, [activeCategory?.id, categoryLoading, inStockOnly, query, sortValue, unknownCategory]);
 
-  useEffect(() => {
-    const seoDefaults = publicSettings.seoDefaults || {};
-    const homeMetaTitle = seoDefaults.homeMetaTitle || publicSettings.storeProfile.storeName;
-    const canonicalRoot = String(seoDefaults.canonicalDomain || "").replace(/\/+$/, "");
+  const selectedCategoryName = activeCategory?.name || "All Products";
 
-    if (homeMetaTitle) {
-      document.title = homeMetaTitle;
-      upsertMetaTag("og:title", homeMetaTitle, "property");
+  const updateSearch = (nextValues = {}) => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    Object.entries(nextValues).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "" || value === false) {
+        nextParams.delete(key);
+      } else {
+        nextParams.set(key, String(value));
+      }
+    });
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const addProductToCart = async (product) => {
+    setBusyProductId(product.id);
+    setNotice("");
+
+    try {
+      await addCartItem({
+        ...buildCartContext(isAuthenticated),
+        productId: product.id,
+        qty: 1
+      });
+      notifyStorefrontCartUpdated();
+      setNotice(`${product.title} added to cart.`);
+    } catch (requestError) {
+      setNotice(requestError.message || "Unable to add this product to the cart.");
+    } finally {
+      setBusyProductId("");
     }
+  };
 
-    if (seoDefaults.homeMetaDescription) {
-      upsertMetaTag("description", seoDefaults.homeMetaDescription);
-      upsertMetaTag("og:description", seoDefaults.homeMetaDescription, "property");
-    }
+  const clearFilters = () => {
+    setMobileFiltersOpen(false);
+    navigate("/products");
+  };
 
-    if (seoDefaults.defaultOgImageUrl) {
-      upsertMetaTag("og:image", seoDefaults.defaultOgImageUrl, "property");
-    }
-
-    if (seoDefaults.searchConsoleVerification) {
-      upsertMetaTag(
-        "google-site-verification",
-        seoDefaults.searchConsoleVerification
-      );
-    }
-
-    if (seoDefaults.bingVerification) {
-      upsertMetaTag("msvalidate.01", seoDefaults.bingVerification);
-    }
-
-    if (canonicalRoot) {
-      upsertCanonical(`${canonicalRoot}/`);
-    }
-  }, [publicSettings]);
-
-  const total = useMemo(() => products.length + blogs.length, [products, blogs]);
-  const storeProfile = publicSettings.storeProfile || {};
-  const contactInformation = publicSettings.contactInformation || {};
-  const storeName = storeProfile.storeName || "Jenix India";
-  const heroTitle =
-    publicSettings.seoDefaults.homeMetaTitle === storeName
-      ? "Security Product Store"
-      : publicSettings.seoDefaults.homeMetaTitle || "Security Product Store";
-  const heroDescription =
-    publicSettings.seoDefaults.homeMetaDescription ||
-    "Browse CCTV, networking, access control, and automation products.";
-  const supportPhone =
-    contactInformation.publicPhone || storeProfile.supportMobile || "";
-  const supportWhatsApp =
-    contactInformation.publicWhatsApp || storeProfile.whatsappNumber || "";
-  const supportTiming =
-    contactInformation.supportTiming || storeProfile.businessHours || "";
+  const navigateToCategory = (nextSlug = "") => {
+    setMobileFiltersOpen(false);
+    const nextParams = new URLSearchParams(searchParams);
+    const suffix = nextParams.toString();
+    const nextPath = nextSlug ? `/categories/${nextSlug}` : "/products";
+    navigate(suffix ? `${nextPath}?${suffix}` : nextPath);
+  };
 
   return (
-    <main className="front-shell">
-      <header className="front-header">
-        <div className="hero-kicker-row">
-          <span className="eyebrow-chip">Storefront</span>
-          <Link to={isAuthenticated ? "/account" : "/account/login"} className="inline-link">
-            {isAuthenticated
-              ? `Account: ${(customer?.name || "Customer").split(" ")[0]}`
-              : "Customer Login"}
-          </Link>
-        </div>
-        <div className="brand-block">
-          <p>{storeName}</p>
-          <h1>{heroTitle}</h1>
-          <span className="hero-support-copy">
-            {heroDescription}
-            {supportTiming ? ` Support timing: ${supportTiming}.` : ""}
-          </span>
-        </div>
+    <main className="proto-main-shell">
+      <div className="proto-listing-shell">
+        <nav className="proto-breadcrumb">
+          <Link to="/">Home</Link>
+          <span>/</span>
+          <span>{selectedCategoryName}</span>
+        </nav>
 
-        <div className="chip-row">
-          <Link to="/guides" className="inline-link">
-            Browse Guides
-          </Link>
-          {supportPhone ? (
-            <a href={`tel:${supportPhone}`} className="inline-link">
-              Call Store
-            </a>
+        <StorefrontPageHeader
+          className="proto-listing-header"
+          title={selectedCategoryName}
+          description={
+            query
+              ? `${products.length} results for "${query}"`
+              : `${products.length} products found`
+          }
+          actions={
+            <div className="proto-listing-actions">
+              <StorefrontSelect
+              value={sortValue}
+              onChange={(event) => updateSearch({ sort: event.target.value })}
+              >
+                <option value="relevance">Sort: Relevance</option>
+                <option value="price_low">Price: Low to High</option>
+                <option value="price_high">Price: High to Low</option>
+                <option value="title">Alphabetical</option>
+              </StorefrontSelect>
+              <StorefrontButton
+                type="button"
+                variant="light"
+                className="proto-mobile-filter-trigger"
+              onClick={() => setMobileFiltersOpen(true)}
+              >
+                Filters
+              </StorefrontButton>
+            </div>
+          }
+        />
+
+        {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
+        {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+
+        <div className="proto-filter-chip-row">
+          {slug ? (
+            <StorefrontChip type="button" active onClick={clearFilters}>
+              {selectedCategoryName}
+            </StorefrontChip>
           ) : null}
-          {supportWhatsApp ? (
-            <a
-              href={buildWhatsAppLink(
-                supportWhatsApp,
-                `Need help choosing products from ${storeName}.`
-              )}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-link"
+          {query ? (
+            <StorefrontChip type="button" active onClick={() => updateSearch({ q: "" })}>
+              Search: {query}
+            </StorefrontChip>
+          ) : null}
+          {inStockOnly ? (
+            <StorefrontChip
+              type="button"
+              active
+              onClick={() => updateSearch({ availability: "" })}
             >
-              WhatsApp Help
-            </a>
+              In Stock Only
+            </StorefrontChip>
+          ) : null}
+          {slug || query || inStockOnly ? (
+            <button type="button" className="proto-filter-reset" onClick={clearFilters}>
+              Clear all
+            </button>
           ) : null}
         </div>
 
-        <form
-          className="front-search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setQuery(searchText.trim());
-          }}
-        >
-          <input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder="Search by product, model, or keyword"
-          />
-          <button type="submit">Search</button>
-        </form>
-      </header>
-
-      <section className="list-meta">
-        <p>{query ? `Showing results for "${query}"` : "Browse all products"}</p>
-        <strong>{total} items</strong>
-      </section>
-
-      {loading ? <div className="state-box">Loading products...</div> : null}
-      {error ? <div className="state-box error">{error}</div> : null}
-
-      {!loading && !error ? (
-        <>
-          {products.length > 0 ? (
-            <section className="products-grid">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </section>
-          ) : null}
-
-          {blogs.length > 0 ? (
-            <section className="section-block">
-              <div className="section-head">
-                <h3>Helpful guides from search</h3>
-              </div>
-              <div className="guide-inline-grid">
-                {blogs.map((blog) => (
-                  <Link key={blog.id} to={`/guides/${blog.slug}`} className="guide-inline-card">
-                    <span className="eyebrow-chip">{blog.category?.name || "Guide"}</span>
-                    <strong>{blog.title}</strong>
-                    <p>{blog.excerpt}</p>
-                  </Link>
+        <div className="proto-filter-layout">
+          <aside className="proto-filter-sidebar">
+            <div className="proto-filter-card">
+              <h3>Categories</h3>
+              <div className="proto-filter-stack">
+                <button
+                  type="button"
+                  className={`proto-filter-option${!slug ? " active" : ""}`}
+                  onClick={() => navigateToCategory("")}
+                >
+                  All Products
+                </button>
+                {categories.map((category) => (
+                  <button
+                    key={category.id}
+                    type="button"
+                    className={`proto-filter-option${slug === category.slug ? " active" : ""}`}
+                    onClick={() => {
+                      navigateToCategory(category.slug);
+                    }}
+                  >
+                    {category.name}
+                  </button>
                 ))}
               </div>
-            </section>
-          ) : null}
+            </div>
 
-          <WebsiteBuyerLeadSection />
-        </>
-      ) : null}
+            <div className="proto-filter-card">
+              <h3>Availability</h3>
+              <label className="proto-check-option">
+                <input
+                  type="checkbox"
+                  checked={inStockOnly}
+                  onChange={(event) =>
+                    updateSearch({
+                      availability: event.target.checked ? "in_stock" : ""
+                    })
+                  }
+                />
+                <span>In Stock Only</span>
+              </label>
+            </div>
+          </aside>
+
+          <section className="proto-listing-content">
+            {loading ? <StorefrontLoadingState label="Loading products..." /> : null}
+
+            {!loading && products.length === 0 && !error ? (
+              <StorefrontEmptyState
+                title="No products matched"
+                description="Try another category, search keyword, or availability filter."
+              />
+            ) : null}
+
+            {!loading && products.length > 0 ? (
+              <div className="proto-product-grid proto-product-grid-catalog">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    busy={busyProductId === product.id}
+                    onAddToCart={addProductToCart}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </section>
+        </div>
+      </div>
+
+      <div className={`proto-mobile-sheet${mobileFiltersOpen ? " open" : ""}`}>
+        <button
+          type="button"
+          className="proto-mobile-sheet-backdrop"
+          onClick={() => setMobileFiltersOpen(false)}
+          aria-label="Close filters"
+        />
+        <div className="proto-mobile-sheet-panel">
+          <div className="proto-mobile-sheet-head">
+            <h3>Filters</h3>
+            <button type="button" onClick={() => setMobileFiltersOpen(false)}>
+              Close
+            </button>
+          </div>
+
+          <div className="proto-filter-card">
+            <h3>Sort</h3>
+            <StorefrontSelect
+              value={sortValue}
+              onChange={(event) => updateSearch({ sort: event.target.value })}
+            >
+              <option value="relevance">Relevance</option>
+              <option value="price_low">Price: Low to High</option>
+              <option value="price_high">Price: High to Low</option>
+              <option value="title">Alphabetical</option>
+            </StorefrontSelect>
+          </div>
+
+          <div className="proto-filter-card">
+            <h3>Categories</h3>
+            <div className="proto-filter-stack">
+              <button
+                type="button"
+                className={`proto-filter-option${!slug ? " active" : ""}`}
+                onClick={() => {
+                  navigateToCategory("");
+                }}
+              >
+                All Products
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`proto-filter-option${slug === category.slug ? " active" : ""}`}
+                  onClick={() => {
+                    navigateToCategory(category.slug);
+                  }}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="proto-filter-card">
+            <h3>Availability</h3>
+            <label className="proto-check-option">
+              <input
+                type="checkbox"
+                checked={inStockOnly}
+                onChange={(event) =>
+                  updateSearch({
+                    availability: event.target.checked ? "in_stock" : ""
+                  })
+                }
+              />
+              <span>In Stock Only</span>
+            </label>
+          </div>
+
+          <div className="proto-mobile-sheet-actions">
+            <StorefrontButton type="button" variant="light" onClick={clearFilters}>
+              Clear
+            </StorefrontButton>
+            <StorefrontButton type="button" onClick={() => setMobileFiltersOpen(false)}>
+              Apply Filters
+            </StorefrontButton>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

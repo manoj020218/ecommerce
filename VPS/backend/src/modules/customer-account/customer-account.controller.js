@@ -82,7 +82,7 @@ const getInvoice = asyncHandler(async (req, res) => {
 
 const downloadInvoice = asyncHandler(async (req, res) => {
   const data = await service.downloadCustomerInvoice(req.customer.id, req.params.invoiceId);
-  return ok(res, data, "Customer invoice download payload fetched.");
+  return ok(res, data, "Customer invoice HTML download prepared.");
 });
 
 const listTracking = asyncHandler(async (req, res) => {

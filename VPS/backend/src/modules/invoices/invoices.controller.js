@@ -48,7 +48,7 @@ const adminGenerateInvoice = asyncHandler(async (req, res) => {
 
 const adminDownloadInvoice = asyncHandler(async (req, res) => {
   const data = await service.getInvoiceDownload(req.params.invoiceId);
-  return ok(res, data, "Invoice download payload fetched.");
+  return ok(res, data, "Invoice HTML download prepared.");
 });
 
 module.exports = {

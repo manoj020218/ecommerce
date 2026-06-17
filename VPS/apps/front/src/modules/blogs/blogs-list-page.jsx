@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import {
+  StorefrontAlert,
+  StorefrontBadge,
+  StorefrontButton,
+  StorefrontCard,
+  StorefrontInput,
+  StorefrontLoadingState,
+  StorefrontPageHeader,
+  StorefrontSelect
+} from "../../shared/storefront/storefront-ui";
 import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 import { listBlogCategories, listBlogs } from "./blogs.api";
 
@@ -18,28 +28,28 @@ function formatDate(value) {
 
 function GuideCard({ blog }) {
   return (
-    <article className="guide-list-card">
+    <StorefrontCard as="article" className="guide-list-card" elevated>
       <div className="guide-list-copy">
         <div className="hero-kicker-row">
-          <span className="eyebrow-chip">{blog.category?.name || "Guide"}</span>
+          <StorefrontBadge className="eyebrow-chip">{blog.category?.name || "Guide"}</StorefrontBadge>
           <span className="guide-meta-text">
-            {formatDate(blog.publishedAt)} - {blog.readingTimeMinutes} min read
+            {formatDate(blog.publishedAt)} | {blog.readingTimeMinutes} min read
           </span>
         </div>
         <h3>{blog.title}</h3>
         <p>{blog.excerpt}</p>
         <div className="chip-row">
           {(Array.isArray(blog.tags) ? blog.tags : []).slice(0, 4).map((tag) => (
-            <span key={tag} className="search-chip">
+            <StorefrontBadge key={tag} className="search-chip">
               {tag}
-            </span>
+            </StorefrontBadge>
           ))}
         </div>
       </div>
-      <Link to={`/guides/${blog.slug}`} className="btn secondary compact-guide-link">
+      <StorefrontButton to={`/guides/${blog.slug}`} variant="light" className="compact-guide-link">
         Read Guide
-      </Link>
-    </article>
+      </StorefrontButton>
+    </StorefrontCard>
   );
 }
 
@@ -91,20 +101,23 @@ export function BlogsListPage() {
   const totalGuides = useMemo(() => blogs.length, [blogs]);
 
   return (
-    <main className="front-shell">
-      <header className="front-header">
-        <div className="hero-kicker-row">
-          <span className="eyebrow-chip">Knowledge Base</span>
-          <Link to={isAuthenticated ? "/account" : "/account/login"} className="inline-link">
-            {isAuthenticated
-              ? `Account: ${(customer?.name || "Customer").split(" ")[0]}`
-              : "Customer Login"}
-          </Link>
-        </div>
-        <div className="brand-block">
-          <p>Jenix India</p>
-          <h1>Installation Guides, Buying Advice, and Troubleshooting</h1>
-        </div>
+    <main className="proto-main-shell">
+      <StorefrontCard className="front-header" elevated>
+        <StorefrontPageHeader
+          eyebrow="Knowledge Base"
+          title="Installation Guides, Buying Advice, and Troubleshooting"
+          description="Browse setup notes, product comparisons, and support articles in the same storefront theme."
+          actions={
+            <StorefrontButton
+              to={isAuthenticated ? "/account" : "/account/login"}
+              variant="light"
+            >
+              {isAuthenticated
+                ? `Account: ${(customer?.name || "Customer").split(" ")[0]}`
+                : "Customer Login"}
+            </StorefrontButton>
+          }
+        />
 
         <form
           className="guide-filter-grid"
@@ -113,30 +126,30 @@ export function BlogsListPage() {
             setQuery(searchText.trim());
           }}
         >
-          <input
+          <StorefrontInput
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             placeholder="Search CCTV, smart lock, router, or troubleshooting guides"
           />
-          <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+          <StorefrontSelect value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
             <option value="">All guide categories</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
               </option>
             ))}
-          </select>
-          <button type="submit">Search</button>
+          </StorefrontSelect>
+          <StorefrontButton type="submit">Search</StorefrontButton>
         </form>
-      </header>
+      </StorefrontCard>
 
       <section className="list-meta">
         <p>{query ? `Showing guide results for "${query}"` : "Browse all published guides"}</p>
         <strong>{totalGuides} guides</strong>
       </section>
 
-      {loading ? <div className="state-box">Loading guides...</div> : null}
-      {error ? <div className="state-box error">{error}</div> : null}
+      {loading ? <StorefrontLoadingState label="Loading guides..." /> : null}
+      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
 
       {!loading && !error ? (
         <>

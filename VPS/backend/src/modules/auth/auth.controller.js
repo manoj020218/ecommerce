@@ -7,6 +7,8 @@ const {
   parseRefreshPayload,
   parseCustomerRegisterEmailPayload,
   parseCustomerLoginEmailPayload,
+  parseCustomerForgotPasswordPayload,
+  parseCustomerResetPasswordPayload,
   parseCustomerGoogleLoginPayload,
   parseOtpRequestPayload,
   parseOtpVerifyPayload,
@@ -66,6 +68,22 @@ const customerLoginEmail = asyncHandler(async (req, res) => {
   const payload = parseCustomerLoginEmailPayload(req.body);
   const data = await service.customerLoginEmail(payload);
   return ok(res, data, "Customer login successful.");
+});
+
+const customerForgotPassword = asyncHandler(async (req, res) => {
+  const payload = parseCustomerForgotPasswordPayload(req.body);
+  const data = await service.customerForgotPassword(payload);
+  return ok(
+    res,
+    data,
+    "If the email exists, password reset instructions have been prepared."
+  );
+});
+
+const customerResetPassword = asyncHandler(async (req, res) => {
+  const payload = parseCustomerResetPasswordPayload(req.body);
+  const data = await service.customerResetPassword(payload);
+  return ok(res, data, "Customer password reset successful.");
 });
 
 const customerLoginGoogle = asyncHandler(async (req, res) => {
@@ -143,6 +161,8 @@ module.exports = {
   adminMe,
   customerRegisterEmail,
   customerLoginEmail,
+  customerForgotPassword,
+  customerResetPassword,
   customerLoginGoogle,
   customerRequestOtp,
   customerVerifyOtp,

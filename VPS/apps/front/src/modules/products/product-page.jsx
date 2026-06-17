@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   getCustomerAccountBootstrap,
   listSavedProducts,
@@ -7,6 +7,16 @@ import {
   saveProduct
 } from "../account/account.api";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import {
+  StorefrontAlert,
+  StorefrontBadge,
+  StorefrontButton,
+  StorefrontInput,
+  StorefrontLoadingState,
+  StorefrontSectionHeader,
+  StorefrontSelect,
+  StorefrontStickyActionBar
+} from "../../shared/storefront/storefront-ui";
 import {
   addCartItem,
   deleteCartItem,
@@ -19,7 +29,10 @@ import {
   startCheckout,
   updateCartItem
 } from "./products.api";
-import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
+import {
+  buildCartContext,
+  notifyStorefrontCartUpdated
+} from "../cart/cart.utils";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -44,15 +57,15 @@ function statusLabel(stockStatus) {
 
 function statusTone(stockStatus) {
   if (stockStatus === "in_stock") {
-    return "tone-green";
+    return "success";
   }
   if (stockStatus === "low_stock") {
-    return "tone-amber";
+    return "warning";
   }
   if (stockStatus === "backorder") {
-    return "tone-blue";
+    return "info";
   }
-  return "tone-red";
+  return "danger";
 }
 
 function visiblePrice(product) {
@@ -82,14 +95,16 @@ function defaultAddress(savedAddresses = []) {
 }
 
 function ProductMiniCard({ product }) {
-  const imageUrl = Array.isArray(product.images) && product.images[0] ? product.images[0] : null;
-
   return (
-    <Link to={`/products/${product.slug}`} className="mini-card">
-      <div className="mini-media">
-        {imageUrl ? <img src={imageUrl} alt={product.title} loading="lazy" /> : <span>No image</span>}
+    <Link to={`/products/${product.slug}`} className="proto-mini-product">
+      <div className="proto-mini-product-media">
+        {Array.isArray(product.images) && product.images[0] ? (
+          <img src={product.images[0]} alt={product.title} loading="lazy" />
+        ) : (
+          <span>{product.brand || "Jenix"}</span>
+        )}
       </div>
-      <div className="mini-body">
+      <div className="proto-mini-product-copy">
         <p>{product.title}</p>
         <strong>{currency(visiblePrice(product))}</strong>
       </div>
@@ -103,11 +118,9 @@ function ProductCarousel({ title, items }) {
   }
 
   return (
-    <section className="section-block">
-      <div className="section-head">
-        <h3>{title}</h3>
-      </div>
-      <div className="carousel-track">
+    <section className="proto-section">
+      <StorefrontSectionHeader title={title} />
+      <div className="proto-mini-product-track">
         {items.map((product) => (
           <ProductMiniCard key={`${title}-${product.id}`} product={product} />
         ))}
@@ -119,6 +132,7 @@ function ProductCarousel({ title, items }) {
 export function ProductPage() {
   const { slug } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const { customer, isAuthenticated } = useCustomerSession();
   const [product, setProduct] = useState(null);
   const [breadcrumb, setBreadcrumb] = useState([]);
@@ -130,6 +144,7 @@ export function ProductPage() {
   const [recommendationError, setRecommendationError] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState("keyFeatures");
+  const [selectedImage, setSelectedImage] = useState("");
   const [pincode, setPincode] = useState("");
   const [shipping, setShipping] = useState(null);
   const [shippingLoading, setShippingLoading] = useState(false);
@@ -163,6 +178,9 @@ export function ProductPage() {
   const [orderRequestLoading, setOrderRequestLoading] = useState(false);
   const [orderRequestError, setOrderRequestError] = useState("");
   const [orderRequestNotice, setOrderRequestNotice] = useState("");
+  const [cartActionBusy, setCartActionBusy] = useState("");
+  const [cartActionError, setCartActionError] = useState("");
+  const [cartActionNotice, setCartActionNotice] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -175,6 +193,9 @@ export function ProductPage() {
     setStructuredData(null);
     setNotifyError("");
     setNotifyNotice("");
+    setCartActionError("");
+    setCartActionNotice("");
+    setSelectedImage("");
 
     getProduct(slug)
       .then((data) => {
@@ -182,16 +203,17 @@ export function ProductPage() {
           return;
         }
         setProduct(data);
+        setSelectedImage(Array.isArray(data.images) && data.images[0] ? data.images[0] : "");
         setQuantity(Math.max(1, Number(data.moq || 1)));
         setBreadcrumb([
           { label: "Home", href: "/" },
-          { label: "Products", href: "/" },
+          { label: "Products", href: "/products" },
           { label: data.title, href: `/products/${data.slug}` }
         ]);
       })
-      .catch((err) => {
+      .catch((requestError) => {
         if (mounted) {
-          setError(err.message || "Failed to load product.");
+          setError(requestError.message || "Failed to load product.");
         }
       })
       .finally(() => {
@@ -214,10 +236,11 @@ export function ProductPage() {
           setRecommendations(bundle.recommendations);
         }
       })
-      .catch(async (err) => {
+      .catch(async (requestError) => {
         if (!mounted) {
           return;
         }
+
         try {
           const fallback = await getProductRecommendations(slug);
           if (mounted) {
@@ -229,7 +252,7 @@ export function ProductPage() {
         } catch (_fallbackError) {
           if (mounted) {
             setRecommendationError(
-              err.message || "Recommendations are temporarily unavailable."
+              requestError.message || "Recommendations are temporarily unavailable."
             );
           }
         }
@@ -316,7 +339,7 @@ export function ProductPage() {
         }));
       })
       .catch(() => {
-        // Keep the order request form editable even if account bootstrap fails.
+        // Keep the form editable if account bootstrap fails.
       });
 
     return () => {
@@ -331,32 +354,35 @@ export function ProductPage() {
   ]);
 
   const effectiveBulkSlabs = useMemo(() => {
-    if (!product) {
+    if (!product || product?.pricing?.isB2BPrice) {
       return [];
     }
-    if (product?.pricing?.isB2BPrice) {
-      return [];
-    }
+
     const slabs = Array.isArray(product.bulkPriceSlabs) ? [...product.bulkPriceSlabs] : [];
-    if (slabs.length === 0) {
-      return [];
-    }
-    return slabs.sort((a, b) => Number(a.minQty) - Number(b.minQty));
+    return slabs.sort((left, right) => Number(left.minQty) - Number(right.minQty));
   }, [product]);
 
+  const images = Array.isArray(product?.images) ? product.images : [];
   const keyFeatures = Array.isArray(product?.keyFeatures) ? product.keyFeatures : [];
-  const specs = product?.specifications && typeof product.specifications === "object"
-    ? Object.entries(product.specifications)
-    : [];
+  const specs =
+    product?.specifications && typeof product.specifications === "object"
+      ? Object.entries(product.specifications)
+      : [];
   const downloads = Array.isArray(product?.downloads) ? product.downloads : [];
   const recGroups = recommendations?.recommendationGroups || {};
-  const recentSearches = recommendations?.recently?.searches || [];
-  const recentViewed = recommendations?.recently?.viewedProducts || [];
   const guides = Array.isArray(recommendations?.guides) ? recommendations.guides : [];
   const showNotifyWhenAvailable = product?.stockStatus === "out_of_stock";
-  const dealerOrderRequestFlow = Boolean(isAuthenticated && product?.pricing?.usesOrderRequestFlow);
+  const dealerOrderRequestFlow = Boolean(
+    isAuthenticated && product?.pricing?.usesOrderRequestFlow
+  );
   const nextVisiblePrice = visiblePrice(product);
   const nextCompareAtPrice = compareAtPrice(product);
+  const saveAmount =
+    nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice
+      ? nextCompareAtPrice - nextVisiblePrice
+      : 0;
+  const featureChips = keyFeatures.slice(0, 5);
+  const activeImage = selectedImage || images[0] || "";
 
   const submitNotifyRequest = async (event) => {
     event.preventDefault();
@@ -372,11 +398,9 @@ export function ProductPage() {
         mobile: notifyForm.mobile,
         sourcePage: location.pathname
       });
-      setNotifyNotice("Availability request saved. We will email you when this product is back.");
+      setNotifyNotice("Availability request saved. We will contact you when this product is back.");
     } catch (requestError) {
-      setNotifyError(
-        requestError.message || "Failed to save your availability request."
-      );
+      setNotifyError(requestError.message || "Failed to save your availability request.");
     } finally {
       setNotifyLoading(false);
     }
@@ -408,6 +432,8 @@ export function ProductPage() {
         });
       }
 
+      notifyStorefrontCartUpdated();
+
       const address = {
         companyName: orderRequestForm.companyName,
         gstin: orderRequestForm.gstin,
@@ -434,31 +460,62 @@ export function ProductPage() {
         `Order request created. Reference ${checkout?.order?.orderNo || checkout?.checkoutSession?.orderId || "saved"}.`
       );
     } catch (requestError) {
-      setOrderRequestError(
-        requestError.message || "Failed to create dealer order request."
-      );
+      setOrderRequestError(requestError.message || "Failed to create dealer order request.");
     } finally {
       setOrderRequestLoading(false);
     }
   };
 
+  const handleCartAction = async (mode) => {
+    if (!product || showNotifyWhenAvailable) {
+      return;
+    }
+
+    setCartActionBusy(mode);
+    setCartActionError("");
+    setCartActionNotice("");
+
+    try {
+      await addCartItem({
+        ...buildCartContext(isAuthenticated),
+        productId: product.id,
+        qty: quantity
+      });
+      notifyStorefrontCartUpdated();
+
+      if (mode === "buy") {
+        navigate("/checkout");
+      } else {
+        setCartActionNotice("Added to cart. Review it before checkout.");
+      }
+    } catch (requestError) {
+      setCartActionError(requestError.message || "Unable to update cart.");
+    } finally {
+      setCartActionBusy("");
+    }
+  };
+
   if (loading) {
-    return <main className="front-shell"><div className="state-box">Loading product...</div></main>;
+    return (
+      <main className="proto-main-shell">
+        <StorefrontLoadingState label="Loading product..." />
+      </main>
+    );
   }
 
   if (error || !product) {
     return (
-      <main className="front-shell">
-        <div className="state-box error">{error || "Product not found."}</div>
-        <Link to="/" className="back-link">
+      <main className="proto-main-shell">
+        <StorefrontAlert tone="error">{error || "Product not found."}</StorefrontAlert>
+        <StorefrontButton to="/products" variant="light">
           Back to products
-        </Link>
+        </StorefrontButton>
       </main>
     );
   }
 
   return (
-    <main className="front-shell product-view">
+    <main className="proto-main-shell proto-product-page">
       {structuredData?.product ? (
         <script
           type="application/ld+json"
@@ -478,21 +535,7 @@ export function ProductPage() {
         />
       ) : null}
 
-      <header className="compact-header">
-        <Link to="/" className="back-link">
-          Back
-        </Link>
-        <div className="header-actions">
-          <p>Jenix Product Detail</p>
-          <Link to={isAuthenticated ? "/account" : `/account/login?redirect=${encodeURIComponent(location.pathname)}`} className="inline-link">
-            {isAuthenticated
-              ? `Account: ${(customer?.name || "Customer").split(" ")[0]}`
-              : "Customer Login"}
-          </Link>
-        </div>
-      </header>
-
-      <nav className="breadcrumb">
+      <nav className="proto-breadcrumb">
         {breadcrumb.map((item, index) => (
           <span key={`${item.label}-${index}`}>
             {index > 0 ? <em>/</em> : null}
@@ -505,258 +548,145 @@ export function ProductPage() {
         ))}
       </nav>
 
-      <section className="hero-grid">
-        <div className="gallery-card">
-          <div className="hero-image">
-            {Array.isArray(product.images) && product.images[0] ? (
-              <img src={product.images[0]} alt={product.title} />
+      <section className="proto-product-layout">
+        <div className="proto-product-gallery">
+          <div className="proto-product-main-image">
+            {activeImage ? (
+              <img src={activeImage} alt={product.title} />
             ) : (
-              <div className="hero-image-placeholder">Product image</div>
+              <div className="proto-product-placeholder large">Product image</div>
             )}
+            {saveAmount > 0 ? (
+              <span className="proto-product-flag">Save {currency(saveAmount)}</span>
+            ) : null}
+            <span className="proto-product-sku-badge">{product.sku || product.modelNumber || "SKU"}</span>
           </div>
-          <div className="thumb-row">
-            {(Array.isArray(product.images) ? product.images : []).slice(0, 4).map((img, index) => (
-              <button key={`${img}-${index}`} type="button" className="thumb-pill">
-                <img src={img} alt={`${product.title} ${index + 1}`} />
-              </button>
-            ))}
-          </div>
+
+          {images.length > 0 ? (
+            <div className="proto-product-thumbs">
+              {images.slice(0, 6).map((imageUrl, index) => (
+                <button
+                  key={`${imageUrl}-${index}`}
+                  type="button"
+                  className={`proto-product-thumb${activeImage === imageUrl ? " active" : ""}`}
+                  onClick={() => setSelectedImage(imageUrl)}
+                >
+                  <img src={imageUrl} alt={`${product.title} ${index + 1}`} />
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        <div className="detail-card">
-          <div className="availability-row">
-            <span className="sku-text">SKU: {product.sku}</span>
-            <span className={`status-pill ${statusTone(product.stockStatus)}`}>
+        <div className="proto-product-summary">
+          <div className="proto-product-meta-top">
+            <StorefrontBadge tone="neutral" className="proto-brand-pill">
+              {product.brand || "Jenix India"}
+            </StorefrontBadge>
+            <StorefrontBadge
+              tone={statusTone(product.stockStatus)}
+              className={`proto-stock-pill ${statusTone(product.stockStatus)}`}
+            >
               {statusLabel(product.stockStatus)}
-            </span>
+            </StorefrontBadge>
           </div>
 
           <h1>{product.title}</h1>
-          <p className="muted-text">{product.shortDescription || "Industrial security product from Jenix India."}</p>
+          <p className="proto-product-subtitle">
+            SKU: {product.sku || "--"} {product.modelNumber ? `| Model: ${product.modelNumber}` : ""}
+          </p>
 
-          <div className="price-row">
+          <div className="proto-price-row proto-price-row-large">
             <strong>{currency(nextVisiblePrice)}</strong>
             {nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice ? (
               <span>{currency(nextCompareAtPrice)}</span>
             ) : null}
+            {saveAmount > 0 ? (
+              <mark>Save {currency(saveAmount)}</mark>
+            ) : null}
           </div>
-          {product?.pricing?.isB2BPrice ? (
-            <p className="muted-text">Approved dealer price is active for this account.</p>
-          ) : null}
 
-          <p className="gst-note">
+          <p className="proto-tax-line">
             GST {Number(product.gstRate || 0)}% applicable. GST invoice is provided for business purchases.
           </p>
 
-          <div className="qty-block">
-            <p>Quantity</p>
-            <div className="qty-controls">
+          {featureChips.length > 0 ? (
+            <div className="proto-feature-chip-row">
+              {featureChips.map((feature) => (
+                <span key={feature}>{feature}</span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="proto-quantity-row">
+            <span>Qty</span>
+            <div className="proto-qty-control">
               <button
                 type="button"
                 onClick={() => setQuantity((current) => Math.max(Number(product.moq || 1), current - 1))}
               >
                 -
               </button>
-              <span>{quantity}</span>
+              <strong>{quantity}</strong>
               <button type="button" onClick={() => setQuantity((current) => current + 1)}>
                 +
               </button>
             </div>
-            <small>MOQ: {Number(product.moq || 1)}</small>
+            <small>Min. order: {Number(product.moq || 1)} unit</small>
           </div>
 
           {effectiveBulkSlabs.length > 0 ? (
-            <div className="bulk-box">
-              <h4>Bulk pricing slabs</h4>
-              <div className="bulk-grid">
+            <div className="proto-bulk-pricing">
+              <p>Bulk Pricing Available</p>
+              <div className="proto-bulk-grid">
                 {effectiveBulkSlabs.map((slab) => (
                   <div key={`${slab.minQty}-${slab.unitPrice}`}>
                     <strong>{currency(slab.unitPrice)}</strong>
-                    <span>{Number(slab.minQty)}+ qty</span>
+                    <span>{Number(slab.minQty)}+ units</span>
                   </div>
                 ))}
               </div>
             </div>
           ) : null}
 
-          <div className="cta-grid">
+          <div className="proto-product-cta-row">
             {dealerOrderRequestFlow ? (
-              <button
+              <StorefrontButton
                 type="submit"
                 form="dealer-order-request-form"
-                className="btn primary"
                 disabled={orderRequestLoading}
               >
                 {orderRequestLoading ? "Submitting..." : "Place Order Request"}
-              </button>
+              </StorefrontButton>
             ) : (
               <>
-                <button type="button" className="btn primary">Add to Cart</button>
-                <button type="button" className="btn dark">Buy Now</button>
+                <StorefrontButton
+                  type="button"
+                  onClick={() => handleCartAction("cart")}
+                  disabled={Boolean(cartActionBusy) || showNotifyWhenAvailable}
+                >
+                  {cartActionBusy === "cart" ? "Adding..." : "Add to Cart"}
+                </StorefrontButton>
+                <StorefrontButton
+                  type="button"
+                  variant="dark"
+                  onClick={() => handleCartAction("buy")}
+                  disabled={Boolean(cartActionBusy) || showNotifyWhenAvailable}
+                >
+                  {cartActionBusy === "buy" ? "Starting..." : "Buy Now"}
+                </StorefrontButton>
               </>
             )}
           </div>
-          {dealerOrderRequestFlow ? (
-            <form id="dealer-order-request-form" className="shipping-box" onSubmit={submitDealerOrderRequest}>
-              <h4>Dealer Order Request</h4>
-              <p className="muted-text">
-                This account uses offline approval and bank-transfer payment. Submit the request and the admin team will approve it before payment proof upload.
-              </p>
-              <div className="shipping-input-row">
-                <input
-                  value={orderRequestForm.companyName}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      companyName: event.target.value
-                    }))
-                  }
-                  placeholder="Company name"
-                  required
-                />
-                <input
-                  value={orderRequestForm.gstin}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      gstin: event.target.value
-                    }))
-                  }
-                  placeholder="GSTIN"
-                />
-              </div>
-              <div className="shipping-input-row">
-                <input
-                  value={orderRequestForm.name}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      name: event.target.value
-                    }))
-                  }
-                  placeholder="Contact name"
-                  required
-                />
-                <input
-                  value={orderRequestForm.mobile}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      mobile: event.target.value
-                    }))
-                  }
-                  placeholder="Mobile"
-                  required
-                />
-              </div>
-              <div className="shipping-input-row">
-                <input
-                  type="email"
-                  value={orderRequestForm.email}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      email: event.target.value
-                    }))
-                  }
-                  placeholder="Email"
-                  required
-                />
-                <select
-                  value={orderRequestForm.shippingMethod}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      shippingMethod: event.target.value
-                    }))
-                  }
-                >
-                  <option value="standard">Standard Delivery</option>
-                  <option value="transport">Transport</option>
-                  <option value="manual_delivery">Manual Delivery</option>
-                  <option value="self_pickup">Self Pickup</option>
-                </select>
-              </div>
-              <div className="shipping-input-row">
-                <input
-                  value={orderRequestForm.addressLine1}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      addressLine1: event.target.value
-                    }))
-                  }
-                  placeholder="Address line 1"
-                  required
-                />
-                <input
-                  value={orderRequestForm.addressLine2}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      addressLine2: event.target.value
-                    }))
-                  }
-                  placeholder="Address line 2"
-                />
-              </div>
-              <div className="shipping-input-row">
-                <input
-                  value={orderRequestForm.city}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      city: event.target.value
-                    }))
-                  }
-                  placeholder="City"
-                  required
-                />
-                <input
-                  value={orderRequestForm.state}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      state: event.target.value
-                    }))
-                  }
-                  placeholder="State"
-                  required
-                />
-              </div>
-              <div className="shipping-input-row">
-                <input
-                  value={orderRequestForm.stateCode}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      stateCode: event.target.value
-                    }))
-                  }
-                  placeholder="State code"
-                  required
-                />
-                <input
-                  value={orderRequestForm.pincode}
-                  onChange={(event) =>
-                    setOrderRequestForm((current) => ({
-                      ...current,
-                      pincode: event.target.value
-                    }))
-                  }
-                  placeholder="Pincode"
-                  required
-                />
-              </div>
-              {orderRequestNotice ? <p className="muted-text">{orderRequestNotice}</p> : null}
-              {orderRequestError ? <p className="muted-error">{orderRequestError}</p> : null}
-            </form>
-          ) : null}
-          {isAuthenticated ? (
-            <div className="save-row">
-              <button
+
+          {cartActionNotice ? <p className="proto-inline-success">{cartActionNotice}</p> : null}
+          {cartActionError ? <p className="proto-inline-error">{cartActionError}</p> : null}
+
+          <div className="proto-save-actions">
+            {isAuthenticated ? (
+              <StorefrontButton
                 type="button"
-                className="btn secondary"
+                variant="light"
                 onClick={() => {
                   setSaveLoading(true);
                   setSaveError("");
@@ -774,36 +704,33 @@ export function ProductPage() {
                 }}
                 disabled={saveLoading}
               >
-                {saveLoading
-                  ? "Updating..."
-                  : saved
-                    ? "Saved in Account"
-                    : "Save Product"}
-              </button>
-              {saveError ? <span className="muted-error inline-error">{saveError}</span> : null}
-            </div>
-          ) : (
-            <div className="save-row">
-              <Link
+                {saveLoading ? "Updating..." : saved ? "Saved in Account" : "Save Product"}
+              </StorefrontButton>
+            ) : (
+              <StorefrontButton
                 to={`/account/login?redirect=${encodeURIComponent(location.pathname)}`}
-                className="btn secondary"
+                variant="light"
               >
                 Login to Save
-              </Link>
-            </div>
-          )}
-          <a className="btn whatsapp" href={`https://wa.me/?text=${encodeURIComponent(`Need details for ${product.title}`)}`}>
-            WhatsApp Enquiry
-          </a>
+              </StorefrontButton>
+            )}
+            <StorefrontButton
+              href={`https://wa.me/?text=${encodeURIComponent(`Need details for ${product.title}`)}`}
+              target="_blank"
+              rel="noreferrer"
+              variant="whatsapp"
+            >
+              WhatsApp Enquiry
+            </StorefrontButton>
+          </div>
+          {saveError ? <p className="proto-inline-error">{saveError}</p> : null}
 
           {showNotifyWhenAvailable ? (
-            <form className="shipping-box" onSubmit={submitNotifyRequest}>
-              <h4>Notify when available</h4>
-              <p className="muted-text">
-                This product is out of stock right now. Leave your email and we will send an availability update.
-              </p>
-              <div className="shipping-input-row">
-                <input
+            <form className="proto-support-card" onSubmit={submitNotifyRequest}>
+              <h3>Notify when available</h3>
+              <p>This product is out of stock right now. Leave your contact details for an alert.</p>
+              <div className="proto-inline-form">
+                <StorefrontInput
                   value={notifyForm.customerName}
                   onChange={(event) =>
                     setNotifyForm((current) => ({
@@ -813,7 +740,7 @@ export function ProductPage() {
                   }
                   placeholder="Your name"
                 />
-                <input
+                <StorefrontInput
                   type="email"
                   value={notifyForm.email}
                   onChange={(event) =>
@@ -825,8 +752,8 @@ export function ProductPage() {
                   placeholder="Email address"
                 />
               </div>
-              <div className="shipping-input-row">
-                <input
+              <div className="proto-inline-form">
+                <StorefrontInput
                   value={notifyForm.mobile}
                   onChange={(event) =>
                     setNotifyForm((current) => ({
@@ -834,19 +761,19 @@ export function ProductPage() {
                       mobile: event.target.value
                     }))
                   }
-                  placeholder="Mobile number (optional)"
+                  placeholder="Mobile number"
                 />
-                <button type="submit" className="btn secondary" disabled={notifyLoading}>
+                <StorefrontButton type="submit" variant="light" disabled={notifyLoading}>
                   {notifyLoading ? "Saving..." : "Notify Me"}
-                </button>
+                </StorefrontButton>
               </div>
-              {notifyError ? <p className="muted-error">{notifyError}</p> : null}
-              {notifyNotice ? <p className="muted-text">{notifyNotice}</p> : null}
+              {notifyError ? <p className="proto-inline-error">{notifyError}</p> : null}
+              {notifyNotice ? <p className="proto-inline-success">{notifyNotice}</p> : null}
             </form>
           ) : null}
 
           <form
-            className="shipping-box"
+            className="proto-support-card"
             onSubmit={(event) => {
               event.preventDefault();
               setShippingLoading(true);
@@ -858,45 +785,192 @@ export function ProductPage() {
                 .then((data) => {
                   setShipping(data);
                 })
-                .catch((err) => {
-                  setShippingError(err.message || "Failed to calculate shipping.");
+                .catch((requestError) => {
+                  setShippingError(requestError.message || "Failed to calculate shipping.");
                 })
                 .finally(() => {
                   setShippingLoading(false);
                 });
             }}
           >
-            <h4>Estimate shipping</h4>
-            <div className="shipping-input-row">
-              <input
+            <h3>Estimate Shipping</h3>
+            <div className="proto-inline-form">
+              <StorefrontInput
                 value={pincode}
                 onChange={(event) => setPincode(event.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-                placeholder="Enter 6-digit pincode"
+                placeholder="Enter pincode"
               />
-              <button type="submit" className="btn secondary" disabled={shippingLoading}>
+              <StorefrontButton type="submit" variant="dark" disabled={shippingLoading}>
                 {shippingLoading ? "Checking..." : "Check"}
-              </button>
+              </StorefrontButton>
             </div>
-            {shippingError ? <p className="muted-error">{shippingError}</p> : null}
+            {shippingError ? <p className="proto-inline-error">{shippingError}</p> : null}
             {shipping?.options ? (
-              <div className="shipping-results">
+              <div className="proto-shipping-list">
                 {shipping.options.map((option) => (
-                  <div key={option.service} className="shipping-row">
-                    <p>{option.label}</p>
+                  <div key={option.service} className="proto-shipping-item">
+                    <strong>{option.label}</strong>
                     <span>
                       {option.etaDaysMin}-{option.etaDaysMax} days
                     </span>
-                    <strong>{currency(option.shippingCharge)}</strong>
+                    <em>{currency(option.shippingCharge)}</em>
                   </div>
                 ))}
               </div>
             ) : null}
           </form>
+
+          {dealerOrderRequestFlow ? (
+            <form id="dealer-order-request-form" className="proto-support-card" onSubmit={submitDealerOrderRequest}>
+              <h3>Dealer Order Request</h3>
+              <p>
+                This account uses offline approval and bank-transfer payment. Submit the request and the admin team will approve it before payment proof upload.
+              </p>
+              <div className="proto-form-grid">
+                <StorefrontInput
+                  value={orderRequestForm.companyName}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      companyName: event.target.value
+                    }))
+                  }
+                  placeholder="Company name"
+                  required
+                />
+                <StorefrontInput
+                  value={orderRequestForm.gstin}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      gstin: event.target.value
+                    }))
+                  }
+                  placeholder="GSTIN"
+                />
+                <StorefrontInput
+                  value={orderRequestForm.name}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      name: event.target.value
+                    }))
+                  }
+                  placeholder="Contact name"
+                  required
+                />
+                <StorefrontInput
+                  value={orderRequestForm.mobile}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      mobile: event.target.value
+                    }))
+                  }
+                  placeholder="Mobile"
+                  required
+                />
+                <StorefrontInput
+                  type="email"
+                  value={orderRequestForm.email}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      email: event.target.value
+                    }))
+                  }
+                  placeholder="Email"
+                  required
+                />
+                <StorefrontSelect
+                  value={orderRequestForm.shippingMethod}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      shippingMethod: event.target.value
+                    }))
+                  }
+                >
+                  <option value="standard">Standard Delivery</option>
+                  <option value="transport">Transport</option>
+                  <option value="manual_delivery">Manual Delivery</option>
+                  <option value="self_pickup">Self Pickup</option>
+                </StorefrontSelect>
+                <StorefrontInput
+                  value={orderRequestForm.addressLine1}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      addressLine1: event.target.value
+                    }))
+                  }
+                  placeholder="Address line 1"
+                  required
+                />
+                <StorefrontInput
+                  value={orderRequestForm.addressLine2}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      addressLine2: event.target.value
+                    }))
+                  }
+                  placeholder="Address line 2"
+                />
+                <StorefrontInput
+                  value={orderRequestForm.city}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      city: event.target.value
+                    }))
+                  }
+                  placeholder="City"
+                  required
+                />
+                <StorefrontInput
+                  value={orderRequestForm.state}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      state: event.target.value
+                    }))
+                  }
+                  placeholder="State"
+                  required
+                />
+                <StorefrontInput
+                  value={orderRequestForm.stateCode}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      stateCode: event.target.value
+                    }))
+                  }
+                  placeholder="State code"
+                  required
+                />
+                <StorefrontInput
+                  value={orderRequestForm.pincode}
+                  onChange={(event) =>
+                    setOrderRequestForm((current) => ({
+                      ...current,
+                      pincode: event.target.value
+                    }))
+                  }
+                  placeholder="Pincode"
+                  required
+                />
+              </div>
+              {orderRequestNotice ? <p className="proto-inline-success">{orderRequestNotice}</p> : null}
+              {orderRequestError ? <p className="proto-inline-error">{orderRequestError}</p> : null}
+            </form>
+          ) : null}
         </div>
       </section>
 
-      <section className="section-block tabs-block">
-        <div className="tab-row">
+      <section className="proto-section proto-tabs-card">
+        <div className="proto-tab-row">
           <button type="button" className={tab === "keyFeatures" ? "active" : ""} onClick={() => setTab("keyFeatures")}>
             Key Features
           </button>
@@ -912,36 +986,39 @@ export function ProductPage() {
         </div>
 
         {tab === "keyFeatures" ? (
-          <ul className="feature-list">
-            {(keyFeatures.length > 0 ? keyFeatures : ["Product highlights will be updated by admin."]).map((feature) => (
+          <ul className="proto-feature-list">
+            {(keyFeatures.length > 0
+              ? keyFeatures
+              : ["Key buying highlights for this product are being prepared."]).map((feature) => (
               <li key={feature}>{feature}</li>
             ))}
           </ul>
         ) : null}
 
         {tab === "description" ? (
-          <p className="tab-description">
-            {product.fullDescription || "Detailed product description will appear here."}
+          <p className="proto-tab-copy">
+            {product.fullDescription ||
+              "A detailed product description is being prepared. Contact the store if you need help validating fit, specs, or installation needs."}
           </p>
         ) : null}
 
         {tab === "specifications" ? (
-          <div className="spec-grid">
+          <div className="proto-spec-table">
             {specs.length > 0 ? (
               specs.map(([key, value]) => (
-                <div key={key} className="spec-row">
+                <div key={key}>
                   <span>{key}</span>
                   <strong>{String(value)}</strong>
                 </div>
               ))
             ) : (
-              <p className="tab-description">Specifications are not available for this product yet.</p>
+              <p className="proto-tab-copy">Specifications are not available for this product yet.</p>
             )}
           </div>
         ) : null}
 
         {tab === "downloads" ? (
-          <div className="download-grid">
+          <div className="proto-download-list">
             {downloads.length > 0 ? (
               downloads.map((download) => (
                 <a key={`${download.title}-${download.url}`} href={download.url} target="_blank" rel="noreferrer">
@@ -949,67 +1026,74 @@ export function ProductPage() {
                 </a>
               ))
             ) : (
-              <p className="tab-description">Datasheet or downloads are not uploaded yet.</p>
+              <p className="proto-tab-copy">Datasheet or downloads are not uploaded yet.</p>
             )}
           </div>
         ) : null}
       </section>
 
-      {recommendationError ? <div className="state-box warning">{recommendationError}</div> : null}
+      {recommendationError ? <StorefrontAlert tone="warning">{recommendationError}</StorefrontAlert> : null}
 
-      {recentSearches.length > 0 || recentViewed.length > 0 ? (
-        <section className="section-block">
-          <div className="section-head">
-            <h3>Recently searched / viewed</h3>
-          </div>
-          {recentSearches.length > 0 ? (
-            <div className="search-chip-row">
-              {recentSearches.map((row) => (
-                <span key={row.id} className="search-chip">
-                  {row.query}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {recentViewed.length > 0 ? (
-            <div className="carousel-track">
-              {recentViewed.map((row) => (
-                <ProductMiniCard key={`recent-${row.id}`} product={row} />
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      <ProductCarousel title="Related products" items={recGroups.related} />
-      <ProductCarousel title="Frequently bought together" items={recGroups.frequentlyBoughtTogether} />
+      <ProductCarousel title="Related Products" items={recGroups.related} />
+      <ProductCarousel title="Frequently Bought Together" items={recGroups.frequentlyBoughtTogether} />
       <ProductCarousel title="Accessories" items={recGroups.accessories} />
-      <ProductCarousel title="Top searched products" items={recGroups.topSearched} />
-      <ProductCarousel title="Most visited products" items={recGroups.mostVisited} />
 
-      <section className="section-block">
-        <div className="section-head">
-          <h3>Helpful guides</h3>
-        </div>
-        <div className="guide-track">
-          {guides.length > 0 ? (
-            guides.map((guide) => (
-              <Link key={guide.id} to={`/guides/${guide.slug}`} className="guide-card guide-card-link">
-                <span className="eyebrow-chip">{guide.category?.name || "Guide"}</span>
+      <section className="proto-section">
+        <StorefrontSectionHeader title="Helpful Guides" />
+        {guides.length > 0 ? (
+          <div className="proto-guide-scroller">
+            {guides.map((guide) => (
+              <Link key={guide.id} to={`/guides/${guide.slug}`} className="proto-guide-card">
+                <span>{guide.category?.name || "Guide"}</span>
                 <strong>{guide.title}</strong>
-                <p>{guide.excerpt || "Read the full guide for buying, installation, and troubleshooting help."}</p>
+                <p>
+                  {guide.excerpt ||
+                    "Read the full guide for buying, installation, and troubleshooting support."}
+                </p>
               </Link>
-            ))
-          ) : (
-            <article className="guide-card">
-              <strong>No linked guides yet</strong>
-              <p>Blog content will appear here when a guide is linked to this product or category.</p>
-            </article>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <StorefrontAlert>
+            No linked guide is attached to this product yet. Browse the full guides
+            library or contact the team for buying help.
+          </StorefrontAlert>
+        )}
       </section>
 
-      <WebsiteBuyerLeadSection />
+      <StorefrontStickyActionBar className="proto-mobile-product-bar">
+        <div>
+          <strong>{currency(nextVisiblePrice)}</strong>
+          <span>+{Number(product.gstRate || 0)}% GST</span>
+        </div>
+        {dealerOrderRequestFlow ? (
+          <StorefrontButton
+            type="submit"
+            form="dealer-order-request-form"
+            disabled={orderRequestLoading}
+          >
+            {orderRequestLoading ? "Submitting..." : "Order Request"}
+          </StorefrontButton>
+        ) : (
+          <>
+            <StorefrontButton
+              type="button"
+              onClick={() => handleCartAction("cart")}
+              disabled={Boolean(cartActionBusy) || showNotifyWhenAvailable}
+            >
+              Cart
+            </StorefrontButton>
+            <StorefrontButton
+              type="button"
+              variant="dark"
+              onClick={() => handleCartAction("buy")}
+              disabled={Boolean(cartActionBusy) || showNotifyWhenAvailable}
+            >
+              Buy
+            </StorefrontButton>
+          </>
+        )}
+      </StorefrontStickyActionBar>
     </main>
   );
 }

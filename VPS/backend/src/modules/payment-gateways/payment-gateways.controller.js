@@ -31,6 +31,11 @@ const adminListPaymentGateways = asyncHandler(async (req, res) => {
   return ok(res, data, "Payment gateways fetched.");
 });
 
+const adminGetPaymentGateway = asyncHandler(async (req, res) => {
+  const data = await service.getPaymentGatewayConfig(req.params.gatewayCode);
+  return ok(res, data, "Payment gateway fetched.");
+});
+
 const adminUpdatePaymentGateway = asyncHandler(async (req, res) => {
   const patch = parseUpdateGatewayPayload(req.body);
   const data = await service.updatePaymentGateway(req.params.gatewayCode, patch, req.actor);
@@ -45,6 +50,7 @@ const adminUpdateDirectDiscount = asyncHandler(async (req, res) => {
 
 module.exports = {
   adminListPaymentGateways,
+  adminGetPaymentGateway,
   adminUpdatePaymentGateway,
   adminUpdateDirectDiscount
 };

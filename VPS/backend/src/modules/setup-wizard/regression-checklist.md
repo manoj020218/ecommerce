@@ -1,0 +1,6 @@
+- [ ] Public setup wizard bootstrap returns step progress without exposing secrets.
+- [ ] Admin can fetch the full setup wizard state with current step summaries.
+- [ ] Business profile step updates store profile and deployment domains.
+- [ ] Admin user step updates the super admin record and password state.
+- [ ] Manual bank / UPI step updates store profile banking fields and manual gateway instructions.
+- [ ] Backup settings persist and completion fails until required steps are ready.

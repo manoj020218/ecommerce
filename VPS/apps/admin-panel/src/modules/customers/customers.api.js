@@ -19,6 +19,17 @@ export function fetchCustomers(params = {}) {
   return apiFetch(`/admin/customers${suffix}`);
 }
 
+export function createCustomer(payload) {
+  return apiFetch("/admin/customers", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function fetchCustomerOrders(customerId) {
+  return apiFetch(`/admin/customers/${customerId}/orders`);
+}
+
 export function updateCustomer(customerId, payload) {
   return apiFetch(`/admin/customers/${customerId}`, {
     method: "PATCH",

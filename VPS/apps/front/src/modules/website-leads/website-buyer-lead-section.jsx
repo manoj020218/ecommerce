@@ -1,5 +1,12 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
+import {
+  StorefrontAlert,
+  StorefrontButton,
+  StorefrontInput,
+  StorefrontSectionHeader,
+  StorefrontTextArea
+} from "../../shared/storefront/storefront-ui";
 import { createWebsiteLead } from "./website-leads.api";
 
 const EMPTY_FORM = {
@@ -53,84 +60,73 @@ export function WebsiteBuyerLeadSection() {
   };
 
   return (
-    <section className="section-block buyer-lead-section">
-      <div className="section-head">
-        <h3>Do you want same type webapp for your business?</h3>
-      </div>
+    <section className="proto-section">
+      <StorefrontSectionHeader title="Do you want same type webapp for your business?" />
       <p className="section-caption">
         Submit your business details and Jenix will contact you with a demo and rollout estimate.
       </p>
 
-      <form className="buyer-lead-grid" onSubmit={onSubmit}>
-        <label>
-          <span>Name *</span>
-          <input name="name" value={form.name} onChange={onChange} required />
-        </label>
-        <label>
-          <span>Mobile *</span>
-          <input name="mobile" value={form.mobile} onChange={onChange} required />
-        </label>
-        <label>
-          <span>Email *</span>
-          <input name="email" type="email" value={form.email} onChange={onChange} required />
-        </label>
-        <label>
-          <span>Business Name *</span>
-          <input name="businessName" value={form.businessName} onChange={onChange} required />
-        </label>
-        <label>
-          <span>Business Type *</span>
-          <input name="businessType" value={form.businessType} onChange={onChange} required />
-        </label>
-        <label>
-          <span>City *</span>
-          <input name="city" value={form.city} onChange={onChange} required />
-        </label>
-        <label>
-          <span>Current Website</span>
-          <input name="currentWebsite" value={form.currentWebsite} onChange={onChange} />
-        </label>
-        <label>
-          <span>Monthly Orders</span>
-          <input
-            name="monthlyOrders"
-            type="number"
-            min="0"
-            value={form.monthlyOrders}
-            onChange={onChange}
-          />
-        </label>
-        <label>
-          <span>Product Count</span>
-          <input
-            name="productCount"
-            type="number"
-            min="0"
-            value={form.productCount}
-            onChange={onChange}
-          />
-        </label>
-        <label className="field-full">
-          <span>Message *</span>
-          <textarea
-            name="message"
-            rows="4"
-            value={form.message}
-            onChange={onChange}
-            required
-          />
-        </label>
+      <form className="proto-form-grid" onSubmit={onSubmit}>
+        <StorefrontInput label="Name *" name="name" value={form.name} onChange={onChange} required />
+        <StorefrontInput label="Mobile *" name="mobile" value={form.mobile} onChange={onChange} required />
+        <StorefrontInput label="Email *" name="email" type="email" value={form.email} onChange={onChange} required />
+        <StorefrontInput
+          label="Business Name *"
+          name="businessName"
+          value={form.businessName}
+          onChange={onChange}
+          required
+        />
+        <StorefrontInput
+          label="Business Type *"
+          name="businessType"
+          value={form.businessType}
+          onChange={onChange}
+          required
+        />
+        <StorefrontInput label="City *" name="city" value={form.city} onChange={onChange} required />
+        <StorefrontInput
+          label="Current Website"
+          name="currentWebsite"
+          value={form.currentWebsite}
+          onChange={onChange}
+        />
+        <StorefrontInput
+          label="Monthly Orders"
+          name="monthlyOrders"
+          type="number"
+          min="0"
+          value={form.monthlyOrders}
+          onChange={onChange}
+        />
+        <StorefrontInput
+          label="Product Count"
+          name="productCount"
+          type="number"
+          min="0"
+          value={form.productCount}
+          onChange={onChange}
+        />
+        <StorefrontTextArea
+          label="Message *"
+          fieldClassName="wide"
+          name="message"
+          rows="4"
+          value={form.message}
+          onChange={onChange}
+          required
+        />
 
-        <div className="field-full buyer-lead-actions">
+        <div className="wide proto-inline-actions">
           <p className="section-caption">Source page: {`${location.pathname}${location.search}` || "/"}</p>
-          <button type="submit" className="btn secondary" disabled={saving}>
+          <StorefrontButton type="submit" disabled={saving}>
             {saving ? "Submitting..." : "Request Demo"}
-          </button>
+          </StorefrontButton>
         </div>
       </form>
 
-      {notice ? <p className="buyer-lead-notice success">{notice}</p> : null}
-      {error ? <p className="buyer-lead-notice error">{error}</p> : null}
+      {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
+      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
     </section>
   );
 }

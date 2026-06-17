@@ -7,6 +7,14 @@ function createGuestSessionId() {
   return `guest-${Date.now()}`;
 }
 
+export function getStoredGuestSessionId() {
+  try {
+    return window.localStorage.getItem(GUEST_SESSION_STORAGE_KEY) || "";
+  } catch (_error) {
+    return "";
+  }
+}
+
 export function getOrCreateGuestSessionId() {
   try {
     const existing = window.localStorage.getItem(GUEST_SESSION_STORAGE_KEY);
@@ -20,4 +28,16 @@ export function getOrCreateGuestSessionId() {
   } catch (_error) {
     return createGuestSessionId();
   }
+}
+
+export function resetGuestSessionId() {
+  const nextSessionId = createGuestSessionId();
+
+  try {
+    window.localStorage.setItem(GUEST_SESSION_STORAGE_KEY, nextSessionId);
+  } catch (_error) {
+    return nextSessionId;
+  }
+
+  return nextSessionId;
 }

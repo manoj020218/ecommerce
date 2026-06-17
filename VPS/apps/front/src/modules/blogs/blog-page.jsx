@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import {
+  StorefrontBadge,
+  StorefrontButton,
+  StorefrontCard,
+  StorefrontChip,
+  StorefrontErrorState,
+  StorefrontLoadingState,
+  StorefrontPageHeader,
+  StorefrontSectionHeader
+} from "../../shared/storefront/storefront-ui";
 import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 import { getBlog } from "./blogs.api";
 
@@ -20,7 +30,7 @@ function ProductMiniCard({ product }) {
   const imageUrl = Array.isArray(product.images) && product.images[0] ? product.images[0] : null;
 
   return (
-    <Link to={`/products/${product.slug}`} className="mini-card">
+    <StorefrontCard as={Link} to={`/products/${product.slug}`} className="mini-card" elevated>
       <div className="mini-media">
         {imageUrl ? <img src={imageUrl} alt={product.title} loading="lazy" /> : <span>No image</span>}
       </div>
@@ -28,17 +38,17 @@ function ProductMiniCard({ product }) {
         <p>{product.title}</p>
         <strong>{product.brand || "Jenix Product"}</strong>
       </div>
-    </Link>
+    </StorefrontCard>
   );
 }
 
 function GuideMiniCard({ blog }) {
   return (
-    <Link to={`/guides/${blog.slug}`} className="guide-inline-card">
-      <span className="eyebrow-chip">{blog.category?.name || "Guide"}</span>
+    <StorefrontCard as={Link} to={`/guides/${blog.slug}`} className="guide-inline-card" elevated>
+      <StorefrontBadge className="eyebrow-chip">{blog.category?.name || "Guide"}</StorefrontBadge>
       <strong>{blog.title}</strong>
       <p>{blog.excerpt}</p>
-    </Link>
+    </StorefrontCard>
   );
 }
 
@@ -88,23 +98,33 @@ export function BlogPage() {
       .filter(Boolean);
   }, [article?.content]);
 
+  const articleMeta = [
+    formatDate(article?.publishedAt),
+    article?.readingTimeMinutes ? `${article.readingTimeMinutes} min read` : null,
+    article?.author || null
+  ].filter(Boolean);
+
   if (loading) {
-    return <main className="front-shell"><div className="state-box">Loading guide...</div></main>;
+    return (
+      <main className="proto-main-shell">
+        <StorefrontLoadingState label="Loading guide..." />
+      </main>
+    );
   }
 
   if (error || !article) {
     return (
-      <main className="front-shell">
-        <div className="state-box error">{error || "Guide not found."}</div>
-        <Link to="/guides" className="back-link">
-          Back to guides
-        </Link>
+      <main className="proto-main-shell">
+        <StorefrontErrorState
+          message={error || "Guide not found."}
+          action={<StorefrontButton to="/guides" variant="light">Back to guides</StorefrontButton>}
+        />
       </main>
     );
   }
 
   return (
-    <main className="front-shell guide-shell">
+    <main className="proto-main-shell guide-shell">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(payload.structuredData?.article || {}) }}
@@ -116,106 +136,123 @@ export function BlogPage() {
         />
       ) : null}
 
-      <header className="front-header">
-        <div className="hero-kicker-row">
-          <span className="eyebrow-chip">{article.category?.name || "Guide"}</span>
-          <Link to={isAuthenticated ? "/account" : "/account/login"} className="inline-link">
-            {isAuthenticated
-              ? `Account: ${(customer?.name || "Customer").split(" ")[0]}`
-              : "Customer Login"}
-          </Link>
-        </div>
-        <div className="guide-title-block">
-          <p className="guide-meta-text">
-            {formatDate(article.publishedAt)} - {article.readingTimeMinutes} min read - {article.author}
-          </p>
-          <h1>{article.title}</h1>
-          <p>{article.excerpt}</p>
-        </div>
-        <div className="chip-row">
-          {(Array.isArray(article.tags) ? article.tags : []).map((tag) => (
-            <span key={tag} className="search-chip">
-              {tag}
-            </span>
-          ))}
-        </div>
-      </header>
+      <StorefrontCard className="front-header" elevated>
+        <StorefrontPageHeader
+          eyebrow={article.category?.name || "Guide"}
+          title={article.title}
+          description={article.excerpt}
+          meta={
+            <>
+              <p className="guide-meta-text">{articleMeta.join(" | ")}</p>
+              <div className="chip-row">
+                {(Array.isArray(article.tags) ? article.tags : []).map((tag) => (
+                  <StorefrontBadge key={tag} className="search-chip">
+                    {tag}
+                  </StorefrontBadge>
+                ))}
+              </div>
+            </>
+          }
+          actions={
+            <StorefrontButton
+              to={isAuthenticated ? "/account" : "/account/login"}
+              variant="light"
+            >
+              {isAuthenticated
+                ? `Account: ${(customer?.name || "Customer").split(" ")[0]}`
+                : "Customer Login"}
+            </StorefrontButton>
+          }
+        />
+      </StorefrontCard>
 
-      <section className="guide-content-card">
+      <StorefrontCard as="section" className="guide-content-card" elevated>
         {contentBlocks.map((block, index) => (
           <p key={`${index}-${block.slice(0, 24)}`}>{block}</p>
         ))}
-      </section>
+      </StorefrontCard>
 
-      <section className="section-block">
-        <div className="section-head">
-          <h3>Need help choosing the right product?</h3>
-        </div>
+      <StorefrontCard as="section" className="section-card" elevated>
+        <StorefrontSectionHeader
+          title="Need help choosing the right product?"
+          description="Reach the store team directly or continue shopping from the approved storefront flow."
+        />
         <div className="cta-grid">
-          <a className="btn whatsapp" href={payload.cta?.whatsappUrl}>
-            WhatsApp Jenix
-          </a>
-          <Link to="/" className="btn secondary">
+          {payload.cta?.whatsappUrl ? (
+            <StorefrontButton href={payload.cta.whatsappUrl} variant="whatsapp">
+              WhatsApp Jenix
+            </StorefrontButton>
+          ) : null}
+          <StorefrontButton to="/products" variant="light">
             Browse Products
-          </Link>
+          </StorefrontButton>
         </div>
-      </section>
+      </StorefrontCard>
 
       {Array.isArray(payload.relatedProducts) && payload.relatedProducts.length > 0 ? (
-        <section className="section-block">
-          <div className="section-head">
-            <h3>Related products</h3>
-          </div>
+        <StorefrontCard as="section" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Related products"
+            description="Products referenced by this guide or commonly bought for the same use case."
+          />
           <div className="carousel-track">
             {payload.relatedProducts.map((product) => (
               <ProductMiniCard key={product.id} product={product} />
             ))}
           </div>
-        </section>
+        </StorefrontCard>
       ) : null}
 
       {Array.isArray(payload.relatedCategories) && payload.relatedCategories.length > 0 ? (
-        <section className="section-block">
-          <div className="section-head">
-            <h3>Related categories</h3>
-          </div>
+        <StorefrontCard as="section" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Related categories"
+            description="Jump straight into the category pages connected to this guide."
+          />
           <div className="chip-row">
             {payload.relatedCategories.map((category) => (
-              <span key={category.id} className="search-chip">
+              <StorefrontChip
+                key={category.id}
+                as={category.slug ? undefined : "span"}
+                to={category.slug ? `/categories/${category.slug}` : undefined}
+                className="search-chip"
+              >
                 {category.name}
-              </span>
+              </StorefrontChip>
             ))}
           </div>
-        </section>
+        </StorefrontCard>
       ) : null}
 
       {Array.isArray(article.faqItems) && article.faqItems.length > 0 ? (
-        <section className="section-block">
-          <div className="section-head">
-            <h3>FAQ</h3>
-          </div>
+        <StorefrontCard as="section" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="FAQ"
+            description="Quick answers pulled from the same published guide content."
+          />
           <div className="faq-stack">
             {article.faqItems.map((item) => (
-              <article key={item.question} className="faq-card">
+              <StorefrontCard key={item.question} as="article" className="faq-card" elevated>
                 <strong>{item.question}</strong>
                 <p>{item.answer}</p>
-              </article>
+              </StorefrontCard>
             ))}
           </div>
-        </section>
+        </StorefrontCard>
       ) : null}
 
       {Array.isArray(payload.relatedBlogs) && payload.relatedBlogs.length > 0 ? (
-        <section className="section-block">
-          <div className="section-head">
-            <h3>Related guides</h3>
-          </div>
+        <StorefrontCard as="section" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Related guides"
+            description="Keep exploring setup notes, buying advice, and troubleshooting articles."
+          />
           <div className="guide-inline-grid">
             {payload.relatedBlogs.map((blog) => (
               <GuideMiniCard key={blog.id} blog={blog} />
             ))}
           </div>
-        </section>
+        </StorefrontCard>
       ) : null}
 
       <WebsiteBuyerLeadSection />

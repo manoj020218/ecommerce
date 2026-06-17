@@ -4,6 +4,7 @@ const { env } = require("../../config/env");
 const { generateId, hashValue } = require("../../common/identity");
 const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
+const { readInvoiceStore } = require("../../database/invoice-store");
 const { readPaymentStore, writePaymentStore } = require("../../database/payment-store");
 const { readShippingStore } = require("../../database/shipping-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
@@ -33,7 +34,10 @@ const {
   ensurePaymentStoreShape,
   resolveGatewayForPaymentAttempt
 } = require("../payment-gateways/payment-gateways.service");
-const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
+const {
+  ensureInvoiceForOrder,
+  getInvoiceDownload
+} = require("../invoices/invoices.service");
 const {
   trackCartSaved,
   trackCheckoutStarted,
@@ -113,6 +117,18 @@ function ensurePhase7StoreShape(store) {
   }
 }
 
+function ensureInvoiceStoreShape(store) {
+  if (!Array.isArray(store.invoices)) {
+    store.invoices = [];
+  }
+}
+
+function ensureShippingStoreShape(store) {
+  if (!Array.isArray(store.shipments)) {
+    store.shipments = [];
+  }
+}
+
 function resolveStockStatus(product) {
   const availableQty = calculateAvailableQty(product);
   const lowStockThreshold = Number(product.lowStockThreshold || 0);
@@ -126,6 +142,129 @@ function resolveStockStatus(product) {
   }
 
   return "in_stock";
+}
+
+function buildLatestShipmentMap(shippingStore) {
+  const map = new Map();
+
+  for (const shipment of ensureArray(shippingStore.shipments)) {
+    const current = map.get(shipment.orderId);
+    if (!current) {
+      map.set(shipment.orderId, shipment);
+      continue;
+    }
+
+    const currentTs = Date.parse(current.updatedAt || current.createdAt || "");
+    const nextTs = Date.parse(shipment.updatedAt || shipment.createdAt || "");
+    if (nextTs >= currentTs) {
+      map.set(shipment.orderId, shipment);
+    }
+  }
+
+  return map;
+}
+
+function buildInvoiceByOrderIdMap(invoiceStore) {
+  const map = new Map();
+
+  for (const invoice of ensureArray(invoiceStore.invoices)) {
+    if (!map.has(invoice.orderId)) {
+      map.set(invoice.orderId, invoice);
+    }
+  }
+
+  return map;
+}
+
+function shouldExposeManualPaymentInstructions(order) {
+  if (!order) {
+    return false;
+  }
+
+  if (
+    ![PAYMENT_METHODS.DIRECT_BANK_TRANSFER, PAYMENT_METHODS.MANUAL_UPI].includes(
+      order.paymentMethod
+    )
+  ) {
+    return false;
+  }
+
+  if (String(order.paymentStatus || "").trim().toLowerCase() === "paid") {
+    return false;
+  }
+
+  if (order.isB2BOrderRequest) {
+    return order.orderStatus === B2B_ORDER_STATUSES.AWAITING_BANK_PAYMENT;
+  }
+
+  return true;
+}
+
+function buildCheckoutOrderFollowup(order, shipment, invoice, manualPaymentInstructions) {
+  return {
+    id: order.id,
+    orderNo: order.orderNo || "",
+    orderDate: order.createdAt || null,
+    orderTotal: Number(order.grandTotal || 0),
+    paymentStatus: order.paymentStatus || "",
+    orderStatus: order.orderStatus || "",
+    shipmentStatus: shipment?.shipmentStatus || order.shipmentStatus || "pending_packing",
+    manualPaymentStatus: order.manualPaymentStatus || "",
+    paymentMethod: order.paymentMethod || "",
+    shippingMethod: order.shippingMethod || "",
+    customerType: order.customerType || "retail",
+    priceGroup: order.priceGroup || "",
+    isB2BOrderRequest: Boolean(order.isB2BOrderRequest),
+    billingAddress: order.billingAddress || {},
+    shippingAddress: order.shippingAddress || {},
+    items: ensureArray(order.items).map((item) => ({
+      productId: item.productId,
+      title: item.title,
+      sku: item.sku || "",
+      hsnCode: item.hsnCode || "",
+      qty: Number(item.qty || 0),
+      unitPriceUsed: Number(item.finalUnitPrice || 0),
+      gstRate: Number(item.gstRate || 0),
+      taxableValue: Number(item.taxableValue || 0),
+      gstAmount: Number(item.gstAmount || 0),
+      lineTotal: Number(item.lineTotal || 0),
+      availabilityStatus: item.availabilityStatus || "confirmed"
+    })),
+    pricing: {
+      productSubtotal: Number(order.productSubtotal || 0),
+      discountAmount: Number(order.discountAmount || 0),
+      taxableValue: Number(order.taxableValue || 0),
+      gstTotal: Number(order.gstTotal || 0),
+      shippingCharge: Number(order.shippingCharge || 0),
+      roundOff: Number(order.roundOff || 0),
+      grandTotal: Number(order.grandTotal || 0)
+    },
+    invoice:
+      invoice === undefined || invoice === null
+        ? null
+        : {
+            id: invoice.id,
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceDate: invoice.invoiceDate
+          },
+    trackingDetails:
+      shipment === undefined || shipment === null
+        ? null
+        : {
+            shipmentId: shipment.id,
+            courierName: shipment.courierName || "",
+            courierCode: shipment.courierCode || "",
+            trackingId: shipment.trackingId || "",
+            trackingUrl: shipment.trackingUrl || "",
+            shipmentStatus: shipment.shipmentStatus || "",
+            dispatchDate: shipment.dispatchDate || "",
+            expectedDeliveryDate: shipment.expectedDeliveryDate || "",
+            deliveredAt: shipment.deliveredAt || "",
+            podStatus: shipment.podStatus || "pending",
+            podFileUrl: shipment.podFileUrl || ""
+          },
+    manualPaymentInstructions: manualPaymentInstructions || null
+  };
 }
 
 function resolveCartOwner(context) {
@@ -1747,6 +1886,68 @@ async function getCheckoutSession(context, checkoutSessionId, query) {
   return sanitizeCheckoutSession(session);
 }
 
+async function getCheckoutFollowup(context, checkoutSessionId, query) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: query.sessionId || context.sessionId || null
+  });
+
+  const [authStore, invoiceStore, paymentStore, shippingStore] = await Promise.all([
+    readAuthStore(),
+    readInvoiceStore(),
+    readPaymentStore(),
+    readShippingStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensureInvoiceStoreShape(invoiceStore);
+  ensurePaymentStoreShape(paymentStore);
+  ensureShippingStoreShape(shippingStore);
+
+  const session = authStore.checkoutSessions.find((row) => row.id === checkoutSessionId);
+  assertCheckoutOwnership(session, owner);
+
+  const order = session.orderId ? findOrderById(authStore, session.orderId) : null;
+  const shipment = order ? buildLatestShipmentMap(shippingStore).get(order.id) || null : null;
+  const invoice = order ? buildInvoiceByOrderIdMap(invoiceStore).get(order.id) || null : null;
+  const manualPaymentInstructions = shouldExposeManualPaymentInstructions(order)
+    ? getManualPaymentInstructions(order.paymentMethod, paymentStore)
+    : null;
+
+  return {
+    checkoutSession: sanitizeCheckoutSession(session),
+    order:
+      order === null
+        ? null
+        : buildCheckoutOrderFollowup(order, shipment, invoice, manualPaymentInstructions)
+  };
+}
+
+async function downloadCheckoutInvoice(context, checkoutSessionId, query) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: query.sessionId || context.sessionId || null
+  });
+
+  const [authStore, invoiceStore] = await Promise.all([readAuthStore(), readInvoiceStore()]);
+  ensurePhase7StoreShape(authStore);
+  ensureInvoiceStoreShape(invoiceStore);
+
+  const session = authStore.checkoutSessions.find((row) => row.id === checkoutSessionId);
+  assertCheckoutOwnership(session, owner);
+
+  const order = session.orderId ? findOrderById(authStore, session.orderId) : null;
+  if (!order) {
+    throw new HttpError(404, "Order is not available for this checkout session yet.");
+  }
+
+  const invoice = ensureArray(invoiceStore.invoices).find((row) => row.orderId === order.id);
+  if (!invoice) {
+    throw new HttpError(404, "Invoice is not generated for this order yet.");
+  }
+
+  return getInvoiceDownload(invoice.id);
+}
+
 async function createPaymentAttempt(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
@@ -2217,6 +2418,8 @@ module.exports = {
   claimSharedCart,
   startCheckout,
   getCheckoutSession,
+  getCheckoutFollowup,
+  downloadCheckoutInvoice,
   createPaymentAttempt,
   processPaymentWebhook,
   processMockPaymentWebhook,

@@ -1,5 +1,10 @@
 const assert = require("node:assert/strict");
+const { execFile } = require("node:child_process");
+const fs = require("node:fs/promises");
 const http = require("node:http");
+const os = require("node:os");
+const path = require("node:path");
+const { promisify } = require("node:util");
 const { createApp } = require("../app");
 const { resetCatalogStoreForRegression } = require("../database/catalog-store");
 const { resetInvoiceStoreForRegression } = require("../database/invoice-store");
@@ -17,6 +22,8 @@ const {
 const { jsonFileStore } = require("../database/json-file-store");
 const { resetAuthStoreForRegression } = require("../database/auth-store");
 const { ensureAuthBootstrap } = require("../modules/auth/auth.service");
+
+const execFileAsync = promisify(execFile);
 
 async function requestJson(baseUrl, path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, options);
@@ -55,6 +62,35 @@ function authHeaders(accessToken) {
     "content-type": "application/json",
     authorization: `Bearer ${accessToken}`
   };
+}
+
+async function runNodeScript(scriptPath, args = [], options = {}) {
+  return execFileAsync(process.execPath, [scriptPath, ...args], {
+    cwd: options.cwd || process.cwd(),
+    env: {
+      ...process.env,
+      ...(options.env || {})
+    }
+  });
+}
+
+function parseJsonOutput(stdout, label) {
+  const text = String(stdout || "").trim();
+
+  try {
+    return JSON.parse(text || "{}");
+  } catch (_error) {
+    const jsonStart = text.lastIndexOf("\n{");
+    if (jsonStart >= 0) {
+      try {
+        return JSON.parse(text.slice(jsonStart + 1));
+      } catch (error) {
+        throw new Error(`Failed to parse JSON output for ${label}: ${error.message}`);
+      }
+    }
+
+    throw new Error(`Failed to parse JSON output for ${label}: invalid JSON payload.`);
+  }
 }
 
 async function run() {
@@ -3612,9 +3648,319 @@ async function run() {
       true
     );
 
+    const phase19ProductSearch = await requestJson(
+      baseUrl,
+      `/api/admin/walkin-orders/products?q=${encodeURIComponent(createdProductSku)}&categoryId=${categoryId}&limit=10`,
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase19ProductSearch.response.status, 200);
+    const phase19ProductMatch = phase19ProductSearch.json.data.find(
+      (row) => row.id === createdProductId
+    );
+    assert.equal(Boolean(phase19ProductMatch), true);
+    assert.equal(phase19ProductMatch.gstRate, 18);
+
+    const phase19CreateCustomerOrder = await requestJson(
+      baseUrl,
+      "/api/admin/walkin-orders",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          customer: {
+            name: "Phase 19 Walk-in Customer",
+            email: "phase19.walkin@example.com",
+            mobile: "+919811223344",
+            companyName: "Phase 19 Counter Sale",
+            gstin: "07ABCDE1234F1Z5",
+            addressLine1: "Counter Desk 1",
+            city: "New Delhi",
+            state: "Delhi",
+            stateCode: "DL",
+            pincode: "110018",
+            country: "India",
+            customerType: "retail"
+          },
+          items: [
+            {
+              productId: createdProductId,
+              qty: 2,
+              priceMode: "retail"
+            }
+          ],
+          shippingMethod: "self_pickup",
+          paymentMethod: "cash",
+          markAsPaid: true,
+          generateInvoice: true,
+          paymentReference: "PHASE19-CASH-001",
+          orderNote: "Phase 19 counter cash order."
+        })
+      }
+    );
+    assert.equal(phase19CreateCustomerOrder.response.status, 201);
+    assert.equal(Boolean(phase19CreateCustomerOrder.json.data.customer.id), true);
+    assert.equal(phase19CreateCustomerOrder.json.data.order.paymentMethod, "cash");
+    assert.equal(phase19CreateCustomerOrder.json.data.order.paymentStatus, "paid");
+    assert.equal(Boolean(phase19CreateCustomerOrder.json.data.invoice?.id), true);
+    assert.equal(phase19CreateCustomerOrder.json.data.order.gstTotal > 0, true);
+    assert.equal(
+      phase19CreateCustomerOrder.json.data.invoice.items[0].gstRate,
+      18
+    );
+    assert.equal(
+      phase19CreateCustomerOrder.json.data.invoice.pricing.gstTotal,
+      phase19CreateCustomerOrder.json.data.order.gstTotal
+    );
+
+    const phase19ExistingCustomerSearch = await requestJson(
+      baseUrl,
+      `/api/admin/walkin-orders/customers?q=${encodeURIComponent("Ravi Customer")}&limit=10`,
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase19ExistingCustomerSearch.response.status, 200);
+    assert.equal(
+      phase19ExistingCustomerSearch.json.data.some(
+        (row) => row.id === customerRegister.json.data.customer.id
+      ),
+      true
+    );
+
+    const phase19PendingOrder = await requestJson(
+      baseUrl,
+      "/api/admin/walkin-orders",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          customerId: customerRegister.json.data.customer.id,
+          customer: {
+            name: "Ravi Customer",
+            email: "ravi@example.com",
+            mobile: "+919800000222",
+            companyName: "Ravi Retail Projects",
+            gstin: "06ABCDE1234F1Z5",
+            addressLine1: "Shop 11, Sector 14",
+            city: "Gurugram",
+            state: "Haryana",
+            stateCode: "HR",
+            pincode: "122001",
+            country: "India",
+            customerType: "retail"
+          },
+          items: [
+            {
+              productId: createdProductId,
+              qty: 1,
+              priceMode: "retail"
+            }
+          ],
+          shippingMethod: "standard",
+          shippingCharge: 150,
+          paymentMethod: "manual_upi",
+          markAsPaid: false,
+          generateInvoice: true,
+          orderNote: "Phase 19 pending manual UPI order."
+        })
+      }
+    );
+    assert.equal(phase19PendingOrder.response.status, 201);
+    assert.equal(phase19PendingOrder.json.data.order.paymentStatus, "pending");
+    assert.equal(phase19PendingOrder.json.data.order.paymentMethod, "manual_upi");
+    assert.equal(phase19PendingOrder.json.data.order.orderStatus, "payment_pending");
+    const phase19PendingOrderId = phase19PendingOrder.json.data.order.id;
+
+    const phase19InvoiceBlockedBeforePayment = await requestJson(
+      baseUrl,
+      `/api/admin/walkin-orders/${phase19PendingOrderId}/generate-invoice`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({})
+      }
+    );
+    assert.equal(phase19InvoiceBlockedBeforePayment.response.status, 409);
+
+    const phase19PaymentConfirm = await requestJson(
+      baseUrl,
+      `/api/admin/walkin-orders/${phase19PendingOrderId}/confirm-payment`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          paymentReference: "UPI-PHASE19-001",
+          generateInvoice: true
+        })
+      }
+    );
+    assert.equal(phase19PaymentConfirm.response.status, 200);
+    assert.equal(phase19PaymentConfirm.json.data.order.paymentStatus, "paid");
+    assert.equal(
+      phase19PaymentConfirm.json.data.order.orderStatus,
+      "invoice_generated"
+    );
+    assert.equal(Boolean(phase19PaymentConfirm.json.data.invoice?.id), true);
+
+    const phase19DispatchedOrder = await requestJson(
+      baseUrl,
+      `/api/admin/walkin-orders/${phase19PendingOrderId}/status`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          orderStatus: "dispatched",
+          adminNote: "Phase 19 manual dispatch."
+        })
+      }
+    );
+    assert.equal(phase19DispatchedOrder.response.status, 200);
+    assert.equal(phase19DispatchedOrder.json.data.order.orderStatus, "dispatched");
+    assert.equal(
+      phase19DispatchedOrder.json.data.order.shipmentStatus,
+      "shipped"
+    );
+
+    const phase19FilteredOrders = await requestJson(
+      baseUrl,
+      "/api/admin/walkin-orders?status=dispatched&paymentMethod=manual_upi&limit=20",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase19FilteredOrders.response.status, 200);
+    assert.equal(
+      phase19FilteredOrders.json.data.rows.some(
+        (row) => row.id === phase19PendingOrderId
+      ),
+      true
+    );
+
+    const phase19AdminOrdersList = await requestJson(
+      baseUrl,
+      "/api/admin/orders?limit=200",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase19AdminOrdersList.response.status, 200);
+    assert.equal(
+      phase19AdminOrdersList.json.data.rows.some(
+        (row) => row.id === phase11CustomerOrderId && row.channel === "storefront"
+      ),
+      true
+    );
+    assert.equal(
+      phase19AdminOrdersList.json.data.rows.some(
+        (row) => row.id === phase18SpecialOrderId && row.channel === "b2b_request"
+      ),
+      true
+    );
+    assert.equal(
+      phase19AdminOrdersList.json.data.rows.some(
+        (row) => row.id === phase19PendingOrderId && row.channel === "walk_in"
+      ),
+      true
+    );
+
+    const phase19AdminOrdersFiltered = await requestJson(
+      baseUrl,
+      "/api/admin/orders?channel=walk_in&paymentMethod=manual_upi&invoiceStatus=generated&limit=20",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase19AdminOrdersFiltered.response.status, 200);
+    assert.equal(
+      phase19AdminOrdersFiltered.json.data.rows.some(
+        (row) => row.id === phase19PendingOrderId
+      ),
+      true
+    );
+
+    const phase19AdminOrderDetail = await requestJson(
+      baseUrl,
+      `/api/admin/orders/${phase19PendingOrderId}`,
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase19AdminOrderDetail.response.status, 200);
+    assert.equal(phase19AdminOrderDetail.json.data.channel, "walk_in");
+    assert.equal(
+      phase19AdminOrderDetail.json.data.invoice.invoiceNumber.length > 0,
+      true
+    );
+    assert.equal(phase19AdminOrderDetail.json.data.items.length, 1);
+
+    const phase19EditorGroup = await requestJson(
+      baseUrl,
+      "/api/admin/roles-permissions",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          name: "Walk-in Editor",
+          description: "Can edit walk-in orders but cannot cancel them.",
+          permissions: ["orders.view", "orders.edit"]
+        })
+      }
+    );
+    assert.equal(phase19EditorGroup.response.status, 201);
+    const phase19EditorGroupId = phase19EditorGroup.json.data.id;
+
+    const phase19EditorStaff = await requestJson(baseUrl, "/api/admin/staff", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        name: "Walk-in Editor User",
+        email: "walkin.editor@example.com",
+        mobile: "+919000000222",
+        password: "WalkinEditor@123",
+        permissionGroupId: phase19EditorGroupId
+      })
+    });
+    assert.equal(phase19EditorStaff.response.status, 201);
+
+    const phase19EditorLogin = await requestJson(baseUrl, "/api/auth/admin/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "walkin.editor@example.com",
+        password: "WalkinEditor@123"
+      })
+    });
+    assert.equal(phase19EditorLogin.response.status, 200);
+    const phase19EditorToken = phase19EditorLogin.json.data.accessToken;
+
+    const phase19CancelDenied = await requestJson(
+      baseUrl,
+      `/api/admin/walkin-orders/${phase19PendingOrderId}/status`,
+      {
+        method: "PATCH",
+        headers: authHeaders(phase19EditorToken),
+        body: JSON.stringify({
+          orderStatus: "cancelled",
+          adminNote: "This should be denied without cancel permission."
+        })
+      }
+    );
+    assert.equal(phase19CancelDenied.response.status, 403);
+
+    const phase16SalesMonth = String(
+      phase10InvoiceForOnlineOrder.json.data.invoiceDate || ""
+    ).slice(0, 7);
+    const phase16SalesYear = String(
+      phase10InvoiceForOnlineOrder.json.data.invoiceDate || ""
+    ).slice(0, 4);
+    assert.equal(phase16SalesMonth.length, 7);
+    assert.equal(phase16SalesYear.length, 4);
+
     const phase16SalesReport = await requestJson(
       baseUrl,
-      "/api/admin/reports/sales?period=monthly&month=2026-05&limit=200",
+      `/api/admin/reports/sales?period=monthly&month=${phase16SalesMonth}&limit=200`,
       {
         headers: authHeaders(superAdminToken)
       }
@@ -3636,7 +3982,7 @@ async function run() {
 
     const phase16SalesCsv = await requestText(
       baseUrl,
-      "/api/admin/reports/sales/export?period=monthly&month=2026-05&format=csv",
+      `/api/admin/reports/sales/export?period=monthly&month=${phase16SalesMonth}&format=csv`,
       {
         headers: authHeaders(superAdminToken)
       }
@@ -3644,7 +3990,7 @@ async function run() {
     assert.equal(phase16SalesCsv.response.status, 200);
     assert.equal(
       String(phase16SalesCsv.response.headers.get("content-disposition") || "").includes(
-        "sales-2026-05.csv"
+        `sales-${phase16SalesMonth}.csv`
       ),
       true
     );
@@ -3655,7 +4001,7 @@ async function run() {
 
     const phase16CityPincodeReport = await requestJson(
       baseUrl,
-      "/api/admin/reports/sales?period=monthly&month=2026-05&city=New%20Delhi&pincode=110015&limit=50",
+      `/api/admin/reports/sales?period=monthly&month=${phase16SalesMonth}&city=New%20Delhi&pincode=110015&limit=50`,
       {
         headers: authHeaders(superAdminToken)
       }
@@ -3669,7 +4015,7 @@ async function run() {
 
     const phase16InvoiceExcel = await requestText(
       baseUrl,
-      "/api/admin/reports/invoices/export?period=yearly&year=2026&format=excel",
+      `/api/admin/reports/invoices/export?period=yearly&year=${phase16SalesYear}&format=excel`,
       {
         headers: authHeaders(superAdminToken)
       }
@@ -3677,7 +4023,7 @@ async function run() {
     assert.equal(phase16InvoiceExcel.response.status, 200);
     assert.equal(
       String(phase16InvoiceExcel.response.headers.get("content-disposition") || "").includes(
-        "invoices-2026.xls"
+        `invoices-${phase16SalesYear}.xls`
       ),
       true
     );
@@ -3688,7 +4034,7 @@ async function run() {
 
     const phase16InvoiceZip = await requestBuffer(
       baseUrl,
-      "/api/admin/reports/invoices/export?period=yearly&year=2026&city=New%20Delhi&pincode=110015&format=invoice-zip",
+      `/api/admin/reports/invoices/export?period=yearly&year=${phase16SalesYear}&city=New%20Delhi&pincode=110015&format=invoice-zip`,
       {
         headers: authHeaders(superAdminToken)
       }
@@ -3696,7 +4042,7 @@ async function run() {
     assert.equal(phase16InvoiceZip.response.status, 200);
     assert.equal(
       String(phase16InvoiceZip.response.headers.get("content-disposition") || "").includes(
-        "invoices-2026.zip"
+        `invoices-${phase16SalesYear}.zip`
       ),
       true
     );
@@ -3755,7 +4101,7 @@ async function run() {
 
     const phase16OpsViewReport = await requestJson(
       baseUrl,
-      "/api/admin/reports/sales?period=monthly&month=2026-05&limit=20",
+      `/api/admin/reports/sales?period=monthly&month=${phase16SalesMonth}&limit=20`,
       {
         headers: authHeaders(phase16OpsToken)
       }
@@ -3764,7 +4110,7 @@ async function run() {
 
     const phase16OpsExportDenied = await requestText(
       baseUrl,
-      "/api/admin/reports/sales/export?period=monthly&month=2026-05&format=csv",
+      `/api/admin/reports/sales/export?period=monthly&month=${phase16SalesMonth}&format=csv`,
       {
         headers: authHeaders(phase16OpsToken)
       }
@@ -3876,6 +4222,433 @@ async function run() {
       }
     );
     assert.equal(restrictedSettingsUpdate.response.status, 403);
+
+    const phase20PublicBootstrap = await requestJson(
+      baseUrl,
+      "/api/setup-wizard/bootstrap"
+    );
+    assert.equal(phase20PublicBootstrap.response.status, 200);
+    assert.equal(phase20PublicBootstrap.json.data.overview.steps.length, 16);
+    assert.equal(
+      phase20PublicBootstrap.json.data.wizard.currentStep,
+      "business_profile"
+    );
+
+    const phase20AdminWizard = await requestJson(
+      baseUrl,
+      "/api/admin/setup-wizard",
+      {
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase20AdminWizard.response.status, 200);
+    assert.equal(
+      Boolean(phase20AdminWizard.json.data.overview.firstPendingStepKey),
+      true
+    );
+
+    const phase20CompleteBlocked = await requestJson(
+      baseUrl,
+      "/api/admin/setup-wizard/complete",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({})
+      }
+    );
+    assert.equal(phase20CompleteBlocked.response.status, 409);
+
+    async function savePhase20Step(stepKey, payload) {
+      const result = await requestJson(
+        baseUrl,
+        `/api/admin/setup-wizard/steps/${stepKey}`,
+        {
+          method: "PUT",
+          headers: authHeaders(superAdminToken),
+          body: JSON.stringify(payload)
+        }
+      );
+      assert.equal(result.response.status, 200);
+      return result;
+    }
+
+    const phase20BusinessProfile = await savePhase20Step("business_profile", {
+      storeName: "Jenix India Pvt Ltd",
+      legalBusinessName: "Jenix India Private Limited",
+      supportEmail: "support@jenixindia.com",
+      supportMobile: "+919999000111",
+      whatsappNumber: "+919999000112",
+      address: "27 Industrial Market, New Delhi",
+      pickupAddress: "Warehouse 12, Kirti Nagar, New Delhi",
+      state: "Delhi",
+      stateCode: "07",
+      storefrontDomain: "https://shop.jenixindia.com",
+      adminDomain: "https://admin.jenixindia.com",
+      apiDomain: "https://api.jenixindia.com"
+    });
+    assert.equal(
+      phase20BusinessProfile.json.data.forms.business_profile.storefrontDomain,
+      "https://shop.jenixindia.com"
+    );
+
+    await savePhase20Step("logo_theme", {
+      themeColor: "#b91c1c",
+      buttonColor: "#111827"
+    });
+    await savePhase20Step("gst_profile", {
+      gstin: "07AABCJ1234D1Z5",
+      state: "Delhi",
+      stateCode: "07"
+    });
+    await savePhase20Step("invoice_settings", {
+      invoicePrefix: "JNX",
+      invoicePostfix: "26",
+      invoiceStartingNumber: 125,
+      invoiceNumberPadding: 6,
+      invoiceFooter: "Authorised by Jenix India.",
+      invoiceTerms: "Goods once sold will not be taken back without approval.",
+      showBankDetails: true,
+      showHsnSummary: true,
+      showShippingLine: true,
+      showDiscountLine: true
+    });
+    await savePhase20Step("admin_user", {
+      name: "Super Admin",
+      email: "admin@jenixindia.com",
+      mobile: "+919000001000",
+      password: "",
+      confirmPassword: ""
+    });
+    await savePhase20Step("smtp_email", {
+      host: "smtp.example.com",
+      port: 587,
+      secure: true,
+      username: "smtp-user",
+      fromName: "Jenix India",
+      fromEmail: "noreply@jenixindia.com",
+      replyToEmail: "support@jenixindia.com",
+      password: "smtp-secret"
+    });
+    await savePhase20Step("google_login", {
+      enabled: false,
+      clientId: "",
+      redirectUri: "",
+      clientSecret: ""
+    });
+    await savePhase20Step("phone_otp", {
+      enabled: false,
+      provider: "dev",
+      senderId: "",
+      templateId: "",
+      apiBaseUrl: "",
+      authToken: ""
+    });
+    await savePhase20Step("payment_gateway", {
+      providerCode: "razorpay",
+      isEnabled: false,
+      mode: "test",
+      keyId: "",
+      keySecret: "",
+      webhookSecret: ""
+    });
+    await savePhase20Step("manual_bank_upi", {
+      beneficiaryName: "Jenix India Pvt Ltd",
+      bankName: "ICICI Bank",
+      accountHolderName: "Jenix India Pvt Ltd",
+      accountNumber: "1234567890",
+      ifsc: "ICIC0001234",
+      upiId: "payments@jenixindia",
+      instructions: "Share UTR screenshot after payment for manual verification."
+    });
+    const phase20ShippingCourier = await savePhase20Step("shipping_courier", {
+      courierName: "Blue Dart Manual",
+      courierCode: "BLUEDART-MANUAL",
+      trackingUrlTemplate: "https://tracking.example.com/{{trackingId}}",
+      trackingPageUrl: "https://tracking.example.com",
+      supportPhone: "+911140000000",
+      supportEmail: "dispatch@jenixindia.com",
+      apiEnabled: false,
+      apiProvider: "manual_courier",
+      pickupAddress: "Warehouse 12, Kirti Nagar, New Delhi",
+      pickupPincode: "110015"
+    });
+    assert.equal(
+      phase20ShippingCourier.json.data.forms.shipping_courier.courierCode,
+      "BLUEDART-MANUAL"
+    );
+    await savePhase20Step("merchant_center", {
+      merchantId: "merchant-jenix-01",
+      claimedDomain: "https://shop.jenixindia.com",
+      feedUrl: "https://api.jenixindia.com/google-merchant-feed.xml",
+      targetCountry: "IN",
+      language: "en"
+    });
+    await savePhase20Step("seo_search_console", {
+      canonicalDomain: "https://shop.jenixindia.com",
+      searchConsoleVerification: "google-site-verification=phase20",
+      bingVerification: "msvalidate.01=phase20",
+      googleAnalyticsId: "G-PHASE20",
+      googleTagManagerId: "GTM-PHASE20"
+    });
+    await savePhase20Step("meta_pixel", {
+      enabled: false,
+      pixelId: "",
+      catalogId: ""
+    });
+    await savePhase20Step("backup_settings", {
+      backupDir: "backups/production",
+      retentionDays: 21,
+      cronExpression: "0 2 * * *",
+      includeUploads: true,
+      includeEnvFile: true,
+      runHealthCheckAfterBackup: true,
+      notifyEmail: "ops@jenixindia.com"
+    });
+    const phase20LaunchChecklist = await savePhase20Step("launch_checklist", {
+      dnsReady: true,
+      sslReady: true,
+      frontServed: true,
+      adminServed: true,
+      apiServed: true,
+      backupVerified: true,
+      paymentGatewayReviewed: true,
+      merchantFeedReviewed: true,
+      searchConsoleSubmitted: true,
+      firstInvoiceTested: true
+    });
+    assert.equal(
+      phase20LaunchChecklist.json.data.overview.firstPendingStepKey,
+      null
+    );
+
+    const phase20Complete = await requestJson(
+      baseUrl,
+      "/api/admin/setup-wizard/complete",
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({})
+      }
+    );
+    assert.equal(phase20Complete.response.status, 200);
+    assert.equal(phase20Complete.json.data.overview.completionPercent, 100);
+    assert.equal(Boolean(phase20Complete.json.data.wizard.completedAt), true);
+
+    const phase20PublicBootstrapAfterComplete = await requestJson(
+      baseUrl,
+      "/api/setup-wizard/bootstrap"
+    );
+    assert.equal(phase20PublicBootstrapAfterComplete.response.status, 200);
+    assert.equal(
+      phase20PublicBootstrapAfterComplete.json.data.readiness.isCompleted,
+      true
+    );
+
+    const phase20TempRoot = await fs.mkdtemp(
+      path.join(os.tmpdir(), "jenix-phase20-")
+    );
+
+    try {
+      const generateEnvScript = path.resolve(process.cwd(), "scripts/generate-env.js");
+      const backupRunnerScript = path.resolve(process.cwd(), "scripts/backup-runner.js");
+      const restoreRunnerScript = path.resolve(process.cwd(), "scripts/restore-runner.js");
+      const seedAdminScript = path.resolve(process.cwd(), "scripts/seed-admin.js");
+      const healthCheckScript = path.resolve(process.cwd(), "scripts/health-check.js");
+      const renderNginxScript = path.resolve(
+        process.cwd(),
+        "scripts/render-nginx-config.js"
+      );
+
+      const envRoot = path.join(phase20TempRoot, "env-root");
+      await fs.mkdir(envRoot, { recursive: true });
+      const phase20EnvResult = await runNodeScript(
+        generateEnvScript,
+        [
+          "--output",
+          path.join(envRoot, "backend.env"),
+          "--front-output",
+          path.join(envRoot, "front.env"),
+          "--admin-output",
+          path.join(envRoot, "admin.env"),
+          "--api-domain",
+          "http://127.0.0.1:5500",
+          "--store-domain",
+          "https://shop.phase20.example.com",
+          "--admin-domain",
+          "https://admin.phase20.example.com",
+          "--super-admin-email",
+          "phase20@example.com",
+          "--super-admin-password",
+          "Phase20@123",
+          "--port",
+          "5500"
+        ]
+      );
+      const phase20EnvSummary = parseJsonOutput(
+        phase20EnvResult.stdout,
+        "generate-env"
+      );
+      assert.equal(phase20EnvSummary.publicBaseUrl, "http://127.0.0.1:5500");
+      const phase20EnvText = await fs.readFile(
+        path.join(envRoot, "backend.env"),
+        "utf-8"
+      );
+      assert.equal(
+        phase20EnvText.includes("SUPER_ADMIN_EMAIL=phase20@example.com"),
+        true
+      );
+
+      const backupSourceRoot = path.join(phase20TempRoot, "backup-source");
+      await fs.mkdir(path.join(backupSourceRoot, "backend/src/database/json"), {
+        recursive: true
+      });
+      await fs.mkdir(path.join(backupSourceRoot, "backend/uploads"), {
+        recursive: true
+      });
+      await fs.mkdir(path.join(backupSourceRoot, "apps/front/dist"), {
+        recursive: true
+      });
+      await fs.mkdir(path.join(backupSourceRoot, "apps/admin-panel/dist"), {
+        recursive: true
+      });
+      await fs.writeFile(path.join(backupSourceRoot, ".env"), "PORT=4100\n", "utf-8");
+      await fs.writeFile(
+        path.join(backupSourceRoot, "backend/src/database/json/settings.json"),
+        "{\"ok\":true}\n",
+        "utf-8"
+      );
+      await fs.writeFile(
+        path.join(backupSourceRoot, "backend/uploads/logo.txt"),
+        "asset\n",
+        "utf-8"
+      );
+      await fs.writeFile(
+        path.join(backupSourceRoot, "apps/front/dist/index.html"),
+        "<html>front</html>\n",
+        "utf-8"
+      );
+      await fs.writeFile(
+        path.join(backupSourceRoot, "apps/admin-panel/dist/index.html"),
+        "<html>admin</html>\n",
+        "utf-8"
+      );
+      await fs.writeFile(
+        path.join(backupSourceRoot, "ecosystem.config.cjs"),
+        "module.exports = {};\n",
+        "utf-8"
+      );
+      await fs.writeFile(
+        path.join(backupSourceRoot, "package.json"),
+        "{\"name\":\"phase20-backup\"}\n",
+        "utf-8"
+      );
+
+      const phase20BackupResult = await runNodeScript(backupRunnerScript, [
+        "--source-root",
+        backupSourceRoot,
+        "--backup-dir",
+        "snapshots",
+        "--label",
+        "phase20",
+        "--retention-days",
+        "30"
+      ]);
+      const phase20BackupSummary = parseJsonOutput(
+        phase20BackupResult.stdout,
+        "backup-runner"
+      );
+      assert.equal(phase20BackupSummary.entries.length >= 5, true);
+
+      const restoreTargetRoot = path.join(phase20TempRoot, "restore-target");
+      const phase20RestoreResult = await runNodeScript(restoreRunnerScript, [
+        "--source",
+        phase20BackupSummary.targetDir,
+        "--target-root",
+        restoreTargetRoot
+      ]);
+      const phase20RestoreSummary = parseJsonOutput(
+        phase20RestoreResult.stdout,
+        "restore-runner"
+      );
+      assert.equal(
+        phase20RestoreSummary.restoredEntries.length,
+        phase20BackupSummary.entries.length
+      );
+      const restoredFrontIndex = await fs.readFile(
+        path.join(restoreTargetRoot, "apps/front/dist/index.html"),
+        "utf-8"
+      );
+      assert.equal(restoredFrontIndex.includes("front"), true);
+
+      const phase20SeedAuthPath = path.join(phase20TempRoot, "phase20-auth.json");
+      const phase20SeedResult = await runNodeScript(
+        seedAdminScript,
+        ["--name", "Phase 20 Admin", "--mobile", "+919111111111"],
+        {
+          env: {
+            AUTH_STORE_PATH: phase20SeedAuthPath,
+            SUPER_ADMIN_EMAIL: "wizard.owner@example.com",
+            SUPER_ADMIN_PASSWORD: "WizardAdmin@123"
+          }
+        }
+      );
+      const phase20SeedSummary = parseJsonOutput(
+        phase20SeedResult.stdout,
+        "seed-admin"
+      );
+      assert.equal(phase20SeedSummary.email, "wizard.owner@example.com");
+      const phase20SeededStore = JSON.parse(
+        await fs.readFile(phase20SeedAuthPath, "utf-8")
+      );
+      assert.equal(
+        phase20SeededStore.staffUsers.some(
+          (row) =>
+            row.role === "super_admin" &&
+            row.email === "wizard.owner@example.com"
+        ),
+        true
+      );
+
+      const phase20HealthResult = await runNodeScript(healthCheckScript, [
+        "--url",
+        `${baseUrl}/health`,
+        "--timeout",
+        "3000"
+      ]);
+      const phase20HealthSummary = parseJsonOutput(
+        phase20HealthResult.stdout,
+        "health-check"
+      );
+      assert.equal(phase20HealthSummary.results[0].status, 200);
+
+      const phase20NginxResult = await runNodeScript(renderNginxScript, [
+        "--deploy-root",
+        backupSourceRoot,
+        "--storefront-domain",
+        "shop.phase20.example.com",
+        "--admin-domain",
+        "admin.phase20.example.com",
+        "--api-domain",
+        "api.phase20.example.com",
+        "--backend-port",
+        "4100",
+        "--ssl",
+        "true"
+      ]);
+      const phase20NginxText = String(phase20NginxResult.stdout || "");
+      assert.equal(phase20NginxText.includes("listen 80;"), true);
+      assert.equal(phase20NginxText.includes("listen 443 ssl http2;"), true);
+      assert.equal(
+        phase20NginxText.includes("server_name admin.phase20.example.com;"),
+        true
+      );
+      assert.equal(
+        phase20NginxText.includes("proxy_pass http://127.0.0.1:4100;"),
+        true
+      );
+    } finally {
+      await fs.rm(phase20TempRoot, { recursive: true, force: true });
+    }
 
     const searchOverview = await requestJson(baseUrl, "/api/admin/search/overview", {
       headers: authHeaders(superAdminToken)

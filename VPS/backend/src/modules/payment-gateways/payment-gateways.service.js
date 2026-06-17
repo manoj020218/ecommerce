@@ -160,6 +160,21 @@ async function listPaymentGateways(filters = {}) {
   };
 }
 
+async function getPaymentGatewayConfig(gatewayCode) {
+  const paymentStore = await readPaymentStore();
+  const changed = ensurePaymentStoreShape(paymentStore);
+  if (changed) {
+    await writePaymentStore(paymentStore);
+  }
+
+  const gateway = findGatewayOrThrow(paymentStore, gatewayCode);
+  return {
+    ...sanitizeGateway(gateway),
+    credentials: clone(gateway.credentials || {}),
+    instructions: clone(gateway.instructions || {})
+  };
+}
+
 async function updatePaymentGateway(gatewayCode, patch, actor) {
   const paymentStore = await readPaymentStore();
   ensurePaymentStoreShape(paymentStore);
@@ -276,6 +291,7 @@ module.exports = {
   MANUAL_GATEWAY_CODES,
   ensurePaymentStoreShape,
   listPaymentGateways,
+  getPaymentGatewayConfig,
   updatePaymentGateway,
   updateDirectPaymentDiscountConfig,
   resolveGatewayForPaymentAttempt

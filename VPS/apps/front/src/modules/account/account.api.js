@@ -26,6 +26,20 @@ export function loginCustomerEmail(payload) {
   });
 }
 
+export function requestCustomerPasswordReset(payload) {
+  return apiFetch("/auth/customer/password/forgot", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function resetCustomerPassword(payload) {
+  return apiFetch("/auth/customer/password/reset", {
+    method: "POST",
+    body: payload
+  });
+}
+
 export function requestCustomerOtp(payload) {
   return apiFetch("/auth/customer/otp/request", {
     method: "POST",

@@ -1,0 +1,6 @@
+- [ ] Walk-in customer can be created during admin order creation.
+- [ ] Existing customer can be selected for a walk-in order.
+- [ ] Product search works by name, SKU, and category filters.
+- [ ] GST is applied from the product HSN rate.
+- [ ] Walk-in payment mode is stored on the order.
+- [ ] Invoice is generated only after payment is confirmed.

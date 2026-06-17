@@ -33,12 +33,56 @@ export function archiveProduct(productId) {
   });
 }
 
+export function importProductsFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch("/admin/products/import-file", {
+    method: "POST",
+    body: formData // multipart — bypasses JSON body size limit
+  });
+}
+
+export function bulkImportProducts(items) {
+  return apiFetch("/admin/products/bulk-import", {
+    method: "POST",
+    body: items
+  });
+}
+
+export function bulkPatchProducts(updates) {
+  return apiFetch("/admin/products/bulk-patch", {
+    method: "PATCH",
+    body: { updates }
+  });
+}
+
 export function uploadProductImage(productId, file) {
   const formData = new FormData();
   formData.append("file", file);
+  return apiFetch(`/admin/products/${productId}/images`, { method: "POST", body: formData });
+}
 
+export function deleteProductImage(productId, imageUrl) {
   return apiFetch(`/admin/products/${productId}/images`, {
-    method: "POST",
-    body: formData
+    method: "DELETE",
+    body: { imageUrl }
   });
+}
+
+export function uploadProductVideo(productId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch(`/admin/products/${productId}/videos`, { method: "POST", body: formData });
+}
+
+export function uploadProductDocument(productId, title, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("title", title);
+  return apiFetch(`/admin/products/${productId}/documents`, { method: "POST", body: formData });
+}
+
+export function getGoogleShoppingExportUrl(apiBase) {
+  // Returns the direct download URL (used as href, not apiFetch)
+  return `${apiBase}/admin/products/google-shopping-export`;
 }

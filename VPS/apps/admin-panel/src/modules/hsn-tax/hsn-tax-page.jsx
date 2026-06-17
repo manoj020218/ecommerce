@@ -54,6 +54,7 @@ export function HsnTaxPage() {
   const [editingCode, setEditingCode] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [duplicateHsn, setDuplicateHsn] = useState(null); // existing record if HSN code already taken
 
   const load = async (nextFilters = filters) => {
     setLoading(true);
@@ -79,6 +80,7 @@ export function HsnTaxPage() {
 
   const openCreate = () => {
     setEditingCode(null);
+    setDuplicateHsn(null);
     setForm({
       ...EMPTY_FORM,
       effectiveFrom: new Date().toISOString().slice(0, 10)
@@ -104,6 +106,7 @@ export function HsnTaxPage() {
   const closeModal = () => {
     setModalOpen(false);
     setSaving(false);
+    setDuplicateHsn(null);
   };
 
   const onFormChange = (event) => {
@@ -112,6 +115,17 @@ export function HsnTaxPage() {
       ...current,
       [name]: type === "checkbox" ? checked : value
     }));
+
+    // Live duplicate check only in create mode on the hsnCode field
+    if (name === "hsnCode" && !editingCode) {
+      const normalized = value.trim().toUpperCase();
+      const found = rows.find((r) => r.hsnCode === normalized);
+      setDuplicateHsn(found || null);
+    }
+  };
+
+  const switchToEdit = (row) => {
+    openEdit(row);
   };
 
   const onSubmit = async (event) => {
@@ -307,8 +321,38 @@ export function HsnTaxPage() {
               onChange={onFormChange}
               disabled={Boolean(editingCode)}
               required
+              style={duplicateHsn ? { borderColor: "#f59e0b", background: "#fffbeb" } : {}}
             />
           </label>
+
+          {duplicateHsn && (
+            <div style={{
+              gridColumn: "1 / -1",
+              background: "#fffbeb", border: "1px solid #f59e0b", borderRadius: 8,
+              padding: "10px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap"
+            }}>
+              <span style={{ fontSize: 13 }}>
+                <strong>⚠ HSN {duplicateHsn.hsnCode}</strong> already exists — {duplicateHsn.gstRate}% GST · {duplicateHsn.description}
+              </span>
+              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-small"
+                  onClick={() => switchToEdit(duplicateHsn)}
+                >
+                  Edit existing
+                </button>
+                <button
+                  type="button"
+                  className="btn-link"
+                  style={{ fontSize: 12 }}
+                  onClick={() => setDuplicateHsn(null)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
 
           <label className="field field-full">
             <span>Description *</span>
@@ -401,7 +445,7 @@ export function HsnTaxPage() {
             <button type="button" className="btn btn-secondary" onClick={closeModal}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button type="submit" className="btn btn-primary" disabled={saving || Boolean(duplicateHsn)}>
               {saving ? "Saving..." : editingCode ? "Update Record" : "Create Record"}
             </button>
           </div>

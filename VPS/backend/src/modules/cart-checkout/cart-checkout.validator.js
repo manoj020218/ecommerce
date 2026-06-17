@@ -99,7 +99,7 @@ const checkoutViewQuerySchema = z.object({
 const createPaymentAttemptSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   checkoutSessionId: z.string().trim().min(2).max(140),
-  gateway: z.string().trim().min(2).max(120).optional().default("razorpay")
+  gateway: z.string().trim().min(2).max(120).optional()
 });
 
 const paymentWebhookSchema = z.object({

@@ -188,6 +188,22 @@ function isWithinWindow(value, window, options = {}) {
   return timestamp >= window.startTs && timestamp <= window.endTs;
 }
 
+function isRangeOverlappingWindow(startValue, endValue, window) {
+  const startTs = resolveTimestamp(startValue || "");
+  const endTs = resolveTimestamp(endValue || "");
+
+  if (!Number.isNaN(startTs) && !Number.isNaN(endTs)) {
+    return endTs >= window.startTs && startTs <= window.endTs;
+  }
+  if (!Number.isNaN(startTs)) {
+    return startTs <= window.endTs;
+  }
+  if (!Number.isNaN(endTs)) {
+    return endTs >= window.startTs;
+  }
+  return false;
+}
+
 function resolveOrderAddress(order) {
   const billing = order?.billingAddress || {};
   const shipping = order?.shippingAddress || {};
@@ -294,6 +310,50 @@ function matchesOrderFilters(order, shipment, filters) {
     return false;
   }
   if (!matchesExact(order.shipmentStatus || "", filters.shipmentStatus)) {
+    return false;
+  }
+
+  return true;
+}
+
+function matchesInvoiceFilters(order, invoice, shipment, filters) {
+  const city = order ? resolveOrderCity(order) : invoice?.buyer?.city || "";
+  const pincode = order ? resolveOrderPincode(order) : invoice?.buyer?.pincode || "";
+  const state = order
+    ? resolveOrderState(order)
+    : invoice?.buyer?.state || invoice?.placeOfSupply?.state || "";
+  const paymentStatus = order?.paymentStatus || invoice?.paymentStatus || "";
+  const orderStatus = order?.orderStatus || "";
+  const shipmentStatus = order?.shipmentStatus || "";
+  const customerType = order?.customerType || "";
+
+  if (!matchesContains(city, filters.city)) {
+    return false;
+  }
+  if (!matchesContains(pincode, filters.pincode)) {
+    return false;
+  }
+  if (!matchesContains(state, filters.state)) {
+    return false;
+  }
+  if (
+    !matchesContains(
+      `${shipment?.courierName || ""} ${shipment?.courierCode || ""}`,
+      filters.courier
+    )
+  ) {
+    return false;
+  }
+  if (!matchesExact(customerType, filters.customerType)) {
+    return false;
+  }
+  if (!matchesExact(paymentStatus, filters.paymentStatus)) {
+    return false;
+  }
+  if (!matchesExact(orderStatus, filters.orderStatus)) {
+    return false;
+  }
+  if (!matchesExact(shipmentStatus, filters.shipmentStatus)) {
     return false;
   }
 
@@ -842,7 +902,7 @@ function buildFilteredInvoiceEntries(context, filters, window) {
       const order = ensureArray(context.authStore.orders).find((row) => row.id === invoice.orderId);
       const shipment = order ? context.shipmentByOrderId.get(order.id) : null;
 
-      if (order && !matchesOrderFilters(order, shipment, filters)) {
+      if (!matchesInvoiceFilters(order, invoice, shipment, filters)) {
         return null;
       }
 
@@ -1318,9 +1378,13 @@ function buildAbandonedCartReport(context, _filters, window) {
 
 function buildMarketingOffersReport(context, filters, window) {
   const rows = ensureArray(context.marketingStore.offers)
-    .filter((offer) =>
-      isWithinWindow(offer.updatedAt || offer.createdAt || offer.startsAt, window)
-    )
+    .filter((offer) => {
+      if (offer.startsAt || offer.endsAt) {
+        return isRangeOverlappingWindow(offer.startsAt, offer.endsAt, window);
+      }
+
+      return isWithinWindow(offer.updatedAt || offer.createdAt, window);
+    })
     .filter((offer) => matchesExact(offer.customerType || "", filters.customerType))
     .map((offer) => ({
       offerName: offer.name || "",

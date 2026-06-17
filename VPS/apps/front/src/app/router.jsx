@@ -1,13 +1,21 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { CustomerForgotPasswordPage } from "../modules/account/account-forgot-password-page";
 import { CustomerAccountLoginPage } from "../modules/account/account-login-page";
 import { CustomerAccountPage } from "../modules/account/account-page";
 import { CustomerOrderPage } from "../modules/account/account-order-page";
+import { CustomerResetPasswordPage } from "../modules/account/account-reset-password-page";
 import { BlogPage } from "../modules/blogs/blog-page";
 import { BlogsListPage } from "../modules/blogs/blogs-list-page";
+import { CartPage } from "../modules/cart/cart-page";
+import { CheckoutPage } from "../modules/cart/checkout-page";
+import { OrderSuccessPage } from "../modules/cart/order-success-page";
 import { ProductsListPage } from "../modules/products/products-list-page";
 import { ProductPage } from "../modules/products/product-page";
+import { StorefrontHomePage } from "../modules/products/storefront-home-page";
 import { RecoveryPage } from "../modules/recovery/recovery-page";
+import { NotFoundPage } from "../modules/settings/not-found-page";
 import { StorefrontLayout } from "../modules/settings/storefront-layout";
+import { StorefrontLoadingState } from "../shared/storefront/storefront-ui";
 import { useCustomerSession } from "../shared/auth/customer-session";
 
 function CustomerProtectedRoute({ children }) {
@@ -16,8 +24,8 @@ function CustomerProtectedRoute({ children }) {
 
   if (loading) {
     return (
-      <main className="front-shell">
-        <div className="state-box">Loading your customer session...</div>
+      <main className="proto-main-shell">
+        <StorefrontLoadingState label="Loading your customer session..." />
       </main>
     );
   }
@@ -39,12 +47,20 @@ export function AppRouter() {
   return (
     <Routes>
       <Route element={<StorefrontLayout />}>
-        <Route path="/" element={<ProductsListPage />} />
+        <Route path="/" element={<StorefrontHomePage />} />
+        <Route path="/products" element={<ProductsListPage />} />
+        <Route path="/categories/:slug" element={<ProductsListPage />} />
         <Route path="/guides" element={<BlogsListPage />} />
         <Route path="/guides/:slug" element={<BlogPage />} />
         <Route path="/products/:slug" element={<ProductPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/checkout/success" element={<OrderSuccessPage />} />
+        <Route path="/orders/guest/:checkoutSessionId" element={<OrderSuccessPage />} />
         <Route path="/recover/:recoveryToken" element={<RecoveryPage />} />
         <Route path="/account/login" element={<CustomerAccountLoginPage />} />
+        <Route path="/account/forgot-password" element={<CustomerForgotPasswordPage />} />
+        <Route path="/account/reset-password" element={<CustomerResetPasswordPage />} />
         <Route
           path="/account"
           element={
@@ -61,7 +77,7 @@ export function AppRouter() {
             </CustomerProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

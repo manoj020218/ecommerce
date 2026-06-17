@@ -1,2 +1,7 @@
 #!/usr/bin/env bash
-curl -sS http://localhost:4100/health
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+node "$ROOT_DIR/scripts/health-check.js" "$@"

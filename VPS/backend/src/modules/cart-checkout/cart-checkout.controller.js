@@ -118,6 +118,26 @@ const checkoutGetSession = asyncHandler(async (req, res) => {
   return ok(res, data, "Checkout session fetched.");
 });
 
+const checkoutGetFollowup = asyncHandler(async (req, res) => {
+  const query = parseCheckoutViewQuery(req.query || {});
+  const data = await service.getCheckoutFollowup(
+    cartContext(req, query.sessionId),
+    req.params.checkoutSessionId,
+    query
+  );
+  return ok(res, data, "Checkout follow-up fetched.");
+});
+
+const checkoutDownloadInvoice = asyncHandler(async (req, res) => {
+  const query = parseCheckoutViewQuery(req.query || {});
+  const data = await service.downloadCheckoutInvoice(
+    cartContext(req, query.sessionId),
+    req.params.checkoutSessionId,
+    query
+  );
+  return ok(res, data, "Checkout invoice download prepared.");
+});
+
 const paymentsCreateAttempt = asyncHandler(async (req, res) => {
   const payload = parseCreatePaymentAttemptPayload(req.body);
   const data = await service.createPaymentAttempt(
@@ -150,6 +170,8 @@ module.exports = {
   claimSharedCart,
   checkoutStart,
   checkoutGetSession,
+  checkoutGetFollowup,
+  checkoutDownloadInvoice,
   paymentsCreateAttempt,
   paymentsWebhookMock,
   paymentsWebhookGateway

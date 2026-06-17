@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { createCustomerSession, useCustomerSession } from "../../shared/auth/customer-session";
+import {
+  StorefrontAlert,
+  StorefrontButton,
+  StorefrontCard,
+  StorefrontInput,
+  StorefrontLoadingState,
+  StorefrontSectionHeader
+} from "../../shared/storefront/storefront-ui";
 import {
   loginCustomerEmail,
   registerCustomerEmail,
@@ -67,20 +75,20 @@ export function CustomerAccountLoginPage() {
 
   if (loading) {
     return (
-      <main className="front-shell">
-        <div className="state-box">Loading your customer session...</div>
+      <main className="proto-main-shell">
+        <StorefrontLoadingState label="Loading your customer session..." />
       </main>
     );
   }
 
   return (
-    <main className="front-shell account-shell">
-      <header className="front-header account-hero">
+    <main className="proto-main-shell account-shell">
+      <StorefrontCard className="front-header account-hero" elevated>
         <div className="hero-kicker-row">
-          <Link to="/" className="inline-link">
+          <StorefrontButton to="/" variant="light">
             Browse products
-          </Link>
-          <span className="eyebrow-chip">Phase 11</span>
+          </StorefrontButton>
+          <span className="eyebrow-chip">Customer Access</span>
         </div>
         <div className="account-hero-copy">
           <div>
@@ -102,17 +110,17 @@ export function CustomerAccountLoginPage() {
             </div>
           </div>
         </div>
-      </header>
+      </StorefrontCard>
 
-      {error ? <div className="state-box error">{error}</div> : null}
-      {info ? <div className="state-box">{info}</div> : null}
+      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+      {info ? <StorefrontAlert>{info}</StorefrontAlert> : null}
 
       <section className="account-grid auth-grid">
-        <article className="section-card">
-          <div className="section-head">
-            <h3>Email Login</h3>
-            <p>Use an existing email and password.</p>
-          </div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Email Login"
+            description="Use an existing email and password."
+          />
           <form
             className="stack-form"
             onSubmit={(event) => {
@@ -124,48 +132,49 @@ export function CustomerAccountLoginPage() {
             }}
           >
             <div className="field-grid">
-              <label>
-                <span>Email</span>
-                <input
-                  type="email"
-                  value={emailLogin.email}
-                  onChange={(event) =>
-                    setEmailLogin((current) => ({
-                      ...current,
-                      email: event.target.value
-                    }))
-                  }
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={emailLogin.password}
-                  onChange={(event) =>
-                    setEmailLogin((current) => ({
-                      ...current,
-                      password: event.target.value
-                    }))
-                  }
-                  placeholder="Your password"
-                  required
-                />
-              </label>
+              <StorefrontInput
+                label="Email"
+                type="email"
+                value={emailLogin.email}
+                onChange={(event) =>
+                  setEmailLogin((current) => ({
+                    ...current,
+                    email: event.target.value
+                  }))
+                }
+                placeholder="name@example.com"
+                required
+              />
+              <StorefrontInput
+                label="Password"
+                type="password"
+                value={emailLogin.password}
+                onChange={(event) =>
+                  setEmailLogin((current) => ({
+                    ...current,
+                    password: event.target.value
+                  }))
+                }
+                placeholder="Your password"
+                required
+              />
             </div>
-            <button type="submit" className="btn primary" disabled={busy === "login"}>
+            <StorefrontButton type="submit" disabled={busy === "login"}>
               {busy === "login" ? "Signing in..." : "Sign In"}
-            </button>
+            </StorefrontButton>
+            <div className="action-row">
+              <StorefrontButton to="/account/forgot-password" variant="light">
+                Forgot Password
+              </StorefrontButton>
+            </div>
           </form>
-        </article>
+        </StorefrontCard>
 
-        <article className="section-card">
-          <div className="section-head">
-            <h3>Create Account</h3>
-            <p>Register a customer account with email and password.</p>
-          </div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Create Account"
+            description="Register a customer account with email and password."
+          />
           <form
             className="stack-form"
             onSubmit={(event) => {
@@ -178,75 +187,67 @@ export function CustomerAccountLoginPage() {
             }}
           >
             <div className="field-grid">
-              <label>
-                <span>Name</span>
-                <input
-                  value={registerForm.name}
-                  onChange={(event) =>
-                    setRegisterForm((current) => ({
-                      ...current,
-                      name: event.target.value
-                    }))
-                  }
-                  placeholder="Your full name"
-                  required
-                />
-              </label>
-              <label>
-                <span>Email</span>
-                <input
-                  type="email"
-                  value={registerForm.email}
-                  onChange={(event) =>
-                    setRegisterForm((current) => ({
-                      ...current,
-                      email: event.target.value
-                    }))
-                  }
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label>
-                <span>Mobile</span>
-                <input
-                  value={registerForm.mobile}
-                  onChange={(event) =>
-                    setRegisterForm((current) => ({
-                      ...current,
-                      mobile: event.target.value
-                    }))
-                  }
-                  placeholder="+91-98xxxxxx10"
-                />
-              </label>
-              <label>
-                <span>Password</span>
-                <input
-                  type="password"
-                  value={registerForm.password}
-                  onChange={(event) =>
-                    setRegisterForm((current) => ({
-                      ...current,
-                      password: event.target.value
-                    }))
-                  }
-                  placeholder="Choose a password"
-                  required
-                />
-              </label>
+              <StorefrontInput
+                label="Name"
+                value={registerForm.name}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }))
+                }
+                placeholder="Your full name"
+                required
+              />
+              <StorefrontInput
+                label="Email"
+                type="email"
+                value={registerForm.email}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({
+                    ...current,
+                    email: event.target.value
+                  }))
+                }
+                placeholder="name@example.com"
+                required
+              />
+              <StorefrontInput
+                label="Mobile"
+                value={registerForm.mobile}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({
+                    ...current,
+                    mobile: event.target.value
+                  }))
+                }
+                placeholder="+91-98xxxxxx10"
+              />
+              <StorefrontInput
+                label="Password"
+                type="password"
+                value={registerForm.password}
+                onChange={(event) =>
+                  setRegisterForm((current) => ({
+                    ...current,
+                    password: event.target.value
+                  }))
+                }
+                placeholder="Choose a password"
+                required
+              />
             </div>
-            <button type="submit" className="btn dark" disabled={busy === "register"}>
+            <StorefrontButton type="submit" variant="dark" disabled={busy === "register"}>
               {busy === "register" ? "Creating..." : "Create Account"}
-            </button>
+            </StorefrontButton>
           </form>
-        </article>
+        </StorefrontCard>
 
-        <article className="section-card">
-          <div className="section-head">
-            <h3>Mobile OTP</h3>
-            <p>Verify a mobile number and access guest-linked orders safely.</p>
-          </div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Mobile OTP"
+            description="Verify a mobile number and access guest-linked orders safely."
+          />
           <form
             className="stack-form"
             onSubmit={(event) => {
@@ -272,38 +273,34 @@ export function CustomerAccountLoginPage() {
             }}
           >
             <div className="field-grid">
-              <label>
-                <span>Mobile</span>
-                <input
-                  value={otpForm.mobile}
-                  onChange={(event) =>
-                    setOtpForm((current) => ({
-                      ...current,
-                      mobile: event.target.value
-                    }))
-                  }
-                  placeholder="+91-98xxxxxx10"
-                  required
-                />
-              </label>
-              <label>
-                <span>Name</span>
-                <input
-                  value={otpForm.name}
-                  onChange={(event) =>
-                    setOtpForm((current) => ({
-                      ...current,
-                      name: event.target.value
-                    }))
-                  }
-                  placeholder="Name for first login"
-                  required
-                />
-              </label>
+              <StorefrontInput
+                label="Mobile"
+                value={otpForm.mobile}
+                onChange={(event) =>
+                  setOtpForm((current) => ({
+                    ...current,
+                    mobile: event.target.value
+                  }))
+                }
+                placeholder="+91-98xxxxxx10"
+                required
+              />
+              <StorefrontInput
+                label="Name"
+                value={otpForm.name}
+                onChange={(event) =>
+                  setOtpForm((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }))
+                }
+                placeholder="Name for first login"
+                required
+              />
             </div>
-            <button type="submit" className="btn secondary" disabled={busy === "otp-request"}>
+            <StorefrontButton type="submit" variant="light" disabled={busy === "otp-request"}>
               {busy === "otp-request" ? "Sending..." : "Request OTP"}
-            </button>
+            </StorefrontButton>
           </form>
 
           <form
@@ -322,20 +319,18 @@ export function CustomerAccountLoginPage() {
             }}
           >
             <div className="field-grid">
-              <label>
-                <span>OTP Code</span>
-                <input
-                  value={otpForm.code}
-                  onChange={(event) =>
-                    setOtpForm((current) => ({
-                      ...current,
-                      code: event.target.value
-                    }))
-                  }
-                  placeholder="6-digit code"
-                  required
-                />
-              </label>
+              <StorefrontInput
+                label="OTP Code"
+                value={otpForm.code}
+                onChange={(event) =>
+                  setOtpForm((current) => ({
+                    ...current,
+                    code: event.target.value
+                  }))
+                }
+                placeholder="6-digit code"
+                required
+              />
             </div>
             {otpState.devCode ? (
               <div className="inline-note">
@@ -345,13 +340,12 @@ export function CustomerAccountLoginPage() {
             {otpState.expiresAt ? (
               <div className="inline-note">Valid until {otpState.expiresAt}</div>
             ) : null}
-            <button type="submit" className="btn primary" disabled={busy === "otp-verify"}>
+            <StorefrontButton type="submit" disabled={busy === "otp-verify"}>
               {busy === "otp-verify" ? "Verifying..." : "Verify OTP"}
-            </button>
+            </StorefrontButton>
           </form>
-        </article>
+        </StorefrontCard>
       </section>
     </main>
   );
 }
-

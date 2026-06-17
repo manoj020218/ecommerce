@@ -1,3 +1,4 @@
+const crypto = require("node:crypto");
 const bcrypt = require("bcryptjs");
 const { HttpError } = require("../../common/http-error");
 const { env } = require("../../config/env");
@@ -26,6 +27,8 @@ const {
   getGuestCartLegacy,
   getCustomerCartLegacy
 } = require("../cart-checkout/cart-checkout.service");
+const { getAllSettings } = require("../settings/settings.service");
+const { safeSendTemplateNotification } = require("../marketing/marketing.service");
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -37,6 +40,34 @@ function normalizeMobile(mobile) {
 
 function ensureArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function normalizePublicBaseUrl(value) {
+  const trimmed = String(value || "").trim().replace(/\/$/, "");
+  if (!trimmed) {
+    return "";
+  }
+
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function buildPasswordResetToken() {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+function prunePasswordResetRequests(store) {
+  const currentRows = ensureArray(store.passwordResetRequests);
+  const nextRows = currentRows.filter(
+    (request) =>
+      !request.usedAt &&
+      Date.parse(request.expiresAt || "") > Date.now()
+  );
+  store.passwordResetRequests = nextRows;
+  return nextRows.length !== currentRows.length;
 }
 
 function buildAdminPermissions(store, staffUser) {
@@ -156,6 +187,27 @@ function ensureCustomerHasProvider(user, providerType, providerId) {
   user.authProviders = providers;
 }
 
+function revokeCustomerRefreshSessions(store, customerId) {
+  const revokedAt = nowIso();
+
+  for (const session of ensureArray(store.refreshSessions)) {
+    if (
+      session.actorType === ACTOR_TYPES.CUSTOMER &&
+      session.actorId === customerId &&
+      !session.revokedAt
+    ) {
+      session.revokedAt = revokedAt;
+    }
+  }
+}
+
+async function resolveStorefrontBaseUrl() {
+  const settings = await getAllSettings();
+  return normalizePublicBaseUrl(
+    settings.seoDefaults?.canonicalDomain || env.publicBaseUrl
+  );
+}
+
 function toPublicAdmin(staffUser, permissions) {
   return {
     id: staffUser.id,
@@ -188,6 +240,10 @@ async function ensureAuthBootstrap() {
   }
   if (!Array.isArray(store.otpChallenges)) {
     store.otpChallenges = [];
+    changed = true;
+  }
+  if (!Array.isArray(store.passwordResetRequests)) {
+    store.passwordResetRequests = [];
     changed = true;
   }
   if (!Array.isArray(store.guestCarts)) {
@@ -247,7 +303,9 @@ async function ensureAuthBootstrap() {
     });
   }
 
-  if (changed) {
+  const prunedPasswordResetRequests = prunePasswordResetRequests(store);
+
+  if (changed || prunedPasswordResetRequests) {
     await writeAuthStore(store);
   }
 
@@ -488,6 +546,120 @@ async function customerLoginEmail(payload) {
   }
 
   return issueCustomerTokens(store, user, payload.guestSessionId);
+}
+
+async function customerForgotPassword(payload) {
+  const store = await ensureAuthBootstrap();
+  const normalizedEmail = normalizeEmail(payload.email);
+  const user = store.users.find(
+    (item) => item.email && normalizeEmail(item.email) === normalizedEmail
+  );
+
+  if (!user) {
+    return { accepted: true };
+  }
+
+  prunePasswordResetRequests(store);
+  store.passwordResetRequests = store.passwordResetRequests.filter(
+    (request) => request.userId !== user.id
+  );
+
+  const rawToken = buildPasswordResetToken();
+  const createdAt = nowIso();
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+  const baseUrl = await resolveStorefrontBaseUrl();
+  const resetUrl = `${baseUrl}/account/reset-password?token=${encodeURIComponent(rawToken)}`;
+
+  store.passwordResetRequests.push({
+    id: generateId("pwd_reset"),
+    userId: user.id,
+    email: normalizedEmail,
+    tokenHash: hashValue(rawToken),
+    createdAt,
+    expiresAt,
+    usedAt: null
+  });
+  await writeAuthStore(store);
+
+  await safeSendTemplateNotification({
+    templateKey: "forgot_password",
+    toEmail: normalizedEmail,
+    relatedResourceType: "customer_auth",
+    relatedResourceId: user.id,
+    variables: {
+      customerName: user.name || "Customer",
+      resetPasswordUrl: resetUrl
+    }
+  });
+
+  await addActivityLog({
+    action: "auth.customer.password_reset.requested",
+    actorId: user.id,
+    actorRole: "customer",
+    resourceType: "customer_auth",
+    resourceId: user.id,
+    metadata: {
+      email: normalizedEmail
+    }
+  });
+
+  return {
+    accepted: true,
+    expiresAt,
+    ...(env.nodeEnv === "production"
+      ? {}
+      : {
+          devResetToken: rawToken,
+          devResetUrl: resetUrl
+        })
+  };
+}
+
+async function customerResetPassword(payload) {
+  const store = await ensureAuthBootstrap();
+  prunePasswordResetRequests(store);
+
+  const request = store.passwordResetRequests.find(
+    (item) =>
+      item.tokenHash === hashValue(payload.token) &&
+      !item.usedAt &&
+      Date.parse(item.expiresAt || "") > Date.now()
+  );
+
+  if (!request) {
+    throw new HttpError(400, "Reset link is invalid or expired.");
+  }
+
+  const user = store.users.find((item) => item.id === request.userId);
+  if (!user || !user.email) {
+    throw new HttpError(400, "Reset link is invalid or expired.");
+  }
+
+  user.passwordHash = await bcrypt.hash(payload.password, 10);
+  user.verifiedEmail = true;
+  user.updatedAt = nowIso();
+  ensureCustomerHasProvider(
+    user,
+    CUSTOMER_AUTH_PROVIDERS.EMAIL_PASSWORD,
+    normalizeEmail(user.email)
+  );
+
+  request.usedAt = nowIso();
+  revokeCustomerRefreshSessions(store, user.id);
+  await writeAuthStore(store);
+
+  await addActivityLog({
+    action: "auth.customer.password_reset.completed",
+    actorId: user.id,
+    actorRole: "customer",
+    resourceType: "customer_auth",
+    resourceId: user.id
+  });
+
+  return {
+    reset: true,
+    customer: sanitizeCustomerUser(user)
+  };
 }
 
 async function customerLoginGoogle(payload) {
@@ -761,6 +933,8 @@ module.exports = {
   revokeSession,
   customerRegisterEmail,
   customerLoginEmail,
+  customerForgotPassword,
+  customerResetPassword,
   customerLoginGoogle,
   requestOtp,
   verifyOtp,

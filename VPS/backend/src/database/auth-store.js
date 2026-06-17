@@ -10,6 +10,7 @@ const DEFAULT_AUTH_STORE = Object.freeze({
   permissionGroups: [],
   refreshSessions: [],
   otpChallenges: [],
+  passwordResetRequests: [],
   guestCarts: [],
   userCarts: [],
   cartShares: [],

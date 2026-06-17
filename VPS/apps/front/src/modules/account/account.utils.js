@@ -54,18 +54,55 @@ export function formatAddress(address = {}) {
 }
 
 export function downloadInvoicePayload(payload) {
-  const blob = new Blob([JSON.stringify(payload.invoice, null, 2)], {
-    type: "application/json"
-  });
+  const blob = new Blob(
+    [
+      payload?.content ||
+        JSON.stringify(payload?.invoice || payload || {}, null, 2)
+    ],
+    {
+      type: payload?.contentType || "text/html;charset=utf-8"
+    }
+  );
   const downloadUrl = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = downloadUrl;
-  link.download = payload.fileName || "invoice.json";
+  link.download = payload.fileName || "invoice.html";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(downloadUrl);
+}
+
+export function canSubmitManualPaymentProof(order) {
+  if (!order) {
+    return false;
+  }
+
+  const paymentMethod = String(order.paymentMethod || "").trim().toLowerCase();
+  const paymentStatus = String(order.paymentStatus || "").trim().toLowerCase();
+  const orderStatus = String(order.orderStatus || "").trim().toLowerCase();
+  const manualPaymentStatus = String(order.manualPaymentStatus || "")
+    .trim()
+    .toLowerCase();
+
+  if (!["direct_bank_transfer", "manual_upi"].includes(paymentMethod)) {
+    return false;
+  }
+
+  if (paymentStatus === "paid") {
+    return false;
+  }
+
+  if (["submitted", "verified"].includes(manualPaymentStatus)) {
+    return false;
+  }
+
+  if (order.isB2BOrderRequest) {
+    return orderStatus === "awaiting_bank_payment";
+  }
+
+  return true;
 }
 
 export function getSupportWhatsappLink(phone, message) {
@@ -76,4 +113,3 @@ export function getSupportWhatsappLink(phone, message) {
   const digits = String(phone).replace(/[^\d+]/g, "");
   return `https://wa.me/${digits.replace(/^\+/, "")}?text=${encodeURIComponent(message)}`;
 }
-

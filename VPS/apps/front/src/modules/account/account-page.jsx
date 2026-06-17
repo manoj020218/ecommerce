@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import {
+  StorefrontAlert,
+  StorefrontBadge,
+  StorefrontButton,
+  StorefrontCard,
+  StorefrontChip,
+  StorefrontInput,
+  StorefrontLoadingState,
+  StorefrontSectionHeader
+} from "../../shared/storefront/storefront-ui";
+import {
   createCustomerAddress,
   deleteCustomerAddress,
   downloadCustomerInvoice,
@@ -14,6 +24,7 @@ import {
   removeSavedProduct,
   reorderCustomerOrder,
   updateCustomerGstDetails,
+  updateCustomerAddress,
   updateCustomerProfile
 } from "./account.api";
 import {
@@ -41,18 +52,30 @@ const EMPTY_ADDRESS = {
   isDefaultShipping: false
 };
 
+function buildAddressForm(address = {}) {
+  return {
+    ...EMPTY_ADDRESS,
+    ...address,
+    country: address.country || "India"
+  };
+}
+
 function MetricCard({ value, label, meta }) {
   return (
-    <div className="metric-card">
+    <StorefrontCard className="metric-card">
       <strong>{value}</strong>
       <span>{label}</span>
       {meta ? <small>{meta}</small> : null}
-    </div>
+    </StorefrontCard>
   );
 }
 
 function visibleProductPrice(product) {
   return Number(product?.pricing?.visiblePrice ?? product?.salePrice ?? 0);
+}
+
+function StatusBadge({ children }) {
+  return <StorefrontBadge className="eyebrow-chip">{children}</StorefrontBadge>;
 }
 
 export function CustomerAccountPage() {
@@ -76,6 +99,7 @@ export function CustomerAccountPage() {
     contactName: ""
   });
   const [addressForm, setAddressForm] = useState(EMPTY_ADDRESS);
+  const [editingAddressId, setEditingAddressId] = useState("");
   const [guestOrderId, setGuestOrderId] = useState("");
 
   function redirectToLogin(requestError) {
@@ -221,9 +245,15 @@ export function CustomerAccountPage() {
     setError("");
     setNotice("");
     try {
-      await createCustomerAddress(addressForm);
+      if (editingAddressId) {
+        await updateCustomerAddress(editingAddressId, addressForm);
+        setNotice("Address updated.");
+      } else {
+        await createCustomerAddress(addressForm);
+        setNotice("Address saved.");
+      }
+      setEditingAddressId("");
       setAddressForm(EMPTY_ADDRESS);
-      setNotice("Address saved.");
       await loadAccount(false);
     } catch (requestError) {
       if (!redirectToLogin(requestError)) {
@@ -240,6 +270,10 @@ export function CustomerAccountPage() {
     setNotice("");
     try {
       await deleteCustomerAddress(addressId);
+      if (editingAddressId === addressId) {
+        setEditingAddressId("");
+        setAddressForm(EMPTY_ADDRESS);
+      }
       setNotice("Address removed.");
       await loadAccount(false);
     } catch (requestError) {
@@ -249,6 +283,20 @@ export function CustomerAccountPage() {
     } finally {
       setBusy("");
     }
+  }
+
+  function handleEditAddress(address) {
+    setEditingAddressId(address.id);
+    setAddressForm(buildAddressForm(address));
+    setError("");
+    setNotice("");
+  }
+
+  function handleCancelAddressEdit() {
+    setEditingAddressId("");
+    setAddressForm(EMPTY_ADDRESS);
+    setError("");
+    setNotice("");
   }
 
   async function handleRemoveSaved(productId) {
@@ -303,8 +351,8 @@ export function CustomerAccountPage() {
 
   if (loading) {
     return (
-      <main className="front-shell">
-        <div className="state-box">Loading your account dashboard...</div>
+      <main className="proto-main-shell">
+        <StorefrontLoadingState label="Loading your account dashboard..." />
       </main>
     );
   }
@@ -315,47 +363,47 @@ export function CustomerAccountPage() {
   const recentlyViewed = Array.isArray(dashboard?.recentlyViewed) ? dashboard.recentlyViewed : [];
   const support = dashboard?.support || {};
   const profile = dashboard?.profile || {};
+  const isEditingAddress = Boolean(editingAddressId);
 
   return (
-    <main className="front-shell account-shell">
-      <header className="front-header account-hero">
+    <main className="proto-main-shell account-shell">
+      <StorefrontCard className="front-header account-hero" elevated>
         <div className="hero-kicker-row">
-          <Link to="/" className="inline-link">Back to storefront</Link>
-          <button
+          <StorefrontButton to="/" variant="light">
+            Back to storefront
+          </StorefrontButton>
+          <StorefrontButton
             type="button"
-            className="btn secondary compact-btn"
+            variant="light"
+            className="compact-btn"
             onClick={handleLogout}
             disabled={busy === "logout"}
           >
             {busy === "logout" ? "Signing out..." : "Logout"}
-          </button>
+          </StorefrontButton>
         </div>
         <div className="account-hero-copy">
           <div>
             <p className="eyebrow-text">My Account</p>
             <h1>{dashboard?.profile?.name || customer?.name || "Customer"}</h1>
             <p className="hero-muted">
-              {dashboard?.profile?.email || "No email linked"} <span className="hero-divider">•</span>{" "}
+              {dashboard?.profile?.email || "No email linked"} <span className="hero-divider">|</span>{" "}
               {dashboard?.profile?.mobile || "No mobile linked"}
             </p>
             <div className="chip-row">
-              <span className="eyebrow-chip">
+              <StatusBadge>
                 {dashboard?.profile?.verifiedEmail ? "Verified email" : "Email not verified"}
-              </span>
-              <span className="eyebrow-chip">
+              </StatusBadge>
+              <StatusBadge>
                 {dashboard?.profile?.verifiedMobile ? "Verified mobile" : "Mobile not verified"}
-              </span>
-              <span className="eyebrow-chip">{humanizeStatus(profile.customerType || "retail")}</span>
-              {profile.isB2BApproved ? <span className="eyebrow-chip">B2B Approved</span> : null}
+              </StatusBadge>
+              <StatusBadge>{humanizeStatus(profile.customerType || "retail")}</StatusBadge>
+              {profile.isB2BApproved ? <StatusBadge>B2B Approved</StatusBadge> : null}
               {profile.priceGroup ? (
-                <span className="eyebrow-chip">
-                  Price Group: {humanizeStatus(profile.priceGroup)}
-                </span>
+                <StatusBadge>Price Group: {humanizeStatus(profile.priceGroup)}</StatusBadge>
               ) : null}
               {profile.orderMode ? (
-                <span className="eyebrow-chip">
-                  Order Mode: {humanizeStatus(profile.orderMode)}
-                </span>
+                <StatusBadge>Order Mode: {humanizeStatus(profile.orderMode)}</StatusBadge>
               ) : null}
             </div>
           </div>
@@ -366,201 +414,571 @@ export function CustomerAccountPage() {
             <MetricCard value={savedProducts.length} label="Saved" meta="Product shortlist" />
           </div>
         </div>
-      </header>
+      </StorefrontCard>
 
-      {error ? <div className="state-box error">{error}</div> : null}
-      {notice ? <div className="state-box">{notice}</div> : null}
+      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+      {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
 
       <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head"><h3>My Profile</h3><p>Update display information.</p></div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="My Profile"
+            description="Update display information."
+          />
           <form className="stack-form" onSubmit={handleProfileSubmit}>
             <div className="field-grid">
-              <label><span>Name</span><input value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} required /></label>
-              <label><span>Company Name</span><input value={profileForm.companyName} onChange={(event) => setProfileForm((current) => ({ ...current, companyName: event.target.value }))} placeholder="Optional" /></label>
-              <label><span>Email</span><input value={dashboard?.profile?.email || ""} disabled /></label>
-              <label><span>Mobile</span><input value={dashboard?.profile?.mobile || ""} disabled /></label>
+              <StorefrontInput
+                label="Name"
+                value={profileForm.name}
+                onChange={(event) =>
+                  setProfileForm((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }))
+                }
+                required
+              />
+              <StorefrontInput
+                label="Company Name"
+                value={profileForm.companyName}
+                onChange={(event) =>
+                  setProfileForm((current) => ({
+                    ...current,
+                    companyName: event.target.value
+                  }))
+                }
+                placeholder="Optional"
+              />
+              <StorefrontInput label="Email" value={dashboard?.profile?.email || ""} disabled />
+              <StorefrontInput label="Mobile" value={dashboard?.profile?.mobile || ""} disabled />
             </div>
-            <button type="submit" className="btn primary" disabled={busy === "profile"}>{busy === "profile" ? "Saving..." : "Save Profile"}</button>
+            <StorefrontButton type="submit" disabled={busy === "profile"}>
+              {busy === "profile" ? "Saving..." : "Save Profile"}
+            </StorefrontButton>
           </form>
-        </article>
+        </StorefrontCard>
 
-        <article className="section-card">
-          <div className="section-head"><h3>GST Details</h3><p>Maintain invoice-ready tax details.</p></div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="GST Details"
+            description="Maintain invoice-ready tax details."
+          />
           <form className="stack-form" onSubmit={handleGstSubmit}>
             <div className="field-grid">
-              <label><span>GSTIN</span><input value={gstForm.gstin} onChange={(event) => setGstForm((current) => ({ ...current, gstin: event.target.value }))} placeholder="GST number" /></label>
-              <label><span>Business Name</span><input value={gstForm.businessName} onChange={(event) => setGstForm((current) => ({ ...current, businessName: event.target.value }))} placeholder="Registered name" /></label>
-              <label><span>Contact Name</span><input value={gstForm.contactName} onChange={(event) => setGstForm((current) => ({ ...current, contactName: event.target.value }))} placeholder="Invoice contact" /></label>
+              <StorefrontInput
+                label="GSTIN"
+                value={gstForm.gstin}
+                onChange={(event) =>
+                  setGstForm((current) => ({
+                    ...current,
+                    gstin: event.target.value
+                  }))
+                }
+                placeholder="GST number"
+              />
+              <StorefrontInput
+                label="Business Name"
+                value={gstForm.businessName}
+                onChange={(event) =>
+                  setGstForm((current) => ({
+                    ...current,
+                    businessName: event.target.value
+                  }))
+                }
+                placeholder="Registered name"
+              />
+              <StorefrontInput
+                label="Contact Name"
+                value={gstForm.contactName}
+                onChange={(event) =>
+                  setGstForm((current) => ({
+                    ...current,
+                    contactName: event.target.value
+                  }))
+                }
+                placeholder="Invoice contact"
+              />
             </div>
-            <button type="submit" className="btn dark" disabled={busy === "gst"}>{busy === "gst" ? "Updating..." : "Save GST Details"}</button>
+            <StorefrontButton type="submit" variant="dark" disabled={busy === "gst"}>
+              {busy === "gst" ? "Updating..." : "Save GST Details"}
+            </StorefrontButton>
           </form>
-        </article>
+        </StorefrontCard>
       </section>
 
-      <section className="section-card">
-        <div className="section-head"><h3>My Orders</h3><p>View totals, shipment status, invoice status, and reorder.</p></div>
+      <StorefrontCard as="section" className="section-card" elevated>
+        <StorefrontSectionHeader
+          title="My Orders"
+          description="View totals, shipment status, invoice status, and reorder."
+        />
         <div className="card-list">
-          {orders.length ? orders.map((order) => (
-            <div key={order.id} className="list-card">
-              <div className="list-card-head">
-                <div><strong>{order.orderNo}</strong><p>{formatDate(order.orderDate)}</p></div>
-                <div className="list-card-meta">
-                  <span className="eyebrow-chip">{humanizeStatus(order.paymentStatus)}</span>
-                  <span className="eyebrow-chip">{humanizeStatus(order.orderStatus)}</span>
-                  <span className="eyebrow-chip">{humanizeStatus(order.shipmentStatus)}</span>
-                </div>
-              </div>
-              <div className="detail-pairs compact">
-                <div><span>Total</span><strong>{formatCurrency(order.orderTotal)}</strong></div>
-                <div><span>Invoice</span><strong>{order.invoiceNumber || "Pending"}</strong></div>
-                <div><span>Courier</span><strong>{order.courierName || "Not assigned"}</strong></div>
-                <div><span>Tracking</span><strong>{order.trackingId || "Awaiting update"}</strong></div>
-              </div>
-              <div className="action-row">
-                <Link to={`/account/orders/${order.id}`} className="btn secondary">View</Link>
-                <button type="button" className="btn secondary" onClick={() => handleDownloadInvoice(order.invoiceId)} disabled={!order.invoiceId}>Invoice</button>
-                <Link to={`/account/orders/${order.id}`} className="btn secondary">Track</Link>
-                <button type="button" className="btn primary" onClick={() => handleReorder(order.id)} disabled={busy === `reorder:${order.id}`}>{busy === `reorder:${order.id}` ? "Reordering..." : "Reorder"}</button>
-              </div>
-            </div>
-          )) : <div className="empty-panel">No customer orders yet.</div>}
-        </div>
-      </section>
-
-      <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head"><h3>My Invoices</h3><p>Download your own invoice records.</p></div>
-          <div className="card-list">
-            {invoices.length ? invoices.map((invoice) => (
-              <div key={invoice.id} className="list-card">
+          {orders.length ? (
+            orders.map((order) => (
+              <div key={order.id} className="list-card">
                 <div className="list-card-head">
-                  <div><strong>{invoice.invoiceNumber}</strong><p>{formatDate(invoice.invoiceDate)}</p></div>
-                  <span className="eyebrow-chip">{humanizeStatus(invoice.paymentStatus)}</span>
-                </div>
-                <div className="detail-pairs compact">
-                  <div><span>Order</span><strong>{invoice.orderNo}</strong></div>
-                  <div><span>Total</span><strong>{formatCurrency(invoice.grandTotal)}</strong></div>
-                </div>
-                <div className="action-row"><button type="button" className="btn secondary" onClick={() => handleDownloadInvoice(invoice.id)}>Download JSON</button></div>
-              </div>
-            )) : <div className="empty-panel">No invoices generated yet.</div>}
-          </div>
-        </article>
-
-        <article className="section-card">
-          <div className="section-head"><h3>My Tracking</h3><p>Latest courier updates entered by admin.</p></div>
-          <div className="card-list">
-            {tracking.length ? tracking.map((entry) => (
-              <div key={entry.orderId} className="list-card">
-                <div className="list-card-head">
-                  <div><strong>{entry.orderNo}</strong><p>{entry.courierName || "Shipment preparing"}</p></div>
-                  <span className="eyebrow-chip">{humanizeStatus(entry.shipmentStatus)}</span>
-                </div>
-                <div className="detail-pairs compact">
-                  <div><span>Tracking ID</span><strong>{entry.trackingId || "Pending"}</strong></div>
-                  <div><span>Expected</span><strong>{entry.expectedDeliveryDate || "--"}</strong></div>
-                </div>
-                <div className="action-row"><Link to={`/account/orders/${entry.orderId}`} className="btn secondary">Open Order</Link>{entry.trackingUrl ? <a className="btn secondary" href={entry.trackingUrl} target="_blank" rel="noreferrer">Courier Link</a> : null}</div>
-              </div>
-            )) : <div className="empty-panel">No shipment updates yet.</div>}
-          </div>
-        </article>
-      </section>
-
-      <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head"><h3>My Addresses</h3><p>Saved billing and shipping addresses.</p></div>
-          <div className="card-list">
-            {savedAddresses.length ? savedAddresses.map((address) => (
-              <div key={address.id} className="list-card">
-                <div className="list-card-head">
-                  <div><strong>{address.label || address.name}</strong><p>{formatAddress(address)}</p></div>
-                  <div className="list-card-meta">{address.isDefaultBilling ? <span className="eyebrow-chip">Default billing</span> : null}{address.isDefaultShipping ? <span className="eyebrow-chip">Default shipping</span> : null}</div>
-                </div>
-                <div className="action-row"><button type="button" className="btn secondary" onClick={() => handleDeleteAddress(address.id)} disabled={busy === `delete-address:${address.id}`}>{busy === `delete-address:${address.id}` ? "Removing..." : "Delete"}</button></div>
-              </div>
-            )) : <div className="empty-panel">No saved addresses yet.</div>}
-          </div>
-        </article>
-
-        <article className="section-card">
-          <div className="section-head"><h3>Add Address</h3><p>Save address details for faster checkout.</p></div>
-          <form className="stack-form" onSubmit={handleAddressSubmit}>
-            <div className="field-grid">
-              <label><span>Label</span><input value={addressForm.label} onChange={(event) => setAddressForm((current) => ({ ...current, label: event.target.value }))} placeholder="Office / Warehouse" /></label>
-              <label><span>Name</span><input value={addressForm.name} onChange={(event) => setAddressForm((current) => ({ ...current, name: event.target.value }))} required /></label>
-              <label><span>Mobile</span><input value={addressForm.mobile} onChange={(event) => setAddressForm((current) => ({ ...current, mobile: event.target.value }))} /></label>
-              <label><span>Email</span><input type="email" value={addressForm.email} onChange={(event) => setAddressForm((current) => ({ ...current, email: event.target.value }))} /></label>
-              <label className="field-span-2"><span>Address Line 1</span><input value={addressForm.addressLine1} onChange={(event) => setAddressForm((current) => ({ ...current, addressLine1: event.target.value }))} required /></label>
-              <label className="field-span-2"><span>Address Line 2</span><input value={addressForm.addressLine2} onChange={(event) => setAddressForm((current) => ({ ...current, addressLine2: event.target.value }))} /></label>
-              <label><span>City</span><input value={addressForm.city} onChange={(event) => setAddressForm((current) => ({ ...current, city: event.target.value }))} required /></label>
-              <label><span>State</span><input value={addressForm.state} onChange={(event) => setAddressForm((current) => ({ ...current, state: event.target.value }))} required /></label>
-              <label><span>State Code</span><input value={addressForm.stateCode} onChange={(event) => setAddressForm((current) => ({ ...current, stateCode: event.target.value }))} required /></label>
-              <label><span>Pincode</span><input value={addressForm.pincode} onChange={(event) => setAddressForm((current) => ({ ...current, pincode: event.target.value }))} required /></label>
-            </div>
-            <div className="check-row">
-              <label className="check-item"><input type="checkbox" checked={addressForm.isDefaultBilling} onChange={(event) => setAddressForm((current) => ({ ...current, isDefaultBilling: event.target.checked }))} /><span>Default billing</span></label>
-              <label className="check-item"><input type="checkbox" checked={addressForm.isDefaultShipping} onChange={(event) => setAddressForm((current) => ({ ...current, isDefaultShipping: event.target.checked }))} /><span>Default shipping</span></label>
-            </div>
-            <button type="submit" className="btn primary" disabled={busy === "address"}>{busy === "address" ? "Saving..." : "Save Address"}</button>
-          </form>
-        </article>
-      </section>
-
-      <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head"><h3>Saved Products</h3><p>Products you marked for follow-up.</p></div>
-          <div className="saved-products-grid">
-            {savedProducts.length ? savedProducts.map((product) => (
-              <div key={product.id} className="saved-product-card">
-                <div className="saved-product-media">{Array.isArray(product.images) && product.images[0] ? <img src={product.images[0]} alt={product.title} loading="lazy" /> : <span>No image</span>}</div>
-                <div className="saved-product-body">
-                  <strong>{product.title}</strong>
-                  <span>{formatCurrency(visibleProductPrice(product))}</span>
-                  {product?.pricing?.isB2BPrice ? <small>Approved dealer price</small> : null}
-                  <div className="action-row">
-                    <Link to={`/products/${product.slug}`} className="btn secondary">Open</Link>
-                    <button type="button" className="btn secondary" onClick={() => handleRemoveSaved(product.id)} disabled={busy === `saved:${product.id}`}>{busy === `saved:${product.id}` ? "Removing..." : "Remove"}</button>
+                  <div>
+                    <strong>{order.orderNo}</strong>
+                    <p>{formatDate(order.orderDate)}</p>
+                  </div>
+                  <div className="list-card-meta">
+                    <StatusBadge>{humanizeStatus(order.paymentStatus)}</StatusBadge>
+                    <StatusBadge>{humanizeStatus(order.orderStatus)}</StatusBadge>
+                    <StatusBadge>{humanizeStatus(order.shipmentStatus)}</StatusBadge>
                   </div>
                 </div>
-              </div>
-            )) : <div className="empty-panel">No saved products yet.</div>}
-          </div>
-        </article>
-
-        <article className="section-card">
-          <div className="section-head"><h3>Recently Viewed</h3><p>Signed-in browsing history and recent searches.</p></div>
-          <div className="saved-products-grid compact-grid">
-            {recentlyViewed.length ? recentlyViewed.map((product) => (
-              <Link key={product.id} to={`/products/${product.slug}`} className="saved-product-card compact-card">
-                <div className="saved-product-body">
-                  <strong>{product.title}</strong>
-                  <span>{formatCurrency(visibleProductPrice(product))}</span>
-                  {product?.pricing?.isB2BPrice ? <small>Approved dealer price</small> : null}
+                <div className="detail-pairs compact">
+                  <div><span>Total</span><strong>{formatCurrency(order.orderTotal)}</strong></div>
+                  <div><span>Invoice</span><strong>{order.invoiceNumber || "Pending"}</strong></div>
+                  <div><span>Courier</span><strong>{order.courierName || "Not assigned"}</strong></div>
+                  <div><span>Tracking</span><strong>{order.trackingId || "Awaiting update"}</strong></div>
                 </div>
-              </Link>
-            )) : <div className="empty-panel">No viewing history yet.</div>}
+                <div className="action-row">
+                  <StorefrontButton to={`/account/orders/${order.id}`} variant="light">
+                    View
+                  </StorefrontButton>
+                  <StorefrontButton
+                    type="button"
+                    variant="light"
+                    onClick={() => handleDownloadInvoice(order.invoiceId)}
+                    disabled={!order.invoiceId}
+                  >
+                    Invoice
+                  </StorefrontButton>
+                  <StorefrontButton to={`/account/orders/${order.id}`} variant="light">
+                    Track
+                  </StorefrontButton>
+                  <StorefrontButton
+                    type="button"
+                    onClick={() => handleReorder(order.id)}
+                    disabled={busy === `reorder:${order.id}`}
+                  >
+                    {busy === `reorder:${order.id}` ? "Reordering..." : "Reorder"}
+                  </StorefrontButton>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="empty-panel">No customer orders yet.</div>
+          )}
+        </div>
+      </StorefrontCard>
+
+      <section className="account-grid">
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="My Invoices"
+            description="Download your own invoice records."
+          />
+          <div className="card-list">
+            {invoices.length ? (
+              invoices.map((invoice) => (
+                <div key={invoice.id} className="list-card">
+                  <div className="list-card-head">
+                    <div>
+                      <strong>{invoice.invoiceNumber}</strong>
+                      <p>{formatDate(invoice.invoiceDate)}</p>
+                    </div>
+                    <StatusBadge>{humanizeStatus(invoice.paymentStatus)}</StatusBadge>
+                  </div>
+                  <div className="detail-pairs compact">
+                    <div><span>Order</span><strong>{invoice.orderNo}</strong></div>
+                    <div><span>Total</span><strong>{formatCurrency(invoice.grandTotal)}</strong></div>
+                  </div>
+                  <div className="action-row">
+                    <StorefrontButton
+                      type="button"
+                      variant="light"
+                      onClick={() => handleDownloadInvoice(invoice.id)}
+                    >
+                      Download Invoice
+                    </StorefrontButton>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="empty-panel">No invoices generated yet.</div>
+            )}
           </div>
-          <div className="search-chip-row">
-            {recentSearches.length ? recentSearches.map((entry) => (
-              <span key={`${entry.query}-${entry.searchedAt}`} className="search-chip">{entry.query}</span>
-            )) : <div className="empty-panel">No search history yet.</div>}
+        </StorefrontCard>
+
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="My Tracking"
+            description="Latest courier updates entered by admin."
+          />
+          <div className="card-list">
+            {tracking.length ? (
+              tracking.map((entry) => (
+                <div key={entry.orderId} className="list-card">
+                  <div className="list-card-head">
+                    <div>
+                      <strong>{entry.orderNo}</strong>
+                      <p>{entry.courierName || "Shipment preparing"}</p>
+                    </div>
+                    <StatusBadge>{humanizeStatus(entry.shipmentStatus)}</StatusBadge>
+                  </div>
+                  <div className="detail-pairs compact">
+                    <div><span>Tracking ID</span><strong>{entry.trackingId || "Pending"}</strong></div>
+                    <div><span>Expected</span><strong>{entry.expectedDeliveryDate || "--"}</strong></div>
+                  </div>
+                  <div className="action-row">
+                    <StorefrontButton to={`/account/orders/${entry.orderId}`} variant="light">
+                      Open Order
+                    </StorefrontButton>
+                    {entry.trackingUrl ? (
+                      <StorefrontButton
+                        href={entry.trackingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        variant="light"
+                      >
+                        Courier Link
+                      </StorefrontButton>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="empty-panel">No shipment updates yet.</div>
+            )}
           </div>
-        </article>
+        </StorefrontCard>
       </section>
 
       <section className="account-grid">
-        <article className="section-card">
-          <div className="section-head"><h3>Link Guest Order</h3><p>Requires verified email or verified mobile on your account.</p></div>
-          <form className="stack-form" onSubmit={handleLinkGuestOrder}>
-            <div className="field-grid"><label><span>Order ID or Order No</span><input value={guestOrderId} onChange={(event) => setGuestOrderId(event.target.value)} placeholder="JNX-ORD-20260525-00001" required /></label></div>
-            <button type="submit" className="btn dark" disabled={busy === "link-guest"}>{busy === "link-guest" ? "Linking..." : "Link Guest Order"}</button>
-          </form>
-        </article>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="My Addresses"
+            description="Saved billing and shipping addresses."
+          />
+          <div className="card-list">
+            {savedAddresses.length ? (
+              savedAddresses.map((address) => (
+                <div key={address.id} className="list-card">
+                  <div className="list-card-head">
+                    <div>
+                      <strong>{address.label || address.name}</strong>
+                      <p>{formatAddress(address)}</p>
+                    </div>
+                    <div className="list-card-meta">
+                      {address.isDefaultBilling ? <StatusBadge>Default billing</StatusBadge> : null}
+                      {address.isDefaultShipping ? <StatusBadge>Default shipping</StatusBadge> : null}
+                    </div>
+                  </div>
+                  <div className="action-row">
+                    <StorefrontButton
+                      type="button"
+                      variant="light"
+                      onClick={() => handleEditAddress(address)}
+                      disabled={busy === "address"}
+                    >
+                      {editingAddressId === address.id ? "Editing" : "Edit"}
+                    </StorefrontButton>
+                    <StorefrontButton
+                      type="button"
+                      variant="light"
+                      onClick={() => handleDeleteAddress(address.id)}
+                      disabled={busy === `delete-address:${address.id}`}
+                    >
+                      {busy === `delete-address:${address.id}` ? "Removing..." : "Delete"}
+                    </StorefrontButton>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="empty-panel">No saved addresses yet.</div>
+            )}
+          </div>
+        </StorefrontCard>
 
-        <article className="section-card">
-          <div className="section-head"><h3>Support</h3><p>Contact the store team directly from your account.</p></div>
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title={isEditingAddress ? "Edit Address" : "Add Address"}
+            description={
+              isEditingAddress
+                ? "Update the saved address and default flags."
+                : "Save address details for faster checkout."
+            }
+          />
+          {isEditingAddress ? (
+            <StorefrontAlert>
+              Editing {addressForm.label || addressForm.name || "saved address"}.
+            </StorefrontAlert>
+          ) : null}
+          <form className="stack-form" onSubmit={handleAddressSubmit}>
+            <div className="field-grid">
+              <StorefrontInput
+                label="Label"
+                value={addressForm.label}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    label: event.target.value
+                  }))
+                }
+                placeholder="Office / Warehouse"
+              />
+              <StorefrontInput
+                label="Name"
+                value={addressForm.name}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    name: event.target.value
+                  }))
+                }
+                required
+              />
+              <StorefrontInput
+                label="Mobile"
+                value={addressForm.mobile}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    mobile: event.target.value
+                  }))
+                }
+              />
+              <StorefrontInput
+                label="Email"
+                type="email"
+                value={addressForm.email}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    email: event.target.value
+                  }))
+                }
+              />
+              <StorefrontInput
+                label="Address Line 1"
+                fieldClassName="field-span-2"
+                value={addressForm.addressLine1}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    addressLine1: event.target.value
+                  }))
+                }
+                required
+              />
+              <StorefrontInput
+                label="Address Line 2"
+                fieldClassName="field-span-2"
+                value={addressForm.addressLine2}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    addressLine2: event.target.value
+                  }))
+                }
+              />
+              <StorefrontInput
+                label="City"
+                value={addressForm.city}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    city: event.target.value
+                  }))
+                }
+                required
+              />
+              <StorefrontInput
+                label="State"
+                value={addressForm.state}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    state: event.target.value
+                  }))
+                }
+                required
+              />
+              <StorefrontInput
+                label="State Code"
+                value={addressForm.stateCode}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    stateCode: event.target.value
+                  }))
+                }
+                required
+              />
+              <StorefrontInput
+                label="Pincode"
+                value={addressForm.pincode}
+                onChange={(event) =>
+                  setAddressForm((current) => ({
+                    ...current,
+                    pincode: event.target.value
+                  }))
+                }
+                required
+              />
+            </div>
+            <div className="check-row">
+              <label className="check-item">
+                <input
+                  type="checkbox"
+                  checked={addressForm.isDefaultBilling}
+                  onChange={(event) =>
+                    setAddressForm((current) => ({
+                      ...current,
+                      isDefaultBilling: event.target.checked
+                    }))
+                  }
+                />
+                <span>Default billing</span>
+              </label>
+              <label className="check-item">
+                <input
+                  type="checkbox"
+                  checked={addressForm.isDefaultShipping}
+                  onChange={(event) =>
+                    setAddressForm((current) => ({
+                      ...current,
+                      isDefaultShipping: event.target.checked
+                    }))
+                  }
+                />
+                <span>Default shipping</span>
+              </label>
+            </div>
+            <div className="action-row">
+              <StorefrontButton type="submit" disabled={busy === "address"}>
+                {busy === "address"
+                  ? isEditingAddress
+                    ? "Updating..."
+                    : "Saving..."
+                  : isEditingAddress
+                    ? "Update Address"
+                    : "Save Address"}
+              </StorefrontButton>
+              {isEditingAddress ? (
+                <StorefrontButton
+                  type="button"
+                  variant="light"
+                  onClick={handleCancelAddressEdit}
+                  disabled={busy === "address"}
+                >
+                  Cancel
+                </StorefrontButton>
+              ) : null}
+            </div>
+          </form>
+        </StorefrontCard>
+      </section>
+
+      <section className="account-grid">
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Saved Products"
+            description="Products you marked for follow-up."
+          />
+          <div className="saved-products-grid">
+            {savedProducts.length ? (
+              savedProducts.map((product) => (
+                <div key={product.id} className="saved-product-card">
+                  <div className="saved-product-media">
+                    {Array.isArray(product.images) && product.images[0] ? (
+                      <img src={product.images[0]} alt={product.title} loading="lazy" />
+                    ) : (
+                      <span>No image</span>
+                    )}
+                  </div>
+                  <div className="saved-product-body">
+                    <strong>{product.title}</strong>
+                    <span>{formatCurrency(visibleProductPrice(product))}</span>
+                    {product?.pricing?.isB2BPrice ? <small>Approved dealer price</small> : null}
+                    <div className="action-row">
+                      <StorefrontButton to={`/products/${product.slug}`} variant="light">
+                        Open
+                      </StorefrontButton>
+                      <StorefrontButton
+                        type="button"
+                        variant="light"
+                        onClick={() => handleRemoveSaved(product.id)}
+                        disabled={busy === `saved:${product.id}`}
+                      >
+                        {busy === `saved:${product.id}` ? "Removing..." : "Remove"}
+                      </StorefrontButton>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="empty-panel">No saved products yet.</div>
+            )}
+          </div>
+        </StorefrontCard>
+
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Recently Viewed"
+            description="Signed-in browsing history and recent searches."
+          />
+          <div className="saved-products-grid compact-grid">
+            {recentlyViewed.length ? (
+              recentlyViewed.map((product) => (
+                <Link
+                  key={product.id}
+                  to={`/products/${product.slug}`}
+                  className="saved-product-card compact-card"
+                >
+                  <div className="saved-product-body">
+                    <strong>{product.title}</strong>
+                    <span>{formatCurrency(visibleProductPrice(product))}</span>
+                    {product?.pricing?.isB2BPrice ? <small>Approved dealer price</small> : null}
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="empty-panel">No viewing history yet.</div>
+            )}
+          </div>
+          <div className="search-chip-row">
+            {recentSearches.length ? (
+              recentSearches.map((entry) => (
+                <StorefrontChip key={`${entry.query}-${entry.searchedAt}`} as="span" className="search-chip">
+                  {entry.query}
+                </StorefrontChip>
+              ))
+            ) : (
+              <div className="empty-panel">No search history yet.</div>
+            )}
+          </div>
+        </StorefrontCard>
+      </section>
+
+      <section className="account-grid">
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Link Guest Order"
+            description="Requires verified email or verified mobile on your account."
+          />
+          <form className="stack-form" onSubmit={handleLinkGuestOrder}>
+            <div className="field-grid">
+              <StorefrontInput
+                label="Order ID or Order No"
+                value={guestOrderId}
+                onChange={(event) => setGuestOrderId(event.target.value)}
+                placeholder="JNX-ORD-20260525-00001"
+                required
+              />
+            </div>
+            <StorefrontButton type="submit" variant="dark" disabled={busy === "link-guest"}>
+              {busy === "link-guest" ? "Linking..." : "Link Guest Order"}
+            </StorefrontButton>
+          </form>
+        </StorefrontCard>
+
+        <StorefrontCard as="article" className="section-card" elevated>
+          <StorefrontSectionHeader
+            title="Support"
+            description="Contact the store team directly from your account."
+          />
           <div className="detail-pairs">
             <div><span>Store</span><strong>{support.storeName || "Jenix India"}</strong></div>
             <div><span>Email</span><strong>{support.supportEmail || "--"}</strong></div>
@@ -568,12 +986,41 @@ export function CustomerAccountPage() {
             <div><span>Timing</span><strong>{support.supportTiming || "--"}</strong></div>
           </div>
           <div className="action-row">
-            {support.supportEmail ? <a className="btn secondary" href={`mailto:${support.supportEmail}`}>Email</a> : null}
-            {support.supportPhone ? <a className="btn secondary" href={`tel:${support.supportPhone}`}>Call</a> : null}
-            {support.supportWhatsApp ? <a className="btn whatsapp" href={getSupportWhatsappLink(support.supportWhatsApp, "Need help with my account and order.")} target="_blank" rel="noreferrer">WhatsApp</a> : null}
-            {support.googleMapLink ? <a className="btn secondary" href={support.googleMapLink} target="_blank" rel="noreferrer">Map</a> : null}
+            {support.supportEmail ? (
+              <StorefrontButton href={`mailto:${support.supportEmail}`} variant="light">
+                Email
+              </StorefrontButton>
+            ) : null}
+            {support.supportPhone ? (
+              <StorefrontButton href={`tel:${support.supportPhone}`} variant="light">
+                Call
+              </StorefrontButton>
+            ) : null}
+            {support.supportWhatsApp ? (
+              <StorefrontButton
+                href={getSupportWhatsappLink(
+                  support.supportWhatsApp,
+                  "Need help with my account and order."
+                )}
+                target="_blank"
+                rel="noreferrer"
+                variant="whatsapp"
+              >
+                WhatsApp
+              </StorefrontButton>
+            ) : null}
+            {support.googleMapLink ? (
+              <StorefrontButton
+                href={support.googleMapLink}
+                target="_blank"
+                rel="noreferrer"
+                variant="light"
+              >
+                Map
+              </StorefrontButton>
+            ) : null}
           </div>
-        </article>
+        </StorefrontCard>
       </section>
     </main>
   );

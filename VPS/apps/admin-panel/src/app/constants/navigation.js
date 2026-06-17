@@ -11,120 +11,66 @@ export const ADMIN_NAV_ITEMS = [
     ]
   },
   {
+    group: "Orders",
+    items: [
+      {
+        key: "orders",
+        label: "All Orders",
+        path: "/orders",
+        permission: "orders.view",
+        children: [
+          { key: "walk-in-orders",  label: "Walk-in Orders",   path: "/walk-in-orders",  permission: "orders.view" },
+          { key: "abandoned-carts", label: "Abandoned Carts",  path: "/abandoned-carts", permission: "marketing.view" },
+          { key: "website-leads",   label: "Website Leads",    path: "/website-leads",   permission: "website_leads.view" }
+        ]
+      }
+    ]
+  },
+  {
     group: "Catalogue",
     items: [
       {
         key: "catalogue",
-        label: "Catalogue",
-        path: "/catalogue",
-        permission: "products.view"
-      },
-      {
-        key: "categories",
-        label: "Categories",
-        path: "/categories",
-        permission: "categories.view"
-      },
-      {
-        key: "products",
         label: "Products",
-        path: "/products",
-        permission: "products.view"
-      },
-      {
-        key: "hsn-tax",
-        label: "HSN / Tax",
-        path: "/hsn-tax",
-        permission: "hsn_tax.view"
-      },
-      {
-        key: "inventory",
-        label: "Inventory",
-        path: "/inventory",
-        permission: "inventory.view"
-      },
-      {
-        key: "search",
-        label: "Search",
-        path: "/search",
-        permission: "search.view"
+        path: "/catalogue",
+        permission: "products.view",
+        children: [
+          { key: "categories", label: "Categories", path: "/categories", permission: "categories.view" },
+          { key: "inventory",  label: "Inventory",  path: "/inventory",  permission: "inventory.view" },
+          { key: "hsn-tax",    label: "HSN / Tax",  path: "/hsn-tax",    permission: "hsn_tax.view" },
+          { key: "search",     label: "Search",     path: "/search",     permission: "search.view" }
+        ]
       }
     ]
   },
   {
-    group: "Content",
+    group: "Customers",
     items: [
-      {
-        key: "blogs",
-        label: "Blogs",
-        path: "/blogs",
-        permission: "blogs.view"
-      }
-    ]
-  },
-  {
-    group: "Operations",
-    items: [
-      {
-        key: "orders",
-        label: "Orders",
-        path: "/orders",
-        permission: "orders.view"
-      },
       {
         key: "customers",
         label: "Customers",
         path: "/customers",
-        permission: "customers.view"
-      },
-      {
-        key: "walk-in-orders",
-        label: "Walk-in Orders",
-        path: "/walk-in-orders",
-        permission: "orders.view"
-      },
-      {
-        key: "shipping",
-        label: "Shipping",
-        path: "/shipping",
-        permission: "shipping.view"
-      },
+        permission: "customers.view",
+        children: [
+          { key: "discounts", label: "Discounts & Coupons", path: "/discounts", permission: "payments.view" }
+        ]
+      }
+    ]
+  },
+  {
+    group: "Finance",
+    items: [
       {
         key: "invoices",
         label: "Invoices",
         path: "/invoices",
-        permission: "invoices.view"
+        permission: "invoices.view",
+        children: [
+          { key: "tally-export", label: "Tally Export", path: "/tally-export", permission: "invoices.export_tally" }
+        ]
       },
-      {
-        key: "tally-export",
-        label: "Tally Export",
-        path: "/tally-export",
-        permission: "invoices.export_tally"
-      },
-      {
-        key: "reports",
-        label: "Reports",
-        path: "/reports",
-        permission: "reports.view"
-      },
-      {
-        key: "audit-logs",
-        label: "Audit Logs",
-        path: "/audit-logs",
-        permission: "staff.view"
-      },
-      {
-        key: "staff",
-        label: "Staff",
-        path: "/staff",
-        permission: "staff.view"
-      },
-      {
-        key: "permission-groups",
-        label: "Permission Groups",
-        path: "/permission-groups",
-        permission: "staff.view"
-      }
+      { key: "shipping", label: "Shipping", path: "/shipping", permission: "shipping.view" },
+      { key: "reports",  label: "Reports",  path: "/reports",  permission: "reports.view" }
     ]
   },
   {
@@ -134,72 +80,44 @@ export const ADMIN_NAV_ITEMS = [
         key: "marketing",
         label: "Marketing",
         path: "/marketing",
-        permission: "marketing.view"
-      },
-      {
-        key: "website-leads",
-        label: "Website Leads",
-        path: "/website-leads",
-        permission: "website_leads.view"
-      },
-      {
-        key: "abandoned-carts",
-        label: "Abandoned Carts",
-        path: "/abandoned-carts",
-        permission: "marketing.view"
-      },
-      {
-        key: "discounts",
-        label: "Discounts & Coupons",
-        path: "/discounts",
-        permission: "payments.view"
-      },
-      {
-        key: "google-merchant",
-        label: "Google Merchant",
-        path: "/google-merchant",
-        permission: "settings.view"
-      },
-      {
-        key: "facebook-feed",
-        label: "Facebook Feed",
-        path: "/facebook-feed",
-        permission: "settings.view"
+        permission: "marketing.view",
+        children: [
+          { key: "google-merchant", label: "Google Merchant", path: "/google-merchant", permission: "settings.view" },
+          { key: "facebook-feed",   label: "Facebook Feed",   path: "/facebook-feed",   permission: "settings.view" }
+        ]
       }
     ]
   },
   {
-    group: "Setup",
+    group: "Content",
+    items: [
+      { key: "blogs", label: "Blogs / Knowledge", path: "/blogs", permission: "blogs.view" }
+    ]
+  },
+  {
+    group: "Admin",
     items: [
       {
-        key: "setup-wizard",
-        label: "Setup Wizard",
-        path: "/setup-wizard",
-        permission: "settings.view"
+        key: "staff",
+        label: "Staff & Permissions",
+        path: "/staff",
+        permission: "staff.view",
+        children: [
+          { key: "audit-logs",        label: "Audit Logs",        path: "/audit-logs",        permission: "staff.view" },
+          { key: "permission-groups", label: "Permission Groups", path: "/permission-groups", permission: "staff.view" }
+        ]
       },
       {
         key: "settings",
         label: "Settings",
         path: "/settings",
-        permission: "settings.view"
-      },
-      {
-        key: "payment-gateways",
-        label: "Payment Gateways",
-        path: "/payment-gateways",
-        permission: "payments.view"
-      },
-      {
-        key: "integrations",
-        label: "Third Party Integrations",
-        path: "/integrations",
-        permission: "settings.view"
-      },
-      {
-        key: "seo",
-        label: "SEO",
-        path: "/seo",
-        permission: "settings.view"
+        permission: "settings.view",
+        children: [
+          { key: "payment-gateways", label: "Payment Gateways",       path: "/payment-gateways", permission: "payments.view" },
+          { key: "integrations",     label: "Third Party Integrations",path: "/integrations",     permission: "settings.view" },
+          { key: "setup-wizard",     label: "Setup Wizard",           path: "/setup-wizard",     permission: "settings.view" },
+          { key: "seo",              label: "SEO",                    path: "/seo",              permission: "settings.view" }
+        ]
       }
     ]
   }

@@ -6,81 +6,34 @@ import { useAuthSession } from "../../modules/auth/use-auth-session";
 import { hasPermission } from "../../shared/utils/permissions";
 
 function titleFromPath(pathname) {
-  if (pathname.startsWith("/dashboard")) {
-    return "Dashboard";
-  }
-  if (pathname.startsWith("/categories")) {
-    return "Categories";
-  }
-  if (pathname.startsWith("/products")) {
-    return "Products";
-  }
-  if (pathname.startsWith("/hsn-tax")) {
-    return "HSN / Tax Master";
-  }
-  if (pathname.startsWith("/inventory")) {
-    return "Inventory";
-  }
-  if (pathname.startsWith("/search")) {
-    return "Search";
-  }
-  if (pathname.startsWith("/orders")) {
-    return "Orders";
-  }
-  if (pathname.startsWith("/walk-in-orders")) {
-    return "Walk-in Orders";
-  }
-  if (pathname.startsWith("/invoices")) {
-    return "Invoices";
-  }
-  if (pathname.startsWith("/tally-export")) {
-    return "Tally Export";
-  }
-  if (pathname.startsWith("/shipping")) {
-    return "Shipping";
-  }
-  if (pathname.startsWith("/reports")) {
-    return "Reports";
-  }
-  if (pathname.startsWith("/audit-logs")) {
-    return "Audit Logs";
-  }
-  if (pathname.startsWith("/staff")) {
-    return "Staff";
-  }
-  if (pathname.startsWith("/permission-groups")) {
-    return "Permission Groups";
-  }
-  if (pathname.startsWith("/blogs")) {
-    return "Blogs / Knowledge Base";
-  }
-  if (pathname.startsWith("/marketing")) {
-    return "Marketing";
-  }
-  if (pathname.startsWith("/abandoned-carts")) {
-    return "Abandoned Carts";
-  }
-  if (pathname.startsWith("/google-merchant")) {
-    return "Google Merchant";
-  }
-  if (pathname.startsWith("/facebook-feed")) {
-    return "Facebook Feed";
-  }
-  if (pathname.startsWith("/website-leads")) {
-    return "Website Buyer Leads";
-  }
-  if (pathname.startsWith("/setup-wizard")) {
-    return "Setup Wizard";
-  }
-  if (pathname.startsWith("/seo")) {
-    return "SEO";
-  }
-  if (pathname.startsWith("/settings")) {
-    return "Settings";
-  }
-  if (pathname.startsWith("/payment-gateways")) {
-    return "Payment Gateways";
-  }
+  if (pathname.startsWith("/dashboard"))       return "Dashboard";
+  if (pathname.startsWith("/walk-in-orders"))  return "Walk-in Orders";
+  if (pathname.startsWith("/orders"))          return "Orders";
+  if (pathname.startsWith("/abandoned-carts")) return "Abandoned Carts";
+  if (pathname.startsWith("/website-leads"))   return "Website Buyer Leads";
+  if (pathname.startsWith("/categories"))      return "Categories";
+  if (pathname.startsWith("/products"))        return "Products";
+  if (pathname.startsWith("/inventory"))       return "Inventory";
+  if (pathname.startsWith("/hsn-tax"))         return "HSN / Tax Master";
+  if (pathname.startsWith("/search"))          return "Search";
+  if (pathname.startsWith("/customers"))       return "Customers";
+  if (pathname.startsWith("/discounts"))       return "Discounts & Coupons";
+  if (pathname.startsWith("/invoices"))        return "Invoices";
+  if (pathname.startsWith("/tally-export"))    return "Tally Export";
+  if (pathname.startsWith("/shipping"))        return "Shipping";
+  if (pathname.startsWith("/reports"))         return "Reports";
+  if (pathname.startsWith("/marketing"))       return "Marketing";
+  if (pathname.startsWith("/google-merchant")) return "Google Merchant";
+  if (pathname.startsWith("/facebook-feed"))   return "Facebook Feed";
+  if (pathname.startsWith("/blogs"))           return "Blogs / Knowledge Base";
+  if (pathname.startsWith("/staff"))           return "Staff";
+  if (pathname.startsWith("/audit-logs"))      return "Audit Logs";
+  if (pathname.startsWith("/permission-groups"))return "Permission Groups";
+  if (pathname.startsWith("/settings"))        return "Settings";
+  if (pathname.startsWith("/payment-gateways"))return "Payment Gateways";
+  if (pathname.startsWith("/integrations"))    return "Third Party Integrations";
+  if (pathname.startsWith("/setup-wizard"))    return "Setup Wizard";
+  if (pathname.startsWith("/seo"))             return "SEO";
   return "Catalogue Overview";
 }
 
@@ -92,15 +45,23 @@ export function AdminLayout() {
   const visibleGroups = useMemo(() => {
     return ADMIN_NAV_ITEMS.map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasPermission(session, item.permission))
+      items: group.items
+        .filter((item) => hasPermission(session, item.permission))
+        .map((item) => ({
+          ...item,
+          children: (item.children || []).filter((c) => hasPermission(session, c.permission))
+        }))
     })).filter((group) => group.items.length > 0);
   }, [session]);
 
+  // Mobile nav shows all items (parents + children) flattened
   const mobileItems = useMemo(() => {
-    return visibleGroups.flatMap((group) => group.items);
+    return visibleGroups.flatMap((group) =>
+      group.items.flatMap((item) => [item, ...(item.children || [])])
+    );
   }, [visibleGroups]);
 
-  const adminName = session?.admin?.name || "Admin User";
+  const adminName  = session?.admin?.name  || "Admin User";
   const adminEmail = session?.admin?.email || "admin@jenixindia.com";
 
   const onLogout = async () => {
@@ -132,15 +93,28 @@ export function AdminLayout() {
             <section key={group.group}>
               <p className="sidebar-group">{group.group}</p>
               {group.items.map((item) => (
-                <NavLink
-                  key={item.key}
-                  to={item.path}
-                  className={({ isActive }) =>
-                    `sidebar-link${isActive ? " active" : ""}`
-                  }
-                >
-                  {item.label}
-                </NavLink>
+                <div key={item.key}>
+                  <NavLink
+                    to={item.path}
+                    end={!(item.children?.length > 0)}
+                    className={({ isActive }) =>
+                      `sidebar-link${isActive ? " active" : ""}`
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                  {item.children?.map((child) => (
+                    <NavLink
+                      key={child.key}
+                      to={child.path}
+                      className={({ isActive }) =>
+                        `sidebar-sublink${isActive ? " active" : ""}`
+                      }
+                    >
+                      {child.label}
+                    </NavLink>
+                  ))}
+                </div>
               ))}
             </section>
           ))}
@@ -161,7 +135,7 @@ export function AdminLayout() {
         <header className="topbar">
           <div>
             <h1>{titleFromPath(location.pathname)}</h1>
-            <p>Admin workspace aligned to PROJECT.md phases</p>
+            <p>Admin workspace — Jenix India</p>
           </div>
           <div className="topbar-user">
             <span>{session?.admin?.role || "staff"}</span>

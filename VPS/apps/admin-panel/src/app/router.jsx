@@ -29,6 +29,7 @@ import { ShippingPage } from "../modules/shipping/shipping-page";
 import { StaffPage } from "../modules/staff/staff-page";
 import { TallyExportPage } from "../modules/tally-export/tally-export-page";
 import { WalkInOrdersPage } from "../modules/walkin-orders/walkin-orders-page";
+import { AddWalkInOrderPage } from "../modules/walkin-orders/add-walkin-order-page";
 import { WebsiteLeadsPage } from "../modules/website-leads/website-leads-page";
 import { DiscountsPage } from "../modules/discounts/discounts-page";
 import { IntegrationsPage } from "../modules/integrations/integrations-page";
@@ -52,6 +53,7 @@ export function AppRouter() {
           <Route path="orders/:orderId" element={<OrderDetailPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="walk-in-orders" element={<WalkInOrdersPage />} />
+          <Route path="walk-in-orders/add" element={<AddWalkInOrderPage />} />
           <Route path="invoices" element={<InvoicesPage />} />
           <Route path="tally-export" element={<TallyExportPage />} />
           <Route path="shipping" element={<ShippingPage />} />

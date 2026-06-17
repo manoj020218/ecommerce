@@ -884,6 +884,28 @@ export function OrderDetailPage() {
         </div>
       </div>
 
+      {/* Invoice section — must be generated before dispatch */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <h4 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Invoice</h4>
+          {canFulfill && (
+            <button
+              type="button" className="btn btn-primary btn-small"
+              style={{ background: "#16a34a", display: "inline-flex", alignItems: "center", gap: 5 }}
+              onClick={() => { setFulfillModal(true); setFulfillError(""); }}
+            >
+              Dispatch &amp; Fulfill →
+            </button>
+          )}
+        </div>
+        <InvoiceSection orderId={orderId} invoice={invoice} onInvoiceGenerated={setInvoice} />
+        {order.orderStatus === "processing" && !invoice && (
+          <p style={{ margin: "10px 0 0", fontSize: 12, color: "#92400e", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: 6, padding: "8px 12px" }}>
+            Generate an invoice above before dispatching this order.
+          </p>
+        )}
+      </div>
+
       {/* Tracking info */}
       {order.trackingDetails?.trackingId && (
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
@@ -923,12 +945,6 @@ export function OrderDetailPage() {
           )}
         </div>
       )}
-
-      {/* Invoice section */}
-      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
-        <h4 style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Invoice</h4>
-        <InvoiceSection orderId={orderId} invoice={invoice} onInvoiceGenerated={setInvoice} />
-      </div>
 
       {/* Notes */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>

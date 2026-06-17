@@ -72,6 +72,7 @@ const {
 } = require("../modules/walkin-orders/walkin-orders.routes");
 const { createOrdersRouter } = require("../modules/orders/orders.routes");
 const { createIntegrationsRouter } = require("../modules/integrations/integrations.routes");
+const { createDashboardRouter } = require("../modules/dashboard/dashboard.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -111,6 +112,7 @@ function createApiRouter() {
   router.use("/admin/walkin-orders", createWalkInOrdersRouter());
   router.use("/admin/setup-wizard", createAdminSetupWizardRouter());
   router.use("/admin/integrations", createIntegrationsRouter());
+  router.use("/admin/dashboard", createDashboardRouter());
   router.use("/shipping", createPublicShippingRouter());
   router.use("/recovery", createPublicRecoveryRouter());
   router.use("/blogs", createPublicBlogsRouter());

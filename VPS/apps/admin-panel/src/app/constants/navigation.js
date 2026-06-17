@@ -1,5 +1,16 @@
 export const ADMIN_NAV_ITEMS = [
   {
+    group: "Overview",
+    items: [
+      {
+        key: "dashboard",
+        label: "Dashboard",
+        path: "/dashboard",
+        permission: null
+      }
+    ]
+  },
+  {
     group: "Catalogue",
     items: [
       {

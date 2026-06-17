@@ -6,6 +6,9 @@ import { useAuthSession } from "../../modules/auth/use-auth-session";
 import { hasPermission } from "../../shared/utils/permissions";
 
 function titleFromPath(pathname) {
+  if (pathname.startsWith("/dashboard")) {
+    return "Dashboard";
+  }
   if (pathname.startsWith("/categories")) {
     return "Categories";
   }

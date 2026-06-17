@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AdminLayout } from "./layout/admin-layout";
 import { AuthGuard } from "../modules/auth/auth-guard";
+import { DashboardPage } from "../modules/dashboard/dashboard-page";
 import { ActivityLogsPage } from "../modules/activity-logs/activity-logs-page";
 import { AbandonedCartsPage } from "../modules/abandoned-carts/abandoned-carts-page";
 import { BlogsPage } from "../modules/blogs/blogs-page";
@@ -41,7 +42,8 @@ export function AppRouter() {
 
       <Route element={<AuthGuard />}>
         <Route path="/" element={<AdminLayout />}>
-          <Route index element={<Navigate to="/catalogue" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="catalogue" element={<CataloguePage />} />
           <Route path="categories" element={<CategoriesPage />} />
           <Route path="products" element={<ProductsPage />} />
@@ -76,7 +78,7 @@ export function AppRouter() {
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/catalogue" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

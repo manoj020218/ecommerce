@@ -185,6 +185,12 @@ export function StorefrontLayout() {
     : "Login";
 
   const topCategories = useMemo(() => categories.slice(0, 8), [categories]);
+  const isOrderSuccessRoute =
+    location.pathname.startsWith("/checkout/success") ||
+    location.pathname.startsWith("/orders/guest/");
+  const usesMinimalShell = isCheckoutRoute || isOrderSuccessRoute;
+  const isCartRoute = location.pathname === "/cart";
+  const isAccountRoute = location.pathname.startsWith("/account");
 
   useEffect(() => {
     listCategories()
@@ -226,18 +232,24 @@ export function StorefrontLayout() {
     };
   }, [isAuthenticated]);
 
-  if (isCheckoutRoute) {
+  if (usesMinimalShell) {
     return (
       <>
         <header className="proto-checkout-header">
-          <div className="proto-checkout-header-inner">
+          <div
+            className={`proto-checkout-header-inner${
+              isOrderSuccessRoute ? " proto-checkout-header-success" : ""
+            }`}
+          >
             <Link to="/" className="proto-logo-link" aria-label={storeName}>
               <StorefrontLogo branding={branding} storeName={storeName} />
             </Link>
-            <div className="proto-checkout-badge">
-              <span className="proto-checkout-badge-dot" />
-              <span>Secure Checkout</span>
-            </div>
+            {!isOrderSuccessRoute ? (
+              <div className="proto-checkout-badge">
+                <span className="proto-checkout-badge-dot" />
+                <span>Secure Checkout</span>
+              </div>
+            ) : null}
           </div>
         </header>
         <Outlet />
@@ -249,8 +261,8 @@ export function StorefrontLayout() {
     <>
       <div className="proto-announcement-bar">
         <div className="proto-announcement-inner">
+          <span>Free shipping on orders above ₹999</span>
           <span>GST Invoice Available</span>
-          {supportPhone ? <span>{supportPhone}</span> : null}
           {supportWhatsApp ? <span>WhatsApp: {supportWhatsApp}</span> : null}
         </div>
       </div>
@@ -281,11 +293,18 @@ export function StorefrontLayout() {
           </form>
 
           <div className="proto-header-actions">
-            <Link to={accountHref} className="proto-header-action proto-desktop-only">
+            <Link
+              to={accountHref}
+              className={`proto-header-action proto-desktop-only${isAccountRoute ? " active" : ""}`}
+            >
               <UserIcon />
               <span>{accountLabel}</span>
             </Link>
-            <Link to="/cart" className="proto-icon-action" aria-label="Cart">
+            <Link
+              to="/cart"
+              className={`proto-icon-action${isCartRoute ? " active" : ""}`}
+              aria-label="Cart"
+            >
               <CartIcon />
               {cartCount > 0 ? <span className="proto-count-badge">{cartCount}</span> : null}
             </Link>
@@ -349,8 +368,7 @@ export function StorefrontLayout() {
               <StorefrontLogo branding={branding} storeName={storeName} />
             </Link>
             <p>
-              {storeProfile.legalBusinessName ||
-                "Security, automation, networking, and smart access solutions for home and business."}
+              India's trusted partner for IoT security systems. CCTV, smart locks, gate automation &amp; more.
             </p>
             <div className="proto-footer-pills">
               {supportPhone ? <a href={`tel:${supportPhone}`}>Call Store</a> : null}
@@ -363,38 +381,48 @@ export function StorefrontLayout() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  WhatsApp
+                  WhatsApp Support
                 </a>
               ) : null}
-              <Link to="/guides">Guides</Link>
             </div>
           </div>
 
           <div className="proto-footer-column">
-            <h3>Contact</h3>
-            <p>{supportEmail || "--"}</p>
-            <p>{supportPhone || "--"}</p>
-            <p>{supportTiming || "--"}</p>
+            <h3>Products</h3>
+            {topCategories.slice(0, 6).map((category) => (
+              <Link key={category.id} to={`/categories/${category.slug}`}>
+                {category.name}
+              </Link>
+            ))}
+            <Link to="/products">All Products</Link>
           </div>
 
           <div className="proto-footer-column">
-            <h3>Store</h3>
-            <p>{publicAddress || "--"}</p>
-            <p>{storeProfile.pickupAddress || "--"}</p>
+            <h3>Company</h3>
+            <Link to="/guides">Guides &amp; Blog</Link>
+            {supportEmail ? <a href={`mailto:${supportEmail}`}>Contact Us</a> : null}
+            {socialLinks.length > 0
+              ? socialLinks.map(([key, value]) => (
+                  <a key={key} href={value} target="_blank" rel="noreferrer">
+                    {SOCIAL_LABELS[key] || key}
+                  </a>
+                ))
+              : null}
+            {publicAddress ? <p>{publicAddress}</p> : null}
           </div>
 
           <div className="proto-footer-column">
-            <h3>Follow</h3>
-            {socialLinks.length > 0 ? (
-              socialLinks.map(([key, value]) => (
-                <a key={key} href={value} target="_blank" rel="noreferrer">
-                  {SOCIAL_LABELS[key] || key}
-                </a>
-              ))
-            ) : (
-              <p>Social links will appear after setup.</p>
-            )}
+            <h3>Help</h3>
+            <Link to="/account">My Account</Link>
+            <Link to="/account/orders">Track Order</Link>
+            <Link to="/cart">View Cart</Link>
+            {supportPhone ? <a href={`tel:${supportPhone}`}>{supportPhone}</a> : null}
+            {supportTiming ? <p>{supportTiming}</p> : null}
+            {storeProfile.gstNumber ? <p>GSTIN: {storeProfile.gstNumber}</p> : null}
           </div>
+        </div>
+        <div className="proto-footer-bottom">
+          <p>© {new Date().getFullYear()} {storeName}. All rights reserved.</p>
         </div>
       </footer>
 

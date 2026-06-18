@@ -110,6 +110,7 @@ export function ProductsListPage() {
   const query = searchParams.get("q") || "";
   const sortValue = searchParams.get("sort") || "relevance";
   const inStockOnly = searchParams.get("availability") === "in_stock";
+  const activeFilterCount = [Boolean(slug), Boolean(query), inStockOnly].filter(Boolean).length;
 
   useEffect(() => {
     let active = true;
@@ -268,9 +269,12 @@ export function ProductsListPage() {
                 type="button"
                 variant="light"
                 className="proto-mobile-filter-trigger"
-              onClick={() => setMobileFiltersOpen(true)}
+                onClick={() => setMobileFiltersOpen(true)}
               >
-                Filters
+                <span>Filters</span>
+                {activeFilterCount > 0 ? (
+                  <span className="proto-filter-trigger-count">{activeFilterCount}</span>
+                ) : null}
               </StorefrontButton>
             </div>
           }

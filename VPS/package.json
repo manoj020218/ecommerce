@@ -14,6 +14,7 @@
     "dev:front": "pnpm --filter @jenix/front dev",
     "build:admin": "pnpm --filter @jenix/admin-panel build",
     "build:front": "pnpm --filter @jenix/front build",
+    "preview:front:4174": "node apps/front/static-preview-server.cjs 4174",
     "check:backend": "node backend/src/checks/run-regression-checks.js",
     "test:backend": "jest",
     "test:backend:watch": "jest --watch",

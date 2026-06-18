@@ -137,22 +137,58 @@ function ProductRailCard({ product, busy, onAddToCart }) {
   );
 }
 
+function UspShieldIcon() {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  );
+}
+
+function UspPackageIcon() {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+    </svg>
+  );
+}
+
+function UspInvoiceIcon() {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function UspSupportIcon() {
+  return (
+    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
 const TRUST_POINTS = [
   {
     title: "100% Genuine",
-    copy: "Authorised products only"
+    copy: "Authorised products only",
+    icon: <UspShieldIcon />
   },
   {
     title: "Pan India Shipping",
-    copy: "Fast and tracked delivery"
+    copy: "Fast and tracked delivery",
+    icon: <UspPackageIcon />
   },
   {
-    title: "GST Billing Ready",
-    copy: "Invoice support for business orders"
+    title: "GST Invoice",
+    copy: "Proper tax invoice for business",
+    icon: <UspInvoiceIcon />
   },
   {
-    title: "Installation Support",
-    copy: "Phone and WhatsApp assistance"
+    title: "Expert Support",
+    copy: "Installation guidance",
+    icon: <UspSupportIcon />
   }
 ];
 
@@ -281,7 +317,7 @@ export function StorefrontHomePage() {
     <main className="proto-main-shell proto-main-shell-home">
       <section className="proto-home-hero">
         <div className="proto-home-hero-copy">
-          <span className="proto-home-kicker">Approved Front UI</span>
+          <span className="proto-home-kicker">New Arrival</span>
           <h1>{heroTitle}</h1>
           <p>
             {heroDescription}
@@ -293,7 +329,7 @@ export function StorefrontHomePage() {
             >
               Shop Now
             </StorefrontButton>
-            <StorefrontButton to="/products" variant="dark">
+            <StorefrontButton to="/products" variant="light">
               View All
             </StorefrontButton>
             {supportWhatsApp ? (
@@ -370,8 +406,11 @@ export function StorefrontHomePage() {
       <section className="proto-usp-strip">
         {TRUST_POINTS.map((item) => (
           <article key={item.title} className="proto-usp-card">
-            <strong>{item.title}</strong>
-            <p>{item.copy}</p>
+            <div className="proto-usp-icon">{item.icon}</div>
+            <div className="proto-usp-text">
+              <strong>{item.title}</strong>
+              <p>{item.copy}</p>
+            </div>
           </article>
         ))}
       </section>

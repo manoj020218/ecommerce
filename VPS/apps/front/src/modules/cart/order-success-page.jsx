@@ -26,11 +26,25 @@ import {
   StorefrontFileInput,
   StorefrontInput,
   StorefrontLoadingState,
-  StorefrontPageHeader,
   StorefrontSectionHeader,
   StorefrontStickyActionBar,
   StorefrontTextArea
 } from "../../shared/storefront/storefront-ui";
+
+function SuccessIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M5 13l4 4L19 7"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.5"
+      />
+    </svg>
+  );
+}
 
 function humanizeInstructionKey(value) {
   return String(value || "")
@@ -390,21 +404,26 @@ export function OrderSuccessPage() {
   }
 
   return (
-    <main className="proto-main-shell proto-checkout-page">
-      <StorefrontPageHeader
-        eyebrow={isFollowupMode ? "Guest Order Follow-Up" : "Order Confirmation"}
-        title={headline}
-        description={
-          effectiveOrderNo
+    <main className="proto-main-shell proto-checkout-page proto-success-page">
+      <section className="proto-success-hero">
+        <div className="proto-success-icon">
+          <SuccessIcon />
+        </div>
+        <StorefrontBadge tone={statusTone(paymentStatus)}>
+          {paymentStatus === "paid" ? "Payment confirmed" : humanizeStatus(paymentStatus)}
+        </StorefrontBadge>
+        <h1>{headline}</h1>
+        <p>
+          {effectiveOrderNo
             ? `Reference ${effectiveOrderNo}. Keep this number for payment, support, and invoice follow-up.`
-            : "Your checkout record has been created."
-        }
-      />
+            : "Your checkout record has been created."}
+        </p>
+      </section>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
 
-      <div className="proto-checkout-layout">
+      <div className="proto-checkout-layout proto-success-layout">
         <section className="proto-checkout-main">
           <StorefrontCard className="proto-checkout-card">
             <StorefrontSectionHeader

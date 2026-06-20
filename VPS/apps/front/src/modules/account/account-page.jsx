@@ -367,7 +367,7 @@ export function CustomerAccountPage() {
 
   return (
     <main className="proto-main-shell account-shell">
-      <StorefrontCard className="front-header account-hero" elevated>
+      <div className="proto-page-hero">
         <div className="hero-kicker-row">
           <StorefrontButton to="/" variant="light">
             Back to storefront
@@ -414,7 +414,7 @@ export function CustomerAccountPage() {
             <MetricCard value={savedProducts.length} label="Saved" meta="Product shortlist" />
           </div>
         </div>
-      </StorefrontCard>
+      </div>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}

@@ -83,7 +83,7 @@ export function CustomerAccountLoginPage() {
 
   return (
     <main className="proto-main-shell account-shell">
-      <StorefrontCard className="front-header account-hero" elevated>
+      <div className="proto-page-hero">
         <div className="hero-kicker-row">
           <StorefrontButton to="/" variant="light">
             Browse products
@@ -110,12 +110,12 @@ export function CustomerAccountLoginPage() {
             </div>
           </div>
         </div>
-      </StorefrontCard>
+      </div>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {info ? <StorefrontAlert>{info}</StorefrontAlert> : null}
 
-      <section className="account-grid auth-grid">
+      <section className="proto-auth-grid">
         <StorefrontCard as="article" className="section-card" elevated>
           <StorefrontSectionHeader
             title="Email Login"

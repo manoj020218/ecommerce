@@ -136,7 +136,7 @@ export function BlogPage() {
         />
       ) : null}
 
-      <StorefrontCard className="front-header" elevated>
+      <div className="proto-page-hero">
         <StorefrontPageHeader
           eyebrow={article.category?.name || "Guide"}
           title={article.title}
@@ -164,7 +164,7 @@ export function BlogPage() {
             </StorefrontButton>
           }
         />
-      </StorefrontCard>
+      </div>
 
       <StorefrontCard as="section" className="guide-content-card" elevated>
         {contentBlocks.map((block, index) => (

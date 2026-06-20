@@ -1,13 +1,12 @@
 import {
   StorefrontButton,
-  StorefrontCard,
   StorefrontPageHeader
 } from "../../shared/storefront/storefront-ui";
 
 export function NotFoundPage() {
   return (
     <main className="proto-main-shell">
-      <StorefrontCard className="front-header account-hero" elevated>
+      <div className="proto-page-hero">
         <StorefrontPageHeader
           eyebrow="404"
           title="This storefront page does not exist"
@@ -27,7 +26,7 @@ export function NotFoundPage() {
             Customer Login
           </StorefrontButton>
         </div>
-      </StorefrontCard>
+      </div>
     </main>
   );
 }

@@ -3676,3 +3676,132 @@ textarea {
   margin-right: 12px;
   opacity: 0.5;
 }
+
+/* ── Page hero — dark header for account, blog, guide, 404 pages ── */
+
+.proto-page-hero {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 60%, #374151 100%);
+  color: #fff;
+  margin-inline: -14px;
+  margin-top: -14px;
+  padding: 20px 14px 28px;
+  display: grid;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.proto-page-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  pointer-events: none;
+}
+
+.proto-page-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.proto-page-hero h1 {
+  margin: 8px 0 10px;
+  font-size: clamp(22px, 3.5vw, 34px);
+  line-height: 1.15;
+  color: #fff;
+}
+
+.proto-page-hero h2,
+.proto-page-hero h3 {
+  color: #fff;
+}
+
+.proto-page-hero p,
+.proto-page-hero .hero-muted {
+  margin: 0;
+  color: #9ca3af;
+  line-height: 1.6;
+}
+
+.proto-page-hero .eyebrow-text {
+  color: var(--brand);
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.proto-page-hero .eyebrow-chip {
+  background: rgba(232, 35, 26, 0.18);
+  border-color: rgba(232, 35, 26, 0.28);
+  color: #fca5a5;
+}
+
+.proto-page-hero .chip-row .eyebrow-chip {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #d1d5db;
+}
+
+.proto-page-hero .metric-card {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.proto-page-hero .metric-card strong {
+  color: #fff;
+}
+
+.proto-page-hero .metric-card span,
+.proto-page-hero .metric-card small {
+  color: #9ca3af;
+}
+
+.proto-page-hero .guide-meta-text {
+  color: #9ca3af;
+}
+
+.proto-page-hero .search-chip {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #d1d5db;
+}
+
+/* ── Auth grid — 3 columns on desktop ── */
+
+.proto-auth-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Blog / guide list meta bar ── */
+
+.list-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.list-meta strong {
+  color: var(--text);
+}
+
+@media (min-width: 900px) {
+  .proto-page-hero {
+    margin-inline: -22px;
+    padding: 32px 22px 38px;
+  }
+
+  .proto-page-hero .hero-stat-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .proto-auth-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

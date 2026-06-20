@@ -102,7 +102,7 @@ export function BlogsListPage() {
 
   return (
     <main className="proto-main-shell">
-      <StorefrontCard className="front-header" elevated>
+      <div className="proto-page-hero">
         <StorefrontPageHeader
           eyebrow="Knowledge Base"
           title="Installation Guides, Buying Advice, and Troubleshooting"
@@ -141,7 +141,7 @@ export function BlogsListPage() {
           </StorefrontSelect>
           <StorefrontButton type="submit">Search</StorefrontButton>
         </form>
-      </StorefrontCard>
+      </div>
 
       <section className="list-meta">
         <p>{query ? `Showing guide results for "${query}"` : "Browse all published guides"}</p>

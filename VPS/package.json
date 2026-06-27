@@ -47,7 +47,7 @@
     "zod": "^4.0.17"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["sharp"]
+    "onlyBuiltDependencies": ["sharp", "esbuild", "unrs-resolver"]
   },
   "devDependencies": {
     "eslint": "^8.57.0",

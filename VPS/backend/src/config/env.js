@@ -21,7 +21,8 @@ const env = {
   allowHeaderAuthFallback: process.env.ALLOW_HEADER_AUTH_FALLBACK === "true",
   superAdminEmail: process.env.SUPER_ADMIN_EMAIL || "admin@jenixindia.com",
   superAdminPassword: process.env.SUPER_ADMIN_PASSWORD || "ChangeMe@123",
-  uploadDir: process.env.UPLOAD_DIR || "backend/uploads",
+  uploadDir: process.env.UPLOAD_DIR || "image-assets/uploads",
+  migrationImagesDir: process.env.MIGRATION_IMAGES_DIR || "image-assets/migration",
   settingsStorePath:
     process.env.SETTINGS_STORE_PATH || "backend/src/database/json/settings.json",
   settingsAuditPath:
@@ -60,7 +61,8 @@ const env = {
   maxUploadSizeBytes: Number.parseInt(
     process.env.MAX_UPLOAD_SIZE_BYTES || `${5 * 1024 * 1024}`,
     10
-  )
+  ),
+  corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:4174,http://localhost:4100"
 };
 
 module.exports = { env };

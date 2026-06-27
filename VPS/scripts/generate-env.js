@@ -115,6 +115,7 @@ async function main() {
     ALLOW_HEADER_AUTH_FALLBACK: "false",
     OTP_DEV_DEFAULT_CODE: args["otp-dev-code"] || "123456",
     CART_STOCK_RESERVATION_MINUTES: args["cart-reservation-minutes"] || "15",
+    CORS_ORIGIN: args["cors-origin"] || `${storeDomain},${adminDomain}`,
     MONGODB_URI:
       args["mongodb-uri"] || "mongodb://127.0.0.1:27017/jenix_commerce",
     SETTINGS_STORE_PATH:
@@ -150,7 +151,8 @@ async function main() {
     MARKETING_STORE_PATH:
       args["marketing-store-path"] ||
       "backend/src/database/json/marketing-store.json",
-    UPLOAD_DIR: args["upload-dir"] || "backend/uploads",
+    UPLOAD_DIR: args["upload-dir"] || "image-assets/uploads",
+    MIGRATION_IMAGES_DIR: args["migration-images-dir"] || "image-assets/migration",
     SUPER_ADMIN_EMAIL:
       args["super-admin-email"] || "admin@businessdomain.com",
     SUPER_ADMIN_PASSWORD:

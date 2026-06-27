@@ -2078,11 +2078,13 @@ async function createPaymentAttempt(context, payload) {
     gateway: attempt.gateway,
     gatewayOrderId: attempt.gatewayOrderId || "",
     gatewayPaymentLink: attempt.gatewayPaymentLink || "",
+    gatewayProviderKey: providerOrder.keyId || "",
+    gatewayMode: providerOrder.mode || "",
     reservation: sanitizeReservation(reservation)
   };
 }
 
-async function processPaymentWebhook(gatewayCode, payload) {
+async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
   const normalizedGatewayCode = String(gatewayCode || "mock_online")
     .trim()
     .toLowerCase();
@@ -2097,7 +2099,7 @@ async function processPaymentWebhook(gatewayCode, payload) {
   let changed = cleanupExpiredReservations(authStore, catalogStore);
 
   const gatewayProvider = createPaymentGateway(normalizedGatewayCode);
-  const normalizedPayload = await gatewayProvider.handleWebhook(payload || {});
+  const normalizedPayload = await gatewayProvider.handleWebhook(payload || {}, rawBody, signature);
   const attemptId = String(normalizedPayload.attemptId || payload.attemptId || "").trim();
   const status = String(normalizedPayload.status || payload.status || "")
     .trim()

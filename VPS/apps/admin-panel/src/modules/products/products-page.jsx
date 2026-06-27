@@ -4,7 +4,6 @@ import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
 import { PageHeader } from "../../shared/components/page-header";
-import { StatusBadge } from "../../shared/components/status-badge";
 import {
   formatCurrencyInr,
   splitCsvInput,
@@ -586,6 +585,53 @@ function EditableCell({ rowId, field, value, type, options, missing, pending, ac
   );
 }
 
+// ── ToggleSwitch ──────────────────────────────────────────────────────────────
+
+function ToggleSwitch({ checked, onChange, disabled }) {
+  return (
+    <label style={{ position: "relative", display: "inline-flex", alignItems: "center", cursor: disabled ? "default" : "pointer" }}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
+      />
+      <div style={{
+        width: 40, height: 22, borderRadius: 11,
+        background: checked ? "#E8231A" : "#d1d5db",
+        transition: "background 0.2s", position: "relative", flexShrink: 0
+      }}>
+        <div style={{
+          position: "absolute", top: 3,
+          left: checked ? 21 : 3,
+          width: 16, height: 16, borderRadius: "50%",
+          background: "#fff", transition: "left 0.2s",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)"
+        }} />
+      </div>
+    </label>
+  );
+}
+
+// ── StockDot ──────────────────────────────────────────────────────────────────
+
+function StockDot({ status, availableQty }) {
+  const config = {
+    in_stock:     { color: "#22c55e", label: "In Stock" },
+    low_stock:    { color: "#f59e0b", label: availableQty != null ? `Low Stock (${availableQty})` : "Low Stock" },
+    out_of_stock: { color: "#ef4444", label: "Out of Stock" },
+    backorder:    { color: "#6366f1", label: "Backorder" }
+  };
+  const c = config[status] || config.in_stock;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, color: c.color }}>
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.color, flexShrink: 0 }} />
+      {c.label}
+    </span>
+  );
+}
+
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export function ProductsPage() {
@@ -638,6 +684,11 @@ export function ProductsPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const importFileRef = useRef(null);
+
+  // list-view selection + display filters
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
 
   // pagination (bulk edit)
   const [page, setPage] = useState(1);
@@ -1005,6 +1056,48 @@ export function ProductsPage() {
 
   const onDiscardEdits = () => { if (window.confirm("Discard all unsaved changes?")) setPendingEdits({}); };
 
+  const onToggleActive = async (row, newIsActive) => {
+    try {
+      await bulkPatchProducts([{ id: row.id, isActive: newIsActive }]);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Toggle failed."); }
+  };
+
+  const openClone = (row) => {
+    setEditingId(null);
+    setEditingProduct(null);
+    const cloneForm = formFromProduct(row);
+    cloneForm.title = `Copy of ${row.title}`;
+    cloneForm.slug = "";
+    cloneForm.sku = "";
+    clearPendingImages();
+    setDocTitle("");
+    setModalOpen(true);
+    setForm(cloneForm);
+  };
+
+  const onBulkActivate = async (activate) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    try {
+      await bulkPatchProducts(ids.map((id) => ({ id, isActive: activate })));
+      setSelectedIds(new Set());
+      setNotice(`${ids.length} products ${activate ? "activated" : "deactivated"}.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk action failed."); }
+  };
+
+  const onBulkArchiveSelected = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length || !window.confirm(`Archive ${ids.length} product${ids.length !== 1 ? "s" : ""}?`)) return;
+    try {
+      for (const id of ids) await archiveProduct(id);
+      setSelectedIds(new Set());
+      setNotice(`${ids.length} products archived.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk archive failed."); }
+  };
+
   // ── bulk-edit display rows ────────────────────────────────────────────────────
 
   const bulkRows = useMemo(() => {
@@ -1014,6 +1107,14 @@ export function ProductsPage() {
     if (q) display = display.filter((r) => `${r.title} ${r.sku} ${r.brand}`.toLowerCase().includes(q));
     return display;
   }, [rows, incompleteOnly, filters.q]);
+
+  const displayRows = useMemo(() => {
+    let result = rows;
+    if (statusFilter === "active")   result = result.filter((r) => r.isActive);
+    if (statusFilter === "inactive") result = result.filter((r) => !r.isActive);
+    if (stockFilter !== "all")       result = result.filter((r) => r.stockStatus === stockFilter);
+    return result;
+  }, [rows, statusFilter, stockFilter]);
 
   const totalPages = Math.max(1, Math.ceil(bulkRows.length / PAGE_SIZE));
   const pageRows = bulkRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -1150,97 +1251,293 @@ export function ProductsPage() {
             </div>
           )}
 
-          <form className="filter-bar" onSubmit={onFilterSubmit}>
-            <input
-              type="search"
-              placeholder="Search title, SKU, model…"
-              value={filters.q}
-              onChange={(e) => setFilters((cur) => ({ ...cur, q: e.target.value }))}
-            />
-            <label className="inline-check">
-              <input
-                type="checkbox"
-                checked={filters.includeInactive}
-                onChange={(e) => setFilters((cur) => ({ ...cur, includeInactive: e.target.checked }))}
-              />
-              Include inactive
-            </label>
-            <button type="submit" className="btn btn-secondary btn-small">Apply</button>
-          </form>
+          {/* ── filter bar ── */}
+          <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6", padding: "12px 16px", marginBottom: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+            <form onSubmit={onFilterSubmit} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <div style={{ flex: "1 1 240px", position: "relative" }}>
+                <svg style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "#9ca3af", pointerEvents: "none" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input
+                  type="search"
+                  placeholder="Search title, SKU, model…"
+                  value={filters.q}
+                  onChange={(e) => setFilters((cur) => ({ ...cur, q: e.target.value }))}
+                  style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, padding: "9px 12px", background: "#fff", outline: "none", cursor: "pointer" }}
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                style={{ fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, padding: "9px 12px", background: "#fff", outline: "none", cursor: "pointer" }}
+              >
+                <option value="all">All Stock</option>
+                <option value="in_stock">In Stock</option>
+                <option value="low_stock">Low Stock</option>
+                <option value="out_of_stock">Out of Stock</option>
+              </select>
+              <button
+                type="submit"
+                style={{ fontSize: 13, fontWeight: 500, padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", color: "#374151" }}
+              >
+                Apply
+              </button>
+              <a
+                href={getGoogleShoppingExportUrl(API_BASE_URL)}
+                download="google-shopping-feed.tsv"
+                style={{ fontSize: 13, fontWeight: 500, padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, color: "#374151", textDecoration: "none" }}
+              >
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Export
+              </a>
+            </form>
+          </div>
 
-          <div className="table-wrap desktop-only">
-            <table>
-              <thead>
+          {/* ── bulk actions bar ── */}
+          {selectedIds.size > 0 && (
+            <div style={{ background: "rgba(232,35,26,0.06)", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 12, padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#E8231A" }}>
+                {selectedIds.size} product{selectedIds.size !== 1 ? "s" : ""} selected
+              </span>
+              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                <button type="button" onClick={() => onBulkActivate(true)}
+                  style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
+                  Activate
+                </button>
+                <button type="button" onClick={() => onBulkActivate(false)}
+                  style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
+                  Deactivate
+                </button>
+                <button type="button" onClick={onBulkArchiveSelected}
+                  style={{ fontSize: 12, background: "#fff", border: "1px solid #fecaca", color: "#dc2626", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
+                  Archive
+                </button>
+                <button type="button" onClick={() => setSelectedIds(new Set())}
+                  style={{ fontSize: 12, background: "none", border: "none", color: "#9ca3af", padding: "6px 8px", cursor: "pointer" }}>
+                  ✕ Clear
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── desktop table ── */}
+          <div className="desktop-only" style={{ background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead style={{ background: "#f9fafb", borderBottom: "1px solid #f3f4f6" }}>
                 <tr>
-                  <th style={{ width: 56 }}></th>
-                  <th>Product</th><th>SKU</th><th>Category</th><th>Price</th>
-                  <th>Stock</th><th>Status</th><th>Images</th><th>Actions</th>
+                  <th style={{ padding: "12px 16px", width: 40, textAlign: "left" }}>
+                    <input
+                      type="checkbox"
+                      checked={displayRows.length > 0 && displayRows.every((r) => selectedIds.has(r.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(new Set(displayRows.map((r) => r.id)));
+                        else setSelectedIds(new Set());
+                      }}
+                      style={{ accentColor: "#E8231A", cursor: "pointer" }}
+                    />
+                  </th>
+                  {["Product", "SKU", "Category", "Price", "Stock", "Active", ""].map((h) => (
+                    <th key={h} style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id} style={isIncomplete(row) ? { background: "#fffbeb" } : {}}>
-                    <td style={{ padding: "6px 8px" }}>
-                      <ProductThumb images={row.images} size={44} />
-                    </td>
-                    <td>
-                      <strong>{row.title}</strong>
-                      <p className="row-sub">HSN {row.hsnCode || "—"} | GST {row.gstRate}%</p>
-                    </td>
-                    <td>{row.sku || <span style={{ color: "#d97706" }}>Missing</span>}</td>
-                    <td>{categoryNameById(categoryMap, row.categoryId)}</td>
-                    <td>
-                      <strong>{formatCurrencyInr(row.salePrice)}</strong>
-                      {Number(row.basePrice) !== Number(row.salePrice) && (
-                        <p className="row-sub line-through">{formatCurrencyInr(row.basePrice)}</p>
-                      )}
-                    </td>
-                    <td>{stockSummary(row)}</td>
-                    <td>
-                      <StatusBadge value={row.stockStatus} />
-                      <span className="spacer-inline" />
-                      <StatusBadge value={row.isActive ? "active" : "inactive"} />
-                    </td>
-                    <td>{Array.isArray(row.images) ? row.images.length : 0}</td>
-                    <td className="row-actions">
-                      {canEdit && (
-                        <button type="button" className="btn-link" onClick={() => openEdit(row)}>Edit</button>
-                      )}
-                      {canDelete && (
-                        <button type="button" className="btn-link danger" onClick={() => onArchive(row)}>Archive</button>
-                      )}
-                      {canEdit && (
-                        <label className="btn-link">
-                          {uploadingProductId === row.id ? "Uploading…" : "Upload Image"}
-                          <input
-                            type="file" accept="image/*" className="hidden-input"
-                            disabled={uploadingProductId.length > 0}
-                            onChange={(e) => { const f = e.target.files?.[0]; onUploadImage(row.id, f); e.target.value = ""; }}
+                {displayRows.map((row) => {
+                  const selected = selectedIds.has(row.id);
+                  return (
+                    <tr
+                      key={row.id}
+                      style={{
+                        borderBottom: "1px solid #f9fafb",
+                        background: selected ? "rgba(232,35,26,0.03)" : "#fff",
+                        opacity: !row.isActive && row.stockStatus === "out_of_stock" ? 0.6 : 1,
+                        transition: "background 0.1s"
+                      }}
+                      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "#f9fafb"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = selected ? "rgba(232,35,26,0.03)" : "#fff"; }}
+                    >
+                      {/* checkbox */}
+                      <td style={{ padding: "14px 16px", width: 40 }}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(e) => {
+                            setSelectedIds((cur) => {
+                              const next = new Set(cur);
+                              if (e.target.checked) next.add(row.id);
+                              else next.delete(row.id);
+                              return next;
+                            });
+                          }}
+                          style={{ accentColor: "#E8231A", cursor: "pointer" }}
+                        />
+                      </td>
+                      {/* product */}
+                      <td style={{ padding: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <ProductThumb images={row.images} size={44} />
+                          <div>
+                            <p style={{ margin: 0, fontWeight: 600, color: "#111827", fontSize: 13, lineHeight: 1.3 }}>
+                              {row.title}
+                            </p>
+                            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                              HSN: {row.hsnCode || "—"} · {row.gstRate ?? "—"}% GST
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      {/* SKU */}
+                      <td style={{ padding: "12px", fontFamily: "monospace", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                        {row.sku || <span style={{ color: "#d97706", fontFamily: "inherit" }}>Missing</span>}
+                      </td>
+                      {/* category */}
+                      <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>
+                        {categoryNameById(categoryMap, row.categoryId)}
+                      </td>
+                      {/* price */}
+                      <td style={{ padding: "12px", whiteSpace: "nowrap" }}>
+                        <p style={{ margin: 0, fontWeight: 700, color: "#E8231A", fontSize: 13 }}>
+                          {formatCurrencyInr(row.salePrice || row.basePrice)}
+                        </p>
+                        {Number(row.basePrice) > 0 && Number(row.basePrice) !== Number(row.salePrice) && Number(row.salePrice) > 0 && (
+                          <p style={{ margin: "1px 0 0", fontSize: 11, color: "#9ca3af", textDecoration: "line-through" }}>
+                            {formatCurrencyInr(row.basePrice)}
+                          </p>
+                        )}
+                      </td>
+                      {/* stock */}
+                      <td style={{ padding: "12px" }}>
+                        <StockDot status={row.stockStatus} availableQty={row.availableQty} />
+                      </td>
+                      {/* active toggle */}
+                      <td style={{ padding: "12px" }}>
+                        {canEdit ? (
+                          <ToggleSwitch
+                            checked={Boolean(row.isActive)}
+                            onChange={(val) => onToggleActive(row, val)}
                           />
-                        </label>
-                      )}
+                        ) : (
+                          <span style={{ fontSize: 12, color: row.isActive ? "#16a34a" : "#9ca3af" }}>
+                            {row.isActive ? "Active" : "Inactive"}
+                          </span>
+                        )}
+                      </td>
+                      {/* actions */}
+                      <td style={{ padding: "12px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 2, whiteSpace: "nowrap" }}>
+                          {canEdit && (
+                            <button type="button" onClick={() => openEdit(row)}
+                              style={{ fontSize: 12, color: "#E8231A", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                              Edit
+                            </button>
+                          )}
+                          {canEdit && (
+                            <>
+                              <span style={{ color: "#e5e7eb" }}>|</span>
+                              <button type="button" onClick={() => openClone(row)}
+                                style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                Clone
+                              </button>
+                            </>
+                          )}
+                          {canDelete && (
+                            <>
+                              <span style={{ color: "#e5e7eb" }}>|</span>
+                              <button type="button" onClick={() => onArchive(row)}
+                                style={{ fontSize: 12, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                Archive
+                              </button>
+                            </>
+                          )}
+                          {canEdit && (
+                            <label title="Upload image" style={{ cursor: uploadingProductId === row.id ? "wait" : "pointer", display: "inline-flex", padding: "4px 4px" }}>
+                              <input
+                                type="file" accept="image/*" className="hidden-input"
+                                disabled={uploadingProductId.length > 0}
+                                onChange={(e) => { const f = e.target.files?.[0]; onUploadImage(row.id, f); e.target.value = ""; }}
+                              />
+                              <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                                {uploadingProductId === row.id ? "…" : "↑"}
+                              </span>
+                            </label>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {displayRows.length === 0 && (
+                  <tr>
+                    <td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                      No products match your filters.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
 
+          {/* ── mobile cards ── */}
           <div className="mobile-cards">
-            {rows.map((row) => (
-              <article key={row.id} className="card">
-                <div className="card-head">
-                  <h4>{row.title}</h4>
-                  <StatusBadge value={row.stockStatus} />
+            {displayRows.map((row) => (
+              <div key={row.id} style={{ background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <ProductThumb images={row.images} size={52} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 14, lineHeight: 1.3 }}>
+                      {row.title}
+                    </p>
+                    <p style={{ margin: "3px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                      {row.sku || "No SKU"} · {categoryNameById(categoryMap, row.categoryId)}
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700, color: "#E8231A", fontSize: 14 }}>
+                        {formatCurrencyInr(row.salePrice || row.basePrice)}
+                      </span>
+                      <StockDot status={row.stockStatus} availableQty={row.availableQty} />
+                    </div>
+                  </div>
+                  {canEdit && (
+                    <ToggleSwitch
+                      checked={Boolean(row.isActive)}
+                      onChange={(val) => onToggleActive(row, val)}
+                    />
+                  )}
                 </div>
-                <p className="muted">{row.sku || "No SKU"}</p>
-                <p className="muted">{categoryNameById(categoryMap, row.categoryId)} | HSN {row.hsnCode || "—"}</p>
-                <p>{formatCurrencyInr(row.salePrice)}</p>
-                <div className="card-actions">
-                  {canEdit && <button type="button" className="btn btn-secondary" onClick={() => openEdit(row)}>Edit</button>}
-                  {canDelete && <button type="button" className="btn btn-danger" onClick={() => onArchive(row)}>Archive</button>}
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  {canEdit && (
+                    <button type="button" onClick={() => openEdit(row)}
+                      style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#E8231A", border: "1px solid rgba(232,35,26,0.3)", background: "rgba(232,35,26,0.04)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
+                      Edit
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button type="button" onClick={() => openClone(row)}
+                      style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#6b7280", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
+                      Clone
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button type="button" onClick={() => onArchive(row)}
+                      style={{ fontSize: 13, fontWeight: 500, color: "#9ca3af", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 8, padding: "7px 12px", cursor: "pointer" }}>
+                      Archive
+                    </button>
+                  )}
                 </div>
-              </article>
+              </div>
             ))}
           </div>
         </>

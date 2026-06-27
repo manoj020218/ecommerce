@@ -23,9 +23,19 @@ class PaymentGatewayAdapter {
 function createPaymentGateway(gatewayCode) {
   const normalized = String(gatewayCode || "").trim().toLowerCase();
 
-  if (normalized === "razorpay" || normalized === "mock_online" || normalized === "mock") {
+  if (normalized === "razorpay") {
     const { RazorpayGateway } = require("./razorpay.gateway");
     return new RazorpayGateway();
+  }
+
+  if (normalized === "mock_online" || normalized === "mock") {
+    const { MockOnlineGateway } = require("./mock-online.gateway");
+    return new MockOnlineGateway();
+  }
+
+  if (normalized === "cashfree") {
+    const { CashfreeGateway } = require("./cashfree.gateway");
+    return new CashfreeGateway();
   }
 
   if (normalized === "manual_upi") {

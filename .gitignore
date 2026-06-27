@@ -6,6 +6,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+!.env.production.example
+!VPS/.env.production.example
 
 # Logs
 *.log
@@ -20,6 +22,7 @@ build/
 coverage/
 .cache/
 .tmp/
+.tmp-*/
 temp/
 out/
 
@@ -40,3 +43,10 @@ Thumbs.db
 VPS/backend/uploads/
 VPS/backend/src/database/json/*.json
 !VPS/backend/src/database/json/.gitkeep
+
+# Portable image-assets folder (not in git — move this folder to migrate servers)
+VPS/image-assets/uploads/*
+VPS/image-assets/migration/*
+!VPS/image-assets/.gitkeep
+!VPS/image-assets/uploads/.gitkeep
+!VPS/image-assets/migration/.gitkeep

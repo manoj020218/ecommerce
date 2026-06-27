@@ -808,6 +808,7 @@ async function saveSetupWizardStep(stepKey, payload, actor) {
         fromName: payload.fromName,
         fromEmail: payload.fromEmail,
         replyToEmail: payload.replyToEmail,
+        password: payload.password || wizard.smtpEmail?.password || "",
         passwordConfigured:
           Boolean(payload.password) || Boolean(wizard.smtpEmail.passwordConfigured)
       });

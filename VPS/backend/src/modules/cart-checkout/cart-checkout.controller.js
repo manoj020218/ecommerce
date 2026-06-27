@@ -155,7 +155,12 @@ const paymentsWebhookMock = asyncHandler(async (req, res) => {
 
 const paymentsWebhookGateway = asyncHandler(async (req, res) => {
   const payload = parsePaymentWebhookPayload(req.body);
-  const data = await service.processPaymentWebhook(req.params.gateway, payload);
+  const rawBody = req.rawBody || null;
+  const signature =
+    req.headers["x-razorpay-signature"] ||
+    req.headers["x-webhook-signature"] ||
+    null;
+  const data = await service.processPaymentWebhook(req.params.gateway, payload, rawBody, signature);
   return ok(res, data, "Payment webhook processed.");
 });
 

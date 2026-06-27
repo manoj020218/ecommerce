@@ -41,6 +41,47 @@ import {
   verifyManualPayment
 } from "./customers.api";
 
+const BRAND = "#E8231A";
+
+const CUSTOMER_TYPE_COLORS = {
+  retail:        { bg: "#f3f4f6", text: "#6b7280" },
+  dealer:        { bg: "#dbeafe", text: "#1d4ed8" },
+  stockist:      { bg: "#f3e8ff", text: "#7c3aed" },
+  distributor:   { bg: "#dcfce7", text: "#16a34a" },
+  institutional: { bg: "#fef3c7", text: "#92400e" },
+  project:       { bg: "#ffedd5", text: "#c2410c" }
+};
+
+function TypeBadge({ type }) {
+  const c = CUSTOMER_TYPE_COLORS[type] || CUSTOMER_TYPE_COLORS.retail;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      background: c.bg, color: c.text,
+      fontSize: 11, fontWeight: 600,
+      padding: "3px 9px", borderRadius: 20,
+      textTransform: "capitalize", whiteSpace: "nowrap"
+    }}>
+      {type || "retail"}
+    </span>
+  );
+}
+
+function ApprovalBadge({ approved }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      background: approved ? "#dcfce7" : "#f3f4f6",
+      color: approved ? "#16a34a" : "#6b7280",
+      fontSize: 11, fontWeight: 600,
+      padding: "3px 9px", borderRadius: 20, whiteSpace: "nowrap"
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: approved ? "#22c55e" : "#9ca3af", flexShrink: 0 }} />
+      {approved ? "B2B Approved" : "Not Approved"}
+    </span>
+  );
+}
+
 const EMPTY_EDIT_FORM = {
   customerType: "retail",
   priceGroup: "",
@@ -338,244 +379,382 @@ export function CustomersPage() {
         }
       />
 
-      <form className="filter-bar" onSubmit={onFilterSubmit}>
-        <input
-          type="search"
-          placeholder="Search by name, email, mobile, GSTIN, or company"
-          value={filters.q}
-          onChange={(event) => setFilters((f) => ({ ...f, q: event.target.value }))}
-        />
-        <select
-          value={filters.customerType}
-          onChange={(event) => setFilters((f) => ({ ...f, customerType: event.target.value }))}
-        >
-          <option value="">All customer types</option>
-          <option value="retail">Retail</option>
-          <option value="dealer">Dealer</option>
-          <option value="stockist">Stockist</option>
-          <option value="distributor">Distributor</option>
-          <option value="institutional">Institutional</option>
-          <option value="project">Project</option>
-        </select>
-        <select
-          value={filters.approvalStatus}
-          onChange={(event) => setFilters((f) => ({ ...f, approvalStatus: event.target.value }))}
-        >
-          <option value="">All approval states</option>
-          <option value="approved">Approved B2B</option>
-          <option value="not_approved">Not Approved</option>
-        </select>
-        <button type="submit" className="btn btn-secondary">Apply</button>
-      </form>
+      {/* ── stat cards ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+        {[
+          { label: "Total Customers",    value: customers.length,                              bg: "#dbeafe", icon: "👥" },
+          { label: "B2B Approved",       value: customers.filter((c) => c.isB2BApproved).length, bg: "#dcfce7", icon: "✅" },
+          { label: "Pending B2B",        value: orderRequests.length,                           bg: "#fef3c7", icon: "📋" },
+          { label: "Pending Payments",   value: manualPayments.length,                          bg: "#fce7f3", icon: "💳" },
+        ].map(({ label, value, bg, icon }) => (
+          <div key={label} style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: "14px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+            <div style={{ width: 36, height: 36, background: bg, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, marginBottom: 10 }}>{icon}</div>
+            <p style={{ fontSize: 24, fontWeight: 800, color: "#111827", margin: 0, lineHeight: 1 }}>{value}</p>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "4px 0 0", fontWeight: 500 }}>{label}</p>
+          </div>
+        ))}
+      </div>
 
-      {notice ? <p className="alert-info">{notice}</p> : null}
-      {error ? <p className="form-error">{error}</p> : null}
+      {/* ── filter bar ── */}
+      <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6", padding: "12px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <form onSubmit={onFilterSubmit} style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <div style={{ flex: "1 1 240px", position: "relative" }}>
+            <svg style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 16, height: 16, color: "#9ca3af", pointerEvents: "none" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input
+              type="search"
+              placeholder="Search name, email, mobile, GSTIN, company…"
+              value={filters.q}
+              onChange={(event) => setFilters((f) => ({ ...f, q: event.target.value }))}
+              style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, outline: "none", boxSizing: "border-box" }}
+            />
+          </div>
+          <select
+            value={filters.customerType}
+            onChange={(event) => setFilters((f) => ({ ...f, customerType: event.target.value }))}
+            style={{ fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, padding: "9px 12px", background: "#fff", outline: "none", cursor: "pointer" }}
+          >
+            <option value="">All Types</option>
+            <option value="retail">Retail</option>
+            <option value="dealer">Dealer</option>
+            <option value="stockist">Stockist</option>
+            <option value="distributor">Distributor</option>
+            <option value="institutional">Institutional</option>
+            <option value="project">Project</option>
+          </select>
+          <select
+            value={filters.approvalStatus}
+            onChange={(event) => setFilters((f) => ({ ...f, approvalStatus: event.target.value }))}
+            style={{ fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, padding: "9px 12px", background: "#fff", outline: "none", cursor: "pointer" }}
+          >
+            <option value="">All Approval States</option>
+            <option value="approved">B2B Approved</option>
+            <option value="not_approved">Not Approved</option>
+          </select>
+          <button
+            type="submit"
+            style={{ fontSize: 13, fontWeight: 500, padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", color: "#374151" }}
+          >
+            Apply
+          </button>
+        </form>
+      </div>
 
-      {/* Desktop table */}
-      <div className="table-wrap desktop-only">
-        <table>
-          <thead>
+      {notice ? (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: "10px 16px", fontSize: 13, color: "#15803d" }}>
+          ✓ {notice}
+        </div>
+      ) : null}
+      {error ? (
+        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "10px 16px", fontSize: 13, color: "#dc2626" }}>
+          {error}
+        </div>
+      ) : null}
+
+      {/* ── desktop table ── */}
+      <div className="desktop-only" style={{ background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead style={{ background: "#f9fafb", borderBottom: "1px solid #f3f4f6" }}>
             <tr>
-              <th>Customer</th>
-              <th>Type</th>
-              <th>Approval</th>
-              <th>Order Mode</th>
-              <th>Orders</th>
-              <th>Last Activity</th>
-              <th>Actions</th>
+              {["Customer", "Type", "Approval", "Order Mode", "Orders", "Last Activity", "Actions"].map((h) => (
+                <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {customers.map((customer) => (
-              <tr key={customer.id}>
-                <td>
-                  <strong>{customer.name || customer.companyName || customer.email || customer.id}</strong>
-                  <p className="row-sub">
-                    {customer.companyName || "No company"} | {customer.email || "No email"} | {customer.mobile || "No mobile"}
-                  </p>
-                </td>
-                <td>
-                  <StatusBadge value={customer.customerType} />
-                  {customer.priceGroup ? <p className="row-sub">Price group: {customer.priceGroup}</p> : null}
-                </td>
-                <td>
-                  <StatusBadge
-                    value={customer.isB2BApproved ? "active" : "inactive"}
-                    label={customer.isB2BApproved ? "Approved" : "Not Approved"}
-                  />
-                  {customer.gstin ? <p className="row-sub">GSTIN: {customer.gstin}</p> : null}
-                </td>
-                <td>{customer.orderMode}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn-link"
-                    onClick={() => openOrdersModal(customer)}
-                    title="View orders"
-                  >
-                    {customer.orderCount} orders
-                  </button>
-                </td>
-                <td>{formatDateTime(customer.lastLoginAt || customer.lastOrderAt || customer.createdAt)}</td>
-                <td className="row-actions">
-                  <button type="button" className="btn-link" onClick={() => openOrdersModal(customer)}>
-                    Orders
-                  </button>
-                  {canManage ? (
-                    <button type="button" className="btn-link" onClick={() => openEditModal(customer)}>
-                      Edit
+            {customers.map((customer) => {
+              const displayName = customer.name || customer.companyName || customer.email || customer.id;
+              const initials = displayName.slice(0, 2).toUpperCase();
+              return (
+                <tr
+                  key={customer.id}
+                  style={{ borderBottom: "1px solid #f9fafb" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f9fafb"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+                >
+                  {/* customer */}
+                  <td style={{ padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{
+                        width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+                        background: customer.isB2BApproved ? BRAND : "#e5e7eb",
+                        color: customer.isB2BApproved ? "#fff" : "#6b7280",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 13, fontWeight: 700
+                      }}>
+                        {initials}
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontWeight: 600, color: "#111827", fontSize: 13 }}>{displayName}</p>
+                        <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                          {customer.email || "—"} · {customer.mobile || "—"}
+                        </p>
+                        {customer.companyName && customer.companyName !== displayName ? (
+                          <p style={{ margin: "1px 0 0", fontSize: 11, color: "#9ca3af" }}>{customer.companyName}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </td>
+                  {/* type */}
+                  <td style={{ padding: "14px 16px" }}>
+                    <TypeBadge type={customer.customerType} />
+                    {customer.priceGroup ? (
+                      <p style={{ margin: "3px 0 0", fontSize: 11, color: "#9ca3af" }}>Group: {customer.priceGroup}</p>
+                    ) : null}
+                  </td>
+                  {/* approval */}
+                  <td style={{ padding: "14px 16px" }}>
+                    <ApprovalBadge approved={customer.isB2BApproved} />
+                    {customer.gstin ? (
+                      <p style={{ margin: "3px 0 0", fontSize: 11, color: "#9ca3af" }}>GSTIN: {customer.gstin}</p>
+                    ) : null}
+                  </td>
+                  {/* order mode */}
+                  <td style={{ padding: "14px 16px", fontSize: 12, color: "#6b7280", textTransform: "capitalize" }}>
+                    {(customer.orderMode || "online").replace(/_/g, " ")}
+                  </td>
+                  {/* orders count */}
+                  <td style={{ padding: "14px 16px" }}>
+                    <button
+                      type="button"
+                      onClick={() => openOrdersModal(customer)}
+                      style={{ fontSize: 13, fontWeight: 600, color: BRAND, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                    >
+                      {customer.orderCount} orders
                     </button>
-                  ) : null}
-                  {customer.mobile ? (
-                    <WaBtn
-                      phone={customer.mobile}
-                      message={`Hi ${customer.name || customer.companyName || "there"}, this is a message from Jenix India.`}
-                      label="WA"
-                    />
-                  ) : null}
+                  </td>
+                  {/* last activity */}
+                  <td style={{ padding: "14px 16px", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                    {formatDateTime(customer.lastLoginAt || customer.lastOrderAt || customer.createdAt)}
+                  </td>
+                  {/* actions */}
+                  <td style={{ padding: "14px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                      <button type="button" onClick={() => openOrdersModal(customer)}
+                        style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                        Orders
+                      </button>
+                      {canManage ? (
+                        <>
+                          <span style={{ color: "#e5e7eb" }}>|</span>
+                          <button type="button" onClick={() => openEditModal(customer)}
+                            style={{ fontSize: 12, color: BRAND, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                            Edit
+                          </button>
+                        </>
+                      ) : null}
+                      {customer.mobile ? (
+                        <>
+                          <span style={{ color: "#e5e7eb" }}>|</span>
+                          <WaBtn
+                            phone={customer.mobile}
+                            message={`Hi ${customer.name || customer.companyName || "there"}, this is a message from Jenix India.`}
+                            label="WA"
+                          />
+                        </>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {customers.length === 0 && (
+              <tr>
+                <td colSpan={7} style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                  No customers match your filters.
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Mobile cards */}
-      <div className="mobile-list">
-        {customers.map((customer) => (
-          <article key={customer.id} className="panel-card">
-            <div className="panel-card-head">
-              <div>
-                <strong>{customer.name || customer.companyName || customer.email || customer.id}</strong>
-                <p className="row-sub">{customer.companyName || "No company"}</p>
+      {/* ── mobile cards ── */}
+      <div className="mobile-cards">
+        {customers.map((customer) => {
+          const displayName = customer.name || customer.companyName || customer.email || customer.id;
+          const initials = displayName.slice(0, 2).toUpperCase();
+          return (
+            <div key={customer.id} style={{ background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 12 }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                  background: customer.isB2BApproved ? BRAND : "#e5e7eb",
+                  color: customer.isB2BApproved ? "#fff" : "#6b7280",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 15, fontWeight: 700
+                }}>
+                  {initials}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 14 }}>{displayName}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af" }}>
+                    {customer.email || "—"} · {customer.mobile || "—"}
+                  </p>
+                </div>
+                <TypeBadge type={customer.customerType} />
               </div>
-              <StatusBadge value={customer.customerType} />
-            </div>
-            <div className="detail-grid">
-              <div><span>Email</span><strong>{customer.email || "--"}</strong></div>
-              <div><span>Mobile</span><strong>{customer.mobile || "--"}</strong></div>
-              <div><span>Approval</span><strong>{customer.isB2BApproved ? "Approved" : "Not Approved"}</strong></div>
-              <div><span>Orders</span><strong>{customer.orderCount}</strong></div>
-            </div>
-            <div className="card-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => openOrdersModal(customer)}>
-                Orders
-              </button>
-              {canManage ? (
-                <button type="button" className="btn btn-secondary" onClick={() => openEditModal(customer)}>
-                  Edit
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", marginBottom: 12, fontSize: 12 }}>
+                <div style={{ color: "#9ca3af" }}>Approval: <span style={{ color: "#111827", fontWeight: 600 }}>{customer.isB2BApproved ? "B2B Approved" : "Not Approved"}</span></div>
+                <div style={{ color: "#9ca3af" }}>Orders: <span style={{ color: "#111827", fontWeight: 600 }}>{customer.orderCount}</span></div>
+                {customer.companyName ? <div style={{ color: "#9ca3af" }}>Company: <span style={{ color: "#111827", fontWeight: 600 }}>{customer.companyName}</span></div> : null}
+                {customer.gstin ? <div style={{ color: "#9ca3af" }}>GSTIN: <span style={{ color: "#111827", fontWeight: 600 }}>{customer.gstin}</span></div> : null}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => openOrdersModal(customer)}
+                  style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#6b7280", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
+                  Orders
                 </button>
-              ) : null}
-              {customer.mobile ? (
-                <WaBtn
-                  phone={customer.mobile}
-                  message={`Hi ${customer.name || customer.companyName || "there"}, this is a message from Jenix India.`}
-                  label="WhatsApp"
-                />
-              ) : null}
+                {canManage ? (
+                  <button type="button" onClick={() => openEditModal(customer)}
+                    style={{ flex: 1, fontSize: 13, fontWeight: 600, color: BRAND, border: "1px solid rgba(232,35,26,0.3)", background: "rgba(232,35,26,0.04)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
+                    Edit
+                  </button>
+                ) : null}
+                {customer.mobile ? (
+                  <WaBtn
+                    phone={customer.mobile}
+                    message={`Hi ${customer.name || customer.companyName || "there"}, this is a message from Jenix India.`}
+                    label="WhatsApp"
+                  />
+                ) : null}
+              </div>
             </div>
-          </article>
-        ))}
+          );
+        })}
       </div>
 
-      {/* B2B Order Requests */}
-      <section className="section-card">
-        <div className="section-head">
-          <h3>B2B Order Requests</h3>
-          <p>Approve dealer requests and move paid pickup orders through fulfilment.</p>
+      {/* ── B2B Order Requests ── */}
+      <div style={{ marginTop: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>B2B Order Requests</h3>
+            <p style={{ fontSize: 12, color: "#9ca3af", margin: "2px 0 0" }}>Approve dealer requests and move paid pickup orders through fulfilment.</p>
+          </div>
+          {orderRequests.length > 0 && (
+            <span style={{ fontSize: 12, background: "#fef3c7", color: "#92400e", borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>
+              {orderRequests.length} pending
+            </span>
+          )}
         </div>
-        <div className="card-list">
-          {orderRequests.length ? orderRequests.map((order) => (
-            <div key={order.id} className="list-card">
-              <div className="list-card-head">
-                <div>
-                  <strong>{order.orderNo}</strong>
-                  <p>{order.customerName}{order.companyName ? ` | ${order.companyName}` : ""}</p>
+        {orderRequests.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {orderRequests.map((order) => (
+              <div key={order.id} style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 14 }}>{order.orderNo}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#9ca3af" }}>
+                      {order.customerName}{order.companyName ? ` · ${order.companyName}` : ""}
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <StatusBadge value={order.orderStatus} />
+                    <StatusBadge value={order.paymentStatus} />
+                  </div>
                 </div>
-                <div className="list-card-meta">
-                  <StatusBadge value={order.orderStatus} />
-                  <StatusBadge value={order.paymentStatus} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "4px 12px", marginBottom: 12, fontSize: 12 }}>
+                  <div style={{ color: "#9ca3af" }}>Type: <span style={{ color: "#111827", fontWeight: 600 }}>{order.customerType}</span></div>
+                  <div style={{ color: "#9ca3af" }}>Shipping: <span style={{ color: "#111827", fontWeight: 600 }}>{order.shippingMethod}</span></div>
+                  <div style={{ color: "#9ca3af" }}>Total: <span style={{ color: BRAND, fontWeight: 700 }}>{formatCurrencyInr(order.grandTotal)}</span></div>
+                  <div style={{ color: "#9ca3af" }}>Requested: <span style={{ color: "#111827", fontWeight: 600 }}>{formatDateTime(order.orderRequestReceivedAt || order.createdAt)}</span></div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {canManage && order.orderStatus === "awaiting_admin_approval" ? (
+                    <button type="button" className="btn btn-primary" onClick={() => onApproveOrderRequest(order.id)} disabled={busyKey === `approve:${order.id}`}>
+                      {busyKey === `approve:${order.id}` ? "Approving..." : "Approve Request"}
+                    </button>
+                  ) : null}
+                  {canManage && order.paymentStatus === "paid" && order.orderStatus !== "ready_for_pickup" && order.shippingMethod === "self_pickup" ? (
+                    <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "ready_for_pickup")} disabled={busyKey === `ready_for_pickup:${order.id}`}>
+                      {busyKey === `ready_for_pickup:${order.id}` ? "Updating..." : "Ready For Pickup"}
+                    </button>
+                  ) : null}
+                  {canManage && order.orderStatus === "ready_for_pickup" ? (
+                    <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "picked_up")} disabled={busyKey === `picked_up:${order.id}`}>
+                      {busyKey === `picked_up:${order.id}` ? "Updating..." : "Mark Picked Up"}
+                    </button>
+                  ) : null}
+                  {canManage && order.paymentStatus === "paid" && order.shippingMethod !== "self_pickup" && order.orderStatus !== "dispatched" ? (
+                    <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "dispatched")} disabled={busyKey === `dispatched:${order.id}`}>
+                      {busyKey === `dispatched:${order.id}` ? "Updating..." : "Mark Dispatched"}
+                    </button>
+                  ) : null}
+                  {canManage && order.orderStatus === "dispatched" ? (
+                    <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "delivered")} disabled={busyKey === `delivered:${order.id}`}>
+                      {busyKey === `delivered:${order.id}` ? "Updating..." : "Mark Delivered"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
-              <div className="detail-pairs compact">
-                <div><span>Customer Type</span><strong>{order.customerType}</strong></div>
-                <div><span>Shipping</span><strong>{order.shippingMethod}</strong></div>
-                <div><span>Total</span><strong>{formatCurrencyInr(order.grandTotal)}</strong></div>
-                <div><span>Requested</span><strong>{formatDateTime(order.orderRequestReceivedAt || order.createdAt)}</strong></div>
-              </div>
-              <div className="action-row">
-                {canManage && order.orderStatus === "awaiting_admin_approval" ? (
-                  <button type="button" className="btn btn-primary" onClick={() => onApproveOrderRequest(order.id)} disabled={busyKey === `approve:${order.id}`}>
-                    {busyKey === `approve:${order.id}` ? "Approving..." : "Approve Request"}
-                  </button>
-                ) : null}
-                {canManage && order.paymentStatus === "paid" && order.orderStatus !== "ready_for_pickup" && order.shippingMethod === "self_pickup" ? (
-                  <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "ready_for_pickup")} disabled={busyKey === `ready_for_pickup:${order.id}`}>
-                    {busyKey === `ready_for_pickup:${order.id}` ? "Updating..." : "Ready For Pickup"}
-                  </button>
-                ) : null}
-                {canManage && order.orderStatus === "ready_for_pickup" ? (
-                  <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "picked_up")} disabled={busyKey === `picked_up:${order.id}`}>
-                    {busyKey === `picked_up:${order.id}` ? "Updating..." : "Mark Picked Up"}
-                  </button>
-                ) : null}
-                {canManage && order.paymentStatus === "paid" && order.shippingMethod !== "self_pickup" && order.orderStatus !== "dispatched" ? (
-                  <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "dispatched")} disabled={busyKey === `dispatched:${order.id}`}>
-                    {busyKey === `dispatched:${order.id}` ? "Updating..." : "Mark Dispatched"}
-                  </button>
-                ) : null}
-                {canManage && order.orderStatus === "dispatched" ? (
-                  <button type="button" className="btn btn-secondary" onClick={() => onUpdateOrderStatus(order.id, "delivered")} disabled={busyKey === `delivered:${order.id}`}>
-                    {busyKey === `delivered:${order.id}` ? "Updating..." : "Mark Delivered"}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          )) : <div className="empty-panel">No B2B order requests yet.</div>}
-        </div>
-      </section>
+            ))}
+          </div>
+        ) : (
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: "14px 16px", fontSize: 13, color: "#9ca3af", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+            No B2B order requests pending.
+          </div>
+        )}
+      </div>
 
-      {/* Manual Payments */}
-      <section className="section-card">
-        <div className="section-head">
-          <h3>Pending Manual Payments</h3>
-          <p>Verify bank transfer or UPI proofs so invoices can be generated.</p>
+      {/* ── Manual Payments ── */}
+      <div style={{ marginTop: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>Pending Manual Payments</h3>
+            <p style={{ fontSize: 12, color: "#9ca3af", margin: "2px 0 0" }}>Verify bank transfer or UPI proofs so invoices can be generated.</p>
+          </div>
+          {manualPayments.length > 0 && (
+            <span style={{ fontSize: 12, background: "#fce7f3", color: "#9d174d", borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>
+              {manualPayments.length} pending
+            </span>
+          )}
         </div>
-        <div className="card-list">
-          {manualPayments.length ? manualPayments.map((submission) => (
-            <div key={submission.id} className="list-card">
-              <div className="list-card-head">
-                <div>
-                  <strong>{submission.order?.orderNo || submission.orderNo}</strong>
-                  <p>{submission.paymentMethod} | UTR {submission.utrNumber}</p>
+        {manualPayments.length > 0 ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {manualPayments.map((submission) => (
+              <div key={submission.id} style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
+                  <div>
+                    <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 14 }}>{submission.order?.orderNo || submission.orderNo}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#9ca3af" }}>
+                      {submission.paymentMethod} · UTR {submission.utrNumber}
+                    </p>
+                  </div>
+                  <StatusBadge value={submission.status} />
                 </div>
-                <StatusBadge value={submission.status} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "4px 12px", marginBottom: 12, fontSize: 12 }}>
+                  <div style={{ color: "#9ca3af" }}>Total: <span style={{ color: BRAND, fontWeight: 700 }}>{formatCurrencyInr(submission.order?.grandTotal || 0)}</span></div>
+                  <div style={{ color: "#9ca3af" }}>Submitted: <span style={{ color: "#111827", fontWeight: 600 }}>{formatDateTime(submission.submittedAt)}</span></div>
+                  <div style={{ color: "#9ca3af" }}>Order Status: <span style={{ color: "#111827", fontWeight: 600 }}>{submission.order?.orderStatus || "--"}</span></div>
+                  <div style={{ color: "#9ca3af" }}>Proof: <span style={{ color: submission.screenshotUrl ? "#16a34a" : "#dc2626", fontWeight: 600 }}>{submission.screenshotUrl ? "Uploaded" : "Missing"}</span></div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {submission.screenshotUrl ? (
+                    <a className="btn btn-secondary" href={submission.screenshotUrl} target="_blank" rel="noreferrer">Open Proof</a>
+                  ) : null}
+                  {canManage ? (
+                    <button type="button" className="btn btn-primary" onClick={() => onVerifyManualPayment(submission.id)} disabled={busyKey === `verify:${submission.id}`}>
+                      {busyKey === `verify:${submission.id}` ? "Verifying..." : "Verify Payment"}
+                    </button>
+                  ) : null}
+                  {canManage ? (
+                    <button type="button" className="btn btn-secondary" onClick={() => onRejectManualPayment(submission.id)} disabled={busyKey === `reject:${submission.id}`}>
+                      {busyKey === `reject:${submission.id}` ? "Rejecting..." : "Reject"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <div className="detail-pairs compact">
-                <div><span>Total</span><strong>{formatCurrencyInr(submission.order?.grandTotal || 0)}</strong></div>
-                <div><span>Submitted</span><strong>{formatDateTime(submission.submittedAt)}</strong></div>
-                <div><span>Order Status</span><strong>{submission.order?.orderStatus || "--"}</strong></div>
-                <div><span>Proof</span><strong>{submission.screenshotUrl ? "Uploaded" : "Missing"}</strong></div>
-              </div>
-              <div className="action-row">
-                {submission.screenshotUrl ? (
-                  <a className="btn btn-secondary" href={submission.screenshotUrl} target="_blank" rel="noreferrer">Open Proof</a>
-                ) : null}
-                {canManage ? (
-                  <button type="button" className="btn btn-primary" onClick={() => onVerifyManualPayment(submission.id)} disabled={busyKey === `verify:${submission.id}`}>
-                    {busyKey === `verify:${submission.id}` ? "Verifying..." : "Verify Payment"}
-                  </button>
-                ) : null}
-                {canManage ? (
-                  <button type="button" className="btn btn-secondary" onClick={() => onRejectManualPayment(submission.id)} disabled={busyKey === `reject:${submission.id}`}>
-                    {busyKey === `reject:${submission.id}` ? "Rejecting..." : "Reject"}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          )) : <div className="empty-panel">No pending manual payment proofs.</div>}
-        </div>
-      </section>
+            ))}
+          </div>
+        ) : (
+          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: "14px 16px", fontSize: 13, color: "#9ca3af", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+            No pending manual payment proofs.
+          </div>
+        )}
+      </div>
 
       {/* ---- Create Customer Modal ---- */}
       <Modal

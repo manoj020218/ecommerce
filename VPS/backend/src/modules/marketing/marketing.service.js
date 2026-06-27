@@ -1,6 +1,7 @@
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { env } = require("../../config/env");
+const { sendSmtpEmail } = require("../../integrations/email-providers/smtp.provider");
 const {
   readMarketingStore,
   writeMarketingStore
@@ -658,6 +659,24 @@ async function sendTemplateNotification(input) {
   ]);
   const template = findTemplateOrThrow(store, input.templateKey);
   const log = buildNotificationLog(template, settings, input);
+
+  if (log.status === "simulated_sent") {
+    const smtp = settings.setupWizard?.smtpEmail;
+    if (smtp?.host && smtp?.username && smtp?.password && smtp?.fromEmail && log.toEmail) {
+      try {
+        await sendSmtpEmail({
+          smtpConfig: smtp,
+          to: log.toEmail,
+          subject: log.subject,
+          html: log.body
+        });
+        log.status = "sent";
+      } catch (emailError) {
+        log.status = "failed";
+        log.failureReason = emailError.message || "SMTP send failed";
+      }
+    }
+  }
 
   store.notificationLogs.push(log);
   await writeMarketingStore(store);

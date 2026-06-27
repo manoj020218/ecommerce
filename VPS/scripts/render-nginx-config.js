@@ -35,23 +35,6 @@ function normalizeHost(value, fallback) {
 
 function serverBlock({ host, rootDir, ssl, isApi, backendPort }) {
   const certPath = `/etc/letsencrypt/live/${host}`;
-  const redirectLines = [
-    "server {",
-    "  listen 80;",
-    `  server_name ${host};`,
-    ...(ssl ? ["  return 301 https://$host$request_uri;"] : []),
-    "}"
-  ];
-
-  const secureLines = ssl
-    ? [
-        "server {",
-        "  listen 443 ssl http2;",
-        `  server_name ${host};`,
-        `  ssl_certificate ${certPath}/fullchain.pem;`,
-        `  ssl_certificate_key ${certPath}/privkey.pem;`
-      ]
-    : ["server {"];
 
   const bodyLines = isApi
     ? [
@@ -72,10 +55,35 @@ function serverBlock({ host, rootDir, ssl, isApi, backendPort }) {
         "  }"
       ];
 
-  const blocks = [];
-  blocks.push(redirectLines.join("\n"));
-  blocks.push([...secureLines, ...bodyLines, "}"].join("\n"));
-  return blocks.join("\n\n");
+  if (ssl) {
+    const httpRedirect = [
+      "server {",
+      "  listen 80;",
+      `  server_name ${host};`,
+      "  return 301 https://$host$request_uri;",
+      "}"
+    ].join("\n");
+
+    const httpsBlock = [
+      "server {",
+      "  listen 443 ssl http2;",
+      `  server_name ${host};`,
+      `  ssl_certificate ${certPath}/fullchain.pem;`,
+      `  ssl_certificate_key ${certPath}/privkey.pem;`,
+      ...bodyLines,
+      "}"
+    ].join("\n");
+
+    return `${httpRedirect}\n\n${httpsBlock}`;
+  }
+
+  return [
+    "server {",
+    "  listen 80;",
+    `  server_name ${host};`,
+    ...bodyLines,
+    "}"
+  ].join("\n");
 }
 
 async function main() {

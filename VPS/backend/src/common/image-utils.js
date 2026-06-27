@@ -1,6 +1,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const sharp = require("sharp");
+
+let sharp;
+try {
+  sharp = require("sharp");
+} catch {
+  sharp = null;
+}
 
 const WEBP_QUALITY = 85;
 const MAX_WIDTH = 1200;
@@ -11,6 +17,12 @@ async function convertToWebp(inputPath) {
   const base = path.basename(inputPath, path.extname(inputPath));
   const mainPath = path.join(dir, `${base}.webp`);
   const thumbPath = path.join(dir, `${base}-thumb.webp`);
+
+  if (!sharp) {
+    // Sharp not available on this platform — serve original as-is
+    const fallback = path.join(dir, `${base}${path.extname(inputPath)}`);
+    return { mainPath: fallback, thumbPath: fallback };
+  }
 
   // Convert + resize main image
   await sharp(inputPath)

@@ -32,6 +32,16 @@ export function AuthGuard() {
         });
         setState("ready");
       } catch (_error) {
+        if (!active) {
+          return;
+        }
+
+        // 429 = rate limited, not an auth failure — keep the existing session
+        if (_error?.status === 429) {
+          setState("ready");
+          return;
+        }
+
         try {
           const refreshed = await adminRefresh(session.refreshToken);
           if (!active) {
@@ -46,6 +56,13 @@ export function AuthGuard() {
           if (!active) {
             return;
           }
+
+          // 429 on refresh also means rate limited, not expired — keep session
+          if (refreshError?.status === 429) {
+            setState("ready");
+            return;
+          }
+
           clearSession();
           setErrorMessage(refreshError.message || "Session expired. Login again.");
           setState("unauthenticated");

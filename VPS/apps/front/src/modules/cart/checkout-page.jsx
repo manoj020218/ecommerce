@@ -16,6 +16,7 @@ import {
   createPaymentAttempt,
   getCart,
   getCheckoutSession,
+  getManualGatewayInfo,
   mergeGuestCart,
   startCheckout
 } from "../products/products.api";
@@ -159,6 +160,7 @@ export function CheckoutPage() {
   const [checkoutSession, setCheckoutSession] = useState(null);
   const [orderSummary, setOrderSummary] = useState(null);
   const [manualPaymentInstructions, setManualPaymentInstructions] = useState(null);
+  const [gatewayInfo, setGatewayInfo] = useState(null);
   const [paymentAttempt, setPaymentAttempt] = useState(null);
 
   const restoredCheckoutSessionId = searchParams.get("session") || "";
@@ -352,6 +354,28 @@ export function CheckoutPage() {
     shippingMethod
   ]);
 
+  useEffect(() => {
+    if (paymentMethod === "online") {
+      setGatewayInfo(null);
+      return undefined;
+    }
+
+    let active = true;
+    getManualGatewayInfo(paymentMethod)
+      .then((data) => {
+        if (active) {
+          setGatewayInfo(data || null);
+        }
+      })
+      .catch(() => {
+        // show fallback text if fetch fails
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [paymentMethod]);
+
   async function handleRefreshTotals() {
     setPreviewLoading(true);
     setError("");
@@ -472,8 +496,8 @@ export function CheckoutPage() {
         setNotice(
           `Checkout created${response.order?.orderNo ? ` for order ${response.order.orderNo}` : ""}.`
         );
-        await refreshCartPreview();
         openOrderSuccess();
+        refreshCartPreview().catch(() => {});
       }
     } catch (requestError) {
       setError(requestError.message || "Checkout could not be started.");
@@ -492,7 +516,7 @@ export function CheckoutPage() {
 
   const items = Array.isArray(cart?.items) ? cart.items : [];
   const manualInstructionEntries = Object.entries(
-    manualPaymentInstructions?.instructions || {}
+    manualPaymentInstructions?.instructions || gatewayInfo?.instructions || {}
   ).filter(([, value]) => Boolean(value));
 
   return (
@@ -828,21 +852,21 @@ export function CheckoutPage() {
 
                 {paymentMethod !== "online" ? (
                   <div className="proto-manual-payment-card">
-                    <p>
-                      {manualInstructionEntries.length > 0
-                        ? "Use the following instructions after the checkout session is created."
-                        : "Manual payment details load after the checkout request is created. Use the confirmation page to copy bank or UPI details and upload proof."}
-                    </p>
                     {manualInstructionEntries.length > 0 ? (
-                      <div className="proto-summary-rows proto-summary-rows-compact">
-                        {manualInstructionEntries.map(([key, value]) => (
-                          <div key={key}>
-                            <span>{humanizeInstructionKey(key)}</span>
-                            <strong>{String(value)}</strong>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
+                      <>
+                        <p>Transfer to the details below, then upload your payment screenshot on the confirmation page.</p>
+                        <div className="proto-summary-rows proto-summary-rows-compact">
+                          {manualInstructionEntries.map(([key, value]) => (
+                            <div key={key}>
+                              <span>{humanizeInstructionKey(key)}</span>
+                              <strong>{String(value)}</strong>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p>Place your order — bank / UPI details and payment upload will appear on the confirmation page.</p>
+                    )}
                   </div>
                 ) : null}
               </article>

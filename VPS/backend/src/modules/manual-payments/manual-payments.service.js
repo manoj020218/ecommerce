@@ -493,8 +493,26 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
   };
 }
 
+async function getPublicGatewayInfo(paymentMethod) {
+  const paymentStore = await readPaymentStore();
+  const safeStore = ensurePaymentStoreShape(paymentStore);
+  const normalizedMethod = String(paymentMethod || "").trim().toLowerCase();
+  const gateway = (safeStore.gateways || []).find(
+    (row) => String(row.code || "").trim().toLowerCase() === normalizedMethod
+  );
+  if (!gateway) {
+    return null;
+  }
+  return {
+    gatewayCode: gateway.code,
+    gatewayLabel: gateway.label,
+    instructions: gateway.instructions || {}
+  };
+}
+
 module.exports = {
   submitManualPayment,
   listManualPaymentSubmissions,
-  verifyManualPaymentSubmission
+  verifyManualPaymentSubmission,
+  getPublicGatewayInfo
 };

@@ -165,3 +165,7 @@ export function createPaymentAttempt(payload) {
     body: payload
   });
 }
+
+export function getManualGatewayInfo(method) {
+  return apiFetch(`/payments/manual/info?method=${encodeURIComponent(method || "")}`);
+}

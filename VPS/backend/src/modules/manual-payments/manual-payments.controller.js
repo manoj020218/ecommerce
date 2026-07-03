@@ -32,6 +32,15 @@ function paymentContext(req, sessionId = null) {
   };
 }
 
+const publicGetManualGatewayInfo = asyncHandler(async (req, res) => {
+  const { method } = req.query;
+  if (!method) {
+    return ok(res, null, "No payment method specified.");
+  }
+  const data = await service.getPublicGatewayInfo(method);
+  return ok(res, data, "Gateway info fetched.");
+});
+
 const publicSubmitManualPayment = asyncHandler(async (req, res) => {
   const payload = parseSubmitManualPaymentPayload(req.body);
   if (!req.file || !req.file.path) {
@@ -63,6 +72,7 @@ const adminVerifyManualPayment = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  publicGetManualGatewayInfo,
   publicSubmitManualPayment,
   adminListManualPayments,
   adminVerifyManualPayment

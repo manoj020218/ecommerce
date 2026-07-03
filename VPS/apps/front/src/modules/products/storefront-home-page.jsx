@@ -335,35 +335,140 @@ export function StorefrontHomePage() {
 
   useEffect(() => {
     const seoDefaults = publicSettings.seoDefaults || {};
-    const storeName = publicSettings.storeProfile.storeName || "Jenix India";
-    const homeMetaTitle = seoDefaults.homeMetaTitle || storeName;
-    const canonicalRoot = String(seoDefaults.canonicalDomain || "").replace(/\/+$/, "");
+    const storeProfile = publicSettings.storeProfile || {};
+    const storeName = storeProfile.storeName || "Jenix India";
+    const homeMetaTitle = seoDefaults.homeMetaTitle
+      ? `${seoDefaults.homeMetaTitle} — ${storeName}`
+      : `${storeName} — CCTV, Smart Security & IoT Solutions`;
+    const metaDescription = seoDefaults.homeMetaDescription ||
+      "Jenix India supplies CCTV cameras, smart locks, gate automation, IP networking, fire alarms and access control. GST invoice, same-day dispatch, pan-India delivery.";
+    const canonicalRoot = String(seoDefaults.canonicalDomain || "https://www.jenixindia.com").replace(/\/+$/, "");
+    const canonicalUrl = `${canonicalRoot}/`;
+    const ogImage = seoDefaults.defaultOgImageUrl || `${canonicalRoot}/og-cover.jpg`;
+    const supportPhone = storeProfile.supportMobile || storeProfile.phone || "";
+    const storeAddress = storeProfile.address || "";
+    const storeCity = storeProfile.city || "";
+    const storeState = storeProfile.state || "";
 
-    if (homeMetaTitle) {
-      document.title = homeMetaTitle;
-      upsertMetaTag("og:title", homeMetaTitle, "property");
-    }
+    document.title = homeMetaTitle;
 
-    if (seoDefaults.homeMetaDescription) {
-      upsertMetaTag("description", seoDefaults.homeMetaDescription);
-      upsertMetaTag("og:description", seoDefaults.homeMetaDescription, "property");
-    }
+    // Core meta
+    upsertMetaTag("description", metaDescription);
+    upsertMetaTag("keywords", "CCTV cameras India, security cameras, smart locks, gate automation, IP cameras, access control, fire alarm, IoT devices, NVR DVR, Jenix India");
+    upsertMetaTag("robots", "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1");
 
-    if (seoDefaults.defaultOgImageUrl) {
-      upsertMetaTag("og:image", seoDefaults.defaultOgImageUrl, "property");
-    }
+    // Open Graph
+    upsertMetaTag("og:type", "website", "property");
+    upsertMetaTag("og:site_name", storeName, "property");
+    upsertMetaTag("og:title", homeMetaTitle, "property");
+    upsertMetaTag("og:description", metaDescription, "property");
+    upsertMetaTag("og:url", canonicalUrl, "property");
+    upsertMetaTag("og:locale", "en_IN", "property");
+    if (ogImage) upsertMetaTag("og:image", ogImage, "property");
 
+    // Twitter Card
+    upsertMetaTag("twitter:card", "summary_large_image");
+    upsertMetaTag("twitter:title", homeMetaTitle);
+    upsertMetaTag("twitter:description", metaDescription);
+    if (ogImage) upsertMetaTag("twitter:image", ogImage);
+
+    // Verification
     if (seoDefaults.searchConsoleVerification) {
       upsertMetaTag("google-site-verification", seoDefaults.searchConsoleVerification);
     }
-
     if (seoDefaults.bingVerification) {
       upsertMetaTag("msvalidate.01", seoDefaults.bingVerification);
     }
 
-    if (canonicalRoot) {
-      upsertCanonical(`${canonicalRoot}/`);
+    upsertCanonical(canonicalUrl);
+
+    // JSON-LD structured data
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": `${canonicalRoot}/#organization`,
+          "name": storeName,
+          "url": canonicalRoot,
+          "logo": ogImage ? { "@type": "ImageObject", "url": ogImage } : undefined,
+          "description": metaDescription,
+          "contactPoint": supportPhone ? [{
+            "@type": "ContactPoint",
+            "telephone": supportPhone,
+            "contactType": "customer service",
+            "availableLanguage": ["English", "Hindi"]
+          }] : undefined,
+          "address": storeAddress ? {
+            "@type": "PostalAddress",
+            "streetAddress": storeAddress,
+            "addressLocality": storeCity,
+            "addressRegion": storeState,
+            "addressCountry": "IN"
+          } : undefined
+        },
+        {
+          "@type": "WebSite",
+          "@id": `${canonicalRoot}/#website`,
+          "url": canonicalRoot,
+          "name": storeName,
+          "publisher": { "@id": `${canonicalRoot}/#organization` },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": `${canonicalRoot}/products?q={search_term_string}`
+            },
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": ["LocalBusiness", "Store"],
+          "@id": `${canonicalRoot}/#localbusiness`,
+          "name": storeName,
+          "url": canonicalRoot,
+          "image": ogImage || undefined,
+          "description": metaDescription,
+          "priceRange": "₹₹",
+          "currenciesAccepted": "INR",
+          "paymentAccepted": "Cash, Credit Card, UPI, Bank Transfer",
+          "areaServed": { "@type": "Country", "name": "India" },
+          "telephone": supportPhone || undefined,
+          "address": storeAddress ? {
+            "@type": "PostalAddress",
+            "streetAddress": storeAddress,
+            "addressLocality": storeCity,
+            "addressRegion": storeState,
+            "addressCountry": "IN"
+          } : undefined,
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Security & IoT Products",
+            "itemListElement": [
+              { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "CCTV Cameras" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Smart Locks" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Gate Automation" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "IP Cameras" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Access Control Systems" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Product", "name": "Fire Alarm Systems" } }
+            ]
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": canonicalUrl }]
+        }
+      ].filter(Boolean)
+    };
+
+    let ldScript = document.head.querySelector('script[data-jenix-ld="home"]');
+    if (!ldScript) {
+      ldScript = document.createElement("script");
+      ldScript.type = "application/ld+json";
+      ldScript.setAttribute("data-jenix-ld", "home");
+      document.head.append(ldScript);
     }
+    ldScript.textContent = JSON.stringify(jsonLd, null, 0);
   }, [publicSettings]);
 
   const featuredProduct = products[0] || null;

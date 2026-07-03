@@ -511,6 +511,8 @@ async function customerRegisterEmail(payload) {
     name: payload.name,
     email: normalizedEmail,
     mobile: payload.mobile ? normalizeMobile(payload.mobile) : "",
+    company: payload.company ? String(payload.company).trim() : "",
+    gstin: payload.gstin ? String(payload.gstin).trim().toUpperCase() : "",
     verifiedEmail: false,
     verifiedMobile: false,
     passwordHash: await bcrypt.hash(payload.password, 10),

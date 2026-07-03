@@ -1,6 +1,7 @@
 const crypto = require("node:crypto");
 const bcrypt = require("bcryptjs");
 const { HttpError } = require("../../common/http-error");
+const { getGoogleOAuthPublicConfig, exchangeGoogleCodeForProfile } = require("./google-oauth.service");
 const { env } = require("../../config/env");
 const { generateId, hashValue } = require("../../common/identity");
 const {
@@ -926,6 +927,17 @@ function publicSearch(query) {
   };
 }
 
+async function customerGoogleExchange(payload) {
+  const profile = await exchangeGoogleCodeForProfile(payload.code, payload.redirectUri);
+  return customerLoginGoogle({
+    email: profile.email,
+    name: profile.name,
+    googleSub: profile.googleSub,
+    guestSessionId: payload.guestSessionId || null,
+    mobile: null
+  });
+}
+
 module.exports = {
   ensureAuthBootstrap,
   adminLogin,
@@ -936,6 +948,8 @@ module.exports = {
   customerForgotPassword,
   customerResetPassword,
   customerLoginGoogle,
+  customerGoogleExchange,
+  getGoogleOAuthPublicConfig,
   requestOtp,
   verifyOtp,
   getCustomerProfile,

@@ -15,6 +15,7 @@ import { StorefrontHomePage } from "../modules/products/storefront-home-page";
 import { RecoveryPage } from "../modules/recovery/recovery-page";
 import { NotFoundPage } from "../modules/settings/not-found-page";
 import { StaticPage } from "../modules/static-pages/static-page";
+import { GoogleCallbackPage } from "../modules/account/google-callback-page";
 import { StorefrontLayout } from "../modules/settings/storefront-layout";
 import { StorefrontLoadingState } from "../shared/storefront/storefront-ui";
 import { useCustomerSession } from "../shared/auth/customer-session";
@@ -67,6 +68,7 @@ export function AppRouter() {
         <Route path="/refund-policy" element={<StaticPage />} />
         <Route path="/shipping-policy" element={<StaticPage />} />
         <Route path="/account/login" element={<CustomerAccountLoginPage />} />
+        <Route path="/account/google-callback" element={<GoogleCallbackPage />} />
         <Route path="/account/forgot-password" element={<CustomerForgotPasswordPage />} />
         <Route path="/account/reset-password" element={<CustomerResetPasswordPage />} />
         <Route

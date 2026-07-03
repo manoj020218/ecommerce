@@ -5382,3 +5382,74 @@ textarea {
     font-size: 18px;
   }
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Google SSO button ─────────────────────────────────────────────────────── */
+
+.proto-google-sso-row {
+  max-width: 900px;
+  margin: 0 auto 8px;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.proto-google-sso-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+  background: #ffffff;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  font-family: inherit;
+}
+
+.proto-google-sso-btn:hover:not(:disabled) {
+  border-color: #9ca3af;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #f9fafb;
+}
+
+.proto-google-sso-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.proto-google-sso-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px auto;
+  max-width: 360px;
+  width: 100%;
+}
+
+.proto-google-sso-divider::before,
+.proto-google-sso-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.proto-google-sso-divider span {
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+  font-weight: 500;
+}

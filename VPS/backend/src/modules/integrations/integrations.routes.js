@@ -17,6 +17,10 @@ function createIntegrationsRouter() {
   router.patch("/couriers/:id", controller.adminUpdateCourier);
   router.delete("/couriers/:id", controller.adminDeleteCourier);
 
+  // Google OAuth credentials — separate from generic integration (has clientSecret)
+  router.get("/google-oauth", controller.adminGetGoogleOAuth);
+  router.put("/google-oauth", controller.adminUpdateGoogleOAuth);
+
   // Generic integration toggle/update — after specific routes
   router.patch("/:code", controller.adminUpdateIntegration);
 

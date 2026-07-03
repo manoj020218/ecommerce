@@ -30,6 +30,8 @@ function createAuthRouter() {
 
   router.get("/public/browse", controller.publicBrowseHealth);
   router.get("/public/search", controller.publicSearch);
+  router.get("/public/google-config", controller.publicGoogleConfig);
+  router.post("/customer/google-exchange", controller.customerGoogleExchange);
   router.post("/public/guest-cart/items", controller.guestCartAddItem);
   router.get("/public/guest-cart/:sessionId", controller.guestCartView);
 

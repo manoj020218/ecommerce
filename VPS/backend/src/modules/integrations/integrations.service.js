@@ -326,6 +326,34 @@ async function updateIntegration(code, patch, adminEmail) {
   return updated;
 }
 
+// ── Google OAuth admin config ─────────────────────────────────────────────────
+
+async function getGoogleOAuthConfig() {
+  const store = await readIntegrationsStore();
+  const cfg = store.integrations?.googleOAuth || {};
+  // Never expose clientSecret to the admin read response
+  return {
+    enabled: Boolean(cfg.enabled),
+    clientId: cfg.clientId || "",
+    hasSecret: Boolean(cfg.clientSecret)
+  };
+}
+
+async function updateGoogleOAuthConfig(patch, adminEmail) {
+  const store = await readIntegrationsStore();
+  if (!store.integrations) store.integrations = {};
+  const existing = store.integrations.googleOAuth || {};
+  store.integrations.googleOAuth = {
+    enabled: patch.enabled !== undefined ? Boolean(patch.enabled) : Boolean(existing.enabled),
+    clientId: patch.clientId !== undefined ? String(patch.clientId).trim() : (existing.clientId || ""),
+    clientSecret: patch.clientSecret !== undefined ? String(patch.clientSecret).trim() : (existing.clientSecret || "")
+  };
+  store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
+  await writeIntegrationsStore(store);
+  const saved = store.integrations.googleOAuth;
+  return { enabled: saved.enabled, clientId: saved.clientId, hasSecret: Boolean(saved.clientSecret) };
+}
+
 module.exports = {
   getAllIntegrations,
   updateIntegration,
@@ -334,5 +362,7 @@ module.exports = {
   updateCustomCourier,
   deleteCustomCourier,
   probeTracking,
-  fetchCourierTracking
+  fetchCourierTracking,
+  getGoogleOAuthConfig,
+  updateGoogleOAuthConfig
 };

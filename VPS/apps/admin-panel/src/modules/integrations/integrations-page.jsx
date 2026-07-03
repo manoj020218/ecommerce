@@ -8,7 +8,7 @@ import {
   fetchPaymentGateways,
   updatePaymentGatewayConfig
 } from "../payment-gateways/payment-gateways.api";
-import { addCourier, deleteCourier, fetchCouriers, fetchIntegrations, probeTracking, updateCourier, updateIntegration } from "./integrations.api";
+import { addCourier, deleteCourier, fetchCouriers, fetchIntegrations, fetchGoogleOAuthConfig, saveGoogleOAuthConfig, probeTracking, updateCourier, updateIntegration } from "./integrations.api";
 
 // ── Shipping / Others integration catalogue ───────────────────────────────────
 
@@ -858,6 +858,109 @@ function CourierModal({ initial, onSave, onClose, saving, error }) {
   );
 }
 
+// ── Google OAuth inline section ───────────────────────────────────────────────
+
+function GoogleOAuthSection({ config, saving, error, onSave }) {
+  const [form, setForm] = useState({
+    enabled: config?.enabled || false,
+    clientId: config?.clientId || "",
+    clientSecret: ""
+  });
+
+  useEffect(() => {
+    setForm((f) => ({ ...f, enabled: config?.enabled || false, clientId: config?.clientId || "" }));
+  }, [config]);
+
+  const isActive = form.enabled && form.clientId;
+
+  return (
+    <div style={{ marginBottom: 36 }}>
+      <div style={{ paddingBottom: 12, marginBottom: 16, borderBottom: "2px solid var(--border)" }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", margin: 0 }}>Customer Authentication</h3>
+        <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--muted)" }}>
+          Let buyers sign in with their Google account — no password needed
+        </p>
+      </div>
+
+      <div style={{
+        background: "var(--surface)", border: `1.5px solid ${isActive ? "var(--success)" : "var(--border)"}`,
+        borderRadius: 14, padding: "20px 22px", maxWidth: 560,
+        boxShadow: isActive ? "0 0 0 3px rgba(22,163,74,0.08)" : "none",
+        transition: "border-color 0.2s, box-shadow 0.2s"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 10, background: "var(--bg)",
+            border: "1px solid var(--border)", display: "flex", alignItems: "center",
+            justifyContent: "center", fontSize: 22, flexShrink: 0
+          }}>🔑</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--text)" }}>Google Sign-In</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+              OAuth 2.0 redirect flow — works in PWA standalone mode
+            </div>
+          </div>
+          <Toggle
+            checked={form.enabled}
+            onChange={(val) => setForm((f) => ({ ...f, enabled: val }))}
+            disabled={saving}
+          />
+        </div>
+
+        {config?.hasSecret && !form.clientSecret && (
+          <div style={{
+            marginBottom: 14, padding: "8px 12px", borderRadius: 8,
+            background: "rgba(37,99,235,0.06)", border: "1px solid rgba(37,99,235,0.2)",
+            fontSize: 12, color: "#1e40af"
+          }}>
+            Client Secret is saved. Leave the field below blank to keep it unchanged.
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Client ID</span>
+            <input
+              type="text" value={form.clientId}
+              placeholder="1234567890-abc...googleusercontent.com"
+              onChange={(e) => setForm((f) => ({ ...f, clientId: e.target.value }))}
+              style={{ padding: "8px 11px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 8, fontFamily: "monospace" }}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>
+              Client Secret{config?.hasSecret ? " (leave blank to keep existing)" : ""}
+            </span>
+            <input
+              type="password" value={form.clientSecret}
+              placeholder={config?.hasSecret ? "••••••••••••••••" : "GOCSPX-..."}
+              onChange={(e) => setForm((f) => ({ ...f, clientSecret: e.target.value }))}
+              style={{ padding: "8px 11px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 8, fontFamily: "monospace" }}
+            />
+          </label>
+        </div>
+
+        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
+          Get credentials at <strong>console.cloud.google.com → APIs &amp; Services → Credentials</strong>.<br />
+          Set Authorized redirect URI to: <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4, fontSize: 11 }}>https://test.jenixindia.com/account/google-callback</code>
+        </div>
+
+        {error && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 12px" }}>{error}</p>}
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={saving || (!form.clientId && !config?.clientId)}
+          onClick={() => onSave(form)}
+          style={{ minWidth: 120 }}
+        >
+          {saving ? "Saving…" : "Save Google OAuth"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function IntegrationsPage() {
@@ -884,17 +987,26 @@ export function IntegrationsPage() {
   const [courierError, setCourierError] = useState("");
   const [courierDeleting, setCourierDeleting] = useState(null);
 
+  // google oauth state
+  const [googleConfig, setGoogleConfig] = useState(null);
+  const [googleSaving, setGoogleSaving] = useState(false);
+  const [googleError, setGoogleError] = useState("");
+
   const showNotice = (msg) => { setNotice(msg); setTimeout(() => setNotice(""), 3000); };
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       // Use allSettled so one API failure doesn't blank the other section
-      const [intResult, pgResult, courierResult] = await Promise.allSettled([
+      const [intResult, pgResult, courierResult, googleResult] = await Promise.allSettled([
         fetchIntegrations(),
         fetchPaymentGateways(),
-        fetchCouriers()
+        fetchCouriers(),
+        fetchGoogleOAuthConfig()
       ]);
+      if (googleResult.status === "fulfilled") {
+        setGoogleConfig(googleResult.value);
+      }
 
       if (intResult.status === "fulfilled") {
         setConfigs(intResult.value?.integrations || {});
@@ -1089,6 +1201,22 @@ export function IntegrationsPage() {
     }
   };
 
+  const handleGoogleSave = async (form) => {
+    setGoogleSaving(true);
+    setGoogleError("");
+    try {
+      const payload = { enabled: form.enabled, clientId: form.clientId };
+      if (form.clientSecret) payload.clientSecret = form.clientSecret;
+      const updated = await saveGoogleOAuthConfig(payload);
+      setGoogleConfig(updated);
+      showNotice("Google OAuth settings saved.");
+    } catch (err) {
+      setGoogleError(err.message || "Failed to save Google OAuth settings.");
+    } finally {
+      setGoogleSaving(false);
+    }
+  };
+
   if (loading) return <LoadingBlock />;
 
   // Always show all GATEWAY_UI gateways — merge live API data where available
@@ -1126,6 +1254,14 @@ export function IntegrationsPage() {
           color: "var(--success)", fontSize: 13, fontWeight: 500
         }}>{notice}</div>
       )}
+
+      {/* ── Google OAuth ── */}
+      <GoogleOAuthSection
+        config={googleConfig}
+        saving={googleSaving}
+        error={googleError}
+        onSave={handleGoogleSave}
+      />
 
       {/* ── Shipping Aggregators ── */}
       <IntegrationSection title="Shipping Aggregators" subtitle="Connect carriers to auto-book shipments and track orders">

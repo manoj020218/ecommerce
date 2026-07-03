@@ -38,3 +38,13 @@ export function probeTracking(payload) {
 export function fetchCourierTracking(courierId, trackingId) {
   return apiFetch(`/admin/integrations/couriers/${courierId}/track?trackingId=${encodeURIComponent(trackingId)}`);
 }
+
+// ── Google OAuth ───────────────────────────────────────────────────────────────
+
+export function fetchGoogleOAuthConfig() {
+  return apiFetch("/admin/integrations/google-oauth");
+}
+
+export function saveGoogleOAuthConfig(payload) {
+  return apiFetch("/admin/integrations/google-oauth", { method: "PUT", body: payload });
+}

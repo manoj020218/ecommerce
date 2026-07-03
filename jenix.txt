@@ -1,0 +1,78 @@
+# UI Refactor Request: Align Live E-commerce Site with UX Prototype Layout
+
+## Objective
+Refactor the live product detail page layout (`test.jenixindia.com`) to match the structural architecture, B2B features, and design hierarchy of our local UX prototype (`product-detail.html`). Move away from standard B2C template limits to a high-converting, trust-focused B2B/B2C hybrid layout.
+
+---
+
+## 1. Global Component Layout & Styling
+- **Framework:** Refactor using a symmetric 2-column grid layout on desktop scales (`md:grid-cols-2 gap-8 max-w-7xl mx-auto px-4 py-8`).
+- **Typography:** Enforce a clean, technical sans-serif font stack (e.g., `Plus Jakarta Sans` or `Inter`).
+- **Color Palette:** Maintain a high-contrast theme: Deep Charcoal/Near-Black (`#111827`) for background depth headers, clean Solid White (`#FFFFFF`) for semantic content blocks, and Bright Red (`#DC2626`) exclusively for critical actionable highlights.
+
+---
+
+## 2. Left Column: Product Gallery Overhaul
+- **Main Image Container:** 
+  - Restructure into a perfect square aspect ratio element (`aspect-square w-full`).
+  - Style with a subtle light gray border (`border border-gray-100`), soft corner rounding (`rounded-xl`), and center the image inside.
+- **Absolute Badges Overlays:**
+  - **Top-Left:** Implement a red discount percentage sticker: `bg-red-600 text-white font-bold px-3 py-1 text-sm rounded-md` (e.g., "-15% OFF").
+  - **Top-Right:** Implement a clean, desaturated SKU label: `bg-gray-100 text-gray-600 px-3 py-1 text-sm rounded-md`.
+- **Thumbnails Row (`mt-4 flex gap-3`):**
+  - Implement a row of uniform square mini-cards (`w-16 h-16 aspect-square border rounded-lg p-1`).
+  - Active image state must feature a high-contrast red border ring: `border-2 border-red-600`.
+
+---
+
+## 3. Right Column: Pricing & Commerce Architecture
+
+### Section A: Title Block
+- Place brand label `JENIX INDIA` tracking wide above the main title (`text-xs font-semibold text-gray-500 tracking-wider uppercase`).
+- Float or inline a badge for `In Stock` indicator using an asset pill: `bg-green-50 text-green-600 font-medium px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1`.
+- Title typography must be dominant and scale well: `text-2xl font-bold text-gray-900 mt-2 tracking-tight`.
+
+### Section B: B2B Price & GST Breakdown
+Replace the traditional single-price string with a clear pricing hierarchy:
+- **Price Block (`flex items-baseline gap-2 mt-3`):**
+  - Current selling price: `text-3xl font-extrabold text-red-600`.
+  - Strikethrough original MRP: `text-lg text-gray-400 line-through`.
+  - Savings badge: `bg-green-100 text-green-700 font-semibold text-xs px-2 py-1 rounded`.
+- **Tax Transparency Row:**
+  - Explicitly declare tax status: `text-sm text-gray-500 mt-1` showing "Exclusive of 18% GST | GST amount included dynamically at checkout".
+  - Include an instant trust indicator: `? GST Invoice will be generated automatically` formatted in `text-green-600 text-sm font-medium`.
+
+### Section C: Visual Spec Badges
+- Immediately beneath the price, add a flex wrapper container (`flex flex-wrap gap-2 mt-4`).
+- Extract key hardware metrics and map them into micro-pills: `bg-gray-100 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-full` (e.g., `4MP Resolution`, `60m IR Night Vision`, `IP67 Weatherproof`).
+
+---
+
+## 4. Bulk Tiered Pricing Grid (Critical B2B Feature)
+Insert a modular table/grid wrapper component beneath the quantity selector logic:
+- **Wrapper Style:** `border border-blue-100 bg-blue-50/30 rounded-xl p-4 mt-6`
+- **Section Heading:** Tiny uppercase subheader `text-xs font-bold text-blue-700 tracking-wide mb-3 block` reading: "BULK PRICING AVAILABLE".
+- **Grid Layout (`grid grid-cols-3 gap-3`):**
+  - Turn volume breaks into solid clickable/viewable cards (`bg-white rounded-lg p-3 border border-gray-100 text-center shadow-xs`).
+  - **Row 1 (Price):** `text-base font-bold text-gray-900`
+  - **Row 2 (Volume):** `text-xs text-gray-500 mt-0.5` (e.g., "1–4 units", "5–19 units", "20+ units").
+
+---
+
+## 5. Dual-Action & Conversational CTAs
+Replace generic, single checkout links with a clear triple-button engagement layout:
+
+- **Primary Action Row (`grid grid-cols-2 gap-4 mt-6`):**
+  - **Button 1 (Add to Cart):** Solid Red Core (`w-full bg-red-600 text-white font-bold py-3.5 px-6 rounded-xl hover:bg-red-700 flex items-center justify-center gap-2 shadow-sm transition-colors`).
+  - **Button 2 (Buy Now):** Solid Tech Black (`w-full bg-slate-900 text-white font-bold py-3.5 px-6 rounded-xl hover:bg-slate-800 transition-colors`).
+- **High-Impact WhatsApp Lead Box (`w-full mt-3`):**
+  - Add an expansive secondary interaction channel designed specifically for system installation inquiries: `bg-emerald-50/50 border-2 border-emerald-500 text-emerald-700 font-semibold py-3.5 px-6 rounded-xl hover:bg-emerald-100/70 flex items-center justify-center gap-2 transition-all`.
+  - Label text: "[WhatsApp Icon] WhatsApp Enquiry for Bulk / Installation Support".
+
+---
+
+## 6. Trust Badges & Shipping Estimation Block
+- Add a dedicated segment underneath the actions block: `mt-6 border-t border-gray-100 pt-6`.
+- Include a single-line inline form grid wrapper for shipping delivery confirmation:
+  - Input: `border border-gray-300 rounded-l-lg px-3 py-2 text-sm focus:ring-1 focus:ring-slate-900 w-48` with placeholder "Enter pincode".
+  - Action button: `bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-r-lg hover:bg-slate-800`.

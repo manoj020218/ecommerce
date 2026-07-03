@@ -208,6 +208,31 @@ function NewArrivalCard({ product, busy, onAddToCart }) {
   );
 }
 
+function MarqueeCategoryCard({ category }) {
+  return (
+    <Link to={`/categories/${category.slug}`} className="proto-cat-card">
+      <div className="proto-cat-img">
+        {category.imageUrl ? (
+          <img src={category.imageUrl} alt={category.name} loading="lazy" />
+        ) : (
+          <svg className="proto-cat-fallback-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+          </svg>
+        )}
+      </div>
+      <span className="proto-cat-name">{category.name}</span>
+    </Link>
+  );
+}
+
+function SecurityCameraIcon() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="proto-device-icon-svg">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+    </svg>
+  );
+}
+
 function UspShieldIcon() {
   return (
     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -388,8 +413,14 @@ export function StorefrontHomePage() {
     <main className="proto-main-shell proto-main-shell-home">
       <section className="proto-home-hero">
         <div className="proto-home-hero-copy">
-          <span className="proto-home-kicker">New Arrival</span>
-          <h1>{heroTitle}</h1>
+          <span className="proto-home-kicker">Premium Security Systems</span>
+          {(() => {
+            const words = heroTitle.trim().split(/\s+/);
+            if (words.length <= 1) return <h1>{heroTitle}</h1>;
+            const accent = words[words.length - 1];
+            const rest = words.slice(0, -1).join(" ");
+            return <h1>{rest} <span className="proto-hero-accent">{accent}</span></h1>;
+          })()}
           <p>
             {heroDescription}
             {supportTiming ? ` Support timing: ${supportTiming}.` : ""}
@@ -417,45 +448,49 @@ export function StorefrontHomePage() {
               </StorefrontButton>
             ) : null}
           </div>
-          <div className="proto-hero-dots">
-            <span className="proto-hero-dot active" />
-            <span className="proto-hero-dot" />
-            <span className="proto-hero-dot" />
-          </div>
         </div>
 
         <div className="proto-home-hero-feature">
-          <div className="proto-home-feature-card">
-            <strong>{featuredProduct?.title || "AI Face Recognition Access Terminal"}</strong>
-            <p>
-              {featuredProduct?.shortDescription ||
-                "Temperature sensing, attendance, and access control for offices, schools, and factories."}
-            </p>
-            <div className="proto-home-feature-meta">
-              <span>{featuredProduct ? currency(visiblePrice(featuredProduct)) : "Ready to Ship"}</span>
-              {supportPhone ? <span>{supportPhone}</span> : null}
+          <div className="proto-home-feature-card proto-home-feature-device">
+            <div className="proto-device-ring-outer">
+              <div className="proto-device-ring-inner">
+                <SecurityCameraIcon />
+              </div>
+            </div>
+            <div className="proto-device-card-text">
+              <strong>{featuredProduct?.title || "AI Face Recognition Terminal"}</strong>
+              <p>{featuredProduct ? currency(visiblePrice(featuredProduct)) : "Ready to Ship"}</p>
+              {supportPhone ? <span className="proto-device-phone">{supportPhone}</span> : null}
             </div>
           </div>
+        </div>
+
+        <div className="proto-hero-dots">
+          <span className="proto-hero-dot active" />
+          <span className="proto-hero-dot" />
+          <span className="proto-hero-dot" />
         </div>
       </section>
 
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
 
-      <section className="proto-section">
+      <section className="proto-section proto-category-marquee-section">
         <StorefrontSectionHeader
           title="Shop by Category"
           action={<Link to="/products">View all →</Link>}
         />
         {loading ? (
           <StorefrontLoadingState label="Loading categories..." />
-        ) : (
-          <div className="proto-category-grid">
-            {topCategories.map((category) => (
-              <CategoryTile key={category.id} category={category} />
-            ))}
+        ) : categories.length > 0 ? (
+          <div className="proto-category-marquee">
+            <div className="proto-category-track">
+              {[...categories, ...categories, ...categories].map((category, index) => (
+                <MarqueeCategoryCard key={`${category.id}-${index}`} category={category} />
+              ))}
+            </div>
           </div>
-        )}
+        ) : null}
       </section>
 
       <section className="proto-section proto-section-surface">

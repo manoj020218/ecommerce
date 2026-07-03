@@ -42,6 +42,12 @@ function currency(amount) {
   }).format(Number(amount || 0));
 }
 
+function resolveImg(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  return img.url || img.thumbnail || "";
+}
+
 function statusLabel(stockStatus) {
   if (stockStatus === "in_stock") {
     return "In Stock";
@@ -99,7 +105,7 @@ function ProductMiniCard({ product }) {
     <Link to={`/products/${product.slug}`} className="proto-mini-product">
       <div className="proto-mini-product-media">
         {Array.isArray(product.images) && product.images[0] ? (
-          <img src={product.images[0]} alt={product.title} loading="lazy" />
+          <img src={resolveImg(product.images[0])} alt={product.title} loading="lazy" />
         ) : (
           <span>{product.brand || "Jenix"}</span>
         )}
@@ -203,7 +209,7 @@ export function ProductPage() {
           return;
         }
         setProduct(data);
-        setSelectedImage(Array.isArray(data.images) && data.images[0] ? data.images[0] : "");
+        setSelectedImage(Array.isArray(data.images) && data.images[0] ? resolveImg(data.images[0]) : "");
         setQuantity(Math.max(1, Number(data.moq || 1)));
         setBreadcrumb([
           { label: "Home", href: "/" },
@@ -362,7 +368,7 @@ export function ProductPage() {
     return slabs.sort((left, right) => Number(left.minQty) - Number(right.minQty));
   }, [product]);
 
-  const images = Array.isArray(product?.images) ? product.images : [];
+  const images = Array.isArray(product?.images) ? product.images.map(resolveImg) : [];
   const keyFeatures = Array.isArray(product?.keyFeatures) ? product.keyFeatures : [];
   const specs =
     product?.specifications && typeof product.specifications === "object"
@@ -383,6 +389,10 @@ export function ProductPage() {
       : 0;
   const featureChips = keyFeatures.slice(0, 5);
   const activeImage = selectedImage || images[0] || "";
+  const discountPct =
+    nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice
+      ? Math.round((1 - nextVisiblePrice / nextCompareAtPrice) * 100)
+      : 0;
 
   const submitNotifyRequest = async (event) => {
     event.preventDefault();
@@ -556,8 +566,8 @@ export function ProductPage() {
             ) : (
               <div className="proto-product-placeholder large">Product image</div>
             )}
-            {saveAmount > 0 ? (
-              <span className="proto-product-flag">Save {currency(saveAmount)}</span>
+            {discountPct > 0 ? (
+              <span className="proto-product-flag">-{discountPct}% OFF</span>
             ) : null}
             <span className="proto-product-sku-badge">{product.sku || product.modelNumber || "SKU"}</span>
           </div>
@@ -607,8 +617,10 @@ export function ProductPage() {
           </div>
 
           <p className="proto-tax-line">
-            GST {Number(product.gstRate || 0)}% applicable. GST invoice is provided for business purchases.
+            Exclusive of {Number(product.gstRate || 0)}% GST
+            {saveAmount > 0 ? <> &nbsp;|&nbsp; GST amount: {currency(Math.round(nextVisiblePrice * Number(product.gstRate || 0) / 100))}</> : null}
           </p>
+          <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
 
           {featureChips.length > 0 ? (
             <div className="proto-feature-chip-row">
@@ -682,6 +694,16 @@ export function ProductPage() {
           {cartActionNotice ? <p className="proto-inline-success">{cartActionNotice}</p> : null}
           {cartActionError ? <p className="proto-inline-error">{cartActionError}</p> : null}
 
+          <StorefrontButton
+            href={`https://wa.me/?text=${encodeURIComponent(`Enquiry for ${product.title} — Bulk / Installation Support`)}`}
+            target="_blank"
+            rel="noreferrer"
+            variant="whatsapp"
+            fullWidth
+          >
+            WhatsApp Enquiry for Bulk / Installation Support
+          </StorefrontButton>
+
           <div className="proto-save-actions">
             {isAuthenticated ? (
               <StorefrontButton
@@ -714,14 +736,6 @@ export function ProductPage() {
                 Login to Save
               </StorefrontButton>
             )}
-            <StorefrontButton
-              href={`https://wa.me/?text=${encodeURIComponent(`Need details for ${product.title}`)}`}
-              target="_blank"
-              rel="noreferrer"
-              variant="whatsapp"
-            >
-              WhatsApp Enquiry
-            </StorefrontButton>
           </div>
           {saveError ? <p className="proto-inline-error">{saveError}</p> : null}
 

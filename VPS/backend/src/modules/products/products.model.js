@@ -366,6 +366,8 @@ function toPublicProduct(product, options = {}) {
     isPurchasable:
       calculateAvailableQty(product) > 0 || Boolean(product.allowBackorder),
     isActive: Boolean(product.isActive),
+    productLabel: product.productLabel || "",
+    tags: Array.isArray(product.tags) ? [...product.tags] : [],
     createdAt: product.createdAt,
     updatedAt: product.updatedAt
   };

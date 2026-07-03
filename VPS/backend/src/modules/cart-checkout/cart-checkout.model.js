@@ -58,6 +58,7 @@ function sanitizeCartLine(line) {
     title: line.title,
     slug: line.slug,
     sku: line.sku,
+    imageUrl: line.imageUrl || "",
     hsnCode: line.hsnCode || "",
     qty: Number(line.qty || 0),
     moq: Number(line.moq || 1),

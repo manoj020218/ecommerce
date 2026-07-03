@@ -25,6 +25,12 @@ function currency(amount) {
   }).format(Number(amount || 0));
 }
 
+function resolveImg(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  return img.url || img.thumbnail || "";
+}
+
 function visiblePrice(product) {
   return Number(product?.pricing?.visiblePrice ?? product?.salePrice ?? 0);
 }
@@ -86,7 +92,9 @@ function CategoryTile({ category }) {
         {category.imageUrl ? (
           <img src={category.imageUrl} alt={category.name} loading="lazy" />
         ) : (
-          <span>{String(category.name || "C").slice(0, 1).toUpperCase()}</span>
+          <svg className="proto-category-svg" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+          </svg>
         )}
       </div>
       <span>{category.name}</span>
@@ -94,28 +102,47 @@ function CategoryTile({ category }) {
   );
 }
 
-function ProductRailCard({ product, busy, onAddToCart }) {
+function badgeClass(label) {
+  if (!label) return "proto-product-flag";
+  const l = label.toLowerCase();
+  if (l === "new") return "proto-product-flag proto-flag-green";
+  if (l === "popular" || l === "trending" || l === "hot") return "proto-product-flag proto-flag-yellow";
+  if (l === "featured") return "proto-product-flag proto-flag-blue";
+  return "proto-product-flag";
+}
+
+function ProductRailCard({ product, categories, busy, onAddToCart }) {
   const price = visiblePrice(product);
   const comparePrice = compareAtPrice(product);
-  const discountAmount =
-    comparePrice && comparePrice > price ? comparePrice - price : 0;
+  const discountPct =
+    comparePrice && comparePrice > price
+      ? Math.round(((comparePrice - price) / comparePrice) * 100)
+      : 0;
+
+  const categoryName =
+    product.categoryId && Array.isArray(categories)
+      ? (categories.find((c) => c.id === product.categoryId)?.name || "")
+      : "";
+  const metaLine = [product.brand, categoryName].filter(Boolean).join(" · ");
+
+  const label = product.productLabel || (discountPct > 0 ? `-${discountPct}%` : "");
 
   return (
     <Link to={`/products/${product.slug}`} className="proto-product-card">
       <div className="proto-product-media">
         {Array.isArray(product.images) && product.images[0] ? (
-          <img src={product.images[0]} alt={product.title} loading="lazy" />
+          <img src={resolveImg(product.images[0])} alt={product.title} loading="lazy" />
         ) : (
           <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
         )}
-        {discountAmount > 0 ? (
-          <span className="proto-product-flag">
-            Save {currency(discountAmount)}
+        {label ? (
+          <span className={badgeClass(product.productLabel || "")}>
+            {label}
           </span>
         ) : null}
       </div>
       <div className="proto-product-copy">
-        <p>{product.brand || "Jenix India"}</p>
+        {metaLine ? <p>{metaLine}</p> : null}
         <h3>{product.title}</h3>
         <div className="proto-price-row">
           <strong>{currency(price)}</strong>
@@ -132,6 +159,50 @@ function ProductRailCard({ product, busy, onAddToCart }) {
         >
           {busy ? "Adding..." : "Add to Cart"}
         </StorefrontButton>
+      </div>
+    </Link>
+  );
+}
+
+function NewArrivalCard({ product, busy, onAddToCart }) {
+  const price = visiblePrice(product);
+
+  return (
+    <Link to={`/products/${product.slug}`} className="proto-arrival-card">
+      <div className="proto-arrival-media">
+        {Array.isArray(product.images) && product.images[0] ? (
+          <img src={resolveImg(product.images[0])} alt={product.title} loading="lazy" />
+        ) : (
+          <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
+        )}
+      </div>
+      <div className="proto-arrival-copy">
+        <p className="proto-arrival-brand">{product.brand || "Jenix"}</p>
+        <h3>{product.title}</h3>
+        <div className="proto-arrival-footer">
+          <div>
+            <strong>{currency(price)}</strong>
+            <small>+{Number(product.gstRate || 18)}% GST</small>
+          </div>
+          <button
+            type="button"
+            className="proto-arrival-add"
+            onClick={(event) => {
+              event.preventDefault();
+              onAddToCart(product);
+            }}
+            disabled={busy}
+            aria-label="Add to cart"
+          >
+            {busy ? (
+              <span>…</span>
+            ) : (
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" width="16" height="16">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
     </Link>
   );
@@ -346,6 +417,11 @@ export function StorefrontHomePage() {
               </StorefrontButton>
             ) : null}
           </div>
+          <div className="proto-hero-dots">
+            <span className="proto-hero-dot active" />
+            <span className="proto-hero-dot" />
+            <span className="proto-hero-dot" />
+          </div>
         </div>
 
         <div className="proto-home-hero-feature">
@@ -369,7 +445,7 @@ export function StorefrontHomePage() {
       <section className="proto-section">
         <StorefrontSectionHeader
           title="Shop by Category"
-          action={<Link to="/products">Browse catalog</Link>}
+          action={<Link to="/products">View all →</Link>}
         />
         {loading ? (
           <StorefrontLoadingState label="Loading categories..." />
@@ -385,7 +461,7 @@ export function StorefrontHomePage() {
       <section className="proto-section proto-section-surface">
         <StorefrontSectionHeader
           title="Bestsellers"
-          action={<Link to="/products">View all</Link>}
+          action={<Link to="/products">View all →</Link>}
         />
         {loading ? (
           <StorefrontLoadingState label="Loading products..." />
@@ -395,6 +471,7 @@ export function StorefrontHomePage() {
               <ProductRailCard
                 key={product.id}
                 product={product}
+                categories={categories}
                 busy={busyProductId === product.id}
                 onAddToCart={addProductToCart}
               />
@@ -418,14 +495,14 @@ export function StorefrontHomePage() {
       <section className="proto-section">
         <StorefrontSectionHeader
           title="New Arrivals"
-          action={<Link to="/products">Explore all</Link>}
+          action={<Link to="/products">View all →</Link>}
         />
         {loading ? (
           <StorefrontLoadingState label="Loading new arrivals..." />
         ) : (
           <div className="proto-product-grid">
             {latestProducts.map((product) => (
-              <ProductRailCard
+              <NewArrivalCard
                 key={product.id}
                 product={product}
                 busy={busyProductId === product.id}
@@ -438,19 +515,30 @@ export function StorefrontHomePage() {
 
       <section className="proto-section proto-section-surface">
         <StorefrontSectionHeader
-          title="Helpful Guides"
-          action={<Link to="/guides">Read more</Link>}
+          title="Knowledge Base & Buying Guides"
+          action={<Link to="/guides">All guides →</Link>}
         />
         {blogs.length > 0 ? (
-          <div className="proto-guide-scroller">
-            {blogs.map((blog) => (
+          <div className="proto-guide-grid">
+            {blogs.slice(0, 3).map((blog) => (
               <Link key={blog.id} to={`/guides/${blog.slug}`} className="proto-guide-card">
-                <span>{blog.category?.name || "Guide"}</span>
-                <strong>{blog.title}</strong>
-                <p>
-                  {blog.excerpt ||
-                    "Read the full guide for buying, installation, and troubleshooting support."}
-                </p>
+                <div className="proto-guide-card-image">
+                  {blog.coverImageUrl ? (
+                    <img src={blog.coverImageUrl} alt={blog.title} loading="lazy" />
+                  ) : (
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="1.5" width="40" height="40" style={{ color: "#6b7280" }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  )}
+                </div>
+                <div className="proto-guide-card-body">
+                  <span className="proto-guide-badge">{blog.category?.name || "Guide"}</span>
+                  <strong>{blog.title}</strong>
+                  <p>
+                    {blog.excerpt ||
+                      "Resolution, features, installation — complete guide for buyers."}
+                  </p>
+                </div>
               </Link>
             ))}
           </div>

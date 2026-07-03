@@ -153,6 +153,8 @@ function applyBranding(branding) {
   );
   document.documentElement.style.setProperty("--accent-theme", themeColor);
 
+  try { localStorage.removeItem("jenix_brand"); } catch (e) {}
+
   upsertMetaTag("theme-color", themeColor);
 
   if (branding?.faviconUrl) {
@@ -172,7 +174,9 @@ export function PublicSettingsProvider({ children }) {
 
     try {
       const payload = await fetchPublicSettings();
-      setSettings(normalizeSettings(payload));
+      const normalized = normalizeSettings(payload);
+      setSettings(normalized);
+      applyBranding(normalized.branding);
     } catch (requestError) {
       setError(requestError.message || "Public settings could not be loaded.");
     } finally {
@@ -183,10 +187,6 @@ export function PublicSettingsProvider({ children }) {
   useEffect(() => {
     reload();
   }, []);
-
-  useEffect(() => {
-    applyBranding(settings.branding);
-  }, [settings.branding]);
 
   const value = useMemo(
     () => ({

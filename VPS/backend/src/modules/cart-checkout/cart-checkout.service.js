@@ -381,6 +381,7 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
   if (
     options.enforceStockCheck &&
     !product.allowBackorder &&
+    Number(product.stockQty || 0) > 0 &&
     qty > availableQty
   ) {
     throw new HttpError(409, "Requested quantity is not available right now.");
@@ -397,11 +398,17 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
       ? null
       : Number(product.quoteRequiredAboveQty);
 
+  const firstImage = Array.isArray(product.images) && product.images[0];
+  const imageUrl = firstImage
+    ? (typeof firstImage === "string" ? firstImage : firstImage.thumbnail || firstImage.url || "")
+    : "";
+
   return {
     productId: product.id,
     title: product.title,
     slug: product.slug,
     sku: product.sku,
+    imageUrl,
     hsnCode: product.hsnCode || "",
     qty,
     moq,

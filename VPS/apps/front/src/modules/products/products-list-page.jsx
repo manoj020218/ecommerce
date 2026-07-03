@@ -25,6 +25,12 @@ function currency(amount) {
   }).format(Number(amount || 0));
 }
 
+function resolveImg(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  return img.url || img.thumbnail || "";
+}
+
 function visiblePrice(product) {
   return Number(product?.pricing?.visiblePrice ?? product?.salePrice ?? 0);
 }
@@ -47,7 +53,7 @@ function ProductCard({ product, busy, onAddToCart }) {
     <Link to={`/products/${product.slug}`} className="proto-product-card proto-product-card-grid">
       <div className="proto-product-media proto-product-media-grid">
         {Array.isArray(product.images) && product.images[0] ? (
-          <img src={product.images[0]} alt={product.title} loading="lazy" />
+          <img src={resolveImg(product.images[0])} alt={product.title} loading="lazy" />
         ) : (
           <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
         )}

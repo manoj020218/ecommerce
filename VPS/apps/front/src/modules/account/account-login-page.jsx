@@ -64,6 +64,126 @@ function GoogleSignInButton({ redirectPath }) {
   );
 }
 
+function FieldRow({ label, badge, children }) {
+  return (
+    <div className="reg-field-wrap">
+      <div className="reg-label-row">
+        <label className="reg-label">{label}</label>
+        {badge && <span className="reg-badge-optional">{badge}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function RegInput({ type = "text", value, onChange, placeholder, required, inputMode }) {
+  const [showPw, setShowPw] = useState(false);
+  const isPw = type === "password";
+  return (
+    <div className="reg-input-wrap">
+      <input
+        className="reg-input"
+        type={isPw ? (showPw ? "text" : "password") : type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        inputMode={inputMode}
+        autoComplete={isPw ? "new-password" : undefined}
+      />
+      {isPw && (
+        <button type="button" className="reg-pw-eye" onClick={() => setShowPw((v) => !v)} tabIndex={-1} aria-label="Toggle password visibility">
+          {showPw ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CreateAccountCard({ busy, onSubmit }) {
+  const [form, setForm] = useState({ name: "", email: "", mobile: "", password: "", company: "", gstin: "" });
+  const [showBiz, setShowBiz] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <StorefrontCard as="article" className="section-card reg-card" elevated>
+      <div className="reg-card-header">
+        <div className="reg-card-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div>
+          <h2 className="reg-card-title">Create Account</h2>
+          <p className="reg-card-subtitle">Start shopping in under 60 seconds</p>
+        </div>
+      </div>
+
+      <form className="reg-form" onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
+        <FieldRow label="Full Name">
+          <RegInput value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Your full name" required />
+        </FieldRow>
+
+        <div className="reg-two-col">
+          <FieldRow label="Email">
+            <RegInput type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="you@example.com" required />
+          </FieldRow>
+          <FieldRow label="Mobile" badge="optional">
+            <RegInput type="tel" value={form.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="+91 98765 43210" inputMode="tel" />
+          </FieldRow>
+        </div>
+
+        <FieldRow label="Password">
+          <RegInput type="password" value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="Minimum 8 characters" required />
+        </FieldRow>
+
+        <button type="button" className="reg-toggle-biz" onClick={() => setShowBiz((v) => !v)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: showBiz ? "rotate(90deg)" : "none", transition: "transform 0.2s" }}><path d="M9 18l6-6-6-6"/></svg>
+          {showBiz ? "Hide" : "Add"} Business Details
+          <span className="reg-badge-optional" style={{ marginLeft: 6 }}>GST Invoice</span>
+        </button>
+
+        {showBiz && (
+          <div className="reg-biz-section">
+            <div className="reg-two-col">
+              <FieldRow label="Company Name" badge="optional">
+                <RegInput value={form.company} onChange={(e) => set("company", e.target.value)} placeholder="Acme Pvt. Ltd." />
+              </FieldRow>
+              <FieldRow label="GSTIN" badge="optional">
+                <RegInput value={form.gstin} onChange={(e) => set("gstin", e.target.value.toUpperCase())} placeholder="27AABCU9603R1ZX" />
+              </FieldRow>
+            </div>
+            <p className="reg-biz-hint">Your GSTIN will be printed on GST invoices for all orders placed with this account.</p>
+          </div>
+        )}
+
+        <button type="submit" className="reg-submit-btn" disabled={busy === "register"}>
+          {busy === "register" ? (
+            <>
+              <span className="reg-submit-spinner" />
+              Creating account…
+            </>
+          ) : (
+            <>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Create Free Account
+            </>
+          )}
+        </button>
+
+        <p className="reg-legal-note">
+          By creating an account you agree to our{" "}
+          <a href="/privacy-policy" className="reg-legal-link">Privacy Policy</a>
+          {" & "}
+          <a href="/terms-and-conditions" className="reg-legal-link">Terms of Service</a>.
+        </p>
+      </form>
+    </StorefrontCard>
+  );
+}
+
 function resolveRedirect(searchParams) {
   const requestedPath = searchParams.get("redirect");
   if (requestedPath && requestedPath.startsWith("/")) {
@@ -80,12 +200,6 @@ export function CustomerAccountLoginPage() {
 
   const [emailLogin, setEmailLogin] = useState({
     email: "",
-    password: ""
-  });
-  const [registerForm, setRegisterForm] = useState({
-    name: "",
-    email: "",
-    mobile: "",
     password: ""
   });
   const [otpForm, setOtpForm] = useState({
@@ -220,78 +334,13 @@ export function CustomerAccountLoginPage() {
           </form>
         </StorefrontCard>
 
-        <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
-            title="Create Account"
-            description="Register a customer account with email and password."
-          />
-          <form
-            className="stack-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setBusy("register");
-              applySession(
-                registerCustomerEmail(registerForm),
-                "Account created. Redirecting to your dashboard."
-              ).finally(() => setBusy(""));
-            }}
-          >
-            <div className="field-grid">
-              <StorefrontInput
-                label="Name"
-                value={registerForm.name}
-                onChange={(event) =>
-                  setRegisterForm((current) => ({
-                    ...current,
-                    name: event.target.value
-                  }))
-                }
-                placeholder="Your full name"
-                required
-              />
-              <StorefrontInput
-                label="Email"
-                type="email"
-                value={registerForm.email}
-                onChange={(event) =>
-                  setRegisterForm((current) => ({
-                    ...current,
-                    email: event.target.value
-                  }))
-                }
-                placeholder="name@example.com"
-                required
-              />
-              <StorefrontInput
-                label="Mobile"
-                value={registerForm.mobile}
-                onChange={(event) =>
-                  setRegisterForm((current) => ({
-                    ...current,
-                    mobile: event.target.value
-                  }))
-                }
-                placeholder="+91-98xxxxxx10"
-              />
-              <StorefrontInput
-                label="Password"
-                type="password"
-                value={registerForm.password}
-                onChange={(event) =>
-                  setRegisterForm((current) => ({
-                    ...current,
-                    password: event.target.value
-                  }))
-                }
-                placeholder="Choose a password"
-                required
-              />
-            </div>
-            <StorefrontButton type="submit" variant="dark" disabled={busy === "register"}>
-              {busy === "register" ? "Creating..." : "Create Account"}
-            </StorefrontButton>
-          </form>
-        </StorefrontCard>
+        <CreateAccountCard busy={busy} onSubmit={(form) => {
+          setBusy("register");
+          applySession(
+            registerCustomerEmail(form),
+            "Account created. Redirecting to your dashboard."
+          ).finally(() => setBusy(""));
+        }} />
 
         <StorefrontCard as="article" className="section-card" elevated>
           <StorefrontSectionHeader

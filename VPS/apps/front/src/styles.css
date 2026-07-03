@@ -5387,6 +5387,229 @@ textarea {
   to { transform: rotate(360deg); }
 }
 
+/* ── Modern Registration Card ──────────────────────────────────────────────── */
+
+.reg-card {
+  background: #fff;
+}
+
+.reg-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1.5px solid #f3f4f6;
+}
+
+.reg-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(232,35,26,0.08), rgba(232,35,26,0.14));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  flex-shrink: 0;
+}
+
+.reg-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 2px;
+}
+
+.reg-card-subtitle {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.reg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reg-field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reg-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reg-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  letter-spacing: 0.01em;
+}
+
+.reg-badge-optional {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 4px;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reg-input-wrap {
+  position: relative;
+}
+
+.reg-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #111827;
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 10px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.reg-input:focus {
+  border-color: var(--brand);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(232,35,26,0.08);
+}
+
+.reg-input::placeholder {
+  color: #9ca3af;
+}
+
+.reg-pw-eye {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.reg-pw-eye:hover { color: #6b7280; }
+
+.reg-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 500px) {
+  .reg-two-col { grid-template-columns: 1fr; }
+}
+
+.reg-toggle-biz {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+  text-decoration: none;
+}
+
+.reg-biz-section {
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reg-biz-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.reg-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  color: #fff;
+  background: linear-gradient(135deg, #e8231a, #c01a13);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 2px 10px rgba(232,35,26,0.28);
+  margin-top: 2px;
+}
+
+.reg-submit-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  box-shadow: 0 4px 16px rgba(232,35,26,0.35);
+  transform: translateY(-1px);
+}
+
+.reg-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.reg-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.reg-submit-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.reg-legal-note {
+  text-align: center;
+  font-size: 11px;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.reg-legal-link {
+  color: #6b7280;
+  text-decoration: underline;
+}
+
+.reg-legal-link:hover { color: var(--brand); }
+
 /* ── Google SSO button ─────────────────────────────────────────────────────── */
 
 .proto-google-sso-row {

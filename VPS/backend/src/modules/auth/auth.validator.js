@@ -15,6 +15,8 @@ const customerRegisterEmailSchema = z.object({
   email: z.string().trim().email().max(150),
   password: z.string().min(8).max(120),
   mobile: z.string().trim().max(20).optional(),
+  company: z.string().trim().max(150).optional(),
+  gstin: z.string().trim().max(20).optional(),
   guestSessionId: z.string().trim().max(120).optional()
 });
 

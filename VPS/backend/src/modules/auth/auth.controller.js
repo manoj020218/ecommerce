@@ -127,6 +127,20 @@ const customerLinkIdentity = asyncHandler(async (req, res) => {
   return ok(res, data, "Customer identity linked.");
 });
 
+const publicGoogleConfig = asyncHandler(async (_req, res) => {
+  const data = await service.getGoogleOAuthPublicConfig();
+  return ok(res, data, "Google OAuth configuration.");
+});
+
+const customerGoogleExchange = asyncHandler(async (req, res) => {
+  const { code, redirectUri, guestSessionId } = req.body || {};
+  if (!code || !redirectUri) {
+    throw new HttpError(400, "code and redirectUri are required.");
+  }
+  const data = await service.customerGoogleExchange({ code, redirectUri, guestSessionId: guestSessionId || null });
+  return ok(res, data, "Google login successful.");
+});
+
 const publicBrowseHealth = asyncHandler(async (_req, res) => {
   const data = service.publicBrowseHealth();
   return ok(res, data, "Guest browse available.");
@@ -164,12 +178,14 @@ module.exports = {
   customerForgotPassword,
   customerResetPassword,
   customerLoginGoogle,
+  customerGoogleExchange,
   customerRequestOtp,
   customerVerifyOtp,
   customerRefresh,
   customerLogout,
   customerMe,
   customerLinkIdentity,
+  publicGoogleConfig,
   publicBrowseHealth,
   publicSearch,
   guestCartAddItem,

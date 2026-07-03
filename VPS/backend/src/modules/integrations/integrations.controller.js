@@ -6,7 +6,9 @@ const {
   updateCustomCourier,
   deleteCustomCourier,
   probeTracking,
-  fetchCourierTracking
+  fetchCourierTracking,
+  getGoogleOAuthConfig,
+  updateGoogleOAuthConfig
 } = require("./integrations.service");
 
 async function adminGetIntegrations(req, res) {
@@ -64,6 +66,17 @@ async function adminGetCourierTracking(req, res) {
   res.json(result);
 }
 
+async function adminGetGoogleOAuth(req, res) {
+  const data = await getGoogleOAuthConfig();
+  res.json(data);
+}
+
+async function adminUpdateGoogleOAuth(req, res) {
+  const adminEmail = req.actor?.email;
+  const data = await updateGoogleOAuthConfig(req.body, adminEmail);
+  res.json(data);
+}
+
 module.exports = {
   adminGetIntegrations,
   adminUpdateIntegration,
@@ -72,5 +85,7 @@ module.exports = {
   adminUpdateCourier,
   adminDeleteCourier,
   adminProbeTracking,
-  adminGetCourierTracking
+  adminGetCourierTracking,
+  adminGetGoogleOAuth,
+  adminUpdateGoogleOAuth
 };

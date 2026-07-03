@@ -34,6 +34,7 @@ import { AddWalkInOrderPage } from "../modules/walkin-orders/add-walkin-order-pa
 import { WebsiteLeadsPage } from "../modules/website-leads/website-leads-page";
 import { DiscountsPage } from "../modules/discounts/discounts-page";
 import { IntegrationsPage } from "../modules/integrations/integrations-page";
+import { WebBuilderPage } from "../modules/web-builder/web-builder-page";
 
 export function AppRouter() {
   return (
@@ -75,6 +76,7 @@ export function AppRouter() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="discounts" element={<DiscountsPage />} />
+          <Route path="web-builder" element={<WebBuilderPage />} />
         </Route>
       </Route>
 

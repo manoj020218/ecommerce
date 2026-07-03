@@ -73,6 +73,10 @@ const {
 const { createOrdersRouter } = require("../modules/orders/orders.routes");
 const { createIntegrationsRouter } = require("../modules/integrations/integrations.routes");
 const { createDashboardRouter } = require("../modules/dashboard/dashboard.routes");
+const {
+  createPublicStaticPagesRouter,
+  createAdminStaticPagesRouter
+} = require("../modules/static-pages/static-pages.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -119,6 +123,8 @@ function createApiRouter() {
   router.use("/website-leads", createPublicWebsiteLeadsRouter());
   router.use("/marketing", createPublicMarketingRouter());
   router.use("/setup-wizard", createPublicSetupWizardRouter());
+  router.use("/pages", createPublicStaticPagesRouter());
+  router.use("/admin/pages", createAdminStaticPagesRouter());
 
   return router;
 }

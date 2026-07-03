@@ -518,6 +518,16 @@ export function StorefrontLayout() {
             {supportTiming ? <p>{supportTiming}</p> : null}
             {storeProfile.gstNumber ? <p>GSTIN: {storeProfile.gstNumber}</p> : null}
           </div>
+
+          <div className="proto-footer-column">
+            <h3>Legal</h3>
+            <Link to="/about-us">About Us</Link>
+            <Link to="/contact-us">Contact Us</Link>
+            <Link to="/privacy-policy">Privacy Policy</Link>
+            <Link to="/terms-and-conditions">Terms &amp; Conditions</Link>
+            <Link to="/refund-policy">Refund Policy</Link>
+            <Link to="/shipping-policy">Shipping Policy</Link>
+          </div>
         </div>
         <div className="proto-footer-bottom">
           <p>© {new Date().getFullYear()} {storeName}. All rights reserved.</p>

@@ -14,6 +14,7 @@ import { ProductPage } from "../modules/products/product-page";
 import { StorefrontHomePage } from "../modules/products/storefront-home-page";
 import { RecoveryPage } from "../modules/recovery/recovery-page";
 import { NotFoundPage } from "../modules/settings/not-found-page";
+import { StaticPage } from "../modules/static-pages/static-page";
 import { StorefrontLayout } from "../modules/settings/storefront-layout";
 import { StorefrontLoadingState } from "../shared/storefront/storefront-ui";
 import { useCustomerSession } from "../shared/auth/customer-session";
@@ -58,6 +59,13 @@ export function AppRouter() {
         <Route path="/checkout/success" element={<OrderSuccessPage />} />
         <Route path="/orders/guest/:checkoutSessionId" element={<OrderSuccessPage />} />
         <Route path="/recover/:recoveryToken" element={<RecoveryPage />} />
+        <Route path="/pages/:slug" element={<StaticPage />} />
+        <Route path="/about-us" element={<StaticPage />} />
+        <Route path="/contact-us" element={<StaticPage />} />
+        <Route path="/privacy-policy" element={<StaticPage />} />
+        <Route path="/terms-and-conditions" element={<StaticPage />} />
+        <Route path="/refund-policy" element={<StaticPage />} />
+        <Route path="/shipping-policy" element={<StaticPage />} />
         <Route path="/account/login" element={<CustomerAccountLoginPage />} />
         <Route path="/account/forgot-password" element={<CustomerForgotPasswordPage />} />
         <Route path="/account/reset-password" element={<CustomerResetPasswordPage />} />

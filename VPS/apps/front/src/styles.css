@@ -5308,3 +5308,77 @@ textarea {
     gap: 18px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   STATIC PAGES (About Us, Privacy Policy, etc.)
+═══════════════════════════════════════════════════════ */
+
+.proto-static-page-body {
+  padding-top: 28px !important;
+  padding-bottom: 40px !important;
+}
+
+.proto-static-content {
+  max-width: 720px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #374151;
+}
+
+.proto-static-content h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f3f4f6;
+}
+
+.proto-static-content h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 28px 0 10px;
+}
+
+.proto-static-content p {
+  margin: 0 0 14px;
+}
+
+.proto-static-content ul,
+.proto-static-content ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+
+.proto-static-content li {
+  margin-bottom: 6px;
+}
+
+.proto-static-content strong {
+  color: #111827;
+  font-weight: 600;
+}
+
+.proto-static-content a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.proto-static-content a:hover {
+  color: var(--brand-dark);
+}
+
+@media (min-width: 900px) {
+  .proto-static-content {
+    font-size: 15px;
+  }
+
+  .proto-static-content h2 {
+    font-size: 26px;
+  }
+
+  .proto-static-content h3 {
+    font-size: 18px;
+  }
+}

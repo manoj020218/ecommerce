@@ -197,10 +197,17 @@ export function CartPage() {
                       <button
                         type="button"
                         className="proto-line-remove"
+                        aria-label="Remove item"
                         onClick={() => removeItem(item.productId)}
                         disabled={busyKey === `remove:${item.productId}`}
                       >
-                        {busyKey === `remove:${item.productId}` ? "Removing..." : "Remove"}
+                        {busyKey === `remove:${item.productId}` ? (
+                          <span style={{ fontSize: 11 }}>…</span>
+                        ) : (
+                          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                            <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                          </svg>
+                        )}
                       </button>
                     </div>
 
@@ -232,6 +239,9 @@ export function CartPage() {
                       <div className="proto-cart-line-price">
                         <strong>{formatCurrency(item.lineTotal)}</strong>
                         <small>{formatCurrency(item.unitPriceUsed)} each</small>
+                        {Number(item.gstRate || 0) > 0 ? (
+                          <small className="proto-cart-gst-line">+GST {Number(item.gstRate)}%</small>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -293,8 +303,12 @@ export function CartPage() {
                 </div>
 
                 <div className="proto-summary-hint">
-                  Pay via <strong>Bank Transfer / UPI</strong> and save an estimated{" "}
-                  <strong>{formatCurrency(estimatedDirectPaySavings)}</strong> at checkout.
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style={{ flexShrink: 0, color: "#16a34a", marginTop: 2 }}>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none" strokeWidth="2" />
+                    <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                  <span>Pay via <strong>Bank Transfer / UPI</strong> and save an estimated{" "}
+                  <strong>{formatCurrency(estimatedDirectPaySavings)}</strong> at checkout.</span>
                 </div>
 
                 <StorefrontButton
@@ -307,6 +321,30 @@ export function CartPage() {
                 <Link to="/products" className="proto-summary-link">
                   Continue Shopping
                 </Link>
+
+                <div className="proto-trust-strip">
+                  <div>
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#16a34a" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Secure Pay</span>
+                  </div>
+                  <div>
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="#2563eb" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="#2563eb" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>GST Invoice</span>
+                  </div>
+                  <div>
+                    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                      <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" stroke="var(--brand)" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <line x1="3" y1="6" x2="21" y2="6" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M16 10a4 4 0 01-8 0" stroke="var(--brand)" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Easy Return</span>
+                  </div>
+                </div>
               </div>
             </aside>
           </section>

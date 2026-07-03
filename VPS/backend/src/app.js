@@ -46,8 +46,14 @@ function createApp() {
   app.use(express.urlencoded({ extended: true }));
   app.use(attachRequestContext);
 
+  function setCorp(req, res, next) {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    next();
+  }
+
   app.use(
     "/static/uploads",
+    setCorp,
     express.static(path.resolve(process.cwd(), env.uploadDir), {
       etag: true,
       maxAge: "7d"
@@ -56,6 +62,7 @@ function createApp() {
 
   app.use(
     "/static/migration",
+    setCorp,
     express.static(path.resolve(process.cwd(), env.migrationImagesDir), {
       etag: true,
       maxAge: "1d"

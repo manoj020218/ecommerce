@@ -406,7 +406,7 @@ export function OrderSuccessPage() {
   return (
     <main className="proto-main-shell proto-checkout-page proto-success-page">
       <section className="proto-success-hero">
-        <div className="proto-success-icon">
+        <div className="proto-success-icon proto-success-icon-anim">
           <SuccessIcon />
         </div>
         <StorefrontBadge tone={statusTone(paymentStatus)}>
@@ -585,6 +585,36 @@ export function OrderSuccessPage() {
                 </div>
               ))}
             </div>
+          </StorefrontCard>
+
+          <StorefrontCard className="proto-checkout-card proto-next-steps-card">
+            <StorefrontSectionHeader
+              title="What Happens Next?"
+              description="Here's what to expect after placing your order."
+            />
+            <ol className="proto-next-steps">
+              <li>
+                <div className="proto-step-circle amber">1</div>
+                <div>
+                  <strong>Payment Verification (2–4 hrs)</strong>
+                  <p>Our team verifies your payment and confirms your order.</p>
+                </div>
+              </li>
+              <li>
+                <div className="proto-step-circle blue">2</div>
+                <div>
+                  <strong>Order Processing (1 business day)</strong>
+                  <p>We&apos;ll pack your items and generate your GST invoice.</p>
+                </div>
+              </li>
+              <li>
+                <div className="proto-step-circle green">3</div>
+                <div>
+                  <strong>Dispatch &amp; Tracking (5–7 days)</strong>
+                  <p>You&apos;ll receive a tracking link via SMS and email once dispatched.</p>
+                </div>
+              </li>
+            </ol>
           </StorefrontCard>
 
           <StorefrontCard className="proto-checkout-card">

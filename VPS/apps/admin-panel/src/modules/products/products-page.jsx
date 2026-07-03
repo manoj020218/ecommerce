@@ -15,6 +15,13 @@ import { createHsnTaxRecord, fetchHsnTaxRecords } from "../hsn-tax/hsn-tax.api";
 import { useAuthSession } from "../auth/use-auth-session";
 import { API_BASE_URL } from "../../shared/api/http-client";
 import {
+  ProductsColumnSelector,
+  loadSavedCols,
+  saveCols
+} from "./products-column-selector";
+
+const STOREFRONT_URL = import.meta.env.VITE_STOREFRONT_URL || "https://test.jenixindia.com";
+import {
   archiveProduct,
   bulkPatchProducts,
   createProduct,
@@ -632,6 +639,65 @@ function StockDot({ status, availableQty }) {
   );
 }
 
+// ── ListPriceCell — two editable price inputs (Sale + MRP) in one table cell ──
+
+function ListPriceCell({ rowId, salePrice, basePrice, pendingSale, pendingBase, activeCell, setActiveCell, onChange }) {
+  const saleRef = useRef(null);
+  const baseRef = useRef(null);
+  const isSaleActive = activeCell?.rowId === rowId && activeCell?.field === "salePrice";
+  const isBaseActive = activeCell?.rowId === rowId && activeCell?.field === "basePrice";
+
+  useEffect(() => { if (isSaleActive && saleRef.current) saleRef.current.focus(); }, [isSaleActive]);
+  useEffect(() => { if (isBaseActive && baseRef.current) baseRef.current.focus(); }, [isBaseActive]);
+
+  const inputStyle = (pending) => ({
+    width: 70, fontSize: 12, padding: "3px 5px", borderRadius: 4,
+    border: pending ? "1px solid #93c5fd" : "1px solid #e5e7eb",
+    background: pending ? "#dbeafe" : "#fff"
+  });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={{ fontSize: 10, color: "#9ca3af", minWidth: 30 }}>Sale</span>
+        {isSaleActive ? (
+          <input ref={saleRef} type="number" style={inputStyle(pendingSale)} value={salePrice ?? ""}
+            onChange={(e) => onChange(rowId, "salePrice", e.target.value)}
+            onBlur={() => setActiveCell(null)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); setActiveCell(null); } }}
+          />
+        ) : (
+          <span
+            style={{ ...inputStyle(pendingSale), cursor: "text", display: "inline-block", minHeight: 22, lineHeight: "22px", color: "#E8231A", fontWeight: 700 }}
+            onClick={() => setActiveCell({ rowId, field: "salePrice" })}
+            title="Click to edit sale price"
+          >
+            {salePrice != null && salePrice !== "" ? `₹${salePrice}` : "—"}
+          </span>
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <span style={{ fontSize: 10, color: "#9ca3af", minWidth: 30 }}>MRP</span>
+        {isBaseActive ? (
+          <input ref={baseRef} type="number" style={inputStyle(pendingBase)} value={basePrice ?? ""}
+            onChange={(e) => onChange(rowId, "basePrice", e.target.value)}
+            onBlur={() => setActiveCell(null)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); setActiveCell(null); } }}
+          />
+        ) : (
+          <span
+            style={{ ...inputStyle(pendingBase), cursor: "text", display: "inline-block", minHeight: 22, lineHeight: "22px", color: "#9ca3af", textDecoration: "line-through" }}
+            onClick={() => setActiveCell({ rowId, field: "basePrice" })}
+            title="Click to edit MRP"
+          >
+            {basePrice != null && basePrice !== "" ? `₹${basePrice}` : "—"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export function ProductsPage() {
@@ -689,6 +755,14 @@ export function ProductsPage() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [statusFilter, setStatusFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
+
+  // column selector (persisted to localStorage via products-column-selector.jsx)
+  const [visibleColumns, setVisibleColumns] = useState(() => loadSavedCols());
+
+  // inline edits in list view (separate from bulk-edit pendingEdits)
+  const [listPendingEdits, setListPendingEdits] = useState({});
+  const [listActiveCell, setListActiveCell] = useState(null);
+  const [listSaving, setListSaving] = useState(false);
 
   // pagination (bulk edit)
   const [page, setPage] = useState(1);
@@ -1025,6 +1099,58 @@ export function ProductsPage() {
     } finally { setImporting(false); }
   };
 
+  // ── column selector + list-view inline edit handlers ─────────────────────────
+
+  const onColumnsChange = (newSet) => {
+    setVisibleColumns(newSet);
+    saveCols(newSet);
+  };
+
+  const setListCellValue = (productId, field, value) => {
+    setListPendingEdits((prev) => ({
+      ...prev,
+      [productId]: { ...(prev[productId] || {}), [field]: value }
+    }));
+  };
+
+  const getListVal = (productId, field, original) => {
+    if (listPendingEdits[productId]?.[field] !== undefined) return listPendingEdits[productId][field];
+    return original;
+  };
+
+  const onListSave = async () => {
+    setListSaving(true);
+    setError(""); setNotice("");
+    try {
+      const updates = Object.entries(listPendingEdits).map(([id, fields]) => ({ id, ...fields }));
+      const result = await bulkPatchProducts(updates);
+      const errMsg = result.errors?.length ? ` ${result.errors.length} error(s).` : "";
+      setNotice(`Saved ${result.updated} product${result.updated !== 1 ? "s" : ""}.${errMsg}`);
+      setListPendingEdits({});
+      await loadProducts(filters);
+    } catch (apiError) {
+      setError(apiError.message || "Save failed.");
+    } finally { setListSaving(false); }
+  };
+
+  const onListDiscard = () => {
+    if (Object.keys(listPendingEdits).length && window.confirm("Discard all unsaved changes?")) {
+      setListPendingEdits({});
+    }
+  };
+
+  const onShareProduct = (row) => {
+    const url = `${STOREFRONT_URL}/products/${row.slug}`;
+    if (navigator.clipboard) {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => setNotice(`Copied: ${url}`))
+        .catch(() => window.open(url, "_blank", "noopener"));
+    } else {
+      window.open(url, "_blank", "noopener");
+    }
+  };
+
   // ── bulk-edit handlers ────────────────────────────────────────────────────────
 
   const setCellValue = (productId, field, value) => {
@@ -1301,8 +1427,28 @@ export function ProductsPage() {
                 </svg>
                 Export
               </a>
+              <ProductsColumnSelector visibleColumns={visibleColumns} onChange={onColumnsChange} />
             </form>
           </div>
+
+          {/* ── pending list-edit save bar ── */}
+          {Object.keys(listPendingEdits).length > 0 && (
+            <div style={{ background: "rgba(232,35,26,0.06)", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 12, padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "#E8231A" }}>
+                {Object.keys(listPendingEdits).length} product{Object.keys(listPendingEdits).length !== 1 ? "s" : ""} with unsaved changes
+              </span>
+              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                <button type="button" onClick={onListSave} disabled={listSaving}
+                  style={{ fontSize: 12, background: "#E8231A", border: "none", color: "#fff", padding: "6px 16px", borderRadius: 8, cursor: listSaving ? "wait" : "pointer", fontWeight: 600 }}>
+                  {listSaving ? "Saving…" : "Save Changes"}
+                </button>
+                <button type="button" onClick={onListDiscard}
+                  style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#9ca3af", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* ── bulk actions bar ── */}
           {selectedIds.size > 0 && (
@@ -1347,27 +1493,62 @@ export function ProductsPage() {
                       style={{ accentColor: "#E8231A", cursor: "pointer" }}
                     />
                   </th>
-                  {["Product", "SKU", "Category", "Price", "Stock", "Active", ""].map((h) => (
-                    <th key={h} style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>
-                      {h}
-                    </th>
-                  ))}
+                  {/* dynamic headers based on visibleColumns */}
+                  {visibleColumns.has("image") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Image</th>
+                  )}
+                  {visibleColumns.has("name") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Product</th>
+                  )}
+                  {visibleColumns.has("sku") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>SKU</th>
+                  )}
+                  {visibleColumns.has("category") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Category</th>
+                  )}
+                  {visibleColumns.has("hsn") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>HSN · GST</th>
+                  )}
+                  {visibleColumns.has("qty") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Qty</th>
+                  )}
+                  {visibleColumns.has("price") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>Sale ₹ / MRP ₹</th>
+                  )}
+                  {visibleColumns.has("active") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Active</th>
+                  )}
+                  {visibleColumns.has("share") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Share</th>
+                  )}
+                  {visibleColumns.has("actions") && (
+                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}></th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {displayRows.map((row) => {
                   const selected = selectedIds.has(row.id);
+                  const listEdits = listPendingEdits[row.id] || {};
+                  const hasPending = Object.keys(listEdits).length > 0;
+
+                  const valCategory = getListVal(row.id, "categoryId", row.categoryId);
+                  const valHsn = getListVal(row.id, "hsnCode", row.hsnCode);
+                  const valQty = getListVal(row.id, "stockQty", row.stockQty);
+                  const valSalePrice = getListVal(row.id, "salePrice", row.salePrice);
+                  const valBasePrice = getListVal(row.id, "basePrice", row.basePrice);
+
                   return (
                     <tr
                       key={row.id}
                       style={{
                         borderBottom: "1px solid #f9fafb",
-                        background: selected ? "rgba(232,35,26,0.03)" : "#fff",
+                        background: hasPending ? "rgba(219,234,254,0.25)" : selected ? "rgba(232,35,26,0.03)" : "#fff",
                         opacity: !row.isActive && row.stockStatus === "out_of_stock" ? 0.6 : 1,
                         transition: "background 0.1s"
                       }}
-                      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = "#f9fafb"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = selected ? "rgba(232,35,26,0.03)" : "#fff"; }}
+                      onMouseEnter={(e) => { if (!selected && !hasPending) e.currentTarget.style.background = "#f9fafb"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = hasPending ? "rgba(219,234,254,0.25)" : selected ? "rgba(232,35,26,0.03)" : "#fff"; }}
                     >
                       {/* checkbox */}
                       <td style={{ padding: "14px 16px", width: 40 }}>
@@ -1385,103 +1566,166 @@ export function ProductsPage() {
                           style={{ accentColor: "#E8231A", cursor: "pointer" }}
                         />
                       </td>
-                      {/* product */}
-                      <td style={{ padding: "12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+
+                      {/* image */}
+                      {visibleColumns.has("image") && (
+                        <td style={{ padding: "10px 8px" }}>
                           <ProductThumb images={row.images} size={44} />
-                          <div>
-                            <p style={{ margin: 0, fontWeight: 600, color: "#111827", fontSize: 13, lineHeight: 1.3 }}>
-                              {row.title}
-                            </p>
-                            <p style={{ margin: "2px 0 0", fontSize: 11, color: "#9ca3af" }}>
-                              HSN: {row.hsnCode || "—"} · {row.gstRate ?? "—"}% GST
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      {/* SKU */}
-                      <td style={{ padding: "12px", fontFamily: "monospace", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
-                        {row.sku || <span style={{ color: "#d97706", fontFamily: "inherit" }}>Missing</span>}
-                      </td>
-                      {/* category */}
-                      <td style={{ padding: "12px", fontSize: 12, color: "#6b7280" }}>
-                        {categoryNameById(categoryMap, row.categoryId)}
-                      </td>
-                      {/* price */}
-                      <td style={{ padding: "12px", whiteSpace: "nowrap" }}>
-                        <p style={{ margin: 0, fontWeight: 700, color: "#E8231A", fontSize: 13 }}>
-                          {formatCurrencyInr(row.salePrice || row.basePrice)}
-                        </p>
-                        {Number(row.basePrice) > 0 && Number(row.basePrice) !== Number(row.salePrice) && Number(row.salePrice) > 0 && (
-                          <p style={{ margin: "1px 0 0", fontSize: 11, color: "#9ca3af", textDecoration: "line-through" }}>
-                            {formatCurrencyInr(row.basePrice)}
+                        </td>
+                      )}
+
+                      {/* name */}
+                      {visibleColumns.has("name") && (
+                        <td style={{ padding: "12px" }}>
+                          <p style={{ margin: 0, fontWeight: 600, color: "#111827", fontSize: 13, lineHeight: 1.3, maxWidth: 260 }}>
+                            {row.title}
                           </p>
-                        )}
-                      </td>
-                      {/* stock */}
-                      <td style={{ padding: "12px" }}>
-                        <StockDot status={row.stockStatus} availableQty={row.availableQty} />
-                      </td>
-                      {/* active toggle */}
-                      <td style={{ padding: "12px" }}>
-                        {canEdit ? (
-                          <ToggleSwitch
-                            checked={Boolean(row.isActive)}
-                            onChange={(val) => onToggleActive(row, val)}
+                        </td>
+                      )}
+
+                      {/* sku — read only */}
+                      {visibleColumns.has("sku") && (
+                        <td style={{ padding: "12px", fontFamily: "monospace", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                          {row.sku || <span style={{ color: "#d97706", fontFamily: "inherit" }}>Missing</span>}
+                        </td>
+                      )}
+
+                      {/* category — editable */}
+                      {visibleColumns.has("category") && (
+                        <EditableCell
+                          rowId={row.id} field="categoryId" value={valCategory} type="select"
+                          options={categoryOptions}
+                          missing={!valCategory} pending={"categoryId" in listEdits}
+                          activeCell={listActiveCell} setActiveCell={setListActiveCell}
+                          onChange={setListCellValue}
+                        />
+                      )}
+
+                      {/* hsn — editable */}
+                      {visibleColumns.has("hsn") && (
+                        <EditableCell
+                          rowId={row.id} field="hsnCode" value={valHsn} type="select"
+                          options={hsnOptions}
+                          missing={!valHsn} pending={"hsnCode" in listEdits}
+                          activeCell={listActiveCell} setActiveCell={setListActiveCell}
+                          onChange={setListCellValue}
+                        />
+                      )}
+
+                      {/* qty — editable */}
+                      {visibleColumns.has("qty") && (
+                        <EditableCell
+                          rowId={row.id} field="stockQty" value={valQty} type="number"
+                          missing={false} pending={"stockQty" in listEdits}
+                          activeCell={listActiveCell} setActiveCell={setListActiveCell}
+                          onChange={setListCellValue}
+                        />
+                      )}
+
+                      {/* price — sale price + base price (MRP) editable inline */}
+                      {visibleColumns.has("price") && (
+                        <td style={{ padding: "4px 8px", whiteSpace: "nowrap" }}>
+                          <ListPriceCell
+                            rowId={row.id}
+                            salePrice={valSalePrice}
+                            basePrice={valBasePrice}
+                            pendingSale={"salePrice" in listEdits}
+                            pendingBase={"basePrice" in listEdits}
+                            activeCell={listActiveCell}
+                            setActiveCell={setListActiveCell}
+                            onChange={setListCellValue}
                           />
-                        ) : (
-                          <span style={{ fontSize: 12, color: row.isActive ? "#16a34a" : "#9ca3af" }}>
-                            {row.isActive ? "Active" : "Inactive"}
-                          </span>
-                        )}
-                      </td>
+                        </td>
+                      )}
+
+                      {/* active toggle */}
+                      {visibleColumns.has("active") && (
+                        <td style={{ padding: "12px" }}>
+                          {canEdit ? (
+                            <ToggleSwitch
+                              checked={Boolean(row.isActive)}
+                              onChange={(val) => onToggleActive(row, val)}
+                            />
+                          ) : (
+                            <span style={{ fontSize: 12, color: row.isActive ? "#16a34a" : "#9ca3af" }}>
+                              {row.isActive ? "Active" : "Inactive"}
+                            </span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* share button */}
+                      {visibleColumns.has("share") && (
+                        <td style={{ padding: "12px" }}>
+                          <button
+                            type="button"
+                            onClick={() => onShareProduct(row)}
+                            title={`Copy storefront URL for: ${row.title}`}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 4,
+                              fontSize: 12, color: "#6366f1", fontWeight: 600,
+                              background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)",
+                              borderRadius: 6, padding: "4px 10px", cursor: "pointer"
+                            }}
+                          >
+                            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                                d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+                            </svg>
+                            Share
+                          </button>
+                        </td>
+                      )}
+
                       {/* actions */}
-                      <td style={{ padding: "12px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 2, whiteSpace: "nowrap" }}>
-                          {canEdit && (
-                            <button type="button" onClick={() => openEdit(row)}
-                              style={{ fontSize: 12, color: "#E8231A", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
-                              Edit
-                            </button>
-                          )}
-                          {canEdit && (
-                            <>
-                              <span style={{ color: "#e5e7eb" }}>|</span>
-                              <button type="button" onClick={() => openClone(row)}
-                                style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
-                                Clone
+                      {visibleColumns.has("actions") && (
+                        <td style={{ padding: "12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 2, whiteSpace: "nowrap" }}>
+                            {canEdit && (
+                              <button type="button" onClick={() => openEdit(row)}
+                                style={{ fontSize: 12, color: "#E8231A", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                Edit
                               </button>
-                            </>
-                          )}
-                          {canDelete && (
-                            <>
-                              <span style={{ color: "#e5e7eb" }}>|</span>
-                              <button type="button" onClick={() => onArchive(row)}
-                                style={{ fontSize: 12, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
-                                Archive
-                              </button>
-                            </>
-                          )}
-                          {canEdit && (
-                            <label title="Upload image" style={{ cursor: uploadingProductId === row.id ? "wait" : "pointer", display: "inline-flex", padding: "4px 4px" }}>
-                              <input
-                                type="file" accept="image/*" className="hidden-input"
-                                disabled={uploadingProductId.length > 0}
-                                onChange={(e) => { const f = e.target.files?.[0]; onUploadImage(row.id, f); e.target.value = ""; }}
-                              />
-                              <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                                {uploadingProductId === row.id ? "…" : "↑"}
-                              </span>
-                            </label>
-                          )}
-                        </div>
-                      </td>
+                            )}
+                            {canEdit && (
+                              <>
+                                <span style={{ color: "#e5e7eb" }}>|</span>
+                                <button type="button" onClick={() => openClone(row)}
+                                  style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                  Clone
+                                </button>
+                              </>
+                            )}
+                            {canDelete && (
+                              <>
+                                <span style={{ color: "#e5e7eb" }}>|</span>
+                                <button type="button" onClick={() => onArchive(row)}
+                                  style={{ fontSize: 12, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                  Archive
+                                </button>
+                              </>
+                            )}
+                            {canEdit && (
+                              <label title="Upload image" style={{ cursor: uploadingProductId === row.id ? "wait" : "pointer", display: "inline-flex", padding: "4px 4px" }}>
+                                <input
+                                  type="file" accept="image/*" className="hidden-input"
+                                  disabled={uploadingProductId.length > 0}
+                                  onChange={(e) => { const f = e.target.files?.[0]; onUploadImage(row.id, f); e.target.value = ""; }}
+                                />
+                                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                                  {uploadingProductId === row.id ? "…" : "↑"}
+                                </span>
+                              </label>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
                 {displayRows.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                    <td colSpan={2 + [...visibleColumns].length} style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
                       No products match your filters.
                     </td>
                   </tr>

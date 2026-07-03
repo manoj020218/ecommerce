@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
@@ -11,11 +11,18 @@ export function AuthGuard() {
   const [state, setState] = useState("checking");
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Ref keeps current session accessible inside the effect without putting it
+  // in the deps array — prevents infinite loop: setSession → session changes → effect re-runs
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
   useEffect(() => {
     let active = true;
 
     async function verify() {
-      if (!isAuthenticated || !session) {
+      const currentSession = sessionRef.current;
+
+      if (!isAuthenticated || !currentSession) {
         setState("unauthenticated");
         return;
       }
@@ -26,10 +33,10 @@ export function AuthGuard() {
           return;
         }
 
-        setSession({
-          ...session,
-          admin
-        });
+        // Only update if admin field not already set — prevents re-triggering this effect
+        if (!currentSession.admin) {
+          setSession({ ...currentSession, admin });
+        }
         setState("ready");
       } catch (_error) {
         if (!active) {
@@ -43,14 +50,12 @@ export function AuthGuard() {
         }
 
         try {
-          const refreshed = await adminRefresh(session.refreshToken);
+          const refreshed = await adminRefresh(currentSession.refreshToken);
           if (!active) {
             return;
           }
 
-          setSession({
-            ...refreshed
-          });
+          setSession({ ...refreshed });
           setState("ready");
         } catch (refreshError) {
           if (!active) {
@@ -75,7 +80,8 @@ export function AuthGuard() {
     return () => {
       active = false;
     };
-  }, [clearSession, isAuthenticated, session, setSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]); // Only re-run on login/logout — not on every session object update
 
   if (state === "checking") {
     return <LoadingBlock label="Verifying admin session..." />;

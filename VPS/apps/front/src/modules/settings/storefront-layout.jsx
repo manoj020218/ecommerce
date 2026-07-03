@@ -295,10 +295,11 @@ export function StorefrontLayout() {
           <div className="proto-header-actions">
             <Link
               to={accountHref}
-              className={`proto-header-action proto-desktop-only${isAccountRoute ? " active" : ""}`}
+              className={`proto-icon-action${isAccountRoute ? " active" : ""}`}
+              aria-label={accountLabel}
             >
               <UserIcon />
-              <span>{accountLabel}</span>
+              <span className="proto-header-action-label">{accountLabel}</span>
             </Link>
             <Link
               to="/cart"

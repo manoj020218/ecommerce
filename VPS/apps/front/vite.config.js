@@ -8,6 +8,21 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon-192.svg", "icon-512.svg"],
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: /\.(?:js|css)$/i,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "static-assets",
+              networkTimeoutSeconds: 5
+            }
+          }
+        ]
+      },
       manifest: {
         name: "Jenix India Store",
         short_name: "JenixStore",
@@ -15,7 +30,7 @@ export default defineConfig({
         start_url: "/",
         display: "standalone",
         background_color: "#f7f8fb",
-        theme_color: "#E8231A",
+        theme_color: "#ff4d4d",
         icons: [
           {
             src: "/icon-192.svg",

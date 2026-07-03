@@ -1,12 +1,5 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import {
-  StorefrontAlert,
-  StorefrontButton,
-  StorefrontInput,
-  StorefrontSectionHeader,
-  StorefrontTextArea
-} from "../../shared/storefront/storefront-ui";
 import { createWebsiteLead } from "./website-leads.api";
 
 const EMPTY_FORM = {
@@ -31,10 +24,7 @@ export function WebsiteBuyerLeadSection() {
 
   const onChange = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: value
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
   };
 
   const onSubmit = async (event) => {
@@ -42,7 +32,6 @@ export function WebsiteBuyerLeadSection() {
     setSaving(true);
     setNotice("");
     setError("");
-
     try {
       await createWebsiteLead({
         ...form,
@@ -51,7 +40,7 @@ export function WebsiteBuyerLeadSection() {
         sourcePage: `${location.pathname}${location.search}` || "/"
       });
       setForm(EMPTY_FORM);
-      setNotice("Thanks. Jenix will contact you about a similar webapp.");
+      setNotice("Thanks! Jenix will contact you about a custom platform for your business.");
     } catch (requestError) {
       setError(requestError.message || "Failed to submit your enquiry.");
     } finally {
@@ -60,73 +49,71 @@ export function WebsiteBuyerLeadSection() {
   };
 
   return (
-    <section className="proto-section">
-      <StorefrontSectionHeader title="Do you want same type webapp for your business?" />
-      <p className="section-caption">
-        Submit your business details and Jenix will contact you with a demo and rollout estimate.
-      </p>
+    <section className="proto-biz-lead">
+      <div className="proto-biz-lead-inner">
+        <p className="proto-biz-eyebrow">For Businesses</p>
+        <h2 className="proto-biz-title">Want This Platform for Your Business?</h2>
+        <p className="proto-biz-desc">
+          We build custom IoT &amp; security e-commerce platforms. Get a free demo.
+        </p>
 
-      <form className="proto-form-grid" onSubmit={onSubmit}>
-        <StorefrontInput label="Name *" name="name" value={form.name} onChange={onChange} required />
-        <StorefrontInput label="Mobile *" name="mobile" value={form.mobile} onChange={onChange} required />
-        <StorefrontInput label="Email *" name="email" type="email" value={form.email} onChange={onChange} required />
-        <StorefrontInput
-          label="Business Name *"
-          name="businessName"
-          value={form.businessName}
-          onChange={onChange}
-          required
-        />
-        <StorefrontInput
-          label="Business Type *"
-          name="businessType"
-          value={form.businessType}
-          onChange={onChange}
-          required
-        />
-        <StorefrontInput label="City *" name="city" value={form.city} onChange={onChange} required />
-        <StorefrontInput
-          label="Current Website"
-          name="currentWebsite"
-          value={form.currentWebsite}
-          onChange={onChange}
-        />
-        <StorefrontInput
-          label="Monthly Orders"
-          name="monthlyOrders"
-          type="number"
-          min="0"
-          value={form.monthlyOrders}
-          onChange={onChange}
-        />
-        <StorefrontInput
-          label="Product Count"
-          name="productCount"
-          type="number"
-          min="0"
-          value={form.productCount}
-          onChange={onChange}
-        />
-        <StorefrontTextArea
-          label="Message *"
-          fieldClassName="wide"
-          name="message"
-          rows="4"
-          value={form.message}
-          onChange={onChange}
-          required
-        />
+        <div className="proto-biz-form-card">
+          <form onSubmit={onSubmit}>
+            <div className="proto-biz-form-grid">
+              <input
+                className="proto-biz-input"
+                name="name"
+                placeholder="Your Name"
+                value={form.name}
+                onChange={onChange}
+                required
+                autoComplete="name"
+              />
+              <input
+                className="proto-biz-input"
+                name="mobile"
+                placeholder="Mobile Number"
+                type="tel"
+                value={form.mobile}
+                onChange={onChange}
+                required
+                autoComplete="tel"
+              />
+              <input
+                className="proto-biz-input"
+                name="businessName"
+                placeholder="Business Name"
+                value={form.businessName}
+                onChange={onChange}
+                required
+              />
+              <input
+                className="proto-biz-input"
+                name="city"
+                placeholder="City"
+                value={form.city}
+                onChange={onChange}
+                required
+              />
+            </div>
+            {/* email, businessType, currentWebsite, monthlyOrders, productCount, message kept in state for API */}
+            <button
+              type="submit"
+              className="proto-biz-submit"
+              disabled={saving}
+            >
+              {saving ? "Submitting…" : "Request Free Demo →"}
+            </button>
+          </form>
 
-        <div className="wide proto-inline-actions">
-          <p className="section-caption">Source page: {`${location.pathname}${location.search}` || "/"}</p>
-          <StorefrontButton type="submit" disabled={saving}>
-            {saving ? "Submitting..." : "Request Demo"}
-          </StorefrontButton>
+          {notice ? (
+            <p className="proto-biz-success">{notice}</p>
+          ) : null}
+          {error ? (
+            <p className="proto-biz-error">{error}</p>
+          ) : null}
         </div>
-      </form>
-
-      {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
-      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+      </div>
     </section>
   );
 }

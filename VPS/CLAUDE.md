@@ -140,3 +140,112 @@ Always run this after backend changes to confirm nothing broke.
 ## Deployment Target
 VPS (Ubuntu), Nginx reverse proxy, PM2 process manager.
 Setup scripts in `VPS/scripts/`. Config: `VPS/ecosystem.config.cjs` for PM2.
+
+---
+
+## CRITICAL CODING RULES (must always follow)
+
+1. **NEVER delete old code** — only add new code or comment out old code. Claude has a known bug where it removes working code while writing new code. Only clean up commented code after the user confirms delivery is final.
+
+2. **Keep pages and components small and independent** — fixing one component must not break another. If a file is getting large (>200 lines), split it before adding more. Each page is its own file, one concern per file, backend routes stay thin.
+
+---
+
+## Production Environment
+
+**VPS IP**: 154.61.69.200
+**Project path on VPS**: `/root/projects/jenixindia`
+**SSH access**: `plink root@154.61.69.200` (password: `***REMOVED***`) via `"D:\plink_git.bat"`
+
+**Live URLs**:
+- Admin panel: `https://admin.jenixindia.com`
+- API: `https://api.jenixindia.com`
+- Storefront (test): `https://test.jenixindia.com`
+
+**PM2 process**: `jenix-backend` (id 28), port 4100
+
+**After .env changes**: always restart with `pm2 restart jenix-backend --update-env` — plain `pm2 restart` does NOT pick up new env vars.
+
+**After admin panel code changes**: rebuild with `pnpm run build:admin` then copy `apps/admin-panel/dist` to VPS.
+
+### VPS .env (production values)
+```
+NODE_ENV=production
+CORS_ORIGIN=https://test.jenixindia.com,https://admin.jenixindia.com
+UPLOAD_DIR=image-assets/uploads
+MIGRATION_IMAGES_DIR=image-assets/migration
+SUPER_ADMIN_EMAIL=admin@jenixindia.com
+SUPER_ADMIN_PASSWORD=***REMOVED***!
+API_BASE_URL=https://api.jenixindia.com/api
+JWT_ACCESS_SECRET=<generated 256-bit value>
+JWT_REFRESH_SECRET=<generated 256-bit value>
+```
+> JWT secrets are generated once by `scripts/generate-env.js`. Do NOT run `generate-env.js` again on the same VPS — it regenerates secrets and invalidates all existing JWT tokens, causing every user to be logged out.
+
+### Nginx config
+Config: `/etc/nginx/sites-available/jenix-test.conf` (symlinked to sites-enabled).
+Three server blocks: test.jenixindia.com (storefront), admin.jenixindia.com (admin panel), api.jenixindia.com (proxy to port 4100). All with SSL via Let's Encrypt.
+Certbot: installed via snap (`snap install --classic certbot`). Cert covers all 3 domains, expires 2026-09-26.
+
+### Image assets folder
+All uploads: `image-assets/uploads/` (relative to `VPS/` project root)
+Migration images: `image-assets/migration/`
+This folder is gitignored (content only; `.gitkeep` files are tracked). To move to another VPS, copy the entire `image-assets/` folder.
+Dev `.env` overrides to: `UPLOAD_DIR=backend/uploads`, `MIGRATION_IMAGES_DIR=scripts/migration/output`
+
+---
+
+## Known Issues Fixed
+
+### AuthGuard infinite loop → auto-logout
+**Symptom**: Auto-logout a few seconds after login with 429 errors.
+**Root cause**: `useEffect` in `auth-guard.jsx` had `session` in its dependency array. Calling `setSession({...session, admin})` inside the effect changed `session`, which re-triggered the effect, creating an infinite loop of `adminMe()` calls until the 300/min rate limit hit and caused logout.
+**Fix**: Use `sessionRef.current` inside the effect instead of `session` directly. Changed deps to `[isAuthenticated]` only — effect only re-runs on login/logout, not on session object updates. Also added guard: only call `setSession` if `!currentSession.admin` (prevents double-update).
+
+### sharp module crashes backend
+**Symptom**: Backend crashes at startup: "Unsupported CPU: requires v2 microarchitecture"
+**Root cause**: VPS CPU doesn't support AVX2; sharp prebuilt binaries require x86-64-v2.
+**Fix**: Made sharp a graceful optional dependency in `common/image-utils.js`. Image uploads work, but skip WebP conversion (original file served instead).
+
+### certbot UnicodeDecodeError
+**Root cause**: Old apt-installed certbot (Python 3.8) choked on non-UTF-8 bytes in another nginx config (`floodguard-api`).
+**Fix**: Installed certbot 5.6.0 via snap.
+
+### CORS blocked on admin login
+**Symptom**: "No 'Access-Control-Allow-Origin' header" error in browser.
+**Root cause**: PM2 was running with stale env — `CORS_ORIGIN` still had the old subdomain. `.env` was updated but `pm2 restart` without `--update-env` doesn't reload it.
+**Fix**: `pm2 restart jenix-backend --update-env`
+
+### vite-plugin-pwa fails on Node 18
+**Symptom**: `Dynamic require of "workbox-build" is not supported` during `pnpm run build:admin`
+**Fix**: Upgraded VPS to Node 20 via NodeSource. Symlinked `/usr/local/bin/node → /usr/bin/nodejs`.
+
+### Non-SSL nginx block missing listen directive
+**Root cause**: Original `render-nginx-config.js` always created two server blocks (redirect + content) even in non-SSL mode; the content block had no `listen` directive.
+**Fix**: Rewrote `serverBlock()` — non-SSL = single block with `listen 80;`; SSL = two blocks.
+
+---
+
+## Payment Gateways — Configuration
+
+Enter credentials via Admin panel → Payment Gateways, or via Setup Wizard.
+
+**Razorpay fields**: `keyId`, `keySecret`, `webhookSecret`
+**Webhook URL**: `https://api.jenixindia.com/api/payments/webhook/razorpay`
+
+**Cashfree fields**: `appId`, `secretKey`, `webhookSecret`
+**Webhook URL**: `https://api.jenixindia.com/api/payments/webhook/cashfree`
+
+Gateways fall back to mock behavior when credentials are not configured — the app won't crash before keys are entered. Once keys are saved in `payment-store.json`, real API calls are made.
+
+Credentials are stored at runtime in `backend/src/database/json/payment-store.json` (not committed to git).
+
+---
+
+## Pending Tasks
+
+- [ ] MongoDB product import — CSV exists locally; needs hsnCode/gstRate filled, then import
+- [ ] 301 redirects — When switching from old jenixindia.com to new site, set up 301s for all old product URLs
+- [ ] Change admin password — Production still uses `***REMOVED***!`; change via Staff page
+- [ ] SMTP email — Configure SMTP via Setup Wizard (host, username, password, fromEmail)
+- [ ] Phone OTP via SMS — Not yet implemented (optional MVP feature)

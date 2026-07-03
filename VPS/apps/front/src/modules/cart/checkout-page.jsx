@@ -506,7 +506,9 @@ export function CheckoutPage() {
 
       <div className="proto-checkout-steps">
         <div className="active"><span>1</span><strong>Delivery Address</strong></div>
+        <div className="proto-step-connector" />
         <div className="active"><span>2</span><strong>Payment</strong></div>
+        <div className="proto-step-connector" />
         <div><span>3</span><strong>Review & Place</strong></div>
       </div>
 

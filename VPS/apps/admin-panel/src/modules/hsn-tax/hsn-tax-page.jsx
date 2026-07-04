@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
@@ -13,6 +14,7 @@ import {
   fetchHsnTaxRecords,
   updateHsnTaxRecord
 } from "./hsn-tax.api";
+import { fetchProducts } from "../products/products.api";
 
 const EMPTY_FORM = {
   hsnCode: "",
@@ -37,12 +39,15 @@ function toDateInput(value) {
 }
 
 export function HsnTaxPage() {
+  const navigate = useNavigate();
   const { session } = useAuthSession();
   const canCreate = hasPermission(session, "hsn_tax.create");
   const canEdit = hasPermission(session, "hsn_tax.edit");
   const canDelete = hasPermission(session, "hsn_tax.delete");
 
   const [rows, setRows] = useState([]);
+  const [productCountMap, setProductCountMap] = useState({});
+  const [missingHsnCount, setMissingHsnCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -50,6 +55,8 @@ export function HsnTaxPage() {
     q: "",
     includeInactive: true
   });
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -60,14 +67,61 @@ export function HsnTaxPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchHsnTaxRecords(nextFilters);
-      setRows(Array.isArray(data) ? data : []);
+      const [hsnData, productData] = await Promise.all([
+        fetchHsnTaxRecords(nextFilters),
+        fetchProducts({ includeInactive: true, q: "" })
+      ]);
+      setRows(Array.isArray(hsnData) ? hsnData : []);
+      const countMap = {};
+      let missing = 0;
+      for (const p of Array.isArray(productData) ? productData : []) {
+        if (!p.hsnCode) { missing++; }
+        else { countMap[p.hsnCode] = (countMap[p.hsnCode] || 0) + 1; }
+      }
+      setProductCountMap(countMap);
+      setMissingHsnCount(missing);
     } catch (apiError) {
       setError(apiError.message || "Failed to load HSN records.");
     } finally {
       setLoading(false);
     }
   };
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("asc"); }
+  };
+
+  const SortTh = ({ col, label, style = {} }) => {
+    const active = sortCol === col;
+    return (
+      <th
+        onClick={() => toggleSort(col)}
+        style={{ cursor: "pointer", userSelect: "none", color: active ? "#E8231A" : undefined, whiteSpace: "nowrap", ...style }}
+      >
+        {label} {active ? (sortDir === "asc" ? "▲" : "▼") : <span style={{ opacity: 0.3 }}>⇅</span>}
+      </th>
+    );
+  };
+
+  const displayRows = useMemo(() => {
+    if (!sortCol) return rows;
+    return [...rows].sort((a, b) => {
+      let av, bv;
+      if (sortCol === "hsn")    { av = a.hsnCode || ""; bv = b.hsnCode || ""; }
+      else if (sortCol === "desc")   { av = (a.description || "").toLowerCase(); bv = (b.description || "").toLowerCase(); }
+      else if (sortCol === "gst")    { av = Number(a.gstRate || 0); bv = Number(b.gstRate || 0); }
+      else if (sortCol === "cgst")   { av = Number(a.cgstRate || 0); bv = Number(b.cgstRate || 0); }
+      else if (sortCol === "sgst")   { av = Number(a.sgstRate || 0); bv = Number(b.sgstRate || 0); }
+      else if (sortCol === "igst")   { av = Number(a.igstRate || 0); bv = Number(b.igstRate || 0); }
+      else if (sortCol === "date")   { av = a.effectiveFrom || ""; bv = b.effectiveFrom || ""; }
+      else if (sortCol === "products") { av = productCountMap[a.hsnCode] || 0; bv = productCountMap[b.hsnCode] || 0; }
+      else { av = ""; bv = ""; }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [rows, sortCol, sortDir, productCountMap]);
 
   useEffect(() => {
     load();
@@ -230,56 +284,91 @@ export function HsnTaxPage() {
       {notice ? <p className="alert-info">{notice}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
+      {missingHsnCount > 0 && (
+        <div style={{ background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <svg width="16" height="16" fill="none" stroke="#d97706" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "#92400e" }}>
+            {missingHsnCount} product{missingHsnCount !== 1 ? "s" : ""} have no HSN code assigned
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate("/products", { state: { presetCategoryId: "" } })}
+            style={{ fontSize: 12, fontWeight: 600, color: "#d97706", background: "none", border: "1px solid #fde68a", borderRadius: 8, padding: "4px 12px", cursor: "pointer", marginLeft: "auto" }}
+          >
+            View products → assign HSN
+          </button>
+        </div>
+      )}
+
       <div className="table-wrap desktop-only">
         <table>
           <thead>
             <tr>
-              <th>HSN</th>
-              <th>Description</th>
-              <th>GST</th>
-              <th>CGST</th>
-              <th>SGST</th>
-              <th>IGST</th>
-              <th>Effective From</th>
+              <SortTh col="hsn" label="HSN" />
+              <SortTh col="desc" label="Description" />
+              <SortTh col="gst" label="GST" />
+              <SortTh col="cgst" label="CGST" />
+              <SortTh col="sgst" label="SGST" />
+              <SortTh col="igst" label="IGST" />
+              <SortTh col="date" label="Effective From" />
+              <SortTh col="products" label="Products" />
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.hsnCode}>
-                <td>
-                  <strong>{row.hsnCode}</strong>
-                </td>
-                <td>{row.description}</td>
-                <td>{row.gstRate}%</td>
-                <td>{row.cgstRate}%</td>
-                <td>{row.sgstRate}%</td>
-                <td>{row.igstRate}%</td>
-                <td>{formatDateTime(row.effectiveFrom)}</td>
-                <td>
-                  <StatusBadge value={row.isActive ? "active" : "inactive"} />
-                </td>
-                <td className="row-actions">
-                  {canEdit ? (
-                    <button type="button" className="btn-link" onClick={() => openEdit(row)}>
-                      Edit
-                    </button>
-                  ) : null}
-                  {canDelete ? (
-                    <button type="button" className="btn-link danger" onClick={() => onArchive(row)}>
-                      Archive
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+            {displayRows.map((row) => {
+              const count = productCountMap[row.hsnCode] || 0;
+              return (
+                <tr key={row.hsnCode}>
+                  <td>
+                    <strong>{row.hsnCode}</strong>
+                  </td>
+                  <td>{row.description}</td>
+                  <td>{row.gstRate}%</td>
+                  <td>{row.cgstRate}%</td>
+                  <td>{row.sgstRate}%</td>
+                  <td>{row.igstRate}%</td>
+                  <td>{formatDateTime(row.effectiveFrom)}</td>
+                  <td>
+                    {count > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate("/products", { state: { presetHsnCode: row.hsnCode } })}
+                        style={{ background: "rgba(232,35,26,0.08)", color: "#E8231A", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        {count}
+                      </button>
+                    ) : (
+                      <span style={{ color: "#d1d5db", fontSize: 12 }}>0</span>
+                    )}
+                  </td>
+                  <td>
+                    <StatusBadge value={row.isActive ? "active" : "inactive"} />
+                  </td>
+                  <td className="row-actions">
+                    {canEdit ? (
+                      <button type="button" className="btn-link" onClick={() => openEdit(row)}>
+                        Edit
+                      </button>
+                    ) : null}
+                    {canDelete ? (
+                      <button type="button" className="btn-link danger" onClick={() => onArchive(row)}>
+                        Archive
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="mobile-cards">
-        {rows.map((row) => (
+        {displayRows.map((row) => {
+          const count = productCountMap[row.hsnCode] || 0;
+          return (
           <article key={row.hsnCode} className="card">
             <div className="card-head">
               <h4>{row.hsnCode}</h4>
@@ -291,6 +380,14 @@ export function HsnTaxPage() {
               {row.igstRate}%
             </p>
             <p className="muted">Effective: {formatDateTime(row.effectiveFrom)}</p>
+            {count > 0 ? (
+              <button type="button" onClick={() => navigate("/products", { state: { presetHsnCode: row.hsnCode } })}
+                style={{ background: "rgba(232,35,26,0.08)", color: "#E8231A", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 4 }}>
+                {count} products
+              </button>
+            ) : (
+              <p className="muted">0 products</p>
+            )}
             <div className="card-actions">
               {canEdit ? (
                 <button type="button" className="btn btn-secondary" onClick={() => openEdit(row)}>
@@ -304,7 +401,8 @@ export function HsnTaxPage() {
               ) : null}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
 
       <Modal

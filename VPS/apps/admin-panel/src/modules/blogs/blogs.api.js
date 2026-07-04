@@ -39,3 +39,12 @@ export function archiveBlog(blogId) {
     method: "DELETE"
   });
 }
+
+export function uploadBlogImage(blogId, file, imageType) {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch(`/admin/blogs/${blogId}/image?type=${imageType}`, {
+    method: "POST",
+    body: fd
+  });
+}

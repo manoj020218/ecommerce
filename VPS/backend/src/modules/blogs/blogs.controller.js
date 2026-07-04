@@ -59,6 +59,13 @@ const adminArchiveBlog = asyncHandler(async (req, res) => {
   return ok(res, data, "Blog archived.");
 });
 
+const adminUploadBlogImage = asyncHandler(async (req, res) => {
+  if (!req.file) throw new HttpError(400, "Image file is required.");
+  const imageType = req.query.type === "og" ? "og" : "featured";
+  const data = await service.uploadBlogImage(req.params.blogId, req.file.path, imageType, req.actor);
+  return ok(res, data, "Blog image uploaded.");
+});
+
 const publicListBlogCategories = asyncHandler(async (_req, res) => {
   const data = await service.listPublicBlogCategories();
   return ok(res, data, "Public blog categories fetched.");
@@ -92,6 +99,7 @@ module.exports = {
   adminCreateBlog,
   adminUpdateBlog,
   adminArchiveBlog,
+  adminUploadBlogImage,
   publicListBlogCategories,
   publicListBlogs,
   publicGetBlog,

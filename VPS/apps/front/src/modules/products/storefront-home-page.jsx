@@ -16,6 +16,7 @@ import {
   listProducts
 } from "./products.api";
 import { usePublicSettings } from "../settings/public-settings-context";
+import { ProductSkeletonGrid } from "../../shared/products/product-skeleton";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -292,45 +293,61 @@ export function StorefrontHomePage() {
   const { settings: publicSettings } = usePublicSettings();
   const { isAuthenticated } = useCustomerSession();
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState([]);           // first 8 — bestsellers rail
+  const [latestProducts, setLatestProducts] = useState([]); // next 8 — new arrivals rail
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [newArrivalsLoading, setNewArrivalsLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyProductId, setBusyProductId] = useState("");
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
 
-    Promise.all([
-      listCategories(),
-      listProducts({}),
-      listBlogs({ limit: 6 })
-    ])
-      .then(([categoryRows, productRows, blogRows]) => {
-        if (!active) {
-          return;
-        }
+    async function loadHome() {
+      try {
+        setLoading(true);
+        setNewArrivalsLoading(true);
+        setError("");
+
+        // Phase 1: categories + first 8 products + blogs in parallel
+        const [categoryRows, firstBatch, blogRows] = await Promise.all([
+          listCategories(),
+          listProducts({ limit: 8, offset: 0 }),
+          listBlogs({ limit: 6 })
+        ]);
+
+        if (!active) return;
+
         setCategories(Array.isArray(categoryRows) ? categoryRows : []);
-        setProducts(Array.isArray(productRows) ? productRows : []);
         setBlogs(Array.isArray(blogRows) ? blogRows : []);
-      })
-      .catch((requestError) => {
+
+        const firstItems = firstBatch?.items ?? (Array.isArray(firstBatch) ? firstBatch : []);
+        setProducts(firstItems);
+        setLoading(false);
+
+        // Phase 2: next 8 products for New Arrivals (loads after hero is already visible)
+        if (firstBatch?.hasMore) {
+          const secondBatch = await listProducts({ limit: 8, offset: 8 });
+          if (!active) return;
+          const secondItems = secondBatch?.items ?? [];
+          setLatestProducts(secondItems.length > 0 ? secondItems : firstItems.slice(0, 8));
+        } else {
+          setLatestProducts(firstItems.slice(0, 8));
+        }
+        setNewArrivalsLoading(false);
+      } catch (requestError) {
         if (active) {
           setError(requestError.message || "Failed to load the storefront.");
-        }
-      })
-      .finally(() => {
-        if (active) {
           setLoading(false);
+          setNewArrivalsLoading(false);
         }
-      });
+      }
+    }
 
-    return () => {
-      active = false;
-    };
+    loadHome();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -472,11 +489,6 @@ export function StorefrontHomePage() {
   }, [publicSettings]);
 
   const featuredProduct = products[0] || null;
-  const featuredProducts = useMemo(() => products.slice(0, 8), [products]);
-  const latestProducts = useMemo(
-    () => (products.length > 8 ? products.slice(8, 16) : products.slice(0, 8)),
-    [products]
-  );
   const topCategories = useMemo(() => categories.slice(0, 8), [categories]);
   const storeProfile = publicSettings.storeProfile || {};
   const contactInformation = publicSettings.contactInformation || {};
@@ -607,7 +619,7 @@ export function StorefrontHomePage() {
           <StorefrontLoadingState label="Loading products..." />
         ) : (
           <div className="proto-product-scroller">
-            {featuredProducts.map((product) => (
+            {products.map((product) => (
               <ProductRailCard
                 key={product.id}
                 product={product}
@@ -637,20 +649,17 @@ export function StorefrontHomePage() {
           title="New Arrivals"
           action={<Link to="/products">View all →</Link>}
         />
-        {loading ? (
-          <StorefrontLoadingState label="Loading new arrivals..." />
-        ) : (
-          <div className="proto-product-grid">
-            {latestProducts.map((product) => (
-              <NewArrivalCard
-                key={product.id}
-                product={product}
-                busy={busyProductId === product.id}
-                onAddToCart={addProductToCart}
-              />
-            ))}
-          </div>
-        )}
+        <div className="proto-product-grid">
+          {latestProducts.map((product) => (
+            <NewArrivalCard
+              key={product.id}
+              product={product}
+              busy={busyProductId === product.id}
+              onAddToCart={addProductToCart}
+            />
+          ))}
+          {newArrivalsLoading ? <ProductSkeletonGrid count={8} /> : null}
+        </div>
       </section>
 
       <section className="proto-section proto-section-surface">

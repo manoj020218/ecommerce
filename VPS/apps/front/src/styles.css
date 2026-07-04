@@ -5387,6 +5387,74 @@ textarea {
   to { transform: rotate(360deg); }
 }
 
+/* ── Progressive product skeleton ──────────────────────────────────────────── */
+
+@keyframes proto-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.proto-skel-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #f3f4f6;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.proto-skel-card-rail {
+  flex-direction: row;
+  align-items: flex-start;
+  min-height: 120px;
+}
+
+.proto-skel-media {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 800px 100%;
+  animation: proto-shimmer 1.4s ease-in-out infinite;
+  aspect-ratio: 4/3;
+  width: 100%;
+  border-radius: 0;
+}
+
+.proto-skel-card-rail .proto-skel-media {
+  aspect-ratio: auto;
+  width: 110px;
+  flex-shrink: 0;
+  align-self: stretch;
+  border-radius: 0;
+}
+
+.proto-skel-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.proto-skel-line {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 800px 100%;
+  animation: proto-shimmer 1.4s ease-in-out infinite;
+}
+
+.proto-skel-sm { width: 40%; }
+.proto-skel-md { width: 65%; }
+.proto-skel-lg { width: 85%; }
+
+.proto-skel-btn-bar {
+  height: 32px;
+  border-radius: 8px;
+  margin-top: 4px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 800px 100%;
+  animation: proto-shimmer 1.4s ease-in-out infinite;
+}
+
 /* ── Modern Registration Card ──────────────────────────────────────────────── */
 
 .reg-card {

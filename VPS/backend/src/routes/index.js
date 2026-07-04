@@ -77,6 +77,7 @@ const {
   createPublicStaticPagesRouter,
   createAdminStaticPagesRouter
 } = require("../modules/static-pages/static-pages.routes");
+const { createPublicSeoRouter } = require("../modules/seo/seo.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -125,6 +126,7 @@ function createApiRouter() {
   router.use("/setup-wizard", createPublicSetupWizardRouter());
   router.use("/pages", createPublicStaticPagesRouter());
   router.use("/admin/pages", createAdminStaticPagesRouter());
+  router.use("/seo", createPublicSeoRouter());
 
   return router;
 }

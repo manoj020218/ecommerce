@@ -20,6 +20,7 @@ async function generateGoogleMerchantFeedXml() {
       buildMerchantItemXml(
         buildProductFeedFields(product, {
           baseUrl,
+          apiBaseUrl: env.publicBaseUrl,
           categoriesById,
           storeName: settings.storeProfile.storeName || "Jenix India",
           defaultOgImageUrl: settings.seoDefaults.defaultOgImageUrl || ""

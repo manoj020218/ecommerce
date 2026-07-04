@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router-dom";
 import { submitManualPaymentProof } from "../account/account.api";
 import {
@@ -186,6 +186,8 @@ export function OrderSuccessPage() {
     file: null
   });
 
+  const gaPurchaseFiredRef = useRef(false);
+
   const isFollowupMode = Boolean(routeCheckoutSessionId);
   const sessionId = routeCheckoutSessionId || searchParams.get("session") || "";
   const orderIdParam = searchParams.get("orderId") || "";
@@ -248,6 +250,43 @@ export function OrderSuccessPage() {
       active = false;
     };
   }, [isAuthenticated, sessionId]);
+
+  // GA4 purchase conversion — fires once when order data arrives
+  useEffect(() => {
+    if ((!order && !checkoutSession) || gaPurchaseFiredRef.current) return;
+    if (typeof window.gtag !== "function") return;
+
+    gaPurchaseFiredRef.current = true;
+
+    const txId = order?.orderNo || order?.id || checkoutSession?.orderId || sessionId;
+    const grandTotal = order?.orderTotal || order?.pricing?.grandTotal || checkoutSession?.cart?.pricing?.grandTotal || 0;
+    const lineItems = Array.isArray(order?.items)
+      ? order.items
+      : (checkoutSession?.cart?.items || []);
+
+    window.gtag("event", "purchase", {
+      transaction_id: String(txId),
+      value: Number(grandTotal),
+      currency: "INR",
+      items: lineItems.map((item, idx) => ({
+        item_id: item.sku || item.productId,
+        item_name: item.title,
+        price: Number(item.unitPrice || item.salePrice || 0),
+        quantity: Number(item.qty || 1),
+        index: idx
+      }))
+    });
+
+    if (typeof window.fbq === "function") {
+      window.fbq("track", "Purchase", {
+        value: Number(grandTotal),
+        currency: "INR",
+        content_ids: lineItems.map((item) => item.sku || item.productId).filter(Boolean),
+        content_type: "product",
+        num_items: lineItems.length
+      });
+    }
+  }, [order, checkoutSession]);
 
   const supportPhone =
     publicSettings.contactInformation.publicPhone ||

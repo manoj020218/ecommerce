@@ -60,7 +60,9 @@ const listAdminProductsQuerySchema = z.object({
 
 const listPublicProductsQuerySchema = z.object({
   categoryId: z.string().trim().optional(),
-  q: z.string().trim().max(120).optional().default("")
+  q: z.string().trim().max(120).optional().default(""),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional().default(0)
 });
 
 const publicProductRecommendationsQuerySchema = z.object({

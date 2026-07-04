@@ -11,10 +11,11 @@ import {
   StorefrontPageHeader,
   StorefrontSelect
 } from "../../shared/storefront/storefront-ui";
+import { useProgressiveProducts } from "../../shared/products/use-progressive-products";
+import { ProductSkeletonGrid } from "../../shared/products/product-skeleton";
 import {
   addCartItem,
-  listCategories,
-  listProducts
+  listCategories
 } from "./products.api";
 
 function currency(amount) {
@@ -105,10 +106,7 @@ export function ProductsListPage() {
   const { isAuthenticated } = useCustomerSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [categoryLoading, setCategoryLoading] = useState(true);
-  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyProductId, setBusyProductId] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -150,50 +148,20 @@ export function ProductsListPage() {
   );
   const unknownCategory = Boolean(slug && !categoryLoading && !activeCategory);
 
-  useEffect(() => {
-    if (categoryLoading || unknownCategory) {
-      if (unknownCategory) {
-        setProducts([]);
-        setLoading(false);
-        setError("This category is not available in the current catalog.");
-      }
-      return;
-    }
+  const {
+    products: rawProducts,
+    skeletonCount,
+    initialLoading,
+    error: productsError
+  } = useProgressiveProducts({
+    q: query,
+    categoryId: activeCategory?.id || ""
+  });
 
-    let active = true;
-    setLoading(true);
-    setError("");
-
-    listProducts({
-      q: query,
-      categoryId: activeCategory?.id || ""
-    })
-      .then((rows) => {
-        if (!active) {
-          return;
-        }
-
-        let nextProducts = Array.isArray(rows) ? rows : [];
-        if (inStockOnly) {
-          nextProducts = nextProducts.filter((product) => product.isPurchasable);
-        }
-        setProducts(sortProducts(nextProducts, sortValue));
-      })
-      .catch((requestError) => {
-        if (active) {
-          setError(requestError.message || "Failed to load products.");
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [activeCategory?.id, categoryLoading, inStockOnly, query, sortValue, unknownCategory]);
+  const visibleProducts = useMemo(() => {
+    const rows = inStockOnly ? rawProducts.filter((p) => p.isPurchasable) : rawProducts;
+    return sortProducts(rows, sortValue);
+  }, [rawProducts, inStockOnly, sortValue]);
 
   const selectedCategoryName = activeCategory?.name || "All Products";
 
@@ -257,8 +225,8 @@ export function ProductsListPage() {
           title={selectedCategoryName}
           description={
             query
-              ? `${products.length} results for "${query}"`
-              : `${products.length} products found`
+              ? `${visibleProducts.length} results for "${query}"`
+              : `${visibleProducts.length} products found`
           }
           actions={
             <div className="proto-listing-actions">
@@ -287,7 +255,7 @@ export function ProductsListPage() {
         />
 
         {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
-        {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+        {productsError && !unknownCategory ? <StorefrontAlert tone="error">{productsError}</StorefrontAlert> : null}
 
         <div className="proto-filter-chip-row">
           {slug ? (
@@ -361,18 +329,24 @@ export function ProductsListPage() {
           </aside>
 
           <section className="proto-listing-content">
-            {loading ? <StorefrontLoadingState label="Loading products..." /> : null}
+            {(initialLoading || (categoryLoading && Boolean(slug))) && !unknownCategory ? (
+              <StorefrontLoadingState label="Loading products..." />
+            ) : null}
 
-            {!loading && products.length === 0 && !error ? (
+            {unknownCategory ? (
+              <StorefrontAlert tone="error">This category is not available in the current catalog.</StorefrontAlert>
+            ) : null}
+
+            {!initialLoading && !unknownCategory && !productsError && skeletonCount === 0 && visibleProducts.length === 0 ? (
               <StorefrontEmptyState
                 title="No products matched"
                 description="Try another category, search keyword, or availability filter."
               />
             ) : null}
 
-            {!loading && products.length > 0 ? (
+            {!unknownCategory && (visibleProducts.length > 0 || skeletonCount > 0) ? (
               <div className="proto-product-grid proto-product-grid-catalog">
-                {products.map((product) => (
+                {visibleProducts.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
@@ -380,6 +354,7 @@ export function ProductsListPage() {
                     onAddToCart={addProductToCart}
                   />
                 ))}
+                <ProductSkeletonGrid count={skeletonCount} />
               </div>
             ) : null}
           </section>

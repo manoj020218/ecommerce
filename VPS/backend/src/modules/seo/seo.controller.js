@@ -33,7 +33,30 @@ const publicTypedSitemap = asyncHandler(async (req, res) => {
   res.status(200).send(xml);
 });
 
+const publicRobotsTxt = asyncHandler(async (_req, res) => {
+  const txt = await service.generateRobotsTxt();
+  res.type("text/plain");
+  res.status(200).send(txt);
+});
+
+const publicGoogleProductFeed = asyncHandler(async (_req, res) => {
+  const xml = await service.generateProductFeedXml();
+  res.type("application/xml");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.status(200).send(xml);
+});
+
+const publicFacebookProductFeed = asyncHandler(async (_req, res) => {
+  const xml = await service.generateProductFeedXml();
+  res.type("application/xml");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.status(200).send(xml);
+});
+
 module.exports = {
   publicSitemapIndex,
-  publicTypedSitemap
+  publicTypedSitemap,
+  publicRobotsTxt,
+  publicGoogleProductFeed,
+  publicFacebookProductFeed
 };

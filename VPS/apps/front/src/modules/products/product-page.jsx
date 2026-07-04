@@ -271,10 +271,33 @@ export function ProductPage() {
 
   useEffect(() => {
     const nextTitle = pageSeo?.metaTitle || product?.title;
-    if (nextTitle) {
-      document.title = nextTitle;
-    }
-  }, [pageSeo?.metaTitle, product?.title]);
+    if (!nextTitle) return;
+
+    document.title = nextTitle;
+
+    const upsertMeta = (name, content, attr = "name") => {
+      if (!content) return;
+      let tag = document.head.querySelector(`meta[${attr}="${name}"]`);
+      if (!tag) { tag = document.createElement("meta"); tag.setAttribute(attr, name); document.head.append(tag); }
+      tag.setAttribute("content", content);
+    };
+
+    const upsertCanonical = (href) => {
+      if (!href) return;
+      let link = document.head.querySelector('link[rel="canonical"]');
+      if (!link) { link = document.createElement("link"); link.setAttribute("rel", "canonical"); document.head.append(link); }
+      link.setAttribute("href", href);
+    };
+
+    upsertMeta("description", pageSeo?.metaDescription);
+    upsertMeta("robots", "index, follow");
+    upsertCanonical(pageSeo?.canonicalUrl);
+    upsertMeta("og:title", nextTitle, "property");
+    upsertMeta("og:description", pageSeo?.metaDescription, "property");
+    upsertMeta("og:url", pageSeo?.canonicalUrl, "property");
+    upsertMeta("og:type", "product", "property");
+    if (pageSeo?.ogImageUrl) upsertMeta("og:image", pageSeo.ogImageUrl, "property");
+  }, [pageSeo, product?.title]);
 
   useEffect(() => {
     if (!product?.id || !isAuthenticated) {

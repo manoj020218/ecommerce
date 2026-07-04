@@ -6,7 +6,8 @@ const ACTOR_TYPES = Object.freeze({
 const CUSTOMER_AUTH_PROVIDERS = Object.freeze({
   EMAIL_PASSWORD: "email_password",
   GOOGLE: "google",
-  OTP_MOBILE: "otp_mobile"
+  OTP_MOBILE: "otp_mobile",
+  OTP_EMAIL: "otp_email"
 });
 
 function sanitizeCustomerUser(user) {

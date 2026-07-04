@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createCustomerSession, useCustomerSession } from "../../shared/auth/customer-session";
 import { exchangeGoogleCode } from "./google-auth.api";
+import { linkGuestCheckout } from "./account.api";
 
 export function GoogleCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -37,8 +38,18 @@ export function GoogleCallbackPage() {
     const redirectUri = `${window.location.origin}/account/google-callback`;
 
     exchangeGoogleCode({ code, redirectUri, guestSessionId: state.guestSessionId || null })
-      .then((payload) => {
+      .then(async (payload) => {
         setSession(createCustomerSession(payload));
+        if (state.linkCheckout) {
+          try {
+            await linkGuestCheckout({
+              checkoutSessionId: state.linkCheckout,
+              guestSessionId: state.guestSessionId || null
+            });
+          } catch (_linkErr) {
+            // Linking failure is non-fatal — user is still logged in
+          }
+        }
         navigate(redirectPath, { replace: true });
       })
       .catch((err) => {

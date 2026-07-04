@@ -4,6 +4,7 @@ const { HttpError } = require("../../common/http-error");
 const { getGoogleOAuthPublicConfig, exchangeGoogleCodeForProfile } = require("./google-oauth.service");
 const { env } = require("../../config/env");
 const { generateId, hashValue } = require("../../common/identity");
+const { sendSmtpEmail } = require("../../integrations/email-providers/smtp.provider");
 const {
   signAccessToken,
   signRefreshToken,
@@ -940,6 +941,157 @@ async function customerGoogleExchange(payload) {
   });
 }
 
+async function requestEmailOtp({ email }) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) throw new HttpError(400, "Email is required.");
+
+  const store = await ensureAuthBootstrap();
+  const now = Date.now();
+  const challengeCode = env.nodeEnv === "production"
+    ? `${Math.floor(100000 + Math.random() * 900000)}`
+    : (env.otpDevDefaultCode || "123456");
+
+  store.otpChallenges = store.otpChallenges.filter(
+    (item) => !(item.email === normalizedEmail && !item.verifiedAt)
+  );
+
+  const challenge = {
+    id: generateId("otp"),
+    email: normalizedEmail,
+    codeHash: hashValue(challengeCode),
+    attempts: 0,
+    maxAttempts: 5,
+    expiresAt: new Date(now + 1000 * 60 * 10).toISOString(),
+    verifiedAt: null,
+    createdAt: new Date(now).toISOString()
+  };
+  store.otpChallenges.push(challenge);
+  await writeAuthStore(store);
+
+  try {
+    const settings = await getAllSettings();
+    const smtp = settings.setupWizard?.smtpEmail;
+    if (smtp?.host && smtp?.username && smtp?.password && smtp?.fromEmail) {
+      await sendSmtpEmail({
+        smtpConfig: smtp,
+        to: normalizedEmail,
+        subject: "[Jenix] Your verification code",
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#E8231A;margin:0 0 16px">Verify your email</h2>
+          <p style="color:#374151;margin:0 0 24px">Use this code to complete your account setup. It expires in 10 minutes.</p>
+          <div style="background:#f9fafb;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px">
+            <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:#111827">${challengeCode}</span>
+          </div>
+          <p style="color:#9ca3af;font-size:13px;margin:0">If you didn't request this, ignore this email.</p>
+        </div>`
+      });
+    }
+  } catch (_sendError) {
+    // Email send failure is non-fatal — challenge is still valid
+  }
+
+  return {
+    challengeId: challenge.id,
+    expiresAt: challenge.expiresAt,
+    ...(env.nodeEnv === "production" ? {} : { devCode: challengeCode })
+  };
+}
+
+async function verifyEmailOtp({ email, code, name, guestSessionId }) {
+  const normalizedEmail = normalizeEmail(email);
+  const store = await ensureAuthBootstrap();
+
+  const challenge = [...store.otpChallenges]
+    .reverse()
+    .find((item) => item.email === normalizedEmail && !item.verifiedAt);
+
+  if (!challenge) throw new HttpError(401, "OTP challenge not found.");
+  if (Date.parse(challenge.expiresAt) < Date.now()) throw new HttpError(401, "OTP has expired.");
+  if (challenge.attempts >= challenge.maxAttempts) throw new HttpError(429, "Too many attempts. Request a new code.");
+
+  if (challenge.codeHash !== hashValue(code)) {
+    challenge.attempts += 1;
+    await writeAuthStore(store);
+    throw new HttpError(401, "Invalid verification code.");
+  }
+
+  challenge.verifiedAt = new Date().toISOString();
+
+  let user = store.users.find((u) => normalizeEmail(u.email) === normalizedEmail);
+  if (!user) {
+    const nowTs = new Date().toISOString();
+    user = {
+      id: generateId("user"),
+      name: name || "Customer",
+      email: normalizedEmail,
+      mobile: "",
+      verifiedEmail: true,
+      verifiedMobile: false,
+      passwordHash: null,
+      authProviders: [],
+      createdAt: nowTs,
+      updatedAt: nowTs,
+      lastLoginAt: null
+    };
+    store.users.push(user);
+  } else {
+    user.verifiedEmail = true;
+    user.updatedAt = new Date().toISOString();
+  }
+
+  ensureCustomerHasProvider(user, CUSTOMER_AUTH_PROVIDERS.OTP_EMAIL, normalizedEmail);
+
+  return issueCustomerTokens(store, user, guestSessionId || null);
+}
+
+async function linkGuestCheckoutToCustomer(customerId, checkoutSessionId, guestSessionId) {
+  if (!checkoutSessionId) throw new HttpError(400, "checkoutSessionId is required.");
+
+  const store = await readAuthStore();
+
+  const session = ensureArray(store.checkoutSessions).find((s) => s.id === checkoutSessionId);
+  if (!session) throw new HttpError(404, "Checkout session not found.");
+
+  if (guestSessionId && session.ownerId !== guestSessionId && session.linkedUserId !== customerId) {
+    throw new HttpError(403, "Checkout session does not match the provided guest session.");
+  }
+
+  if (session.linkedUserId === customerId) {
+    return { linked: true, alreadyLinked: true, ordersLinked: 0 };
+  }
+
+  const now = new Date().toISOString();
+  session.linkedUserId = customerId;
+  session.accountLinkedAt = now;
+
+  let ordersLinked = 0;
+  for (const order of ensureArray(store.orders)) {
+    if (order.checkoutSessionId === checkoutSessionId && !order.userId) {
+      order.userId = customerId;
+      order.accountLinkedAt = now;
+      ordersLinked++;
+    }
+  }
+
+  const customer = ensureArray(store.users).find((u) => u.id === customerId);
+  if (customer && !customer.accountCreatedAtCheckout) {
+    customer.accountCreatedAtCheckout = true;
+  }
+
+  await writeAuthStore(store);
+
+  await addActivityLog({
+    action: "auth.customer.checkout_linked",
+    actorId: customerId,
+    actorRole: "customer",
+    resourceType: "checkout_session",
+    resourceId: checkoutSessionId,
+    metadata: { ordersLinked, guestSessionId: guestSessionId || null }
+  });
+
+  return { linked: true, alreadyLinked: false, ordersLinked };
+}
+
 module.exports = {
   ensureAuthBootstrap,
   adminLogin,
@@ -954,6 +1106,9 @@ module.exports = {
   getGoogleOAuthPublicConfig,
   requestOtp,
   verifyOtp,
+  requestEmailOtp,
+  verifyEmailOtp,
+  linkGuestCheckoutToCustomer,
   getCustomerProfile,
   linkCustomerIdentity,
   adminMe,

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router-dom";
-import { submitManualPaymentProof } from "../account/account.api";
+import { submitManualPaymentProof, requestEmailOtp, verifyEmailOtp, linkGuestCheckout } from "../account/account.api";
+import { getGoogleAuthConfig } from "../account/google-auth.api";
+import { createCustomerSession, useCustomerSession } from "../../shared/auth/customer-session";
 import {
   canSubmitManualPaymentProof,
   downloadInvoicePayload,
@@ -10,7 +12,6 @@ import {
   getSupportWhatsappLink,
   humanizeStatus
 } from "../account/account.utils";
-import { useCustomerSession } from "../../shared/auth/customer-session";
 import { usePublicSettings } from "../settings/public-settings-context";
 import {
   createPaymentAttempt,
@@ -155,6 +156,167 @@ function resolveNextStep({ order, session, hasManualInstructions, pickupAddress 
 function buildCheckoutAccessParams(isAuthenticated) {
   const guestSessionId = getExistingGuestSessionId();
   return isAuthenticated ? {} : { sessionId: guestSessionId || "" };
+}
+
+function CheckoutAccountLink({ checkoutSessionId, guestSessionId, onLinked }) {
+  const { setSession } = useCustomerSession();
+  const [step, setStep] = useState("idle"); // idle | email | otp | linking | done | dismissed
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [devCode, setDevCode] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [googleConfig, setGoogleConfig] = useState(null);
+  const fetchedGoogleConfig = useRef(false);
+
+  useEffect(() => {
+    if (fetchedGoogleConfig.current) return;
+    fetchedGoogleConfig.current = true;
+    getGoogleAuthConfig()
+      .then((data) => { if (data?.enabled && data?.clientId) setGoogleConfig(data); })
+      .catch(() => {});
+  }, []);
+
+  async function handleRequestOtp(event) {
+    event.preventDefault();
+    if (!email.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await requestEmailOtp({ email: email.trim() });
+      setExpiresAt(result.expiresAt || "");
+      setDevCode(result.devCode || "");
+      setStep("otp");
+    } catch (err) {
+      setError(err.message || "Could not send verification code.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleVerifyOtp(event) {
+    event.preventDefault();
+    if (!code.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const authPayload = await verifyEmailOtp({ email: email.trim(), code: code.trim(), guestSessionId });
+      setSession(createCustomerSession(authPayload));
+      setStep("linking");
+      await linkGuestCheckout({ checkoutSessionId, guestSessionId });
+      setStep("done");
+      onLinked();
+    } catch (err) {
+      setError(err.message || "Verification failed.");
+      if (step === "linking") setStep("otp");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleGoogleLogin() {
+    const state = encodeURIComponent(JSON.stringify({
+      redirect: window.location.pathname + window.location.search,
+      linkCheckout: checkoutSessionId,
+      guestSessionId: guestSessionId || null
+    }));
+    const redirectUri = encodeURIComponent(`${window.location.origin}/account/google-callback`);
+    const scope = encodeURIComponent("openid email profile");
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(googleConfig.clientId)}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${state}&access_type=online`;
+  }
+
+  if (step === "done" || step === "dismissed") return null;
+
+  return (
+    <div className="proto-acct-link-card">
+      {step === "idle" && (
+        <>
+          <div className="proto-acct-link-header">
+            <div className="proto-acct-link-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div>
+              <h3 className="proto-acct-link-title">Get order updates</h3>
+              <p className="proto-acct-link-sub">Save your order for easy tracking and reorders</p>
+            </div>
+          </div>
+          <div className="proto-acct-link-actions">
+            {googleConfig ? (
+              <button type="button" className="proto-google-sso-btn proto-acct-link-google" onClick={handleGoogleLogin}>
+                <svg width="16" height="16" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                  <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+                  <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                  <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                </svg>
+                Continue with Google
+              </button>
+            ) : null}
+            <button type="button" className="proto-acct-link-email-btn" onClick={() => setStep("email")}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,4 12,13 22,4"/></svg>
+              Verify with Email OTP
+            </button>
+            <button type="button" className="proto-acct-link-skip" onClick={() => setStep("dismissed")}>
+              Skip for now
+            </button>
+          </div>
+        </>
+      )}
+
+      {step === "email" && (
+        <form className="proto-acct-link-form" onSubmit={handleRequestOtp}>
+          <h3 className="proto-acct-link-title">Enter your email</h3>
+          <p className="proto-acct-link-sub">We&apos;ll send a 6-digit code to verify your order</p>
+          <input
+            className="proto-acct-link-input"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            autoFocus
+          />
+          {error ? <p className="proto-acct-link-error">{error}</p> : null}
+          <div className="proto-acct-link-btn-row">
+            <button type="submit" className="proto-acct-link-submit" disabled={busy}>
+              {busy ? "Sending…" : "Send Code"}
+            </button>
+            <button type="button" className="proto-acct-link-skip" onClick={() => setStep("idle")}>Back</button>
+          </div>
+        </form>
+      )}
+
+      {(step === "otp" || step === "linking") && (
+        <form className="proto-acct-link-form" onSubmit={handleVerifyOtp}>
+          <h3 className="proto-acct-link-title">Enter verification code</h3>
+          <p className="proto-acct-link-sub">Code sent to <strong>{email}</strong>{expiresAt ? ` · valid 10 min` : ""}</p>
+          {devCode ? <p className="proto-acct-link-devcode">Dev code: <strong>{devCode}</strong></p> : null}
+          <input
+            className="proto-acct-link-input proto-acct-link-otp"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]{6}"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="000000"
+            required
+            autoFocus
+          />
+          {error ? <p className="proto-acct-link-error">{error}</p> : null}
+          <div className="proto-acct-link-btn-row">
+            <button type="submit" className="proto-acct-link-submit" disabled={busy || step === "linking"}>
+              {step === "linking" ? "Linking order…" : busy ? "Verifying…" : "Verify & Save Order"}
+            </button>
+            <button type="button" className="proto-acct-link-skip" onClick={() => { setStep("email"); setCode(""); setError(""); }}>
+              Resend
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
 }
 
 export function OrderSuccessPage() {
@@ -461,6 +623,14 @@ export function OrderSuccessPage() {
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
+
+      {!isAuthenticated && checkoutSession?.id ? (
+        <CheckoutAccountLink
+          checkoutSessionId={checkoutSession.id}
+          guestSessionId={getExistingGuestSessionId() || ""}
+          onLinked={() => loadSuccessState({ showSpinner: false })}
+        />
+      ) : null}
 
       <div className="proto-checkout-layout proto-success-layout">
         <section className="proto-checkout-main">

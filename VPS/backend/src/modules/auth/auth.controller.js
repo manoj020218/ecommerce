@@ -168,6 +168,31 @@ const customerCartView = asyncHandler(async (req, res) => {
   return ok(res, data, "Customer cart fetched.");
 });
 
+const customerRequestEmailOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) throw new HttpError(400, "email is required.");
+  const data = await service.requestEmailOtp({ email });
+  return ok(res, data, "Email OTP sent.");
+});
+
+const customerVerifyEmailOtp = asyncHandler(async (req, res) => {
+  const { email, code, name, guestSessionId } = req.body || {};
+  if (!email || !code) throw new HttpError(400, "email and code are required.");
+  const data = await service.verifyEmailOtp({ email, code, name: name || "", guestSessionId: guestSessionId || null });
+  return ok(res, data, "Email verified and login successful.");
+});
+
+const customerLinkGuestCheckout = asyncHandler(async (req, res) => {
+  const { checkoutSessionId, guestSessionId } = req.body || {};
+  if (!checkoutSessionId) throw new HttpError(400, "checkoutSessionId is required.");
+  const data = await service.linkGuestCheckoutToCustomer(
+    req.customer.id,
+    checkoutSessionId,
+    guestSessionId || null
+  );
+  return ok(res, data, "Order linked to account.");
+});
+
 module.exports = {
   adminLogin,
   adminRefresh,
@@ -190,5 +215,8 @@ module.exports = {
   publicSearch,
   guestCartAddItem,
   guestCartView,
-  customerCartView
+  customerCartView,
+  customerRequestEmailOtp,
+  customerVerifyEmailOtp,
+  customerLinkGuestCheckout
 };

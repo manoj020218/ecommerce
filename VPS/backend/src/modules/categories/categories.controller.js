@@ -53,6 +53,12 @@ const adminArchiveCategory = asyncHandler(async (req, res) => {
   return ok(res, data, "Category archived.");
 });
 
+const adminUploadCategoryImage = asyncHandler(async (req, res) => {
+  if (!req.file) throw new HttpError(400, "Image file is required.");
+  const data = await service.uploadCategoryImage(req.params.categoryId, req.file.path, req.actor);
+  return ok(res, data, "Category image uploaded.");
+});
+
 const publicListCategories = asyncHandler(async (_req, res) => {
   const data = await service.listPublicCategories();
   return ok(res, data, "Public categories fetched.");
@@ -64,5 +70,6 @@ module.exports = {
   adminCreateCategory,
   adminUpdateCategory,
   adminArchiveCategory,
+  adminUploadCategoryImage,
   publicListCategories
 };

@@ -27,6 +27,7 @@ const fulfillmentItemSchema = z.object({
 
 const updateOrderSchema = z.object({
   orderStatus: z.enum(["processing", "cancelled", "fulfilled"]).optional(),
+  manualPaymentStatus: z.enum(["verified", "failed", "pending"]).optional(),
   adminNote: z.string().trim().max(2000).optional(),
   customerNote: z.string().trim().max(2000).optional(),
   tags: z.array(z.string().trim().max(60)).max(20).optional(),

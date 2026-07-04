@@ -183,6 +183,111 @@ function StatusChip({ label, value }) {
   );
 }
 
+// ── Payment Action Banner ────────────────────────────────────────────────────
+
+const MANUAL_PAYMENT_METHODS_UI = new Set(["direct_bank_transfer", "manual_upi"]);
+
+function PaymentActionBanner({ order, onConfirmPayment, onConfirmOrder, paymentSaving, orderSaving }) {
+  const isManual = MANUAL_PAYMENT_METHODS_UI.has(order.paymentMethod);
+  const paymentVerified = order.manualPaymentStatus === "verified";
+  const orderConfirmed = ["processing", "fulfilled", "delivered", "cancelled"].includes(order.orderStatus);
+
+  if (!isManual || (paymentVerified && orderConfirmed)) return null;
+
+  return (
+    <div style={{
+      background: "rgba(232,35,26,0.03)", border: "1.5px solid rgba(232,35,26,0.25)",
+      borderRadius: 12, padding: "16px 20px", marginBottom: 14
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8231A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#E8231A" }}>
+          Manual Payment — Admin Action Required
+        </span>
+        <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 4 }}>
+          ({humanize(order.paymentMethod)})
+        </span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {/* Step 1 — Confirm Payment */}
+        <div style={{
+          background: paymentVerified ? "rgba(22,163,74,0.06)" : "#fff",
+          border: paymentVerified ? "1.5px solid rgba(22,163,74,0.4)" : "1.5px solid rgba(234,179,8,0.45)",
+          borderRadius: 10, padding: "14px 16px"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            {paymentVerified ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            )}
+            <span style={{ fontSize: 12, fontWeight: 700, color: paymentVerified ? "#16a34a" : "#d97706" }}>
+              Step 1 — Confirm Payment Received
+            </span>
+          </div>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+            {paymentVerified
+              ? "Payment has been verified. Order total marked as paid."
+              : "Verify that the bank transfer / UPI payment has been received in your account."}
+          </p>
+          {!paymentVerified && (
+            <button
+              type="button" className="btn btn-primary btn-small"
+              disabled={paymentSaving}
+              onClick={onConfirmPayment}
+              style={{ background: "#d97706" }}
+            >
+              {paymentSaving ? "Confirming…" : "Confirm Payment Received"}
+            </button>
+          )}
+          {paymentVerified && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>Payment Verified</span>
+          )}
+        </div>
+
+        {/* Step 2 — Confirm Order */}
+        <div style={{
+          background: orderConfirmed ? "rgba(22,163,74,0.06)" : "#fff",
+          border: orderConfirmed ? "1.5px solid rgba(22,163,74,0.4)" : "1.5px solid rgba(37,99,235,0.3)",
+          borderRadius: 10, padding: "14px 16px",
+          opacity: (!paymentVerified && !orderConfirmed) ? 0.65 : 1
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+            {orderConfirmed ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            )}
+            <span style={{ fontSize: 12, fontWeight: 700, color: orderConfirmed ? "#16a34a" : "#2563eb" }}>
+              Step 2 — Confirm Order
+            </span>
+          </div>
+          <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+            {orderConfirmed
+              ? "Order confirmed and moved to processing. Generate invoice and dispatch when ready."
+              : "Accept this order to begin processing. Invoice generation and courier assignment become available after this step."}
+          </p>
+          {!orderConfirmed && (
+            <button
+              type="button" className="btn btn-primary btn-small"
+              disabled={orderSaving}
+              onClick={onConfirmOrder}
+            >
+              {orderSaving ? "Confirming…" : "Confirm Order"}
+            </button>
+          )}
+          {orderConfirmed && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>Order Confirmed</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Mark as Processing modal ─────────────────────────────────────────────────
 
 function ProcessingModal({ order, onClose, onSave, saving, error }) {
@@ -560,6 +665,8 @@ export function OrderDetailPage() {
 
   const [noteSaving, setNoteSaving] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
+  const [paymentConfirmSaving, setPaymentConfirmSaving] = useState(false);
+  const [orderConfirmSaving, setOrderConfirmSaving] = useState(false);
 
   const reload = async () => {
     setError("");
@@ -625,6 +732,30 @@ export function OrderDetailPage() {
       setError(e.message || "Failed to cancel.");
     } finally {
       setCancelSaving(false);
+    }
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!window.confirm("Mark this payment as received / verified? This will update payment status to Paid.")) return;
+    setPaymentConfirmSaving(true);
+    try {
+      await handleUpdateOrder({ manualPaymentStatus: "verified" });
+    } catch (e) {
+      setError(e.message || "Failed to confirm payment.");
+    } finally {
+      setPaymentConfirmSaving(false);
+    }
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!window.confirm("Confirm and accept this order? It will move to Processing status, enabling invoice generation and dispatch.")) return;
+    setOrderConfirmSaving(true);
+    try {
+      await handleUpdateOrder({ orderStatus: "processing" });
+    } catch (e) {
+      setError(e.message || "Failed to confirm order.");
+    } finally {
+      setOrderConfirmSaving(false);
     }
   };
 
@@ -771,6 +902,15 @@ export function OrderDetailPage() {
           <StatusChip label="Payment Status" value={order.paymentStatus} />
         </div>
       </div>
+
+      {/* Manual payment action banner */}
+      <PaymentActionBanner
+        order={order}
+        onConfirmPayment={handleConfirmPayment}
+        onConfirmOrder={handleConfirmOrder}
+        paymentSaving={paymentConfirmSaving}
+        orderSaving={orderConfirmSaving}
+      />
 
       {/* Payment gateway info */}
       {order.gatewayTxnId && (

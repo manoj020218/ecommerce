@@ -393,6 +393,14 @@ async function updateOrder(orderId, patch, actor) {
     order.orderStatus = patch.orderStatus;
     if (patch.orderStatus === "cancelled") order.shipmentStatus = "cancelled";
   }
+  if (patch.manualPaymentStatus !== undefined) {
+    order.manualPaymentStatus = patch.manualPaymentStatus;
+    if (patch.manualPaymentStatus === "verified") {
+      order.paymentStatus = "paid";
+      order.paymentVerifiedAt = new Date().toISOString();
+      if (actor) order.paymentVerifiedByAdminId = actor.id;
+    }
+  }
   if (patch.adminNote !== undefined) order.adminNote = String(patch.adminNote || "").trim();
   if (patch.customerNote !== undefined) order.customerNote = String(patch.customerNote || "").trim();
   if (patch.tags !== undefined) {

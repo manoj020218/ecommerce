@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
@@ -13,6 +14,7 @@ import {
   updateCategory,
   uploadCategoryImage
 } from "./categories.api";
+import { fetchProducts } from "../products/products.api";
 
 const EMPTY_FORM = {
   name: "",
@@ -34,12 +36,14 @@ function categoryLabel(categoryMap, categoryId) {
 }
 
 export function CategoriesPage() {
+  const navigate = useNavigate();
   const { session } = useAuthSession();
   const canCreate = hasPermission(session, "categories.create");
   const canEdit = hasPermission(session, "categories.edit");
   const canDelete = hasPermission(session, "categories.delete");
 
   const [rows, setRows] = useState([]);
+  const [productCountMap, setProductCountMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -71,8 +75,17 @@ export function CategoriesPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await fetchCategories(nextFilters);
-      setRows(Array.isArray(data) ? data : []);
+      const [catData, productData] = await Promise.all([
+        fetchCategories(nextFilters),
+        fetchProducts({ includeInactive: true, q: "" })
+      ]);
+      setRows(Array.isArray(catData) ? catData : []);
+      const countMap = {};
+      for (const p of Array.isArray(productData) ? productData : []) {
+        const key = p.categoryId || "__none__";
+        countMap[key] = (countMap[key] || 0) + 1;
+      }
+      setProductCountMap(countMap);
     } catch (apiError) {
       setError(apiError.message || "Failed to load categories.");
     } finally {
@@ -277,83 +290,168 @@ export function CategoriesPage() {
               <th>Slug</th>
               <th>Parent</th>
               <th>Sort</th>
+              <th>Products</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    {row.imageUrl ? (
-                      <img
-                        src={row.imageUrl}
-                        alt={row.name}
-                        style={{ width: 44, height: 33, objectFit: "cover", borderRadius: 6, background: "#f3f4f6", flexShrink: 0 }}
-                      />
-                    ) : (
-                      <div style={{ width: 44, height: 33, borderRadius: 6, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+            {rows.map((row) => {
+              const count = productCountMap[row.id] || 0;
+              return (
+                <tr key={row.id}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {row.imageUrl ? (
+                        <img
+                          src={row.imageUrl}
+                          alt={row.name}
+                          style={{ width: 44, height: 33, objectFit: "cover", borderRadius: 6, background: "#f3f4f6", flexShrink: 0 }}
+                        />
+                      ) : (
+                        <div style={{ width: 44, height: 33, borderRadius: 6, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+                        </div>
+                      )}
+                      <div>
+                        <strong>{row.name}</strong>
+                        {row.description ? <p className="row-sub">{row.description}</p> : null}
                       </div>
-                    )}
-                    <div>
-                      <strong>{row.name}</strong>
-                      {row.description ? <p className="row-sub">{row.description}</p> : null}
                     </div>
-                  </div>
-                </td>
-                <td>{row.slug}</td>
-                <td>{categoryLabel(categoryMap, row.parentCategoryId)}</td>
-                <td>{row.sortOrder}</td>
-                <td>
-                  <StatusBadge value={row.isActive ? "active" : "inactive"} />
-                </td>
-                <td className="row-actions">
-                  {canEdit ? (
-                    <button type="button" className="btn-link" onClick={() => openEdit(row)}>
-                      Edit
-                    </button>
-                  ) : null}
-                  {canDelete ? (
-                    <button type="button" className="btn-link danger" onClick={() => onArchive(row)}>
-                      Archive
-                    </button>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td>{row.slug}</td>
+                  <td>{categoryLabel(categoryMap, row.parentCategoryId)}</td>
+                  <td>{row.sortOrder}</td>
+                  <td>
+                    {count > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate("/products", { state: { presetCategoryId: row.id } })}
+                        style={{ background: "rgba(232,35,26,0.08)", color: "#E8231A", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        {count}
+                      </button>
+                    ) : (
+                      <span style={{ color: "#d1d5db", fontSize: 12 }}>0</span>
+                    )}
+                  </td>
+                  <td>
+                    <StatusBadge value={row.isActive ? "active" : "inactive"} />
+                  </td>
+                  <td className="row-actions">
+                    {canEdit ? (
+                      <button type="button" className="btn-link" onClick={() => openEdit(row)}>
+                        Edit
+                      </button>
+                    ) : null}
+                    {canDelete ? (
+                      <button type="button" className="btn-link danger" onClick={() => onArchive(row)}>
+                        Archive
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            })}
+            {/* Non Categorized virtual row */}
+            {(() => {
+              const noneCount = productCountMap["__none__"] || 0;
+              return (
+                <tr style={{ background: "#fafafa" }}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 44, height: 33, borderRadius: 6, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><path d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      </div>
+                      <div>
+                        <strong style={{ color: "#9ca3af", fontStyle: "italic" }}>Non Categorised</strong>
+                        <p className="row-sub" style={{ color: "#9ca3af" }}>Products with no category assigned</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ color: "#d1d5db" }}>—</td>
+                  <td style={{ color: "#d1d5db" }}>—</td>
+                  <td style={{ color: "#d1d5db" }}>—</td>
+                  <td>
+                    {noneCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => navigate("/products", { state: { presetCategoryId: "__none__" } })}
+                        style={{ background: "rgba(245,158,11,0.1)", color: "#d97706", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        {noneCount}
+                      </button>
+                    ) : (
+                      <span style={{ color: "#d1d5db", fontSize: 12 }}>0</span>
+                    )}
+                  </td>
+                  <td><StatusBadge value="inactive" /></td>
+                  <td></td>
+                </tr>
+              );
+            })()}
           </tbody>
         </table>
       </div>
 
       <div className="mobile-cards">
-        {rows.map((row) => (
-          <article key={row.id} className="card">
-            <div className="card-head">
-              {row.imageUrl ? (
-                <img src={row.imageUrl} alt={row.name} style={{ width: 48, height: 36, objectFit: "cover", borderRadius: 6, background: "#f3f4f6" }} />
-              ) : null}
-              <h4 style={{ flex: 1 }}>{row.name}</h4>
-              <StatusBadge value={row.isActive ? "active" : "inactive"} />
-            </div>
-            <p className="muted">{row.slug}</p>
-            <p className="muted">Parent: {categoryLabel(categoryMap, row.parentCategoryId)}</p>
-            <p className="muted">Sort: {row.sortOrder}</p>
-            <div className="card-actions">
-              {canEdit ? (
-                <button type="button" className="btn btn-secondary" onClick={() => openEdit(row)}>
-                  Edit
+        {rows.map((row) => {
+          const count = productCountMap[row.id] || 0;
+          return (
+            <article key={row.id} className="card">
+              <div className="card-head">
+                {row.imageUrl ? (
+                  <img src={row.imageUrl} alt={row.name} style={{ width: 48, height: 36, objectFit: "cover", borderRadius: 6, background: "#f3f4f6" }} />
+                ) : null}
+                <h4 style={{ flex: 1 }}>{row.name}</h4>
+                <StatusBadge value={row.isActive ? "active" : "inactive"} />
+              </div>
+              <p className="muted">{row.slug}</p>
+              <p className="muted">Parent: {categoryLabel(categoryMap, row.parentCategoryId)}</p>
+              <p className="muted">Sort: {row.sortOrder}</p>
+              {count > 0 ? (
+                <button type="button" onClick={() => navigate("/products", { state: { presetCategoryId: row.id } })}
+                  style={{ background: "rgba(232,35,26,0.08)", color: "#E8231A", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 4 }}>
+                  {count} products
                 </button>
-              ) : null}
-              {canDelete ? (
-                <button type="button" className="btn btn-danger" onClick={() => onArchive(row)}>
-                  Archive
+              ) : (
+                <p className="muted">0 products</p>
+              )}
+              <div className="card-actions">
+                {canEdit ? (
+                  <button type="button" className="btn btn-secondary" onClick={() => openEdit(row)}>
+                    Edit
+                  </button>
+                ) : null}
+                {canDelete ? (
+                  <button type="button" className="btn btn-danger" onClick={() => onArchive(row)}>
+                    Archive
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+        {/* Non Categorised mobile card */}
+        {(() => {
+          const noneCount = productCountMap["__none__"] || 0;
+          return (
+            <article className="card" style={{ background: "#fafafa", opacity: 0.85 }}>
+              <div className="card-head">
+                <h4 style={{ flex: 1, color: "#9ca3af", fontStyle: "italic" }}>Non Categorised</h4>
+              </div>
+              <p className="muted">Products with no category assigned</p>
+              {noneCount > 0 ? (
+                <button type="button" onClick={() => navigate("/products", { state: { presetCategoryId: "__none__" } })}
+                  style={{ background: "rgba(245,158,11,0.1)", color: "#d97706", border: "1px solid rgba(245,158,11,0.3)", borderRadius: 20, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  {noneCount} products
                 </button>
-              ) : null}
-            </div>
-          </article>
-        ))}
+              ) : (
+                <p className="muted">0 products</p>
+              )}
+            </article>
+          );
+        })()}
       </div>
 
       <Modal

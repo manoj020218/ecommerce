@@ -756,6 +756,10 @@ export function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
 
+  // mass-action panel
+  const [massAction, setMassAction] = useState(null); // null | "category" | "hsn" | "price" | "qty"
+  const [massValue, setMassValue] = useState({ categoryId: "", hsnCode: "", priceMode: "pct_increase", priceAmount: "", qtyMode: "set", qtyAmount: "" });
+
   // column selector (persisted to localStorage via products-column-selector.jsx)
   const [visibleColumns, setVisibleColumns] = useState(() => loadSavedCols());
 
@@ -1208,6 +1212,7 @@ export function ProductsPage() {
     try {
       await bulkPatchProducts(ids.map((id) => ({ id, isActive: activate })));
       setSelectedIds(new Set());
+      setMassAction(null);
       setNotice(`${ids.length} products ${activate ? "activated" : "deactivated"}.`);
       await loadProducts(filters);
     } catch (err) { setError(err.message || "Bulk action failed."); }
@@ -1222,6 +1227,73 @@ export function ProductsPage() {
       setNotice(`${ids.length} products archived.`);
       await loadProducts(filters);
     } catch (err) { setError(err.message || "Bulk archive failed."); }
+  };
+
+  const onApplyMassCategory = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length || !massValue.categoryId) return;
+    try {
+      const result = await bulkPatchProducts(ids.map((id) => ({ id, categoryId: massValue.categoryId })));
+      setSelectedIds(new Set());
+      setMassAction(null);
+      setNotice(`Category updated on ${result.updated} product${result.updated !== 1 ? "s" : ""}.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk category update failed."); }
+  };
+
+  const onApplyMassHsn = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length || !massValue.hsnCode) return;
+    try {
+      const result = await bulkPatchProducts(ids.map((id) => ({ id, hsnCode: massValue.hsnCode })));
+      setSelectedIds(new Set());
+      setMassAction(null);
+      setNotice(`HSN code updated on ${result.updated} product${result.updated !== 1 ? "s" : ""}.${result.errors?.length ? ` ${result.errors.length} skipped.` : ""}`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk HSN update failed."); }
+  };
+
+  const onApplyMassPrice = async () => {
+    const ids = [...selectedIds];
+    const amt = parseFloat(massValue.priceAmount);
+    if (!ids.length || isNaN(amt) || amt <= 0) return;
+    const updates = ids.map((id) => {
+      const product = rows.find((r) => r.id === id);
+      const base = Number(product?.salePrice || product?.basePrice || 0);
+      let nextPrice = base;
+      if (massValue.priceMode === "pct_increase") nextPrice = Math.round(base * (1 + amt / 100));
+      else if (massValue.priceMode === "pct_decrease") nextPrice = Math.round(base * (1 - amt / 100));
+      else if (massValue.priceMode === "set") nextPrice = amt;
+      return { id, salePrice: Math.max(0, nextPrice) };
+    });
+    try {
+      const result = await bulkPatchProducts(updates);
+      setSelectedIds(new Set());
+      setMassAction(null);
+      setNotice(`Price updated on ${result.updated} product${result.updated !== 1 ? "s" : ""}.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk price update failed."); }
+  };
+
+  const onApplyMassQty = async () => {
+    const ids = [...selectedIds];
+    const amt = parseInt(massValue.qtyAmount, 10);
+    if (!ids.length || isNaN(amt)) return;
+    const updates = ids.map((id) => {
+      const product = rows.find((r) => r.id === id);
+      const current = Number(product?.stockQty || 0);
+      let nextQty = amt;
+      if (massValue.qtyMode === "add") nextQty = current + amt;
+      else if (massValue.qtyMode === "subtract") nextQty = Math.max(0, current - amt);
+      return { id, stockQty: Math.max(0, nextQty) };
+    });
+    try {
+      const result = await bulkPatchProducts(updates);
+      setSelectedIds(new Set());
+      setMassAction(null);
+      setNotice(`Qty updated on ${result.updated} product${result.updated !== 1 ? "s" : ""}.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk qty update failed."); }
   };
 
   // ── bulk-edit display rows ────────────────────────────────────────────────────
@@ -1452,28 +1524,139 @@ export function ProductsPage() {
 
           {/* ── bulk actions bar ── */}
           {selectedIds.size > 0 && (
-            <div style={{ background: "rgba(232,35,26,0.06)", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 12, padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: "#E8231A" }}>
-                {selectedIds.size} product{selectedIds.size !== 1 ? "s" : ""} selected
-              </span>
-              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-                <button type="button" onClick={() => onBulkActivate(true)}
-                  style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
-                  Activate
-                </button>
-                <button type="button" onClick={() => onBulkActivate(false)}
-                  style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
-                  Deactivate
-                </button>
-                <button type="button" onClick={onBulkArchiveSelected}
-                  style={{ fontSize: 12, background: "#fff", border: "1px solid #fecaca", color: "#dc2626", padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>
-                  Archive
-                </button>
-                <button type="button" onClick={() => setSelectedIds(new Set())}
-                  style={{ fontSize: 12, background: "none", border: "none", color: "#9ca3af", padding: "6px 8px", cursor: "pointer" }}>
-                  ✕ Clear
-                </button>
+            <div style={{ marginBottom: 12 }}>
+              {/* top bar */}
+              <div style={{ background: "rgba(232,35,26,0.06)", border: "1px solid rgba(232,35,26,0.2)", borderRadius: massAction ? "12px 12px 0 0" : 12, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#E8231A", marginRight: 4 }}>
+                  {selectedIds.size} selected
+                </span>
+                {/* mass-action buttons */}
+                {[
+                  { key: "category", label: "Set Category" },
+                  { key: "hsn",      label: "Set HSN" },
+                  { key: "price",    label: "Adjust Price" },
+                  { key: "qty",      label: "Set Qty" }
+                ].map(({ key, label }) => (
+                  <button key={key} type="button"
+                    onClick={() => setMassAction(massAction === key ? null : key)}
+                    style={{ fontSize: 12, background: massAction === key ? "#E8231A" : "#fff", border: "1px solid " + (massAction === key ? "#E8231A" : "#e5e7eb"), color: massAction === key ? "#fff" : "#374151", padding: "5px 11px", borderRadius: 8, cursor: "pointer", fontWeight: massAction === key ? 700 : 400 }}>
+                    {label}
+                  </button>
+                ))}
+                <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+                  <button type="button" onClick={() => onBulkActivate(true)}
+                    style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>
+                    Activate
+                  </button>
+                  <button type="button" onClick={() => onBulkActivate(false)}
+                    style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>
+                    Deactivate
+                  </button>
+                  <button type="button" onClick={onBulkArchiveSelected}
+                    style={{ fontSize: 12, background: "#fff", border: "1px solid #fecaca", color: "#dc2626", padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>
+                    Archive
+                  </button>
+                  <button type="button" onClick={() => { setSelectedIds(new Set()); setMassAction(null); }}
+                    style={{ fontSize: 12, background: "none", border: "none", color: "#9ca3af", padding: "5px 8px", cursor: "pointer" }}>
+                    ✕ Clear
+                  </button>
+                </div>
               </div>
+
+              {/* expandable panel */}
+              {massAction === "category" && (
+                <div style={{ background: "#fff", border: "1px solid rgba(232,35,26,0.2)", borderTop: "none", borderRadius: "0 0 12px 12px", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>Category</label>
+                  <select
+                    value={massValue.categoryId}
+                    onChange={(e) => setMassValue((v) => ({ ...v, categoryId: e.target.value }))}
+                    style={{ flex: "1 1 220px", padding: "6px 10px", fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 8, minWidth: 180 }}>
+                    <option value="">— pick a category —</option>
+                    {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  <button type="button" onClick={onApplyMassCategory} disabled={!massValue.categoryId}
+                    style={{ fontSize: 13, fontWeight: 700, background: "#E8231A", color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: "pointer", opacity: massValue.categoryId ? 1 : 0.45 }}>
+                    Apply to {selectedIds.size} products
+                  </button>
+                </div>
+              )}
+
+              {massAction === "hsn" && (
+                <div style={{ background: "#fff", border: "1px solid rgba(232,35,26,0.2)", borderTop: "none", borderRadius: "0 0 12px 12px", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>HSN Code</label>
+                  <select
+                    value={massValue.hsnCode}
+                    onChange={(e) => setMassValue((v) => ({ ...v, hsnCode: e.target.value }))}
+                    style={{ flex: "1 1 260px", padding: "6px 10px", fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 8, minWidth: 200 }}>
+                    <option value="">— pick an HSN code —</option>
+                    {hsnRecords.map((h) => <option key={h.id} value={h.hsnCode}>{h.hsnCode} — {h.description || ""} ({h.gstRate}% GST)</option>)}
+                  </select>
+                  <button type="button" onClick={onApplyMassHsn} disabled={!massValue.hsnCode}
+                    style={{ fontSize: 13, fontWeight: 700, background: "#E8231A", color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: "pointer", opacity: massValue.hsnCode ? 1 : 0.45 }}>
+                    Apply to {selectedIds.size} products
+                  </button>
+                </div>
+              )}
+
+              {massAction === "price" && (
+                <div style={{ background: "#fff", border: "1px solid rgba(232,35,26,0.2)", borderTop: "none", borderRadius: "0 0 12px 12px", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>Price</label>
+                  <select
+                    value={massValue.priceMode}
+                    onChange={(e) => setMassValue((v) => ({ ...v, priceMode: e.target.value }))}
+                    style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 8 }}>
+                    <option value="pct_increase">Increase by %</option>
+                    <option value="pct_decrease">Decrease by %</option>
+                    <option value="set">Set fixed price (₹)</option>
+                  </select>
+                  <input
+                    type="number" min="0" step="0.01"
+                    placeholder={massValue.priceMode === "set" ? "Price (₹)" : "Percentage (%)"}
+                    value={massValue.priceAmount}
+                    onChange={(e) => setMassValue((v) => ({ ...v, priceAmount: e.target.value }))}
+                    style={{ width: 130, padding: "6px 10px", fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 8 }}
+                  />
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                    {massValue.priceMode === "pct_increase" && massValue.priceAmount ? `e.g. ₹1000 → ₹${Math.round(1000 * (1 + Number(massValue.priceAmount) / 100))}` : ""}
+                    {massValue.priceMode === "pct_decrease" && massValue.priceAmount ? `e.g. ₹1000 → ₹${Math.round(1000 * (1 - Number(massValue.priceAmount) / 100))}` : ""}
+                    {massValue.priceMode === "set" && massValue.priceAmount ? `All selected products set to ₹${massValue.priceAmount}` : ""}
+                  </span>
+                  <button type="button" onClick={onApplyMassPrice} disabled={!massValue.priceAmount}
+                    style={{ fontSize: 13, fontWeight: 700, background: "#E8231A", color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: "pointer", opacity: massValue.priceAmount ? 1 : 0.45 }}>
+                    Apply to {selectedIds.size} products
+                  </button>
+                </div>
+              )}
+
+              {massAction === "qty" && (
+                <div style={{ background: "#fff", border: "1px solid rgba(232,35,26,0.2)", borderTop: "none", borderRadius: "0 0 12px 12px", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>Stock Qty</label>
+                  <select
+                    value={massValue.qtyMode}
+                    onChange={(e) => setMassValue((v) => ({ ...v, qtyMode: e.target.value }))}
+                    style={{ padding: "6px 10px", fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 8 }}>
+                    <option value="set">Set to exact value</option>
+                    <option value="add">Add to current qty</option>
+                    <option value="subtract">Subtract from current qty</option>
+                  </select>
+                  <input
+                    type="number" min="0" step="1"
+                    placeholder="Quantity"
+                    value={massValue.qtyAmount}
+                    onChange={(e) => setMassValue((v) => ({ ...v, qtyAmount: e.target.value }))}
+                    style={{ width: 110, padding: "6px 10px", fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 8 }}
+                  />
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>
+                    {massValue.qtyMode === "set" && massValue.qtyAmount ? `All selected set to qty ${massValue.qtyAmount}` : ""}
+                    {massValue.qtyMode === "add" && massValue.qtyAmount ? `Current qty + ${massValue.qtyAmount}` : ""}
+                    {massValue.qtyMode === "subtract" && massValue.qtyAmount ? `Current qty − ${massValue.qtyAmount} (min 0)` : ""}
+                  </span>
+                  <button type="button" onClick={onApplyMassQty} disabled={!massValue.qtyAmount}
+                    style={{ fontSize: 13, fontWeight: 700, background: "#E8231A", color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: "pointer", opacity: massValue.qtyAmount ? 1 : 0.45 }}>
+                    Apply to {selectedIds.size} products
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

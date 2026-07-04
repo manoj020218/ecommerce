@@ -29,14 +29,19 @@ function buildFeedDescription(product) {
   );
 }
 
+function resolveImageUrl(img, apiBaseUrl) {
+  const raw = typeof img === "string" ? img : (img?.url || img?.thumbnail || "");
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${apiBaseUrl}/static/uploads/${raw.replace(/^\/+/, "")}`;
+}
+
 function buildProductFeedFields(product, options) {
-  const primaryImage =
-    (Array.isArray(product.images) && product.images.find(Boolean)) ||
-    options.defaultOgImageUrl ||
-    "";
-  const additionalImages = Array.isArray(product.images)
-    ? product.images.filter((imageUrl) => imageUrl && imageUrl !== primaryImage)
-    : [];
+  const apiBaseUrl = options.apiBaseUrl || "";
+  const rawImages = Array.isArray(product.images) ? product.images : [];
+  const resolvedImages = rawImages.map((img) => resolveImageUrl(img, apiBaseUrl)).filter(Boolean);
+  const primaryImage = resolvedImages[0] || options.defaultOgImageUrl || "";
+  const additionalImages = resolvedImages.slice(1, 10);
   const categoryPathNames = buildCategoryPathNames(
     options.categoriesById,
     product.subcategoryId || product.categoryId

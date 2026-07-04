@@ -224,8 +224,95 @@ async function generateTypedSitemapXml(type) {
   return buildUrlSetXml(entries[type] || []);
 }
 
+function resolveProductImageUrl(img, apiBaseUrl) {
+  const raw = typeof img === "string" ? img : (img?.url || img?.thumbnail || "");
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `${apiBaseUrl}/static/uploads/${raw.replace(/^\/+/, "")}`;
+}
+
+async function generateProductFeedXml() {
+  const [settings, catalogStore] = await Promise.all([getAllSettings(), readCatalogStore()]);
+  const baseUrl = buildCanonicalBaseUrl(settings);
+  const apiBaseUrl = env.publicBaseUrl;
+  const storeName = settings.storeProfile?.storeName || "Jenix India";
+
+  const items = catalogStore.products
+    .filter((p) => p.isActive)
+    .map((p) => {
+      const salePrice = Number(p.salePrice || p.basePrice || 0);
+      const basePrice = Number(p.basePrice || 0);
+      const gstRate = Number(p.gstRate || 18);
+      const priceInclTax = (salePrice * (1 + gstRate / 100)).toFixed(2);
+      const regularInclTax = (basePrice * (1 + gstRate / 100)).toFixed(2);
+      const isOnSale = basePrice > salePrice && basePrice > 0;
+      const availability = p.stockStatus === "out_of_stock" ? "out of stock" : "in stock";
+      const images = Array.isArray(p.images) ? p.images : [];
+      const imageLink = resolveProductImageUrl(images[0], apiBaseUrl);
+      const additionalImages = images.slice(1, 4)
+        .map((img) => resolveProductImageUrl(img, apiBaseUrl))
+        .filter(Boolean);
+      const link = `${baseUrl}/products/${p.slug}`;
+      const title = escapeXml(p.googleShoppingTitle || p.title || "");
+      const description = escapeXml(
+        collapseText(p.googleShoppingDescription || p.shortDescription || p.fullDescription || p.title)
+      );
+
+      const lines = [
+        `    <item>`,
+        `      <g:id>${escapeXml(p.sku || p.id)}</g:id>`,
+        `      <g:title>${title}</g:title>`,
+        `      <g:description>${description}</g:description>`,
+        `      <g:link>${escapeXml(link)}</g:link>`,
+        imageLink ? `      <g:image_link>${escapeXml(imageLink)}</g:image_link>` : null,
+        ...additionalImages.map((u) => `      <g:additional_image_link>${escapeXml(u)}</g:additional_image_link>`),
+        isOnSale
+          ? `      <g:price>${escapeXml(regularInclTax)} INR</g:price>\n      <g:sale_price>${escapeXml(priceInclTax)} INR</g:sale_price>`
+          : `      <g:price>${escapeXml(priceInclTax)} INR</g:price>`,
+        `      <g:availability>${availability}</g:availability>`,
+        `      <g:condition>new</g:condition>`,
+        `      <g:brand>${escapeXml(p.brand || storeName)}</g:brand>`,
+        p.gtin ? `      <g:gtin>${escapeXml(p.gtin)}</g:gtin>` : null,
+        (p.modelNumber || p.mpn) ? `      <g:mpn>${escapeXml(p.modelNumber || p.mpn)}</g:mpn>` : null,
+        p.googleProductCategory ? `      <g:google_product_category>${escapeXml(p.googleProductCategory)}</g:google_product_category>` : null,
+        p.productType ? `      <g:product_type>${escapeXml(p.productType)}</g:product_type>` : null,
+        `    </item>`
+      ].filter((line) => line !== null);
+
+      return lines.join("\n");
+    });
+
+  return [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">`,
+    `  <channel>`,
+    `    <title>${escapeXml(storeName)}</title>`,
+    `    <link>${escapeXml(baseUrl)}</link>`,
+    `    <description>${escapeXml(storeName)} Product Feed</description>`,
+    ...items,
+    `  </channel>`,
+    `</rss>`
+  ].join("\n");
+}
+
+async function generateRobotsTxt() {
+  const settings = await getAllSettings();
+  const baseUrl = buildCanonicalBaseUrl(settings);
+  return [
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /account",
+    "Disallow: /cart",
+    "Disallow: /checkout",
+    "",
+    `Sitemap: ${baseUrl}/sitemap.xml`
+  ].join("\n");
+}
+
 module.exports = {
   buildProductPageSeoPayload,
   generateSitemapIndexXml,
-  generateTypedSitemapXml
+  generateTypedSitemapXml,
+  generateRobotsTxt,
+  generateProductFeedXml
 };

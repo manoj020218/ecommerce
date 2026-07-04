@@ -212,7 +212,9 @@ const adminBulkPatchProducts = asyncHandler(async (req, res) => {
 const publicListProducts = asyncHandler(async (req, res) => {
   const filters = parseListPublicProductsQuery(req.query || {});
   const data = await service.listPublicProducts(filters, {
-    customerId: req.customer?.id || null
+    customerId: req.customer?.id || null,
+    limit: filters.limit,
+    offset: filters.offset
   });
   return ok(res, data, "Public products fetched.");
 });

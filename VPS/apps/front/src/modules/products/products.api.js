@@ -15,16 +15,12 @@ function buildQuery(params = {}) {
 }
 
 export function listProducts(params = {}) {
-  const suffix = (() => {
-    const query = new URLSearchParams();
-    if (params.q) {
-      query.set("q", params.q);
-    }
-    if (params.categoryId) {
-      query.set("categoryId", params.categoryId);
-    }
-    return query.size ? `?${query.toString()}` : "";
-  })();
+  const query = new URLSearchParams();
+  if (params.q) query.set("q", params.q);
+  if (params.categoryId) query.set("categoryId", params.categoryId);
+  if (params.limit != null) query.set("limit", String(params.limit));
+  if (params.offset != null) query.set("offset", String(params.offset));
+  const suffix = query.size ? `?${query.toString()}` : "";
   return apiFetch(`/products${suffix}`, { auth: true });
 }
 

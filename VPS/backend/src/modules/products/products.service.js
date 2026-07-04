@@ -844,11 +844,23 @@ async function listPublicProducts(filters, options = {}) {
   const customerPricingContext = await resolveCustomerPricingContext(options.customerId);
   let rows = store.products.filter((product) => product.isActive);
   rows = filterProducts(rows, filters);
-  return sortProducts(rows).map((product) =>
-    toPublicProduct(product, {
-      customerPricingContext
-    })
-  );
+  const sorted = sortProducts(rows);
+
+  // Paginated response when limit is requested
+  if (options.limit) {
+    const offset = options.offset || 0;
+    const slice = sorted.slice(offset, offset + options.limit);
+    return {
+      items: slice.map((product) => toPublicProduct(product, { customerPricingContext })),
+      total: sorted.length,
+      hasMore: offset + options.limit < sorted.length,
+      offset,
+      limit: options.limit
+    };
+  }
+
+  // Backward-compatible flat array
+  return sorted.map((product) => toPublicProduct(product, { customerPricingContext }));
 }
 
 async function getPublicProductBySlug(slug, options = {}) {

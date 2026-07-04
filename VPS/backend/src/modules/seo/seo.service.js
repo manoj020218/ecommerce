@@ -36,8 +36,9 @@ function buildCanonicalBaseUrl(settings) {
 function buildProductPageMeta(product, settings) {
   const baseUrl = buildCanonicalBaseUrl(settings);
   return {
-    metaTitle: product.googleShoppingTitle || product.title,
+    metaTitle: product.metaTitle || product.googleShoppingTitle || product.title,
     metaDescription:
+      collapseText(product.metaDescription) ||
       collapseText(product.shortDescription) ||
       collapseText(product.googleShoppingDescription) ||
       collapseText(product.fullDescription) ||

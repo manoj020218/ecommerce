@@ -409,7 +409,8 @@ const EMPTY_FORM = {
   videos: [], downloads: [],
   metaTitle: "", metaDescription: "", metaKeywords: "",
   googleShoppingTitle: "", googleShoppingDescription: "", googleProductCategory: "",
-  productType: "", isActive: true, stockQty: 0, reservedQty: 0,
+  productType: "", relationsRelated: [], relationsAccessory: [],
+  isActive: true, stockQty: 0, reservedQty: 0,
   stockStatus: "in_stock", allowBackorder: false, maxOrderQty: 1000, lowStockThreshold: 0
 };
 
@@ -447,7 +448,10 @@ function formFromProduct(product) {
     googleShoppingTitle: product.googleShoppingTitle || "",
     googleShoppingDescription: product.googleShoppingDescription || "",
     googleProductCategory: product.googleProductCategory || "",
-    productType: product.productType || "", isActive: Boolean(product.isActive),
+    productType: product.productType || "",
+    relationsRelated: Array.isArray(product.relations?.related) ? product.relations.related : [],
+    relationsAccessory: Array.isArray(product.relations?.accessory) ? product.relations.accessory : [],
+    isActive: Boolean(product.isActive),
     stockQty: Number(product.stockQty || 0), reservedQty: Number(product.reservedQty || 0),
     stockStatus: product.stockStatus || "in_stock", allowBackorder: Boolean(product.allowBackorder),
     maxOrderQty: Number(product.maxOrderQty || 1000), lowStockThreshold: Number(product.lowStockThreshold || 0)
@@ -515,6 +519,7 @@ function buildPayload(form) {
     googleShoppingTitle: form.googleShoppingTitle,
     googleShoppingDescription: form.googleShoppingDescription,
     googleProductCategory: form.googleProductCategory, productType: form.productType,
+    relations: { related: form.relationsRelated || [], accessory: form.relationsAccessory || [] },
     isActive: Boolean(form.isActive), stockQty: Number(form.stockQty || 0),
     reservedQty: Number(form.reservedQty || 0), stockStatus: form.stockStatus,
     allowBackorder: Boolean(form.allowBackorder),
@@ -527,6 +532,77 @@ function stockSummary(product) {
   const available = Number(product.availableQty || 0);
   const reserved = Number(product.reservedQty || 0);
   return `${available} avail / ${reserved} rsv`;
+}
+
+// ── Product relation chip picker ──────────────────────────────────────────────
+
+function ProductRelationPicker({ label, ids, setIds, allProducts, currentId }) {
+  const [query, setQuery] = useState("");
+  const inputRef = useRef(null);
+
+  const selected = (ids || [])
+    .map((id) => allProducts.find((p) => p.id === id))
+    .filter(Boolean);
+
+  const matches = query.trim().length >= 1
+    ? allProducts.filter((p) => {
+        if (p.id === currentId) return false;
+        if ((ids || []).includes(p.id)) return false;
+        const q = query.toLowerCase();
+        return (
+          (p.title || "").toLowerCase().includes(q) ||
+          (p.sku || "").toLowerCase().includes(q) ||
+          (p.modelNumber || "").toLowerCase().includes(q)
+        );
+      }).slice(0, 8)
+    : [];
+
+  const add = (p) => {
+    setIds((cur) => (cur.includes(p.id) ? cur : [...cur, p.id]));
+    setQuery("");
+    inputRef.current?.focus();
+  };
+
+  const remove = (id) => setIds((cur) => cur.filter((x) => x !== id));
+
+  return (
+    <div className="field field-full" style={{ position: "relative" }}>
+      <span style={{ fontWeight: 500, fontSize: 13, color: "var(--text)", marginBottom: 4, display: "block" }}>{label}</span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, minHeight: 36, padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 8, background: "#fff", cursor: "text" }} onClick={() => inputRef.current?.focus()}>
+        {selected.map((p) => (
+          <span key={p.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(232,35,26,0.08)", color: "var(--brand)", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 6, padding: "2px 8px", fontSize: 12, fontWeight: 500, whiteSpace: "nowrap" }}>
+            {p.title}{p.sku ? ` (${p.sku})` : ""}
+            <button type="button" onClick={(e) => { e.stopPropagation(); remove(p.id); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: "var(--brand)", fontWeight: 700, fontSize: 14 }}>×</button>
+          </span>
+        ))}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={selected.length === 0 ? "Type product name or SKU…" : ""}
+          style={{ border: "none", outline: "none", flex: 1, minWidth: 140, fontSize: 13, padding: "2px 0", background: "transparent" }}
+        />
+      </div>
+      {matches.length > 0 && (
+        <div style={{ position: "absolute", zIndex: 200, top: "100%", left: 0, right: 0, background: "#fff", border: "1px solid var(--border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", marginTop: 2, overflow: "hidden" }}>
+          {matches.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => add(p)}
+              style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", background: "none", border: "none", cursor: "pointer", fontSize: 13, borderBottom: "1px solid var(--border-light)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#f9fafb"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+            >
+              <strong>{p.title}</strong>
+              {p.sku ? <span style={{ color: "var(--muted)", marginLeft: 8, fontSize: 11 }}>{p.sku}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── Inline cell component ─────────────────────────────────────────────────────
@@ -2497,6 +2573,26 @@ export function ProductsPage() {
           <label className="field field-full"><span>Shopping Description</span><textarea rows="2" name="googleShoppingDescription" value={form.googleShoppingDescription} onChange={onFormChange} /></label>
           <label className="field"><span>Google Product Category</span><input name="googleProductCategory" value={form.googleProductCategory} onChange={onFormChange} placeholder="Electronics > Industrial" /></label>
           <label className="field"><span>Product Type</span><input name="productType" value={form.productType} onChange={onFormChange} placeholder="Relays > Power Relays" /></label>
+
+          {/* ── LINKED PRODUCTS ── */}
+          <h4 className="form-section">Linked Products</h4>
+          <p style={{ fontSize: 12, color: "var(--muted)", margin: "-8px 0 8px", gridColumn: "1/-1" }}>
+            These appear on the buyer product page below the main product. <strong>Related Products</strong> shows alternatives; <strong>Accessories</strong> shows add-ons.
+          </p>
+          <ProductRelationPicker
+            label="Related Products"
+            ids={form.relationsRelated}
+            setIds={(updater) => setForm((cur) => ({ ...cur, relationsRelated: typeof updater === "function" ? updater(cur.relationsRelated) : updater }))}
+            allProducts={rows}
+            currentId={editingId}
+          />
+          <ProductRelationPicker
+            label="Accessories"
+            ids={form.relationsAccessory}
+            setIds={(updater) => setForm((cur) => ({ ...cur, relationsAccessory: typeof updater === "function" ? updater(cur.relationsAccessory) : updater }))}
+            allProducts={rows}
+            currentId={editingId}
+          />
 
           {modalError && (
             <div style={{

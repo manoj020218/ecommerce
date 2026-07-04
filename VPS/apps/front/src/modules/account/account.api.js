@@ -54,6 +54,28 @@ export function verifyCustomerOtp(payload) {
   });
 }
 
+export function requestEmailOtp(payload) {
+  return apiFetch("/auth/customer/email-otp/request", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function verifyEmailOtp(payload) {
+  return apiFetch("/auth/customer/email-otp/verify", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function linkGuestCheckout(payload) {
+  return apiFetch("/auth/customer/link-guest-checkout", {
+    method: "POST",
+    auth: true,
+    body: payload
+  });
+}
+
 export function logoutCustomer(refreshToken) {
   return apiFetch("/auth/customer/logout", {
     method: "POST",

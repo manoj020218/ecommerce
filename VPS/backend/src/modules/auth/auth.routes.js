@@ -35,6 +35,10 @@ function createAuthRouter() {
   router.post("/public/guest-cart/items", controller.guestCartAddItem);
   router.get("/public/guest-cart/:sessionId", controller.guestCartView);
 
+  router.post("/customer/email-otp/request", controller.customerRequestEmailOtp);
+  router.post("/customer/email-otp/verify", controller.customerVerifyEmailOtp);
+  router.post("/customer/link-guest-checkout", requireCustomerAuth, controller.customerLinkGuestCheckout);
+
   return router;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
@@ -10,7 +10,8 @@ import {
   archiveCategory,
   createCategory,
   fetchCategories,
-  updateCategory
+  updateCategory,
+  uploadCategoryImage
 } from "./categories.api";
 
 const EMPTY_FORM = {
@@ -22,6 +23,8 @@ const EMPTY_FORM = {
   sortOrder: 0,
   isActive: true
 };
+
+const CAT_IMAGE_SIZE_HINT = "800 × 600 px recommended (JPG, PNG, WebP) — auto-converted to WebP. Max 5 MB.";
 
 function categoryLabel(categoryMap, categoryId) {
   if (!categoryId) {
@@ -47,8 +50,11 @@ export function CategoriesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [saving, setSaving] = useState(false);
   const [duplicateCategory, setDuplicateCategory] = useState(null);
+  const imageInputRef = useRef(null);
 
   const categoryMap = useMemo(() => {
     return new Map(rows.map((row) => [row.id, row]));
@@ -86,6 +92,8 @@ export function CategoriesPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setImageFile(null);
+    setImagePreview("");
     setNotice("");
     setError("");
     setDuplicateCategory(null);
@@ -103,6 +111,8 @@ export function CategoriesPage() {
       sortOrder: Number(row.sortOrder || 0),
       isActive: Boolean(row.isActive)
     });
+    setImageFile(null);
+    setImagePreview(row.imageUrl || "");
     setNotice("");
     setError("");
     setDuplicateCategory(null);
@@ -112,7 +122,18 @@ export function CategoriesPage() {
   const closeModal = () => {
     setModalOpen(false);
     setSaving(false);
+    setImageFile(null);
+    setImagePreview("");
     setDuplicateCategory(null);
+  };
+
+  const onImageFileChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setImageFile(file);
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setImagePreview(url);
+    }
   };
 
   const onFormChange = (event) => {
@@ -135,16 +156,31 @@ export function CategoriesPage() {
       parentCategoryId: form.parentCategoryId || null,
       slug: form.slug.trim() || undefined
     };
+    // Don't send imageUrl in the create/update payload — managed via dedicated upload
+    delete payload.imageUrl;
 
     try {
+      let savedId = editingId;
       if (editingId) {
         await updateCategory(editingId, payload);
-        setNotice("Category updated.");
       } else {
-        await createCategory(payload);
-        setNotice("Category created.");
+        const created = await createCategory(payload);
+        savedId = created.id;
       }
 
+      if (imageFile && savedId) {
+        try {
+          await uploadCategoryImage(savedId, imageFile);
+        } catch (imgErr) {
+          setError(`Category saved but image upload failed: ${imgErr.message || "unknown error"}`);
+          load(filters);
+          setSaving(false);
+          setModalOpen(false);
+          return;
+        }
+      }
+
+      setNotice(editingId ? "Category updated." : "Category created.");
       closeModal();
       load(filters);
     } catch (apiError) {
@@ -249,8 +285,23 @@ export function CategoriesPage() {
             {rows.map((row) => (
               <tr key={row.id}>
                 <td>
-                  <strong>{row.name}</strong>
-                  {row.description ? <p className="row-sub">{row.description}</p> : null}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {row.imageUrl ? (
+                      <img
+                        src={row.imageUrl}
+                        alt={row.name}
+                        style={{ width: 44, height: 33, objectFit: "cover", borderRadius: 6, background: "#f3f4f6", flexShrink: 0 }}
+                      />
+                    ) : (
+                      <div style={{ width: 44, height: 33, borderRadius: 6, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+                      </div>
+                    )}
+                    <div>
+                      <strong>{row.name}</strong>
+                      {row.description ? <p className="row-sub">{row.description}</p> : null}
+                    </div>
+                  </div>
                 </td>
                 <td>{row.slug}</td>
                 <td>{categoryLabel(categoryMap, row.parentCategoryId)}</td>
@@ -280,7 +331,10 @@ export function CategoriesPage() {
         {rows.map((row) => (
           <article key={row.id} className="card">
             <div className="card-head">
-              <h4>{row.name}</h4>
+              {row.imageUrl ? (
+                <img src={row.imageUrl} alt={row.name} style={{ width: 48, height: 36, objectFit: "cover", borderRadius: 6, background: "#f3f4f6" }} />
+              ) : null}
+              <h4 style={{ flex: 1 }}>{row.name}</h4>
               <StatusBadge value={row.isActive ? "active" : "inactive"} />
             </div>
             <p className="muted">{row.slug}</p>
@@ -386,10 +440,54 @@ export function CategoriesPage() {
             />
           </label>
 
-          <label className="field field-full">
-            <span>Image URL</span>
-            <input name="imageUrl" value={form.imageUrl} onChange={onFormChange} />
-          </label>
+          <div className="field field-full" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Category Image</span>
+            <div
+              style={{
+                border: "1.5px dashed #d1d5db", borderRadius: 10, padding: "14px 16px",
+                background: "#f9fafb", display: "flex", flexDirection: "column", gap: 10
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {imagePreview ? (
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    style={{ width: 80, height: 60, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb", background: "#f3f4f6" }}
+                  />
+                ) : (
+                  <div style={{ width: 80, height: 60, borderRadius: 8, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #e5e7eb" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: 13, padding: "6px 14px" }}
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    {imagePreview ? "Replace Image" : "Choose Image"}
+                  </button>
+                  {imageFile ? (
+                    <p style={{ margin: "6px 0 0", fontSize: 12, color: "#16a34a" }}>
+                      ✓ {imageFile.name}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+              <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+                📐 {CAT_IMAGE_SIZE_HINT}
+              </p>
+            </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={onImageFileChange}
+            />
+          </div>
 
           <label className="inline-check">
             <input

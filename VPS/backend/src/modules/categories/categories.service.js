@@ -1,8 +1,11 @@
+const path = require("node:path");
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { sanitizeCategory, toPublicCategory } = require("./categories.model");
+const { convertToWebp } = require("../../common/image-utils");
+const { env } = require("../../config/env");
 
 function slugify(value) {
   return value
@@ -208,11 +211,53 @@ async function archiveCategory(categoryId, actor) {
   return sanitizeCategory(store.categories[index]);
 }
 
+function publicBaseUploadUrl(filePath) {
+  const uploadsRoot = path.resolve(process.cwd(), env.uploadDir);
+  const relativePath = path.relative(uploadsRoot, filePath).replace(/\\/g, "/");
+  return `${env.publicBaseUrl}/static/uploads/${relativePath}`;
+}
+
+async function uploadCategoryImage(categoryId, filePath, actor) {
+  const store = await readCatalogStore();
+  const index = store.categories.findIndex((c) => c.id === categoryId);
+  if (index < 0) throw new HttpError(404, "Category not found.");
+
+  let mainPath = filePath;
+  try {
+    const result = await convertToWebp(filePath);
+    mainPath = result.mainPath;
+  } catch {
+    // keep original if sharp unavailable
+  }
+
+  const imageUrl = publicBaseUploadUrl(mainPath);
+
+  store.categories[index] = {
+    ...store.categories[index],
+    imageUrl,
+    updatedAt: new Date().toISOString()
+  };
+
+  await writeCatalogStore(store);
+
+  await addActivityLog({
+    action: "categories.image.uploaded",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "category",
+    resourceId: categoryId,
+    metadata: { imageUrl }
+  });
+
+  return sanitizeCategory(store.categories[index]);
+}
+
 module.exports = {
   listAdminCategories,
   listPublicCategories,
   getCategoryById,
   createCategory,
   updateCategory,
-  archiveCategory
+  archiveCategory,
+  uploadCategoryImage
 };

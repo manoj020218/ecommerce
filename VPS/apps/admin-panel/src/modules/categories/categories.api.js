@@ -31,3 +31,12 @@ export function archiveCategory(categoryId) {
     method: "DELETE"
   });
 }
+
+export function uploadCategoryImage(categoryId, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch(`/admin/categories/${categoryId}/image`, {
+    method: "POST",
+    body: fd
+  });
+}

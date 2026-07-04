@@ -681,6 +681,28 @@ async function archiveProduct(productId, actor) {
   return sanitizeAdminProduct(store.products[index]);
 }
 
+async function deleteProduct(productId, actor) {
+  const store = await readCatalogStore();
+  const index = store.products.findIndex((product) => product.id === productId);
+  if (index < 0) {
+    throw new HttpError(404, "Product not found.");
+  }
+  const deleted = store.products[index];
+  store.products.splice(index, 1);
+  await writeCatalogStore(store);
+
+  await addActivityLog({
+    action: "products.deleted",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "product",
+    resourceId: productId,
+    meta: { title: deleted.title, sku: deleted.sku }
+  });
+
+  return { id: productId };
+}
+
 async function addProductImage(productId, filePath, actor) {
   const store = await readCatalogStore();
   const index = store.products.findIndex((product) => product.id === productId);
@@ -1242,6 +1264,7 @@ module.exports = {
   updateProduct,
   updateProductRelations,
   archiveProduct,
+  deleteProduct,
   addProductImage,
   deleteProductImage,
   addProductVideo,

@@ -33,6 +33,12 @@ export function archiveProduct(productId) {
   });
 }
 
+export function deleteProduct(productId) {
+  return apiFetch(`/admin/products/${productId}/permanent`, {
+    method: "DELETE"
+  });
+}
+
 export function importProductsFile(file) {
   const formData = new FormData();
   formData.append("file", file);

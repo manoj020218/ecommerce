@@ -790,7 +790,13 @@ export function ProductsPage() {
   const [hsnRecords, setHsnRecords] = useState([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [filters, setFilters] = useState({ q: "", categoryId: "", includeInactive: true });
+  const [filters, setFilters] = useState(() => {
+    const preset = location.state?.presetCategoryId;
+    return { q: "", categoryId: preset && preset !== "__none__" ? preset : "", includeInactive: true };
+  });
+  const [noCategoryOnly] = useState(() => location.state?.presetCategoryId === "__none__");
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
 
   // list-view state
   const [modalOpen, setModalOpen] = useState(false);
@@ -1387,8 +1393,42 @@ export function ProductsPage() {
     if (statusFilter === "active")   result = result.filter((r) => r.isActive);
     if (statusFilter === "inactive") result = result.filter((r) => !r.isActive);
     if (stockFilter !== "all")       result = result.filter((r) => r.stockStatus === stockFilter);
+    if (noCategoryOnly)              result = result.filter((r) => !r.categoryId);
+    if (sortCol) {
+      result = [...result].sort((a, b) => {
+        let av, bv;
+        if (sortCol === "name")     { av = (a.title || "").toLowerCase(); bv = (b.title || "").toLowerCase(); }
+        else if (sortCol === "sku") { av = (a.sku || "").toLowerCase(); bv = (b.sku || "").toLowerCase(); }
+        else if (sortCol === "category") { av = (a.categoryId || "").toLowerCase(); bv = (b.categoryId || "").toLowerCase(); }
+        else if (sortCol === "qty")   { av = Number(a.stockQty || 0); bv = Number(b.stockQty || 0); }
+        else if (sortCol === "price") { av = Number(a.salePrice || a.basePrice || 0); bv = Number(b.salePrice || b.basePrice || 0); }
+        else if (sortCol === "active") { av = a.isActive ? 1 : 0; bv = b.isActive ? 1 : 0; }
+        else if (sortCol === "stock") { av = (a.stockStatus || ""); bv = (b.stockStatus || ""); }
+        else { av = ""; bv = ""; }
+        if (av < bv) return sortDir === "asc" ? -1 : 1;
+        if (av > bv) return sortDir === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
     return result;
-  }, [rows, statusFilter, stockFilter]);
+  }, [rows, statusFilter, stockFilter, noCategoryOnly, sortCol, sortDir]);
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortCol(col); setSortDir("asc"); }
+  };
+
+  const SortTh = ({ col, label, style = {} }) => {
+    const active = sortCol === col;
+    return (
+      <th
+        onClick={() => toggleSort(col)}
+        style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: active ? "#E8231A" : "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}
+      >
+        {label} {active ? (sortDir === "asc" ? "▲" : "▼") : <span style={{ opacity: 0.35 }}>⇅</span>}
+      </th>
+    );
+  };
 
   const totalPages = Math.max(1, Math.ceil(bulkRows.length / PAGE_SIZE));
   const pageRows = bulkRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -1579,6 +1619,14 @@ export function ProductsPage() {
             </form>
           </div>
 
+          {/* ── no-category filter notice ── */}
+          {noCategoryOnly && (
+            <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+              <span style={{ fontWeight: 600, color: "#92400e" }}>Showing uncategorised products only</span>
+              <span style={{ color: "#78350f" }}>— assign a category via Edit or the inline category cell</span>
+            </div>
+          )}
+
           {/* ── pending list-edit save bar ── */}
           {Object.keys(listPendingEdits).length > 0 && (
             <div style={{ background: "rgba(232,35,26,0.06)", border: "1px solid rgba(232,35,26,0.2)", borderRadius: 12, padding: "10px 16px", marginBottom: 12, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -1756,27 +1804,15 @@ export function ProductsPage() {
                   {visibleColumns.has("image") && (
                     <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Image</th>
                   )}
-                  {visibleColumns.has("name") && (
-                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Product</th>
-                  )}
-                  {visibleColumns.has("sku") && (
-                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>SKU</th>
-                  )}
-                  {visibleColumns.has("category") && (
-                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Category</th>
-                  )}
+                  {visibleColumns.has("name") && <SortTh col="name" label="Product" />}
+                  {visibleColumns.has("sku") && <SortTh col="sku" label="SKU" />}
+                  {visibleColumns.has("category") && <SortTh col="category" label="Category" />}
                   {visibleColumns.has("hsn") && (
                     <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>HSN · GST</th>
                   )}
-                  {visibleColumns.has("qty") && (
-                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Qty</th>
-                  )}
-                  {visibleColumns.has("price") && (
-                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px", whiteSpace: "nowrap" }}>Sale ₹ / MRP ₹</th>
-                  )}
-                  {visibleColumns.has("active") && (
-                    <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Active</th>
-                  )}
+                  {visibleColumns.has("qty") && <SortTh col="qty" label="Qty" />}
+                  {visibleColumns.has("price") && <SortTh col="price" label="Sale ₹ / MRP ₹" />}
+                  {visibleColumns.has("active") && <SortTh col="active" label="Active" />}
                   {visibleColumns.has("share") && (
                     <th style={{ padding: "12px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>Share</th>
                   )}

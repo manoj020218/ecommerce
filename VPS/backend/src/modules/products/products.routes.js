@@ -154,6 +154,11 @@ function createAdminProductsRouter() {
     controller.adminExportGoogleShopping
   );
   router.delete(
+    "/:productId/permanent",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.DELETE),
+    controller.adminDeleteProduct
+  );
+  router.delete(
     "/:productId",
     requireAdminPermission(PRODUCTS_PERMISSIONS.DELETE),
     controller.adminArchiveProduct

@@ -23,6 +23,7 @@ import {
 const STOREFRONT_URL = import.meta.env.VITE_STOREFRONT_URL || "https://test.jenixindia.com";
 import {
   archiveProduct,
+  deleteProduct,
   bulkPatchProducts,
   createProduct,
   deleteProductImage,
@@ -1075,6 +1076,15 @@ export function ProductsPage() {
     } catch (apiError) { setError(apiError.message || "Failed to archive."); }
   };
 
+  const onDelete = async (row) => {
+    if (!window.confirm(`Permanently delete "${row.title}"?\n\nThis cannot be undone.`)) return;
+    try {
+      await deleteProduct(row.id);
+      setNotice(`Deleted: ${row.title}`);
+      await loadProducts(filters);
+    } catch (apiError) { setError(apiError.message || "Failed to delete."); }
+  };
+
   const onUploadImage = async (productId, file) => {
     if (!file) return;
     setUploadingProductId(productId); setError(""); setNotice("");
@@ -1309,6 +1319,17 @@ export function ProductsPage() {
       setNotice(`${ids.length} products archived.`);
       await loadProducts(filters);
     } catch (err) { setError(err.message || "Bulk archive failed."); }
+  };
+
+  const onBulkDeleteSelected = async () => {
+    const ids = [...selectedIds];
+    if (!ids.length || !window.confirm(`Permanently delete ${ids.length} product${ids.length !== 1 ? "s" : ""}?\n\nThis cannot be undone.`)) return;
+    try {
+      for (const id of ids) await deleteProduct(id);
+      setSelectedIds(new Set());
+      setNotice(`${ids.length} products deleted.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk delete failed."); }
   };
 
   const onApplyMassCategory = async () => {
@@ -1676,9 +1697,9 @@ export function ProductsPage() {
                     style={{ fontSize: 12, background: "#fff", border: "1px solid #e5e7eb", color: "#374151", padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>
                     Deactivate
                   </button>
-                  <button type="button" onClick={onBulkArchiveSelected}
-                    style={{ fontSize: 12, background: "#fff", border: "1px solid #fecaca", color: "#dc2626", padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>
-                    Archive
+                  <button type="button" onClick={onBulkDeleteSelected}
+                    style={{ fontSize: 12, background: "#dc2626", border: "1px solid #dc2626", color: "#fff", padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>
+                    Delete
                   </button>
                   <button type="button" onClick={() => { setSelectedIds(new Set()); setMassAction(null); }}
                     style={{ fontSize: 12, background: "none", border: "none", color: "#9ca3af", padding: "5px 8px", cursor: "pointer" }}>
@@ -1994,9 +2015,9 @@ export function ProductsPage() {
                             {canDelete && (
                               <>
                                 <span style={{ color: "#e5e7eb" }}>|</span>
-                                <button type="button" onClick={() => onArchive(row)}
-                                  style={{ fontSize: 12, color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
-                                  Archive
+                                <button type="button" onClick={() => onDelete(row)}
+                                  style={{ fontSize: 12, color: "#dc2626", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                  Delete
                                 </button>
                               </>
                             )}
@@ -2070,9 +2091,9 @@ export function ProductsPage() {
                     </button>
                   )}
                   {canDelete && (
-                    <button type="button" onClick={() => onArchive(row)}
-                      style={{ fontSize: 13, fontWeight: 500, color: "#9ca3af", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 8, padding: "7px 12px", cursor: "pointer" }}>
-                      Archive
+                    <button type="button" onClick={() => onDelete(row)}
+                      style={{ fontSize: 13, fontWeight: 500, color: "#dc2626", border: "1px solid #fecaca", background: "#fff", borderRadius: 8, padding: "7px 12px", cursor: "pointer" }}>
+                      Delete
                     </button>
                   )}
                 </div>

@@ -67,6 +67,11 @@ const adminArchiveProduct = asyncHandler(async (req, res) => {
   return ok(res, data, "Product archived.");
 });
 
+const adminDeleteProduct = asyncHandler(async (req, res) => {
+  const data = await service.deleteProduct(req.params.productId, req.actor);
+  return ok(res, data, "Product deleted.");
+});
+
 const adminUploadProductImage = asyncHandler(async (req, res) => {
   if (!req.file || !req.file.path) {
     throw new HttpError(400, "Image file is required.");
@@ -262,6 +267,7 @@ module.exports = {
   adminUpdateProduct,
   adminUpdateProductRelations,
   adminArchiveProduct,
+  adminDeleteProduct,
   adminUploadProductImage,
   adminDeleteProductImage,
   adminUploadProductVideo,

@@ -365,6 +365,7 @@ export function PaymentGatewaysPage() {
         open={modalOpen}
         onClose={closeModal}
         width="720px"
+        disableOutsideClick
       >
         {detailLoading ? (
           <LoadingBlock label="Loading gateway configuration..." />

@@ -855,6 +855,7 @@ export function MarketingPage() {
         open={offerModalOpen}
         onClose={closeOfferModal}
         width="900px"
+        disableOutsideClick
       >
         <form className="form-grid wide" onSubmit={onSaveOffer}>
           <label className="field">

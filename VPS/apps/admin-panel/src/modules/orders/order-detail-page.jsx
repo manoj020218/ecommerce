@@ -305,7 +305,7 @@ function ProcessingModal({ order, onClose, onSave, saving, error }) {
     setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [key]: val } : it));
 
   return (
-    <Modal title="Mark as Processing" open onClose={onClose} width="620px">
+    <Modal title="Mark as Processing" open onClose={onClose} width="620px" disableOutsideClick>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
           Review items below. Adjust fulfill quantity if dispatching a partial shipment due to stock shortage.
@@ -389,7 +389,7 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
   const customerMobile = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
 
   return (
-    <Modal title="Convert to Fulfill — Dispatch Order" open onClose={onClose} width="580px">
+    <Modal title="Convert to Fulfill — Dispatch Order" open onClose={onClose} width="580px" disableOutsideClick>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ background: "rgba(37,99,235,0.05)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: 8, padding: "10px 14px" }}>
           <p style={{ margin: 0, fontSize: 12, color: "#1d4ed8", fontWeight: 500 }}>

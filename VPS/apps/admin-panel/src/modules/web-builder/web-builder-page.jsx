@@ -1,10 +1,242 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../shared/api/http-client";
 
 const BRAND = "#E8231A";
 const DARK = "#111827";
 
 const BASE = "/admin/pages";
+const BANNERS_BASE = "/admin/settings/hero-banners";
+
+function apiFetchBanners() { return apiFetch(BANNERS_BASE, { auth: true }); }
+function apiSaveBanners(slides) { return apiFetch(BANNERS_BASE, { method: "PUT", auth: true, body: { slides } }); }
+function apiUploadBannerImage(slideId, imageType, file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiFetch(`${BANNERS_BASE}/upload/${slideId}/${imageType}`, { method: "POST", auth: true, body: fd });
+}
+
+function newSlideId() {
+  return `slide_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function BannerSlideRow({ slide, onChange, onDelete, onUpload, uploadingKey }) {
+  const desktopInputRef = useRef(null);
+  const mobileInputRef = useRef(null);
+
+  return (
+    <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, display: "grid", gap: 14, background: "#fafafa" }}>
+      {/* Image upload row */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+            Desktop Image
+            <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: 6 }}>1920 × 600 px (JPG/PNG/WebP)</span>
+          </div>
+          {slide.desktopImageUrl ? (
+            <img src={slide.desktopImageUrl} alt="Desktop banner" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6, marginBottom: 6, border: "1px solid #e5e7eb" }} />
+          ) : (
+            <div style={{ width: "100%", height: 80, background: "#f3f4f6", borderRadius: 6, marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed #d1d5db", fontSize: 12, color: "#9ca3af" }}>
+              No image
+            </div>
+          )}
+          <input ref={desktopInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) onUpload(slide.id, "desktop", e.target.files[0]); }} />
+          <button
+            onClick={() => desktopInputRef.current?.click()}
+            disabled={uploadingKey === `${slide.id}-desktop`}
+            style={{ padding: "5px 12px", fontSize: 12, fontWeight: 600, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            {uploadingKey === `${slide.id}-desktop` ? "Uploading…" : "Upload Desktop"}
+          </button>
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6 }}>
+            Mobile Image
+            <span style={{ fontWeight: 400, color: "#9ca3af", marginLeft: 6 }}>768 × 400 px (JPG/PNG/WebP)</span>
+          </div>
+          {slide.mobileImageUrl ? (
+            <img src={slide.mobileImageUrl} alt="Mobile banner" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6, marginBottom: 6, border: "1px solid #e5e7eb" }} />
+          ) : (
+            <div style={{ width: "100%", height: 80, background: "#f3f4f6", borderRadius: 6, marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", border: "1px dashed #d1d5db", fontSize: 12, color: "#9ca3af" }}>
+              No image
+            </div>
+          )}
+          <input ref={mobileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { if (e.target.files?.[0]) onUpload(slide.id, "mobile", e.target.files[0]); }} />
+          <button
+            onClick={() => mobileInputRef.current?.click()}
+            disabled={uploadingKey === `${slide.id}-mobile`}
+            style={{ padding: "5px 12px", fontSize: 12, fontWeight: 600, border: "1px solid #e5e7eb", borderRadius: 6, background: "#fff", cursor: "pointer", fontFamily: "inherit" }}
+          >
+            {uploadingKey === `${slide.id}-mobile` ? "Uploading…" : "Upload Mobile"}
+          </button>
+        </div>
+      </div>
+
+      {/* Text fields */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <input
+          value={slide.title || ""}
+          onChange={(e) => onChange({ ...slide, title: e.target.value })}
+          placeholder="Slide headline (optional)"
+          style={{ padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}
+        />
+        <input
+          value={slide.subtitle || ""}
+          onChange={(e) => onChange({ ...slide, subtitle: e.target.value })}
+          placeholder="Sub-headline (optional)"
+          style={{ padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}
+        />
+        <input
+          value={slide.linkUrl || ""}
+          onChange={(e) => onChange({ ...slide, linkUrl: e.target.value })}
+          placeholder="CTA link URL e.g. /products or /categories/cctv"
+          style={{ padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}
+        />
+        <input
+          value={slide.linkLabel || ""}
+          onChange={(e) => onChange({ ...slide, linkLabel: e.target.value })}
+          placeholder="CTA button label e.g. Shop Now"
+          style={{ padding: "7px 10px", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 13, fontFamily: "inherit" }}
+        />
+      </div>
+
+      {/* Active + Delete row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, fontWeight: 500 }}>
+          <input
+            type="checkbox"
+            checked={slide.isActive !== false}
+            onChange={(e) => onChange({ ...slide, isActive: e.target.checked })}
+            style={{ width: 16, height: 16, accentColor: BRAND }}
+          />
+          Active (visible on storefront)
+        </label>
+        <button
+          onClick={() => onDelete(slide.id)}
+          style={{ padding: "5px 12px", fontSize: 12, fontWeight: 600, border: "1px solid #fee2e2", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#ef4444", fontFamily: "inherit" }}
+        >
+          Remove Slide
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HeroBannerSection() {
+  const [slides, setSlides] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState("");
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    apiFetchBanners()
+      .then((data) => setSlides(Array.isArray(data?.slides) ? data.slides : []))
+      .catch((e) => setError(e.message || "Failed to load banners."))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      await apiSaveBanners(slides);
+      setNotice("Hero banners saved.");
+    } catch (e) {
+      setError(e.message || "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpload = async (slideId, imageType, file) => {
+    setUploadingKey(`${slideId}-${imageType}`);
+    setError("");
+    try {
+      const result = await apiUploadBannerImage(slideId, imageType, file);
+      setSlides((prev) =>
+        prev.map((s) =>
+          s.id === slideId
+            ? { ...s, [imageType === "desktop" ? "desktopImageUrl" : "mobileImageUrl"]: result.url }
+            : s
+        )
+      );
+      setNotice(`${imageType} image uploaded.`);
+    } catch (e) {
+      setError(e.message || "Upload failed.");
+    } finally {
+      setUploadingKey("");
+    }
+  };
+
+  const handleChange = (updated) => {
+    setSlides((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+  };
+
+  const handleDelete = (id) => {
+    setSlides((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleAdd = () => {
+    setSlides((prev) => [
+      ...prev,
+      { id: newSlideId(), desktopImageUrl: "", mobileImageUrl: "", title: "", subtitle: "", linkUrl: "", linkLabel: "", isActive: true }
+    ]);
+  };
+
+  return (
+    <div style={{ marginBottom: 32, padding: 20, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: DARK }}>Hero Banner Slides</h2>
+          <p style={{ margin: "3px 0 0", fontSize: 12, color: "#6b7280" }}>
+            Upload banner images shown at the top of the home page. If no slides are active, the default text hero is shown.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={handleAdd}
+            style={{ padding: "8px 16px", background: "#f3f4f6", color: DARK, border: 0, borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            + Add Slide
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ padding: "8px 16px", background: BRAND, color: "#fff", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}
+          >
+            {saving ? "Saving…" : "Save Banners"}
+          </button>
+        </div>
+      </div>
+
+      {notice ? <div style={{ background: "#ecfdf3", border: "1px solid #a7f3d0", borderRadius: 8, padding: "8px 12px", color: "#065f46", fontSize: 13, marginBottom: 12 }}>{notice}</div> : null}
+      {error ? <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 12px", color: "#b91c1c", fontSize: 13, marginBottom: 12 }}>{error}</div> : null}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 32, color: "#9ca3af", fontSize: 13 }}>Loading…</div>
+      ) : slides.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 32, color: "#9ca3af", fontSize: 13, border: "1px dashed #e5e7eb", borderRadius: 10 }}>
+          No slides yet. Click "+ Add Slide" to create the first banner.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {slides.map((slide) => (
+            <BannerSlideRow
+              key={slide.id}
+              slide={slide}
+              onChange={handleChange}
+              onDelete={handleDelete}
+              onUpload={handleUpload}
+              uploadingKey={uploadingKey}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function apiFetchPages() { return apiFetch(BASE, { auth: true }); }
 function apiFetchPage(id) { return apiFetch(`${BASE}/${id}`, { auth: true }); }
@@ -293,6 +525,8 @@ export function WebBuilderPage() {
 
   return (
     <div style={{ padding: "24px 28px" }}>
+      <HeroBannerSection />
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: DARK }}>Web Builder</h1>

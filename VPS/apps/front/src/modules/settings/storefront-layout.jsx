@@ -325,10 +325,25 @@ export function StorefrontLayout() {
     <>
       <div className="proto-announcement-bar">
         <div className="proto-announcement-inner">
-          <span>⚡ Same Day Dispatch</span>
-          <span>📄 GST Invoice Included</span>
-          <span>🛡️ 100% Genuine Products</span>
-          {supportWhatsApp ? <span>📞 WhatsApp: {supportWhatsApp}</span> : null}
+          <div className="proto-announcement-track">
+            <span>⚡ Same Day Dispatch</span>
+            <span>·</span>
+            <span>📄 GST Invoice Included</span>
+            <span>·</span>
+            <span>🛡️ 100% Genuine Products</span>
+            <span>·</span>
+            <span>🚚 Pan India Delivery</span>
+            {supportWhatsApp ? <><span>·</span><span>📞 {supportWhatsApp}</span></> : null}
+            {/* Duplicate for seamless loop */}
+            <span aria-hidden="true">⚡ Same Day Dispatch</span>
+            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">📄 GST Invoice Included</span>
+            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">🛡️ 100% Genuine Products</span>
+            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">🚚 Pan India Delivery</span>
+            {supportWhatsApp ? <><span aria-hidden="true">·</span><span aria-hidden="true">📞 {supportWhatsApp}</span></> : null}
+          </div>
         </div>
       </div>
 

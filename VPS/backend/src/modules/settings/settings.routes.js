@@ -88,6 +88,19 @@ function createAdminSettingsRouter() {
     controller.adminUploadInvoiceAsset
   );
 
+  router.get("/hero-banners", controller.adminGetHeroBanners);
+  router.put(
+    "/hero-banners",
+    ensurePermission(SETTINGS_PERMISSIONS.EDIT),
+    controller.adminUpdateHeroBanners
+  );
+  router.post(
+    "/hero-banners/upload/:slideId/:imageType",
+    ensurePermission(SETTINGS_PERMISSIONS.EDIT),
+    upload.single("file"),
+    controller.adminUploadHeroBannerImage
+  );
+
   return router;
 }
 

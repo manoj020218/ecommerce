@@ -47,6 +47,9 @@ const DEFAULT_PUBLIC_SETTINGS = {
       x: ""
     }
   },
+  heroBanners: {
+    slides: []
+  },
   meta: {
     updatedAt: ""
   }
@@ -79,6 +82,9 @@ function normalizeSettings(payload) {
         ...DEFAULT_PUBLIC_SETTINGS.contactInformation.socialLinks,
         ...(next.contactInformation?.socialLinks || {})
       }
+    },
+    heroBanners: {
+      slides: Array.isArray(next.heroBanners?.slides) ? next.heroBanners.slides : []
     },
     meta: {
       ...DEFAULT_PUBLIC_SETTINGS.meta,

@@ -110,6 +110,27 @@ const adminUploadInvoiceAsset = asyncHandler(async (req, res) => {
   return created(res, data, "Invoice asset uploaded.");
 });
 
+const adminGetHeroBanners = asyncHandler(async (req, res) => {
+  const settings = await settingsService.getAllSettings();
+  return ok(res, settings.heroBanners || { slides: [] }, "Hero banners fetched.");
+});
+
+const adminUpdateHeroBanners = asyncHandler(async (req, res) => {
+  const { slides } = req.body;
+  if (!Array.isArray(slides)) throw new HttpError(400, "slides must be an array.");
+  const data = await settingsService.updateHeroBanners(slides, req.actor);
+  return ok(res, data, "Hero banners updated.");
+});
+
+const adminUploadHeroBannerImage = asyncHandler(async (req, res) => {
+  if (!req.file || !req.file.path) {
+    throw new HttpError(400, "File upload is required with field name `file`.");
+  }
+  const { slideId, imageType } = req.params;
+  const data = await settingsService.saveHeroBannerImage(slideId, imageType, req.file.path, req.actor);
+  return created(res, data, "Banner image uploaded.");
+});
+
 const publicGetSettingsBootstrap = asyncHandler(async (_req, res) => {
   const data = await settingsService.getPublicSettingsBundle();
   return ok(res, data, "Public settings fetched.");
@@ -146,6 +167,9 @@ module.exports = {
   adminUpdateInvoiceSettings,
   adminUploadBrandingAsset,
   adminUploadInvoiceAsset,
+  adminGetHeroBanners,
+  adminUpdateHeroBanners,
+  adminUploadHeroBannerImage,
   publicGetSettingsBootstrap,
   publicGetStoreProfile,
   publicGetBranding,

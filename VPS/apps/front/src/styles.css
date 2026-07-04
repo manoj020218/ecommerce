@@ -1748,18 +1748,33 @@ textarea {
   height: 40px;
   display: flex;
   align-items: center;
+  overflow: hidden;
+}
+
+@keyframes announcement-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 .proto-announcement-inner {
-  width: min(1280px, 100%);
-  margin: 0 auto;
-  padding: 0 14px;
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: nowrap;
+  width: 100%;
   overflow: hidden;
+}
+
+.proto-announcement-track {
+  display: flex;
+  gap: 32px;
   white-space: nowrap;
+  animation: announcement-scroll 22s linear infinite;
+  padding: 0 16px;
+}
+
+.proto-announcement-track:hover {
+  animation-play-state: paused;
+}
+
+.proto-announcement-track span {
+  flex-shrink: 0;
 }
 
 .proto-header-shell,
@@ -1841,13 +1856,14 @@ textarea {
 .proto-header-search input {
   border: 0;
   border-radius: 0;
+  padding: 15px 16px;
 }
 
 .proto-header-search button {
   border: 0;
   background: var(--brand);
   color: #fff;
-  width: 46px;
+  width: 60px;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -5743,4 +5759,323 @@ textarea {
   color: #9ca3af;
   white-space: nowrap;
   font-weight: 500;
+}
+
+/* ── Social Share Panel ──────────────────────────────────── */
+.proto-share-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(255,255,255,0.92);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  z-index: 4;
+  transition: background 0.15s;
+}
+.proto-share-badge:hover { background: #fff; }
+.proto-share-panel {
+  position: absolute;
+  bottom: 52px;
+  right: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  z-index: 10;
+  min-width: 200px;
+}
+.proto-share-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 2px;
+}
+.proto-share-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.proto-share-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #111827;
+  text-decoration: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.proto-share-btn:hover { background: #f3f4f6; }
+.proto-share-btn svg { flex-shrink: 0; }
+.proto-share-copy-notice {
+  font-size: 11px;
+  color: #16a34a;
+  padding: 0 10px 4px;
+  text-align: center;
+}
+
+/* ── Product Gallery Swipe / Fullscreen ──────────────────── */
+.proto-product-main-image {
+  touch-action: pan-y;
+  user-select: none;
+}
+.proto-product-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.94);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.proto-product-fullscreen-overlay img {
+  max-width: 100vw;
+  max-height: 90vh;
+  object-fit: contain;
+  touch-action: pinch-zoom;
+  cursor: zoom-in;
+}
+.proto-fullscreen-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.proto-fullscreen-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.6);
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── WhatsApp + Save row ──────────────────────────────────── */
+.proto-wa-save-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.proto-wa-save-row > :first-child { flex: 7; }
+.proto-wa-save-row > :last-child { flex: 3; }
+
+/* ── Auto-Scroll Carousel (Recent Viewed / Linked Products) ─ */
+@keyframes carousel-scroll-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.proto-auto-carousel-shell {
+  overflow: hidden;
+  width: 100%;
+}
+.proto-auto-carousel-track {
+  display: flex;
+  gap: 12px;
+  animation: carousel-scroll-left 30s linear infinite;
+  will-change: transform;
+}
+.proto-auto-carousel-track:hover {
+  animation-play-state: paused;
+}
+.proto-recent-card {
+  flex-shrink: 0;
+  width: 160px;
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s;
+}
+.proto-recent-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+.proto-recent-card-media {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f9fafb;
+}
+.proto-recent-card-media img { width: 100%; height: 100%; object-fit: cover; }
+.proto-recent-card-body {
+  padding: 8px 10px;
+}
+.proto-recent-card-body p {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 0 0 3px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+.proto-recent-card-body strong {
+  font-size: 13px;
+  color: var(--brand);
+  font-weight: 700;
+}
+.proto-recent-add-btn {
+  width: 100%;
+  padding: 6px 8px;
+  margin-top: 6px;
+  background: var(--brand);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Hero Banner Slider ──────────────────────────────────── */
+.proto-banner-slider {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #111;
+}
+.proto-banner-track {
+  display: flex;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.proto-banner-slide {
+  min-width: 100%;
+  flex-shrink: 0;
+  position: relative;
+}
+.proto-banner-slide img {
+  width: 100%;
+  display: block;
+  object-fit: cover;
+  height: 520px;
+}
+.proto-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.12) 60%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 64px;
+  gap: 12px;
+}
+.proto-banner-overlay h2 {
+  font-size: 36px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+  max-width: 520px;
+  line-height: 1.2;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.proto-banner-overlay p {
+  font-size: 16px;
+  color: rgba(255,255,255,0.88);
+  margin: 0;
+  max-width: 440px;
+}
+.proto-banner-cta {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 28px;
+  background: var(--brand);
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  width: fit-content;
+  margin-top: 4px;
+  transition: background 0.2s;
+}
+.proto-banner-cta:hover { background: var(--brand-dark); }
+.proto-banner-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.9);
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #111;
+  z-index: 5;
+  transition: background 0.2s, transform 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.proto-banner-arrow:hover { background: #fff; transform: translateY(-50%) scale(1.08); }
+.proto-banner-prev { left: 20px; }
+.proto-banner-next { right: 20px; }
+.proto-banner-dots {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+}
+.proto-banner-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.5);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s, transform 0.2s;
+}
+.proto-banner-dot.active {
+  background: #fff;
+  transform: scale(1.25);
+}
+@media (max-width: 639px) {
+  .proto-banner-slide img { height: 240px; }
+  .proto-banner-overlay { padding: 20px 20px; gap: 8px; }
+  .proto-banner-overlay h2 { font-size: 18px; }
+  .proto-banner-overlay p { font-size: 13px; }
+  .proto-banner-arrow { width: 34px; height: 34px; font-size: 20px; }
+  .proto-banner-prev { left: 10px; }
+  .proto-banner-next { right: 10px; }
 }

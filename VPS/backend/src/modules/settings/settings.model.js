@@ -8,7 +8,8 @@ const SETTINGS_SECTION_MAP = Object.freeze({
   "seo-defaults": "seoDefaults",
   "contact-information": "contactInformation",
   "custom-code": "customCodeTags",
-  "invoice-settings": "invoiceSettings"
+  "invoice-settings": "invoiceSettings",
+  "hero-banners": "heroBanners"
 });
 
 const INVOICE_SETTINGS_UPLOAD_ASSET_MAP = Object.freeze({
@@ -97,6 +98,9 @@ const DEFAULT_SETTINGS_DOCUMENT = Object.freeze({
     showDiscountLine: true,
     customInvoiceFields: []
   },
+  heroBanners: {
+    slides: []
+  },
   setupWizard: cloneDefaultSetupWizardSection(),
   meta: {
     createdAt: new Date().toISOString(),
@@ -152,6 +156,11 @@ function buildPublicSettingsView(document) {
     },
     seoDefaults: { ...document.seoDefaults },
     contactInformation: { ...document.contactInformation },
+    heroBanners: {
+      slides: Array.isArray(document.heroBanners?.slides)
+        ? document.heroBanners.slides.filter((s) => s.isActive !== false)
+        : []
+    },
     meta: {
       updatedAt: document.meta.updatedAt
     }

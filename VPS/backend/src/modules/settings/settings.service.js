@@ -203,6 +203,60 @@ async function saveInvoiceAsset(assetKey, fullFilePath, actor) {
   };
 }
 
+async function saveHeroBannerImage(slideId, imageType, fullFilePath, actor) {
+  if (!slideId) throw new HttpError(400, "slideId is required.");
+  if (imageType !== "desktop" && imageType !== "mobile") {
+    throw new HttpError(400, "imageType must be 'desktop' or 'mobile'.");
+  }
+
+  const settings = await getAllSettings();
+  if (!settings.heroBanners) settings.heroBanners = { slides: [] };
+
+  const slides = Array.isArray(settings.heroBanners.slides) ? settings.heroBanners.slides : [];
+  let slide = slides.find((s) => s.id === slideId);
+  if (!slide) {
+    slide = { id: slideId, desktopImageUrl: "", mobileImageUrl: "", title: "", subtitle: "", linkUrl: "", linkLabel: "", isActive: true };
+    slides.push(slide);
+  }
+
+  const publicUrl = buildPublicUploadUrl(fullFilePath);
+  if (imageType === "desktop") slide.desktopImageUrl = publicUrl;
+  else slide.mobileImageUrl = publicUrl;
+
+  settings.heroBanners.slides = slides;
+  settings.meta = stampMeta(settings, actor);
+  await jsonFileStore.writeSettingsDocument(settings);
+
+  await addActivityLog({
+    action: "settings.hero_banner.image_uploaded",
+    actorId: actor?.id || "unknown",
+    actorRole: actor?.role || "unknown",
+    resourceType: "hero_banner",
+    resourceId: slideId,
+    metadata: { imageType }
+  });
+
+  return { slideId, imageType, url: publicUrl };
+}
+
+async function updateHeroBanners(slides, actor) {
+  const settings = await getAllSettings();
+  settings.heroBanners = { slides: Array.isArray(slides) ? slides : [] };
+  settings.meta = stampMeta(settings, actor);
+  await jsonFileStore.writeSettingsDocument(settings);
+
+  await addActivityLog({
+    action: "settings.hero_banners.updated",
+    actorId: actor?.id || "unknown",
+    actorRole: actor?.role || "unknown",
+    resourceType: "hero_banners",
+    resourceId: "slides",
+    metadata: { count: Array.isArray(slides) ? slides.length : 0 }
+  });
+
+  return settings.heroBanners;
+}
+
 async function getPublicSettingsBundle() {
   const settings = await getAllSettings();
   return buildPublicSettingsView(settings);
@@ -222,6 +276,8 @@ module.exports = {
   updateSection,
   saveBrandingAsset,
   saveInvoiceAsset,
+  saveHeroBannerImage,
+  updateHeroBanners,
   getPublicSettingsBundle,
   getPublicSettingsSection
 };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import {
@@ -289,6 +289,79 @@ const TRUST_POINTS = [
   }
 ];
 
+function HeroBannerSlider({ slides }) {
+  const [active, setActive] = useState(0);
+  const timerRef = useRef(null);
+  const total = slides.length;
+
+  function startTimer() {
+    timerRef.current = setInterval(() => setActive((a) => (a + 1) % total), 5000);
+  }
+
+  useEffect(() => {
+    if (total <= 1) return undefined;
+    startTimer();
+    return () => clearInterval(timerRef.current);
+  }, [total]);
+
+  function goTo(idx) {
+    setActive((idx + total) % total);
+  }
+
+  return (
+    <section
+      className="proto-banner-slider"
+      onMouseEnter={() => clearInterval(timerRef.current)}
+      onMouseLeave={() => { if (total > 1) startTimer(); }}
+    >
+      <div className="proto-banner-track" style={{ transform: `translateX(-${active * 100}%)` }}>
+        {slides.map((slide, idx) => (
+          <div key={slide.id || idx} className="proto-banner-slide">
+            <picture>
+              {slide.mobileImageUrl ? (
+                <source media="(max-width: 639px)" srcSet={slide.mobileImageUrl} />
+              ) : null}
+              <img
+                src={slide.desktopImageUrl || slide.mobileImageUrl || ""}
+                alt={slide.title || `Banner ${idx + 1}`}
+                loading={idx === 0 ? "eager" : "lazy"}
+              />
+            </picture>
+            {(slide.title || slide.linkUrl) ? (
+              <div className="proto-banner-overlay">
+                {slide.title ? <h2>{slide.title}</h2> : null}
+                {slide.subtitle ? <p>{slide.subtitle}</p> : null}
+                {slide.linkUrl ? (
+                  <Link to={slide.linkUrl} className="proto-banner-cta">
+                    {slide.linkLabel || "Shop Now"}
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {total > 1 ? (
+        <>
+          <button className="proto-banner-arrow proto-banner-prev" aria-label="Previous" onClick={() => goTo(active - 1)}>‹</button>
+          <button className="proto-banner-arrow proto-banner-next" aria-label="Next" onClick={() => goTo(active + 1)}>›</button>
+          <div className="proto-banner-dots">
+            {slides.map((_, idx) => (
+              <button
+                key={idx}
+                aria-label={`Go to slide ${idx + 1}`}
+                className={`proto-banner-dot${idx === active ? " active" : ""}`}
+                onClick={() => goTo(idx)}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 export function StorefrontHomePage() {
   const { settings: publicSettings } = usePublicSettings();
   const { isAuthenticated } = useCustomerSession();
@@ -526,8 +599,13 @@ export function StorefrontHomePage() {
     }
   };
 
+  const bannerSlides = publicSettings.heroBanners?.slides || [];
+
   return (
     <main className="proto-main-shell proto-main-shell-home">
+      {bannerSlides.length > 0 ? (
+        <HeroBannerSlider slides={bannerSlides} />
+      ) : (
       <section className="proto-home-hero">
         <div className="proto-home-hero-copy">
           <span className="proto-home-kicker">Premium Security Systems</span>
@@ -588,6 +666,7 @@ export function StorefrontHomePage() {
           <span className="proto-hero-dot" />
         </div>
       </section>
+      )}
 
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}

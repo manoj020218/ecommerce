@@ -2182,6 +2182,7 @@ export function ProductsPage() {
         open={modalOpen}
         onClose={closeModal}
         width="980px"
+        disableOutsideClick
       >
         <form className="form-grid wide" onSubmit={onSubmit} data-modal-form>
 

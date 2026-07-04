@@ -311,6 +311,7 @@ export function HsnTaxPage() {
         title={editingCode ? `Edit HSN ${editingCode}` : "Add HSN Record"}
         open={modalOpen}
         onClose={closeModal}
+        disableOutsideClick
       >
         <form className="form-grid" onSubmit={onSubmit}>
           <label className="field">

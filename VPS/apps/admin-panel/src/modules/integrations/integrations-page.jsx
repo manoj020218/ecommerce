@@ -416,7 +416,7 @@ function GatewayConfigModal({ gateway, onSave, onClose, saving, error, isStatic 
   );
 
   return (
-    <Modal title={`Configure — ${ui.label || gateway.label}`} open onClose={onClose} width="520px">
+    <Modal title={`Configure — ${ui.label || gateway.label}`} open onClose={onClose} width="520px" disableOutsideClick>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {isStatic && (
           <div style={{
@@ -502,7 +502,7 @@ function ConfigureModal({ meta, config, onSave, onClose, saving, error }) {
   const isWhatsApp = meta.code === "whatsapp";
 
   return (
-    <Modal title={`Configure — ${meta.label}`} open onClose={onClose} width="520px">
+    <Modal title={`Configure — ${meta.label}`} open onClose={onClose} width="520px" disableOutsideClick>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {isWhatsApp && (
           <div style={{
@@ -766,7 +766,7 @@ function CourierModal({ initial, onSave, onClose, saving, error }) {
   );
 
   return (
-    <Modal title={isEdit ? "Edit Courier Partner" : "Add Courier Partner"} open onClose={onClose} width="560px">
+    <Modal title={isEdit ? "Edit Courier Partner" : "Add Courier Partner"} open onClose={onClose} width="560px" disableOutsideClick>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
         {field("Courier Name", "name", "text", "e.g. Shree Maruti Courier", null, true)}

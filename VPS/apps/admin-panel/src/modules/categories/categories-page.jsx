@@ -360,6 +360,7 @@ export function CategoriesPage() {
         title={editingId ? "Edit Category" : "Add Category"}
         open={modalOpen}
         onClose={closeModal}
+        disableOutsideClick
       >
         {duplicateCategory ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "8px 0" }}>

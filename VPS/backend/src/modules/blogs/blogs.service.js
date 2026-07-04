@@ -1,6 +1,8 @@
+const path = require("node:path");
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { env } = require("../../config/env");
+const { convertToWebp } = require("../../common/image-utils");
 const {
   readContentStore,
   writeContentStore
@@ -651,6 +653,49 @@ async function generateSitemapXml() {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows}\n</urlset>`;
 }
 
+function blogPublicUploadUrl(filePath) {
+  const uploadsRoot = path.resolve(process.cwd(), env.uploadDir);
+  const relativePath = path.relative(uploadsRoot, filePath).replace(/\\/g, "/");
+  return `${env.publicBaseUrl}/static/uploads/${relativePath}`;
+}
+
+async function uploadBlogImage(blogId, filePath, imageType, actor) {
+  const store = await readNormalizedContentStore();
+  const index = store.blogs.findIndex((b) => b.id === blogId);
+  if (index < 0) throw new HttpError(404, "Blog not found.");
+
+  let mainPath = filePath;
+  try {
+    const result = await convertToWebp(filePath);
+    mainPath = result.mainPath;
+  } catch {
+    // keep original if sharp unavailable
+  }
+
+  const imageUrl = blogPublicUploadUrl(mainPath);
+  const blog = store.blogs[index];
+
+  if (imageType === "og") {
+    blog.ogImageUrl = imageUrl;
+  } else {
+    blog.featuredImageUrl = imageUrl;
+  }
+  blog.updatedAt = new Date().toISOString();
+  store.blogs[index] = blog;
+  await writeContentStore(store);
+
+  await addActivityLog({
+    action: "blogs.image.uploaded",
+    actorId: actor?.id,
+    actorRole: actor?.role,
+    resourceType: "blog",
+    resourceId: blogId,
+    metadata: { imageType }
+  });
+
+  return sanitizeAdminBlog(blog);
+}
+
 module.exports = {
   listAdminBlogCategories,
   listPublicBlogCategories,
@@ -659,6 +704,7 @@ module.exports = {
   createBlog,
   updateBlog,
   archiveBlog,
+  uploadBlogImage,
   listPublicBlogs,
   getPublicBlogBySlug,
   listHelpfulGuidesForProduct,

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export function Modal({ title, open, onClose, children, width = "720px" }) {
+export function Modal({ title, open, onClose, children, width = "720px", disableOutsideClick = false }) {
   useEffect(() => {
     if (!open) {
       return undefined;
@@ -21,7 +21,7 @@ export function Modal({ title, open, onClose, children, width = "720px" }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={disableOutsideClick ? undefined : onClose}>
       <div
         className="modal-card"
         style={{ maxWidth: width }}

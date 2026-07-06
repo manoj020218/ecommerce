@@ -18,6 +18,7 @@ import {
   humanizeStatus,
   notifyStorefrontCartUpdated
 } from "./cart.utils";
+import { watchdog } from "../../shared/watchdog-client";
 import {
   deleteCartItem,
   getCart,
@@ -52,6 +53,9 @@ export function CartPage() {
   const loadCart = async () => {
     const data = await getCart(buildCartContext(isAuthenticated));
     setCart(data);
+    if (data?.id || data?.itemCount > 0) {
+      watchdog.trackCartView(data?.id, data?.pricing?.grandTotal);
+    }
   };
 
   useEffect(() => {

@@ -33,6 +33,7 @@ import {
   buildCartContext,
   notifyStorefrontCartUpdated
 } from "../cart/cart.utils";
+import { watchdog } from "../../shared/watchdog-client";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -277,6 +278,7 @@ export function ProductPage() {
           return;
         }
         setProduct(data);
+        watchdog.trackProductView(data.id);
         setSelectedImage(Array.isArray(data.images) && data.images[0] ? resolveImg(data.images[0]) : "");
         setQuantity(Math.max(1, Number(data.moq || 1)));
         setBreadcrumb([
@@ -581,11 +583,13 @@ export function ProductPage() {
     setCartActionNotice("");
 
     try {
+      watchdog.trackAddToCartClick(product.id);
       await addCartItem({
         ...buildCartContext(isAuthenticated),
         productId: product.id,
         qty: quantity
       });
+      watchdog.trackAddToCartSuccess(product.id);
       notifyStorefrontCartUpdated();
 
       if (mode === "buy") {

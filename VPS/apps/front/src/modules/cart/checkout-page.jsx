@@ -31,6 +31,7 @@ import {
   humanizeStatus,
   notifyStorefrontCartUpdated
 } from "./cart.utils";
+import { watchdog } from "../../shared/watchdog-client";
 
 const PAYMENT_DESCRIPTIONS = {
   online: "Credit/Debit card, UPI, and net banking through the online gateway.",
@@ -288,6 +289,7 @@ export function CheckoutPage() {
         }
 
         setCart(cartData);
+        watchdog.trackCheckoutStarted(cartData?.id);
 
         if (restoredCheckoutSessionId) {
           try {
@@ -405,6 +407,7 @@ export function CheckoutPage() {
         ...(context || {}),
         checkoutSessionId
       });
+      watchdog.trackPaymentInitiated(cart?.id, attempt?.id);
       setPaymentAttempt(attempt);
       setCheckoutSession((current) =>
         current
@@ -448,6 +451,7 @@ export function CheckoutPage() {
       const nextCheckoutSession = response.checkoutSession || null;
       const nextOrderSummary = response.order || null;
       const nextManualInstructions = response.manualPaymentInstructions || null;
+      watchdog.trackAddressSubmitted(cart?.id);
       setCheckoutSession(nextCheckoutSession);
       setOrderSummary(nextOrderSummary);
       setManualPaymentInstructions(nextManualInstructions);

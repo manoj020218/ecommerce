@@ -19,6 +19,7 @@ import {
   getCheckoutOrderFollowup
 } from "../products/products.api";
 import { getExistingGuestSessionId } from "./cart.utils";
+import { watchdog } from "../../shared/watchdog-client";
 import {
   StorefrontAlert,
   StorefrontBadge,
@@ -385,6 +386,12 @@ export function OrderSuccessPage() {
 
       setCheckoutSession(followup?.checkoutSession || null);
       setOrder(followup?.order || null);
+      if (followup?.order?.id) {
+        const oid = followup.order.id;
+        watchdog.trackOrderCreated(oid, followup?.checkoutSession?.cartId);
+        watchdog.trackOrderConfirmed(oid);
+        watchdog.trackCompleted(oid);
+      }
       setManualInstructions(
         followup?.order?.manualPaymentInstructions?.instructions ||
           location.state?.manualPaymentInstructions?.instructions ||

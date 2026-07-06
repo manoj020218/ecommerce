@@ -791,10 +791,18 @@ export function ProductPage() {
             ) : null}
           </div>
 
-          <p className="proto-tax-line">
-            Exclusive of {Number(product.gstRate || 0)}% GST
-            {saveAmount > 0 ? <> &nbsp;|&nbsp; GST amount: {currency(Math.round(nextVisiblePrice * Number(product.gstRate || 0) / 100))}</> : null}
-          </p>
+          {product.priceIncludesGst ? (
+            <p className="proto-tax-line" style={{ color: "#15803d", fontWeight: 600 }}>
+              <span style={{ background: "#dcfce7", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>Incl. GST</span>
+              Price includes {Number(product.gstRate || 0)}% GST
+              {Number(product.gstRate || 0) > 0 ? <> &nbsp;·&nbsp; GST: {currency(Math.round(nextVisiblePrice - nextVisiblePrice / (1 + Number(product.gstRate) / 100)))}</> : null}
+            </p>
+          ) : (
+            <p className="proto-tax-line">
+              Excl. {Number(product.gstRate || 0)}% GST — added at checkout
+              {saveAmount > 0 ? <> &nbsp;|&nbsp; GST: {currency(Math.round(nextVisiblePrice * Number(product.gstRate || 0) / 100))}</> : null}
+            </p>
+          )}
           <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
 
           {featureChips.length > 0 ? (
@@ -1282,7 +1290,9 @@ export function ProductPage() {
       <StorefrontStickyActionBar className="proto-mobile-product-bar">
         <div>
           <strong>{currency(nextVisiblePrice)}</strong>
-          <span>+{Number(product.gstRate || 0)}% GST</span>
+          <span style={product.priceIncludesGst ? { color: "#15803d", fontWeight: 600 } : {}}>
+            {product.priceIncludesGst ? `Incl. ${Number(product.gstRate || 0)}% GST` : `+${Number(product.gstRate || 0)}% GST`}
+          </span>
         </div>
         {dealerOrderRequestFlow ? (
           <StorefrontButton

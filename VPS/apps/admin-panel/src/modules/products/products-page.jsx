@@ -412,7 +412,7 @@ const EMPTY_FORM = {
   googleShoppingTitle: "", googleShoppingDescription: "", googleProductCategory: "",
   productType: "", relationsRelated: [], relationsAccessory: [],
   isActive: true, stockQty: 0, reservedQty: 0,
-  stockStatus: "in_stock", allowBackorder: false, maxOrderQty: 1000, lowStockThreshold: 0
+  stockStatus: "in_stock", allowBackorder: false, priceIncludesGst: false, maxOrderQty: 1000, lowStockThreshold: 0
 };
 
 function formFromProduct(product) {
@@ -455,6 +455,7 @@ function formFromProduct(product) {
     isActive: Boolean(product.isActive),
     stockQty: Number(product.stockQty || 0), reservedQty: Number(product.reservedQty || 0),
     stockStatus: product.stockStatus || "in_stock", allowBackorder: Boolean(product.allowBackorder),
+    priceIncludesGst: Boolean(product.priceIncludesGst),
     maxOrderQty: Number(product.maxOrderQty || 1000), lowStockThreshold: Number(product.lowStockThreshold || 0)
   };
 }
@@ -524,6 +525,7 @@ function buildPayload(form) {
     isActive: Boolean(form.isActive), stockQty: Number(form.stockQty || 0),
     reservedQty: Number(form.reservedQty || 0), stockStatus: form.stockStatus,
     allowBackorder: Boolean(form.allowBackorder),
+    priceIncludesGst: Boolean(form.priceIncludesGst),
     maxOrderQty: Number(form.maxOrderQty || 1000),
     lowStockThreshold: Number(form.lowStockThreshold || 0)
   };
@@ -2411,6 +2413,32 @@ export function ProductsPage() {
           <h4 className="form-section">Pricing & Inventory</h4>
           <label className="field"><span>Base Price (₹) *</span><input type="number" min="0" step="0.01" name="basePrice" value={form.basePrice} onChange={onFormChange} required /></label>
           <label className="field"><span>Sale Price (₹)</span><input type="number" min="0" step="0.01" name="salePrice" value={form.salePrice} onChange={onFormChange} /></label>
+          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${form.priceIncludesGst ? "#16a34a" : "#e5e7eb"}`, background: form.priceIncludesGst ? "#f0fdf4" : "#f9fafb" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: 1 }}>
+              <div
+                onClick={() => setForm((c) => ({ ...c, priceIncludesGst: !c.priceIncludesGst }))}
+                style={{ width: 42, height: 24, borderRadius: 12, background: form.priceIncludesGst ? "#16a34a" : "#d1d5db", position: "relative", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 }}
+              >
+                <div style={{ position: "absolute", top: 3, left: form.priceIncludesGst ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
+              </div>
+              <input type="checkbox" name="priceIncludesGst" checked={form.priceIncludesGst} onChange={onFormChange} style={{ display: "none" }} />
+              <div>
+                <strong style={{ fontSize: 13, color: form.priceIncludesGst ? "#15803d" : "#374151" }}>
+                  {form.priceIncludesGst ? "Price includes GST" : "Price excludes GST"}
+                </strong>
+                <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
+                  {form.priceIncludesGst
+                    ? "The entered price already contains GST. Buyer sees: ₹ incl. GST. GST is extracted at checkout."
+                    : "Price is ex-GST. Buyer sees: + GST added at checkout. GST is added on top in the cart."}
+                </p>
+              </div>
+            </label>
+            {form.hsnCode ? (
+              <div style={{ fontSize: 12, color: "#6b7280", textAlign: "right", flexShrink: 0 }}>
+                HSN {form.hsnCode} · {form.priceIncludesGst ? "GST extracted from price" : "GST added on price"}
+              </div>
+            ) : null}
+          </div>
           <label className="field"><span>MOQ</span><input type="number" min="1" name="moq" value={form.moq} onChange={onFormChange} /></label>
           <label className="field"><span>Quote Required Above Qty</span><input type="number" min="1" name="quoteRequiredAboveQty" value={form.quoteRequiredAboveQty} onChange={onFormChange} /></label>
           <label className="field"><span>Stock Qty</span><input type="number" min="0" name="stockQty" value={form.stockQty} onChange={onFormChange} /></label>

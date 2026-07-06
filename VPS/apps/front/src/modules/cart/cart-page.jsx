@@ -240,7 +240,9 @@ export function CartPage() {
                         <strong>{formatCurrency(item.lineTotal)}</strong>
                         <small>{formatCurrency(item.unitPriceUsed)} each</small>
                         {Number(item.gstRate || 0) > 0 ? (
-                          <small className="proto-cart-gst-line">+GST {Number(item.gstRate)}%</small>
+                          <small className="proto-cart-gst-line" style={item.priceIncludesGst ? { color: "#15803d" } : {}}>
+                            {item.priceIncludesGst ? `GST ${Number(item.gstRate)}% incl.` : `+GST ${Number(item.gstRate)}%`}
+                          </small>
                         ) : null}
                       </div>
                     </div>

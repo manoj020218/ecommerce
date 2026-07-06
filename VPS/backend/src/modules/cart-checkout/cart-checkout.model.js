@@ -63,6 +63,7 @@ function sanitizeCartLine(line) {
     qty: Number(line.qty || 0),
     moq: Number(line.moq || 1),
     gstRate: Number(line.gstRate || 0),
+    priceIncludesGst: Boolean(line.priceIncludesGst),
     unitPrice: Number(line.unitPrice || 0),
     finalUnitPriceAfterDiscount: Number(line.finalUnitPriceAfterDiscount || line.unitPrice || 0),
     priceSource: line.priceSource || "base",

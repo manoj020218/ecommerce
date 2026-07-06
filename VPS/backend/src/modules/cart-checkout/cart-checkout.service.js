@@ -413,6 +413,7 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     qty,
     moq,
     gstRate: Number(product.gstRate || 0),
+    priceIncludesGst: Boolean(product.priceIncludesGst),
     unitPrice: Number(unitPrice),
     finalUnitPriceAfterDiscount: Number(unitPrice),
     priceSource: pricing.priceSource || "base",
@@ -518,10 +519,19 @@ async function calculatePricing(
     discountLeft = roundMoney(discountLeft - lineDiscount);
 
     line.discountAmount = lineDiscount;
-    line.taxableValue = roundMoney(line.lineSubtotal - lineDiscount);
-    line.gstAmount = roundMoney(line.taxableValue * (Number(line.gstRate || 0) / 100));
-    line.lineTotal = roundMoney(line.taxableValue + line.gstAmount);
-    line.finalUnitPriceAfterDiscount = roundMoney(line.taxableValue / line.qty);
+    const lineAfterDiscount = roundMoney(line.lineSubtotal - lineDiscount);
+    if (line.priceIncludesGst && line.gstRate > 0) {
+      // Price already contains GST — extract the tax component
+      const divisor = 1 + Number(line.gstRate) / 100;
+      line.taxableValue = roundMoney(lineAfterDiscount / divisor);
+      line.gstAmount = roundMoney(lineAfterDiscount - line.taxableValue);
+      line.lineTotal = lineAfterDiscount;
+    } else {
+      line.taxableValue = lineAfterDiscount;
+      line.gstAmount = roundMoney(line.taxableValue * (Number(line.gstRate || 0) / 100));
+      line.lineTotal = roundMoney(line.taxableValue + line.gstAmount);
+    }
+    line.finalUnitPriceAfterDiscount = roundMoney(line.lineTotal / line.qty);
 
     taxableValue = roundMoney(taxableValue + line.taxableValue);
     gstTotal = roundMoney(gstTotal + line.gstAmount);

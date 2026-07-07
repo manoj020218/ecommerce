@@ -30,7 +30,13 @@ const { generateId } = require("../backend/src/common/identity");
 const { env } = require("../backend/src/config/env");
 
 const importData = require("./migration/output/products_import.json");
-const cleanedDescs = require("./migration/output/products_descriptions_cleaned.json");
+// Cleaned descriptions may be in migration/output/ OR in the scripts root (VPS copy)
+let cleanedDescs;
+try {
+  cleanedDescs = require("./migration/output/products_descriptions_cleaned.json");
+} catch (_) {
+  cleanedDescs = require("./products_descriptions_cleaned.json");
+}
 
 const isDryRun = process.argv.includes("--dry-run");
 

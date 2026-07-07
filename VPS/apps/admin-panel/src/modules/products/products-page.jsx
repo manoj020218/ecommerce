@@ -20,7 +20,6 @@ import {
   saveCols
 } from "./products-column-selector";
 
-const STOREFRONT_URL = import.meta.env.VITE_STOREFRONT_URL || "https://jenixindia.com";
 import { fetchShippingClasses } from "../shipping/shipping.api";
 import {
   archiveProduct,
@@ -38,6 +37,7 @@ import {
 } from "./products.api";
 import { RichTextEditor } from "../../shared/components/rich-text-editor";
 
+const STOREFRONT_URL = import.meta.env.VITE_STOREFRONT_URL || "https://jenixindia.com";
 const BACKEND_BASE = API_BASE_URL.replace(/\/api$/, "");
 
 function detectVideoPlatform(url) {

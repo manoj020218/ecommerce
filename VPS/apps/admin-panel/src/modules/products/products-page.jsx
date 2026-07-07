@@ -20,7 +20,8 @@ import {
   saveCols
 } from "./products-column-selector";
 
-const STOREFRONT_URL = import.meta.env.VITE_STOREFRONT_URL || "https://test.jenixindia.com";
+const STOREFRONT_URL = import.meta.env.VITE_STOREFRONT_URL || "https://jenixindia.com";
+import { fetchShippingClasses } from "../shipping/shipping.api";
 import {
   archiveProduct,
   deleteProduct,
@@ -412,7 +413,7 @@ const EMPTY_FORM = {
   googleShoppingTitle: "", googleShoppingDescription: "", googleProductCategory: "",
   productType: "", relationsRelated: [], relationsAccessory: [],
   isActive: true, stockQty: 0, reservedQty: 0,
-  stockStatus: "in_stock", allowBackorder: false, priceIncludesGst: false, maxOrderQty: 1000, lowStockThreshold: 0
+  stockStatus: "in_stock", allowBackorder: false, priceIncludesGst: false, shippingIncluded: false, maxOrderQty: 1000, lowStockThreshold: 0
 };
 
 function formFromProduct(product) {
@@ -456,6 +457,7 @@ function formFromProduct(product) {
     stockQty: Number(product.stockQty || 0), reservedQty: Number(product.reservedQty || 0),
     stockStatus: product.stockStatus || "in_stock", allowBackorder: Boolean(product.allowBackorder),
     priceIncludesGst: Boolean(product.priceIncludesGst),
+    shippingIncluded: Boolean(product.shippingIncluded),
     maxOrderQty: Number(product.maxOrderQty || 1000), lowStockThreshold: Number(product.lowStockThreshold || 0)
   };
 }
@@ -494,7 +496,7 @@ function buildPayload(form) {
     title: form.title, slug: form.slug.trim() || undefined, oldUrl: form.oldUrl,
     categoryId: form.categoryId || null, subcategoryId: form.subcategoryId || null,
     brand: form.brand, modelNumber: form.modelNumber,
-    hsnCode: form.hsnCode, basePrice: Number(form.basePrice),
+    hsnCode: form.hsnCode || undefined, basePrice: Number(form.basePrice),
     salePrice: form.salePrice === "" ? undefined : Number(form.salePrice),
     shortDescription: form.shortDescription, fullDescription: form.fullDescription,
     specifications, technicalKeywords: splitCsvInput(form.technicalKeywordsText),
@@ -526,6 +528,7 @@ function buildPayload(form) {
     reservedQty: Number(form.reservedQty || 0), stockStatus: form.stockStatus,
     allowBackorder: Boolean(form.allowBackorder),
     priceIncludesGst: Boolean(form.priceIncludesGst),
+    shippingIncluded: Boolean(form.shippingIncluded),
     maxOrderQty: Number(form.maxOrderQty || 1000),
     lowStockThreshold: Number(form.lowStockThreshold || 0)
   };
@@ -720,7 +723,7 @@ function StockDot({ status, availableQty }) {
 
 // ── ListPriceCell — two editable price inputs (Sale + MRP) in one table cell ──
 
-function ListPriceCell({ rowId, salePrice, basePrice, pendingSale, pendingBase, activeCell, setActiveCell, onChange }) {
+function ListPriceCell({ rowId, salePrice, basePrice, pendingSale, pendingBase, activeCell, setActiveCell, onChange, priceIncludesGst, shippingIncluded }) {
   const saleRef = useRef(null);
   const baseRef = useRef(null);
   const isSaleActive = activeCell?.rowId === rowId && activeCell?.field === "salePrice";
@@ -773,6 +776,27 @@ function ListPriceCell({ rowId, salePrice, basePrice, pendingSale, pendingBase, 
           </span>
         )}
       </div>
+      {/* GST / Shipping indicator chips */}
+      <div style={{ display: "flex", gap: 3, marginTop: 4, flexWrap: "wrap" }}>
+        <span title={priceIncludesGst ? "Price includes GST" : "GST added on top"} style={{
+          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+          background: priceIncludesGst ? "#dcfce7" : "#fef3c7",
+          color: priceIncludesGst ? "#15803d" : "#b45309",
+          border: `1px solid ${priceIncludesGst ? "#86efac" : "#fcd34d"}`,
+          letterSpacing: "0.3px", cursor: "default"
+        }}>
+          {priceIncludesGst ? "GST incl." : "GST excl."}
+        </span>
+        <span title={shippingIncluded ? "Shipping included in price" : "Shipping charged at checkout"} style={{
+          fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 4,
+          background: shippingIncluded ? "#dbeafe" : "#f3f4f6",
+          color: shippingIncluded ? "#1d4ed8" : "#6b7280",
+          border: `1px solid ${shippingIncluded ? "#93c5fd" : "#d1d5db"}`,
+          letterSpacing: "0.3px", cursor: "default"
+        }}>
+          {shippingIncluded ? "Ship incl." : "Ship extra"}
+        </span>
+      </div>
     </div>
   );
 }
@@ -791,6 +815,7 @@ export function ProductsPage() {
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [hsnRecords, setHsnRecords] = useState([]);
+  const [shippingClasses, setShippingClasses] = useState([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [filters, setFilters] = useState(() => {
@@ -899,14 +924,16 @@ export function ProductsPage() {
     setLoading(true);
     setError("");
     try {
-      const [productData, categoryData, hsnData] = await Promise.all([
+      const [productData, categoryData, hsnData, classData] = await Promise.all([
         fetchProducts(filters),
         fetchCategories({ includeInactive: true, q: "" }),
-        fetchHsnTaxRecords({ includeInactive: false, q: "" })
+        fetchHsnTaxRecords({ includeInactive: false, q: "" }),
+        fetchShippingClasses().catch(() => [])
       ]);
       setRows(Array.isArray(productData) ? productData : []);
       setCategories(Array.isArray(categoryData) ? categoryData : []);
       setHsnRecords(Array.isArray(hsnData) ? hsnData : []);
+      setShippingClasses(Array.isArray(classData) ? classData.filter((c) => c.isActive) : []);
     } catch (apiError) {
       setError(apiError.message || "Failed to load.");
     } finally {
@@ -1952,6 +1979,8 @@ export function ProductsPage() {
                             activeCell={listActiveCell}
                             setActiveCell={setListActiveCell}
                             onChange={setListCellValue}
+                            priceIncludesGst={Boolean(row.priceIncludesGst)}
+                            shippingIncluded={Boolean(row.shippingIncluded)}
                           />
                         </td>
                       )}
@@ -2004,6 +2033,15 @@ export function ProductsPage() {
                                 style={{ fontSize: 12, color: "#E8231A", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
                                 Edit
                               </button>
+                            )}
+                            {canEdit && (
+                              <>
+                                <span style={{ color: "#e5e7eb" }}>|</span>
+                                <button type="button" onClick={() => navigate(`/products/${row.id}/edit`)}
+                                  style={{ fontSize: 12, color: "#2563eb", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                                  Full Edit
+                                </button>
+                              </>
                             )}
                             {canEdit && (
                               <>
@@ -2083,7 +2121,13 @@ export function ProductsPage() {
                   {canEdit && (
                     <button type="button" onClick={() => openEdit(row)}
                       style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#E8231A", border: "1px solid rgba(232,35,26,0.3)", background: "rgba(232,35,26,0.04)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
-                      Edit
+                      Quick Edit
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button type="button" onClick={() => navigate(`/products/${row.id}/edit`)}
+                      style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#2563eb", border: "1px solid rgba(37,99,235,0.3)", background: "rgba(37,99,235,0.04)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
+                      Full Edit
                     </button>
                   )}
                   {canEdit && (
@@ -2439,6 +2483,27 @@ export function ProductsPage() {
               </div>
             ) : null}
           </div>
+          <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${form.shippingIncluded ? "#2563eb" : "#e5e7eb"}`, background: form.shippingIncluded ? "#eff6ff" : "#f9fafb" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: 1 }}>
+              <div
+                onClick={() => setForm((c) => ({ ...c, shippingIncluded: !c.shippingIncluded }))}
+                style={{ width: 42, height: 24, borderRadius: 12, background: form.shippingIncluded ? "#2563eb" : "#d1d5db", position: "relative", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 }}
+              >
+                <div style={{ position: "absolute", top: 3, left: form.shippingIncluded ? 21 : 3, width: 18, height: 18, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
+              </div>
+              <input type="checkbox" name="shippingIncluded" checked={form.shippingIncluded} onChange={onFormChange} style={{ display: "none" }} />
+              <div>
+                <strong style={{ fontSize: 13, color: form.shippingIncluded ? "#1d4ed8" : "#374151" }}>
+                  {form.shippingIncluded ? "Shipping included in price" : "Shipping charged separately"}
+                </strong>
+                <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
+                  {form.shippingIncluded
+                    ? "Free shipping for this product — no shipping charge added at checkout."
+                    : "Buyer pays shipping at checkout based on weight, zone, and shipping class."}
+                </p>
+              </div>
+            </label>
+          </div>
           <label className="field"><span>MOQ</span><input type="number" min="1" name="moq" value={form.moq} onChange={onFormChange} /></label>
           <label className="field"><span>Quote Required Above Qty</span><input type="number" min="1" name="quoteRequiredAboveQty" value={form.quoteRequiredAboveQty} onChange={onFormChange} /></label>
           <label className="field"><span>Stock Qty</span><input type="number" min="0" name="stockQty" value={form.stockQty} onChange={onFormChange} /></label>
@@ -2458,7 +2523,17 @@ export function ProductsPage() {
           <label className="field"><span>Length (cm)</span><input type="number" min="0" step="0.01" name="lengthCm" value={form.lengthCm} onChange={onFormChange} /></label>
           <label className="field"><span>Width (cm)</span><input type="number" min="0" step="0.01" name="widthCm" value={form.widthCm} onChange={onFormChange} /></label>
           <label className="field"><span>Height (cm)</span><input type="number" min="0" step="0.01" name="heightCm" value={form.heightCm} onChange={onFormChange} /></label>
-          <label className="field"><span>Shipping Class</span><input name="shippingClass" value={form.shippingClass} onChange={onFormChange} /></label>
+          <label className="field">
+            <span>Shipping Class</span>
+            <select name="shippingClass" value={form.shippingClass} onChange={onFormChange}>
+              {shippingClasses.length === 0 && <option value="normal">Normal (default)</option>}
+              {shippingClasses.map((sc) => (
+                <option key={sc.id} value={sc.code}>
+                  {sc.name}{sc.rateType === "fixed" ? ` — Flat ₹${sc.fixedAmount}` : sc.baseCharge || sc.perKgRate ? ` — ₹${sc.baseCharge} + ₹${sc.perKgRate}/kg` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             <label className="inline-check"><input type="checkbox" name="bulkPricingEnabled" checked={form.bulkPricingEnabled} onChange={onFormChange} /> Bulk pricing enabled</label>
             <label className="inline-check"><input type="checkbox" name="allowBackorder" checked={form.allowBackorder} onChange={onFormChange} /> Allow backorder</label>

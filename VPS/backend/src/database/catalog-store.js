@@ -11,6 +11,9 @@ const DEFAULT_CATALOG_STORE = Object.freeze({
   inventoryMovements: []
 });
 
+// Mutex to prevent concurrent writes from corrupting the JSON file
+let writeQueue = Promise.resolve();
+
 function cloneDefaultCatalogStore() {
   return JSON.parse(JSON.stringify(DEFAULT_CATALOG_STORE));
 }
@@ -36,17 +39,28 @@ async function readCatalogStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultCatalogStore();
-    await fs.writeFile(catalogStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    // DO NOT overwrite the file here — preserve the corrupted file as a backup
+    // so data can potentially be recovered. Throw instead.
+    const backupPath = catalogStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(catalogStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error("catalog-store.json is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Original error: " + parseError.message);
   }
 }
 
 async function writeCatalogStore(store) {
-  await ensureCatalogStoreFile();
-  await fs.writeFile(catalogStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  // Serialize writes through a queue to prevent concurrent-write race conditions
+  const result = writeQueue.then(async () => {
+    await ensureCatalogStoreFile();
+    // Atomic write: write to a temp file first, then rename over the real file.
+    // If the write crashes halfway, the original file is untouched.
+    const tmpPath = catalogStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, catalogStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { /* keep queue moving even on error */ });
+  return result;
 }
 
 async function resetCatalogStoreForRegression() {

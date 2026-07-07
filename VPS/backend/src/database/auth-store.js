@@ -22,6 +22,9 @@ const DEFAULT_AUTH_STORE = Object.freeze({
   activityLogs: []
 });
 
+// Mutex to prevent concurrent writes from corrupting the JSON file
+let writeQueue = Promise.resolve();
+
 function cloneDefaultAuthStore() {
   return JSON.parse(JSON.stringify(DEFAULT_AUTH_STORE));
 }
@@ -47,17 +50,23 @@ async function readAuthStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultAuthStore();
-    await fs.writeFile(authStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = authStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(authStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error("auth-store.json is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Original error: " + parseError.message);
   }
 }
 
 async function writeAuthStore(store) {
-  await ensureAuthStoreFile();
-  await fs.writeFile(authStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureAuthStoreFile();
+    const tmpPath = authStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, authStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetAuthStoreForRegression() {

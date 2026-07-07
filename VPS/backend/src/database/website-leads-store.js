@@ -7,6 +7,8 @@ const {
 
 const websiteLeadsStorePath = path.resolve(process.cwd(), env.websiteLeadsStorePath);
 
+let writeQueue = Promise.resolve();
+
 async function ensureWebsiteLeadsStoreFile() {
   const directoryPath = path.dirname(websiteLeadsStorePath);
   await fs.mkdir(directoryPath, { recursive: true });
@@ -28,21 +30,23 @@ async function readWebsiteLeadsStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultWebsiteLeadsStore();
-    await fs.writeFile(
-      websiteLeadsStorePath,
-      JSON.stringify(fallback, null, 2),
-      "utf-8"
-    );
-    return fallback;
+  } catch (parseError) {
+    const backupPath = websiteLeadsStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(websiteLeadsStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(websiteLeadsStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeWebsiteLeadsStore(store) {
-  await ensureWebsiteLeadsStoreFile();
-  await fs.writeFile(websiteLeadsStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureWebsiteLeadsStoreFile();
+    const tmpPath = websiteLeadsStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, websiteLeadsStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetWebsiteLeadsStoreForRegression() {

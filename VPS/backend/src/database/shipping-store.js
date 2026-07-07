@@ -170,10 +170,26 @@ const DEFAULT_SHIPPING_STORE = Object.freeze({
       isActive: true
     }
   ],
+  shippingClasses: [
+    {
+      id: "sc_normal",
+      name: "Normal",
+      code: "normal",
+      description: "Standard weight-based shipping using rate cards.",
+      rateType: "weight_based",
+      fixedAmount: 0,
+      baseCharge: 0,
+      perKgRate: 0,
+      isActive: true,
+      createdAt: "2026-01-01T00:00:00.000Z"
+    }
+  ],
   courierProfiles: [],
   shipments: [],
   trackingEmailLogs: []
 });
+
+let writeQueue = Promise.resolve();
 
 function cloneDefaultShippingStore() {
   return JSON.parse(JSON.stringify(DEFAULT_SHIPPING_STORE));
@@ -200,17 +216,23 @@ async function readShippingStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultShippingStore();
-    await fs.writeFile(shippingStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = shippingStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(shippingStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(shippingStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeShippingStore(store) {
-  await ensureShippingStoreFile();
-  await fs.writeFile(shippingStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureShippingStoreFile();
+    const tmpPath = shippingStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, shippingStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetShippingStoreForRegression() {

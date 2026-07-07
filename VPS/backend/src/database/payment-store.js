@@ -160,6 +160,8 @@ const DEFAULT_PAYMENT_STORE = Object.freeze({
   processedWebhooks: []
 });
 
+let writeQueue = Promise.resolve();
+
 function cloneDefaultPaymentStore() {
   return JSON.parse(JSON.stringify(DEFAULT_PAYMENT_STORE));
 }
@@ -185,17 +187,23 @@ async function readPaymentStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultPaymentStore();
-    await fs.writeFile(paymentStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = paymentStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(paymentStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(paymentStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writePaymentStore(store) {
-  await ensurePaymentStoreFile();
-  await fs.writeFile(paymentStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensurePaymentStoreFile();
+    const tmpPath = paymentStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, paymentStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetPaymentStoreForRegression() {

@@ -23,15 +23,18 @@ async function readJson(filePath, fallbackData) {
 
   try {
     return JSON.parse(fileText);
-  } catch (_error) {
-    await fs.writeFile(filePath, JSON.stringify(fallbackData, null, 2), "utf-8");
-    return JSON.parse(JSON.stringify(fallbackData));
+  } catch (parseError) {
+    const backupPath = filePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(filePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(filePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeJson(filePath, payload) {
   await ensureFile(filePath, payload);
-  await fs.writeFile(filePath, JSON.stringify(payload, null, 2), "utf-8");
+  const tmpPath = filePath + ".tmp";
+  await fs.writeFile(tmpPath, JSON.stringify(payload, null, 2), "utf-8");
+  await fs.rename(tmpPath, filePath);
 }
 
 function createJsonFileStore() {

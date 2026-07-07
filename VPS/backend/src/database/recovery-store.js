@@ -4,6 +4,8 @@ const { env } = require("../config/env");
 
 const recoveryStorePath = path.resolve(process.cwd(), env.recoveryStorePath);
 
+let writeQueue = Promise.resolve();
+
 const DEFAULT_RECOVERY_STORE = Object.freeze({
   recoveries: []
 });
@@ -33,17 +35,23 @@ async function readRecoveryStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultRecoveryStore();
-    await fs.writeFile(recoveryStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = recoveryStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(recoveryStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(recoveryStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeRecoveryStore(store) {
-  await ensureRecoveryStoreFile();
-  await fs.writeFile(recoveryStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureRecoveryStoreFile();
+    const tmpPath = recoveryStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, recoveryStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetRecoveryStoreForRegression() {

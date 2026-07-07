@@ -5,6 +5,8 @@ const { cloneDefaultMarketingStore } = require("../modules/marketing/marketing.m
 
 const marketingStorePath = path.resolve(process.cwd(), env.marketingStorePath);
 
+let writeQueue = Promise.resolve();
+
 async function ensureMarketingStoreFile() {
   const directoryPath = path.dirname(marketingStorePath);
   await fs.mkdir(directoryPath, { recursive: true });
@@ -26,17 +28,23 @@ async function readMarketingStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultMarketingStore();
-    await fs.writeFile(marketingStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = marketingStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(marketingStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(marketingStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeMarketingStore(store) {
-  await ensureMarketingStoreFile();
-  await fs.writeFile(marketingStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureMarketingStoreFile();
+    const tmpPath = marketingStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, marketingStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetMarketingStoreForRegression() {

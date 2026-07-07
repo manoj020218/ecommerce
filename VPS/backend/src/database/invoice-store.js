@@ -4,6 +4,8 @@ const { env } = require("../config/env");
 
 const invoiceStorePath = path.resolve(process.cwd(), env.invoiceStorePath);
 
+let writeQueue = Promise.resolve();
+
 const DEFAULT_INVOICE_STORE = Object.freeze({
   invoices: [],
   sequences: [],
@@ -35,17 +37,23 @@ async function readInvoiceStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultInvoiceStore();
-    await fs.writeFile(invoiceStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = invoiceStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(invoiceStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(invoiceStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeInvoiceStore(store) {
-  await ensureInvoiceStoreFile();
-  await fs.writeFile(invoiceStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureInvoiceStoreFile();
+    const tmpPath = invoiceStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, invoiceStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetInvoiceStoreForRegression() {

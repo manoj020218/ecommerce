@@ -4,6 +4,8 @@ const { env } = require("../config/env");
 
 const searchStorePath = path.resolve(process.cwd(), env.searchStorePath);
 
+let writeQueue = Promise.resolve();
+
 const DEFAULT_SEARCH_STORE = Object.freeze({
   searchSynonyms: [],
   buyerPhraseMappings: [],
@@ -46,17 +48,23 @@ async function readSearchStore() {
 
   try {
     return JSON.parse(raw);
-  } catch (_error) {
-    const fallback = cloneDefaultSearchStore();
-    await fs.writeFile(searchStorePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = searchStorePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(searchStorePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(searchStorePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeSearchStore(store) {
-  await ensureSearchStoreFile();
-  await fs.writeFile(searchStorePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureSearchStoreFile();
+    const tmpPath = searchStorePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, searchStorePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 async function resetSearchStoreForRegression() {

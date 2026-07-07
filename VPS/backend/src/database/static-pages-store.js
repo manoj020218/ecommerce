@@ -4,6 +4,8 @@ const { env } = require("../config/env");
 
 const storePath = path.resolve(process.cwd(), env.staticPagesStorePath);
 
+let writeQueue = Promise.resolve();
+
 const DEFAULT_PAGES = [
   {
     id: "page_about_us",
@@ -213,17 +215,23 @@ async function readStaticPagesStore() {
       await fs.writeFile(storePath, JSON.stringify(parsed, null, 2), "utf-8");
     }
     return parsed;
-  } catch (_error) {
-    const fallback = { pages: DEFAULT_PAGES };
-    await fs.writeFile(storePath, JSON.stringify(fallback, null, 2), "utf-8");
-    return fallback;
+  } catch (parseError) {
+    const backupPath = storePath + ".corrupted." + Date.now();
+    try { await fs.copyFile(storePath, backupPath); } catch (_) { /* best effort */ }
+    throw new Error(storePath + " is corrupted (JSON parse failed). Backup saved to: " + backupPath + ". Error: " + parseError.message);
   }
 }
 
 async function writeStaticPagesStore(store) {
-  await ensureStoreFile();
-  await fs.writeFile(storePath, JSON.stringify(store, null, 2), "utf-8");
-  return store;
+  const result = writeQueue.then(async () => {
+    await ensureStoreFile();
+    const tmpPath = storePath + ".tmp";
+    await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
+    await fs.rename(tmpPath, storePath);
+    return store;
+  });
+  writeQueue = result.catch(() => { });
+  return result;
 }
 
 module.exports = { readStaticPagesStore, writeStaticPagesStore, DEFAULT_PAGES };

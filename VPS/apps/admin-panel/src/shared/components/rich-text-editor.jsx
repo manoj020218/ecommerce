@@ -14,19 +14,28 @@ const TOOLS = [
 
 export function RichTextEditor({ value, onChange, minRows = 5, placeholder }) {
   const editorRef = useRef(null);
-  const suppressSync = useRef(false);
+  // Tracks the last HTML value we pushed out via onChange.
+  // useEffect skips DOM reset when the incoming value matches what we just emitted,
+  // preventing the cursor from jumping on every keystroke.
+  // null sentinel: ensures first useEffect run always populates the DOM
+  const lastEmitted = useRef(null);
 
   useEffect(() => {
-    if (!editorRef.current || suppressSync.current) return;
-    if (editorRef.current.innerHTML !== (value || "")) {
-      editorRef.current.innerHTML = value || "";
+    if (!editorRef.current) return;
+    const incoming = value || "";
+    // Skip: this value was just emitted by us — no need to touch the DOM.
+    if (lastEmitted.current === incoming) return;
+    // External change (e.g. parent loaded data) — update the DOM.
+    if (editorRef.current.innerHTML !== incoming) {
+      lastEmitted.current = incoming;
+      editorRef.current.innerHTML = incoming;
     }
   }, [value]);
 
   const pushChange = useCallback(() => {
-    suppressSync.current = true;
-    onChange(editorRef.current?.innerHTML || "");
-    suppressSync.current = false;
+    const html = editorRef.current?.innerHTML || "";
+    lastEmitted.current = html;
+    onChange(html);
   }, [onChange]);
 
   const exec = useCallback((cmd, arg) => {
@@ -36,7 +45,12 @@ export function RichTextEditor({ value, onChange, minRows = 5, placeholder }) {
   }, [pushChange]);
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", background: "var(--surface)" }}>
+    // stopPropagation prevents the parent <label> (Field component) from forwarding
+    // the click to the first <button> (Bold) instead of the contentEditable div.
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", background: "var(--surface)" }}
+    >
       <div style={{
         display: "flex", gap: 3, padding: "5px 8px",
         background: "#f9fafb", borderBottom: "1px solid var(--border)", flexWrap: "wrap"

@@ -42,6 +42,8 @@ Thumbs.db
 # Project runtime data
 VPS/backend/uploads/
 VPS/backend/src/database/json/*.json
+VPS/backend/src/database/json/*.bak*
+VPS/backend/src/database/json/*.tmp
 !VPS/backend/src/database/json/.gitkeep
 
 # Portable image-assets folder (not in git — move this folder to migrate servers)

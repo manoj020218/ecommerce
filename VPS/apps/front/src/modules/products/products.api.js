@@ -1,4 +1,5 @@
 import { apiFetch } from "../../shared/api/http-client";
+import { getOrCreateGuestSessionId } from "../../shared/cart/guest-session";
 
 function buildQuery(params = {}) {
   const query = new URLSearchParams();
@@ -90,7 +91,7 @@ export function addCartItem(payload) {
   return apiFetch("/cart/items", {
     method: "POST",
     auth: true,
-    body: payload
+    body: { sessionId: getOrCreateGuestSessionId(), ...payload }
   });
 }
 
@@ -98,12 +99,13 @@ export function updateCartItem(productId, payload) {
   return apiFetch(`/cart/items/${productId}`, {
     method: "PATCH",
     auth: true,
-    body: payload
+    body: { sessionId: getOrCreateGuestSessionId(), ...payload }
   });
 }
 
 export function deleteCartItem(productId, params = {}) {
-  const query = buildQuery(params);
+  const sessionId = getOrCreateGuestSessionId();
+  const query = buildQuery({ sessionId, ...params });
   return apiFetch(query ? `/cart/items/${productId}?${query}` : `/cart/items/${productId}`, {
     method: "DELETE",
     auth: true
@@ -158,6 +160,13 @@ export function createPaymentAttempt(payload) {
   return apiFetch("/payments/create-attempt", {
     method: "POST",
     auth: true,
+    body: payload
+  });
+}
+
+export function confirmRazorpayPayment(payload) {
+  return apiFetch("/payments/razorpay-confirm", {
+    method: "POST",
     body: payload
   });
 }

@@ -13,6 +13,7 @@ import {
   StorefrontStickyActionBar
 } from "../../shared/storefront/storefront-ui";
 import {
+  confirmRazorpayPayment,
   createPaymentAttempt,
   getCart,
   getCheckoutSession,
@@ -20,6 +21,17 @@ import {
   mergeGuestCart,
   startCheckout
 } from "../products/products.api";
+
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) { resolve(true); return; }
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
 import {
   PAYMENT_METHOD_OPTIONS,
   SHIPPING_METHOD_OPTIONS,
@@ -445,7 +457,11 @@ export function CheckoutPage() {
         paymentMethod,
         shippingMethod,
         billingAddress: buildAddressPayload(billingForm),
-        shippingAddress: buildAddressPayload(effectiveShippingForm)
+        shippingAddress: buildAddressPayload(effectiveShippingForm),
+        // Ties this submission to the exact cart this tab last displayed, so a
+        // cart mutated from another tab (same guest/customer session) can't silently
+        // get ordered instead of what was reviewed and confirmed here.
+        expectedCartUpdatedAt: cart?.updatedAt || null
       });
 
       const nextCheckoutSession = response.checkoutSession || null;
@@ -493,9 +509,63 @@ export function CheckoutPage() {
 
       if (paymentMethod === "online" && nextCheckoutSession?.id) {
         const attempt = await handleCreatePaymentLink(nextCheckoutSession.id);
-        if (attempt) {
-          openOrderSuccess(attempt);
+        if (!attempt) return;
+
+        // Open Razorpay checkout modal if we have the gateway order ID
+        if (attempt.gatewayOrderId && attempt.gatewayProviderKey) {
+          const loaded = await loadRazorpayScript();
+          if (!loaded) {
+            setError("Failed to load payment gateway. Please check your internet connection and try again.");
+            setSubmitting(false);
+            return;
+          }
+
+          const rzpOptions = {
+            key: attempt.gatewayProviderKey,
+            order_id: attempt.gatewayOrderId,
+            amount: Math.round(Number(attempt.amount || 0) * 100),
+            currency: "INR",
+            name: "Jenix India",
+            description: `Order ${nextOrderSummary?.orderNo || nextCheckoutSession.id}`,
+            theme: { color: "#E8231A" },
+            prefill: {
+              name: billingForm.name || "",
+              email: billingForm.email || "",
+              contact: billingForm.mobile || ""
+            },
+            handler: async function (rzpResponse) {
+              // Payment succeeded — confirm with backend then go to success page
+              try {
+                await confirmRazorpayPayment({
+                  attemptId: attempt.attemptId,
+                  razorpay_payment_id: rzpResponse.razorpay_payment_id,
+                  razorpay_order_id: rzpResponse.razorpay_order_id,
+                  razorpay_signature: rzpResponse.razorpay_signature
+                });
+              } catch (_confirmErr) {
+                // Non-fatal: webhook will also process it
+              }
+              openOrderSuccess(attempt);
+            },
+            modal: {
+              ondismiss: function () {
+                setError("Payment was not completed. You can try again.");
+                setSubmitting(false);
+              }
+            }
+          };
+
+          const rzp = new window.Razorpay(rzpOptions);
+          rzp.on("payment.failed", function (resp) {
+            setError(`Payment failed: ${resp.error?.description || "Please try again."}`);
+            setSubmitting(false);
+          });
+          rzp.open();
+          return; // Navigation handled by the modal handler callback above
         }
+
+        // Fallback if no gateway order ID (e.g. unconfigured gateway)
+        openOrderSuccess(attempt);
       } else {
         setNotice(
           `Checkout created${response.order?.orderNo ? ` for order ${response.order.orderNo}` : ""}.`
@@ -505,6 +575,11 @@ export function CheckoutPage() {
       }
     } catch (requestError) {
       setError(requestError.message || "Checkout could not be started.");
+      if (requestError.status === 409) {
+        // Cart changed since this tab last loaded it — refresh the on-screen summary
+        // so the buyer reviews the current items before trying to place the order again.
+        refreshCartPreview().catch(() => {});
+      }
     } finally {
       setSubmitting(false);
     }
@@ -648,23 +723,23 @@ export function CheckoutPage() {
 
                 <div className="proto-form-grid">
                   <StorefrontInput
-                    label="Company Name"
-                    value={billingForm.companyName}
-                    onChange={(event) => setBillingForm((current) => ({ ...current, companyName: event.target.value }))}
-                    placeholder="Company Name"
-                  />
-                  <StorefrontInput
-                    label="GSTIN"
-                    value={billingForm.gstin}
-                    onChange={(event) => setBillingForm((current) => ({ ...current, gstin: event.target.value }))}
-                    placeholder="GSTIN"
-                  />
-                  <StorefrontInput
                     label="Contact Name"
                     value={billingForm.name}
                     onChange={(event) => setBillingForm((current) => ({ ...current, name: event.target.value }))}
                     placeholder="Contact Name"
                     required
+                  />
+                  <StorefrontInput
+                    label="Company Name (optional)"
+                    value={billingForm.companyName}
+                    onChange={(event) => setBillingForm((current) => ({ ...current, companyName: event.target.value }))}
+                    placeholder="Company Name"
+                  />
+                  <StorefrontInput
+                    label="GSTIN (optional)"
+                    value={billingForm.gstin}
+                    onChange={(event) => setBillingForm((current) => ({ ...current, gstin: event.target.value }))}
+                    placeholder="GSTIN"
                   />
                   <StorefrontInput
                     label="Mobile"
@@ -849,6 +924,12 @@ export function CheckoutPage() {
                       <div>
                         <strong>{option.label}</strong>
                         <p>{PAYMENT_DESCRIPTIONS[option.value] || "Payment method configured in admin."}</p>
+                        {option.value === "direct_bank_transfer" ? (
+                          <span className="proto-discount-chip">Get 2% discount when pay by direct bank transfer</span>
+                        ) : null}
+                        {option.value === "manual_upi" ? (
+                          <span className="proto-discount-chip">Get 2% discount when pay by manual UPI</span>
+                        ) : null}
                       </div>
                     </label>
                   ))}

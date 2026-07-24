@@ -342,7 +342,8 @@ export function CustomerAccountLoginPage() {
           ).finally(() => setBusy(""));
         }} />
 
-        <StorefrontCard as="article" className="section-card" elevated>
+        {/* Mobile OTP hidden — pending WhatsApp free-message OTP integration */}
+        <StorefrontCard as="article" className="section-card" elevated style={{ display: "none" }}>
           <StorefrontSectionHeader
             title="Mobile OTP"
             description="Verify a mobile number and access guest-linked orders safely."

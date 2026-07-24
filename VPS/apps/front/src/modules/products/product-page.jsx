@@ -808,6 +808,16 @@ export function ProductPage() {
             </p>
           )}
           <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
+          {product.shippingIncluded ? (
+            <p className="proto-shipping-info-line proto-shipping-included">
+              <span className="proto-shipping-chip">Free Shipping</span>
+              Shipping is included in the price — no extra charge at checkout.
+            </p>
+          ) : (
+            <p className="proto-shipping-info-line">
+              Shipping calculated at checkout based on your location.
+            </p>
+          )}
 
           {featureChips.length > 0 ? (
             <div className="proto-feature-chip-row">
@@ -1189,10 +1199,16 @@ export function ProductPage() {
         ) : null}
 
         {tab === "description" ? (
-          <p className="proto-tab-copy">
-            {product.fullDescription ||
-              "A detailed product description is being prepared. Contact the store if you need help validating fit, specs, or installation needs."}
-          </p>
+          product.fullDescription ? (
+            <div
+              className="proto-tab-copy"
+              dangerouslySetInnerHTML={{ __html: product.fullDescription }}
+            />
+          ) : (
+            <p className="proto-tab-copy">
+              A detailed product description is being prepared. Contact the store if you need help validating fit, specs, or installation needs.
+            </p>
+          )
         ) : null}
 
         {tab === "specifications" ? (
@@ -1297,6 +1313,9 @@ export function ProductPage() {
           <span style={product.priceIncludesGst ? { color: "#15803d", fontWeight: 600 } : {}}>
             {product.priceIncludesGst ? `Incl. ${Number(product.gstRate || 0)}% GST` : `+${Number(product.gstRate || 0)}% GST`}
           </span>
+          {product.shippingIncluded ? (
+            <span className="proto-shipping-chip proto-shipping-chip-sm">Free Shipping</span>
+          ) : null}
         </div>
         {dealerOrderRequestFlow ? (
           <StorefrontButton

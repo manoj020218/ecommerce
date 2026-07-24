@@ -312,6 +312,7 @@ function toPublicProduct(product, options = {}) {
     hsnCode: product.hsnCode || "",
     gstRate: Number(product.gstRate || 0),
     priceIncludesGst: Boolean(product.priceIncludesGst),
+    shippingIncluded: Boolean(product.shippingIncluded),
     basePrice: Number(product.basePrice || 0),
     salePrice: Number(product.salePrice || 0),
     pricing,

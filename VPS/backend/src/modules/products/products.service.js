@@ -10,6 +10,7 @@ const {
   createShippingProvider
 } = require("../../integrations/shipping-providers/shipping-provider.adapter");
 const { convertToWebp } = require("../../common/image-utils");
+const { sanitizeRichText } = require("../../common/html-sanitizer");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { listHelpfulGuidesForProduct } = require("../blogs/blogs.service");
 const { buildProductPageSeoPayload } = require("../seo/seo.service");
@@ -1136,8 +1137,10 @@ async function bulkImportProducts(items) {
       basePrice,
       salePrice,
       images: Array.isArray(item.images) ? item.images : [],
-      shortDescription: item.shortDescription || "",
-      fullDescription: item.fullDescription || "",
+      // Bulk import feeds scraped/migrated CSV data straight in, bypassing the
+      // create-product Zod validator's sanitizeRichText transform — sanitize here too.
+      shortDescription: sanitizeRichText(item.shortDescription || ""),
+      fullDescription: sanitizeRichText(item.fullDescription || ""),
       keyFeatures: normalizeKeyFeatures(item.keyFeatures || []),
       specifications: item.specifications || {},
       downloads: [],

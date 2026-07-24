@@ -1,6 +1,12 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
 const { PRODUCT_RELATION_TYPES } = require("./products.model");
+const { sanitizeRichText } = require("../../common/html-sanitizer");
+
+// Strips <script>/event-handlers/etc. before the description ever reaches storage —
+// these fields are rendered as raw innerHTML in the admin RichTextEditor on every
+// edit, so an unsanitized value there is a stored-XSS hit against the admin's session.
+const richTextSchema = (maxLength) => z.string().trim().max(maxLength).transform(sanitizeRichText);
 
 const positiveMoneySchema = z.coerce.number().min(0).max(100000000);
 const qtySchema = z.coerce.number().int().min(0).max(100000000);
@@ -83,8 +89,8 @@ const createProductSchema = z.object({
   hsnCode: z.string().trim().min(4).max(20),
   basePrice: positiveMoneySchema,
   salePrice: positiveMoneySchema.optional(),
-  shortDescription: z.string().trim().max(50000).optional().default(""),
-  fullDescription: z.string().trim().max(100000).optional().default(""),
+  shortDescription: richTextSchema(50000).optional().default(""),
+  fullDescription: richTextSchema(100000).optional().default(""),
   keyFeatures: z.array(z.string().trim().max(240)).optional().default([]),
   specifications: z.record(z.any()).optional().default({}),
   downloads: z.array(downloadItemSchema).optional().default([]),
@@ -148,8 +154,8 @@ const updateProductSchema = z.object({
   hsnCode: z.string().trim().min(4).max(20).optional(),
   basePrice: positiveMoneySchema.optional(),
   salePrice: positiveMoneySchema.optional(),
-  shortDescription: z.string().trim().max(50000).optional(),
-  fullDescription: z.string().trim().max(100000).optional(),
+  shortDescription: richTextSchema(50000).optional(),
+  fullDescription: richTextSchema(100000).optional(),
   keyFeatures: z.array(z.string().trim().max(240)).optional(),
   specifications: z.record(z.any()).optional(),
   downloads: z.array(downloadItemSchema).optional(),

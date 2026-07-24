@@ -1,6 +1,16 @@
 const crypto = require("node:crypto");
 const { PaymentGatewayAdapter } = require("./payment-gateway.adapter");
 const { readPaymentStore } = require("../../database/payment-store");
+const { env } = require("../../config/env");
+
+function timingSafeStringEqual(expected, actual) {
+  const expectedBuf = Buffer.from(String(expected || ""), "utf-8");
+  const actualBuf = Buffer.from(String(actual || ""), "utf-8");
+  if (expectedBuf.length !== actualBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
 
 class RazorpayGateway extends PaymentGatewayAdapter {
   async _getConfig() {
@@ -63,18 +73,26 @@ class RazorpayGateway extends PaymentGatewayAdapter {
 
     const body = `${input.razorpay_order_id}|${input.razorpay_payment_id}`;
     const expected = crypto.createHmac("sha256", keySecret).update(body).digest("hex");
-    return { verified: expected === input.razorpay_signature };
+    return { verified: timingSafeStringEqual(expected, input.razorpay_signature) };
   }
 
   async handleWebhook(payload, rawBody, signature) {
     const { webhookSecret } = await this._getConfig();
 
+    if (env.nodeEnv === "production" && !webhookSecret) {
+      // Never accept an unsigned webhook in production — a missing secret must fail
+      // closed, not silently trust whoever calls the endpoint.
+      throw new Error("Razorpay webhook secret is not configured; refusing unsigned webhook.");
+    }
+
     if (webhookSecret && signature && rawBody) {
       const bodyString = Buffer.isBuffer(rawBody) ? rawBody.toString("utf-8") : String(rawBody);
       const expected = crypto.createHmac("sha256", webhookSecret).update(bodyString).digest("hex");
-      if (expected !== signature) {
+      if (!timingSafeStringEqual(expected, signature)) {
         throw new Error("Invalid Razorpay webhook signature.");
       }
+    } else if (webhookSecret && (!signature || !rawBody)) {
+      throw new Error("Razorpay webhook is missing signature or raw body.");
     }
 
     const event = String(payload.event || "");

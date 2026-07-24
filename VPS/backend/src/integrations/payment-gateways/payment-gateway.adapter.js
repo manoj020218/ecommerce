@@ -29,6 +29,9 @@ function createPaymentGateway(gatewayCode) {
   }
 
   if (normalized === "mock_online" || normalized === "mock") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Mock payment gateway is disabled in production.");
+    }
     const { MockOnlineGateway } = require("./mock-online.gateway");
     return new MockOnlineGateway();
   }

@@ -1,6 +1,16 @@
 const crypto = require("node:crypto");
 const { PaymentGatewayAdapter } = require("./payment-gateway.adapter");
 const { readPaymentStore } = require("../../database/payment-store");
+const { env } = require("../../config/env");
+
+function timingSafeStringEqual(expected, actual) {
+  const expectedBuf = Buffer.from(String(expected || ""), "utf-8");
+  const actualBuf = Buffer.from(String(actual || ""), "utf-8");
+  if (expectedBuf.length !== actualBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
 
 const CF_API_VERSION = "2023-08-01";
 
@@ -96,19 +106,27 @@ class CashfreeGateway extends PaymentGatewayAdapter {
 
   async handleWebhook(payload, rawBody, signature) {
     const config = await this._getConfig();
+    const secretToUse = config.webhookSecret || config.secretKey;
+
+    if (env.nodeEnv === "production" && !secretToUse) {
+      // Never accept an unsigned webhook in production — a missing secret must fail
+      // closed, not silently trust whoever calls the endpoint.
+      throw new Error("Cashfree webhook secret is not configured; refusing unsigned webhook.");
+    }
 
     if (rawBody && signature) {
       const bodyString = Buffer.isBuffer(rawBody) ? rawBody.toString("utf-8") : String(rawBody);
-      const secretToUse = config.webhookSecret || config.secretKey;
       if (secretToUse) {
         const expected = crypto
           .createHmac("sha256", secretToUse)
           .update(bodyString)
           .digest("base64");
-        if (expected !== signature) {
+        if (!timingSafeStringEqual(expected, signature)) {
           throw new Error("Invalid Cashfree webhook signature.");
         }
       }
+    } else if (secretToUse) {
+      throw new Error("Cashfree webhook is missing signature or raw body.");
     }
 
     const type = String(payload.type || "");

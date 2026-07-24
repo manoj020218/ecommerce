@@ -1623,6 +1623,20 @@ async function startCheckout(context, payload) {
     throw new HttpError(400, "Cart is empty.");
   }
 
+  // Guard against placing an order for a cart that changed after this tab/device last
+  // loaded it (e.g. another tab sharing the same guest/customer cart added or removed
+  // items). The order must match what the submitting tab actually showed the buyer.
+  if (
+    payload.expectedCartUpdatedAt &&
+    cart.updatedAt &&
+    payload.expectedCartUpdatedAt !== cart.updatedAt
+  ) {
+    throw new HttpError(
+      409,
+      "Your cart changed since this page was last loaded (possibly in another tab). Please review the updated order summary and place the order again."
+    );
+  }
+
   const lines = buildStrictCartLines(catalogStore, cart.items, {
     enforceStockCheck: true,
     customerPricingContext
@@ -2105,6 +2119,13 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
   const normalizedGatewayCode = String(gatewayCode || "mock_online")
     .trim()
     .toLowerCase();
+
+  // The mock gateway performs no signature verification — it must never be reachable
+  // in production, where it would let anyone confirm a real payment attempt as paid.
+  if (env.nodeEnv === "production" && (normalizedGatewayCode === "mock_online" || normalizedGatewayCode === "mock")) {
+    throw new HttpError(403, "Mock payment gateway is disabled in production.");
+  }
+
   const [authStore, catalogStore, paymentStore] = await Promise.all([
     readAuthStore(),
     readCatalogStore(),
@@ -2160,10 +2181,10 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
     ? authStore.stockReservations.find((row) => row.id === session.reservationId)
     : null;
 
-  const gatewayMatch =
-    attempt.gateway === normalizedGatewayCode ||
-    (attempt.gateway === "razorpay" && normalizedGatewayCode === "mock_online") ||
-    (attempt.gateway === "mock_online" && normalizedGatewayCode === "razorpay");
+  // A webhook may only confirm an attempt created for the SAME gateway. The previous
+  // razorpay<->mock_online cross-match let anyone hit the unsigned mock webhook with a
+  // guessed/leaked attemptId and mark a real Razorpay order paid without paying.
+  const gatewayMatch = attempt.gateway === normalizedGatewayCode;
   if (!gatewayMatch) {
     throw new HttpError(409, "Webhook gateway does not match payment attempt gateway.");
   }

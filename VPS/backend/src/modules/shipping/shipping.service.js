@@ -1169,6 +1169,70 @@ async function trackShipmentByTrackingId(trackingId) {
   };
 }
 
+async function listShippingClasses() {
+  const store = await readShippingStore();
+  return Array.isArray(store.shippingClasses) ? store.shippingClasses : [];
+}
+
+async function createShippingClass(payload, actor) {
+  const store = await readShippingStore();
+  if (!Array.isArray(store.shippingClasses)) store.shippingClasses = [];
+
+  const code = String(payload.code || "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+  if (!code) throw new HttpError(400, "Shipping class code is required.");
+  if (store.shippingClasses.find((c) => c.code === code)) {
+    throw new HttpError(409, `Shipping class with code "${code}" already exists.`);
+  }
+
+  const record = {
+    id: generateId("sc"),
+    name: String(payload.name || "").trim(),
+    code,
+    description: String(payload.description || "").trim(),
+    rateType: payload.rateType === "fixed" ? "fixed" : "weight_based",
+    fixedAmount: Number(payload.fixedAmount || 0),
+    baseCharge: Number(payload.baseCharge || 0),
+    perKgRate: Number(payload.perKgRate || 0),
+    isActive: payload.isActive !== false,
+    createdAt: new Date().toISOString()
+  };
+
+  store.shippingClasses.push(record);
+  await writeShippingStore(store);
+  await addActivityLog({
+    action: "shipping_class.created",
+    resourceId: record.id,
+    actorId: actor?.id,
+    details: { name: record.name, code: record.code }
+  });
+  return record;
+}
+
+async function updateShippingClass(classId, patch, actor) {
+  const store = await readShippingStore();
+  if (!Array.isArray(store.shippingClasses)) store.shippingClasses = [];
+
+  const idx = store.shippingClasses.findIndex((c) => c.id === classId);
+  if (idx === -1) throw new HttpError(404, "Shipping class not found.");
+
+  const existing = store.shippingClasses[idx];
+  const updated = {
+    ...existing,
+    name: patch.name !== undefined ? String(patch.name).trim() : existing.name,
+    description: patch.description !== undefined ? String(patch.description).trim() : existing.description,
+    rateType: patch.rateType !== undefined ? (patch.rateType === "fixed" ? "fixed" : "weight_based") : existing.rateType,
+    fixedAmount: patch.fixedAmount !== undefined ? Number(patch.fixedAmount) : existing.fixedAmount,
+    baseCharge: patch.baseCharge !== undefined ? Number(patch.baseCharge) : existing.baseCharge,
+    perKgRate: patch.perKgRate !== undefined ? Number(patch.perKgRate) : existing.perKgRate,
+    isActive: patch.isActive !== undefined ? Boolean(patch.isActive) : existing.isActive
+  };
+
+  store.shippingClasses[idx] = updated;
+  await writeShippingStore(store);
+  await addActivityLog({ action: "shipping_class.updated", resourceId: classId, actorId: actor?.id });
+  return updated;
+}
+
 module.exports = {
   getShippingSettings,
   patchShippingSettings,
@@ -1186,5 +1250,8 @@ module.exports = {
   sendTrackingEmail,
   uploadShipmentPod,
   estimateCartShipping,
-  trackShipmentByTrackingId
+  trackShipmentByTrackingId,
+  listShippingClasses,
+  createShippingClass,
+  updateShippingClass
 };

@@ -99,3 +99,15 @@ export function updateShipmentStatus(id, payload) {
     body: payload
   });
 }
+
+export function fetchShippingClasses() {
+  return apiFetch("/admin/shipping/classes");
+}
+
+export function createShippingClass(payload) {
+  return apiFetch("/admin/shipping/classes", { method: "POST", body: payload });
+}
+
+export function updateShippingClass(id, payload) {
+  return apiFetch(`/admin/shipping/classes/${id}`, { method: "PATCH", body: payload });
+}

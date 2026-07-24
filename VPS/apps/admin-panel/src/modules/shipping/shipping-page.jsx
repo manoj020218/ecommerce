@@ -7,6 +7,7 @@ import { StatusBadge } from "../../shared/components/status-badge";
 import { formatCurrencyInr, formatDateTime } from "../../shared/utils/formatters";
 import { hasPermission } from "../../shared/utils/permissions";
 import { useAuthSession } from "../auth/use-auth-session";
+import { ShippingClassesTab } from "./shipping-classes-tab";
 import {
   createCourier,
   createRateCard,
@@ -56,11 +57,12 @@ const SHIPMENT_STATUSES = [
   { value: "picked_up", label: "Picked Up" }
 ];
 
-const TABS = ["queue", "shipments", "rate-cards", "settings"];
+const TABS = ["queue", "shipments", "rate-cards", "classes", "settings"];
 const TAB_LABELS = {
   queue: "Queue",
   shipments: "Shipments",
   "rate-cards": "Rate Cards",
+  classes: "Shipping Classes",
   settings: "Settings"
 };
 
@@ -1663,6 +1665,12 @@ export function ShippingPage() {
               <LoadingBlock label="Loading couriers..." />
             )}
           </div>
+        </div>
+      ) : null}
+
+      {activeTab === "classes" ? (
+        <div className="stack">
+          <ShippingClassesTab canCreate={canCreate} />
         </div>
       ) : null}
 

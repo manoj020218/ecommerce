@@ -85,6 +85,22 @@ function createAdminShippingRouter() {
   );
 
   router.get(
+    "/classes",
+    requireAdminPermission(SHIPPING_PERMISSIONS.VIEW),
+    controller.adminListShippingClasses
+  );
+  router.post(
+    "/classes",
+    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    controller.adminCreateShippingClass
+  );
+  router.patch(
+    "/classes/:classId",
+    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    controller.adminUpdateShippingClass
+  );
+
+  router.get(
     "/queue",
     requireAdminPermission(SHIPPING_PERMISSIONS.VIEW),
     controller.adminListShippingQueue

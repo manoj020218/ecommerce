@@ -130,6 +130,21 @@ const adminUploadShipmentPod = asyncHandler(async (req, res) => {
   return created(res, data, "POD uploaded.");
 });
 
+const adminListShippingClasses = asyncHandler(async (_req, res) => {
+  const data = await service.listShippingClasses();
+  return ok(res, data, "Shipping classes fetched.");
+});
+
+const adminCreateShippingClass = asyncHandler(async (req, res) => {
+  const data = await service.createShippingClass(req.body, req.actor);
+  return created(res, data, "Shipping class created.");
+});
+
+const adminUpdateShippingClass = asyncHandler(async (req, res) => {
+  const data = await service.updateShippingClass(req.params.classId, req.body, req.actor);
+  return ok(res, data, "Shipping class updated.");
+});
+
 const publicEstimateCartShipping = asyncHandler(async (req, res) => {
   const query = parseEstimateCartShippingQuery(req.query || {});
   const data = await service.estimateCartShipping(query);
@@ -158,5 +173,8 @@ module.exports = {
   adminSendTrackingEmail,
   adminUploadShipmentPod,
   publicEstimateCartShipping,
-  publicTrackShipment
+  publicTrackShipment,
+  adminListShippingClasses,
+  adminCreateShippingClass,
+  adminUpdateShippingClass
 };

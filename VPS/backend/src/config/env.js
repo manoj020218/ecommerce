@@ -10,15 +10,22 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: ${portRaw}`);
 }
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const DEV_JWT_ACCESS_SECRET = "dev_access_secret_change_me";
+const DEV_JWT_REFRESH_SECRET = "dev_refresh_secret_change_me";
+
 const env = {
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv,
   port,
   publicBaseUrl: process.env.PUBLIC_BASE_URL || `http://localhost:${port}`,
-  jwtAccessSecret: process.env.JWT_ACCESS_SECRET || "dev_access_secret_change_me",
-  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || "dev_refresh_secret_change_me",
+  jwtAccessSecret: process.env.JWT_ACCESS_SECRET || DEV_JWT_ACCESS_SECRET,
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || DEV_JWT_REFRESH_SECRET,
   jwtAccessTtl: process.env.JWT_ACCESS_TTL || "15m",
   jwtRefreshTtl: process.env.JWT_REFRESH_TTL || "30d",
-  allowHeaderAuthFallback: process.env.ALLOW_HEADER_AUTH_FALLBACK === "true",
+  // Hard-gated in code, not just via env: this header-identity fallback must never be
+  // reachable in production no matter how ALLOW_HEADER_AUTH_FALLBACK is set in .env.
+  allowHeaderAuthFallback:
+    nodeEnv !== "production" && process.env.ALLOW_HEADER_AUTH_FALLBACK === "true",
   superAdminEmail: process.env.SUPER_ADMIN_EMAIL || "admin@jenixindia.com",
   superAdminPassword: process.env.SUPER_ADMIN_PASSWORD || "ChangeMe@123",
   uploadDir: process.env.UPLOAD_DIR || "image-assets/uploads",
@@ -67,5 +74,21 @@ const env = {
   ),
   corsOrigin: process.env.CORS_ORIGIN || "http://localhost:5173,http://localhost:4174,http://localhost:4100"
 };
+
+if (nodeEnv === "production") {
+  // If the real secret failed to load (wrong CWD, PM2 restart without env, etc.), the
+  // backend must refuse to start rather than silently sign/accept tokens using a
+  // fallback value that is published in source control.
+  if (env.jwtAccessSecret === DEV_JWT_ACCESS_SECRET || env.jwtAccessSecret.length < 32) {
+    throw new Error(
+      "Refusing to start in production with a missing/weak JWT_ACCESS_SECRET (must be a real secret, 32+ chars)."
+    );
+  }
+  if (env.jwtRefreshSecret === DEV_JWT_REFRESH_SECRET || env.jwtRefreshSecret.length < 32) {
+    throw new Error(
+      "Refusing to start in production with a missing/weak JWT_REFRESH_SECRET (must be a real secret, 32+ chars)."
+    );
+  }
+}
 
 module.exports = { env };

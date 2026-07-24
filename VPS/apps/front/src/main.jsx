@@ -5,6 +5,7 @@ import { registerSW } from "virtual:pwa-register";
 import { AppRouter } from "./app/router";
 import { PublicSettingsProvider } from "./modules/settings/public-settings-context";
 import { CustomerSessionProvider } from "./shared/auth/customer-session";
+import { ErrorBoundary } from "./shared/error-boundary";
 import "./styles.css";
 
 const LOCAL_PREVIEW_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -58,11 +59,13 @@ if (isLocalPreviewHost()) {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
-      <CustomerSessionProvider>
-        <PublicSettingsProvider>
-          <AppRouter />
-        </PublicSettingsProvider>
-      </CustomerSessionProvider>
+      <ErrorBoundary>
+        <CustomerSessionProvider>
+          <PublicSettingsProvider>
+            <AppRouter />
+          </PublicSettingsProvider>
+        </CustomerSessionProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   </React.StrictMode>
 );

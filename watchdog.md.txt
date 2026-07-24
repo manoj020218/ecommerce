@@ -1,0 +1,517 @@
+# Codex Task: Build Standalone E-commerce Order Pipeline Watchdog
+
+## Product Goal
+
+Build a standalone SaaS-ready module named **Commerce Watchdog**.
+
+This module must monitor an e-commerce website from the moment a buyer visits a product page until the buyer completes checkout successfully. It must detect technical/business failures before the buyer raises a ticket.
+
+The system should work first on our own e-commerce site, but code architecture must be designed as a reusable standalone product/plugin for any e-commerce website.
+
+## Core Intention
+
+The module should answer:
+
+1. Where did the buyer get stuck?
+2. What exactly failed?
+3. Was it frontend, backend, payment gateway, database, stock, invoice, order history, or webhook issue?
+4. How many users are affected?
+5. What action should admin take?
+6. Can the system auto-retry or auto-create an internal ticket?
+
+## Tech Stack
+
+Use:
+
+* React + TypeScript for admin dashboard
+* Node.js + TypeScript backend
+* MongoDB
+* Express or Fastify
+* PNPM
+* REST API first
+* Webhook-ready architecture
+* Plugin/SDK approach for frontend website
+* Modular files, each component preferably under 200 lines
+* Unit tests and integration tests required
+
+## Product Architecture
+
+Create these major parts:
+
+```text
+commerce-watchdog/
+  apps/
+    dashboard/
+    api/
+  packages/
+    web-sdk/
+    node-sdk/
+    ecommerce-adapters/
+    shared/
+  docs/
+  tests/
+```
+
+## Main Modules
+
+### 1. Frontend Web SDK
+
+Create a lightweight JavaScript/TypeScript SDK that any e-commerce website can add.
+
+Example use:
+
+```html
+<script src="https://cdn.example.com/commerce-watchdog.js"></script>
+<script>
+  CommerceWatchdog.init({
+    projectId: "STORE_ID",
+    apiKey: "PUBLIC_KEY",
+    environment: "production"
+  });
+</script>
+```
+
+SDK must track:
+
+* Product page viewed
+* Add to cart clicked
+* Add to cart success/failure
+* Buy now clicked
+* Cart opened
+* Checkout started
+* Address form submitted
+* Coupon applied
+* Shipping calculated
+* Payment initiated
+* Payment redirected
+* Payment success callback
+* Payment failure callback
+* Order created
+* Invoice generated
+* Order confirmation shown
+* Order history visible
+
+SDK must also capture:
+
+* sessionId
+* anonymous visitorId
+* userId if logged in
+* cartId
+* productId
+* orderId
+* paymentAttemptId
+* browser
+* device
+* URL
+* frontend error
+* API response status
+* timeout
+* page load performance
+* click event timestamp
+
+Do not collect card number, CVV, UPI PIN, password, or sensitive payment details.
+
+## 2. Backend API
+
+Create backend APIs to receive events.
+
+Required endpoints:
+
+```text
+POST /v1/events
+POST /v1/errors
+POST /v1/payment-webhook
+POST /v1/order-state
+GET  /v1/incidents
+GET  /v1/sessions/:sessionId
+GET  /v1/orders/:orderId/timeline
+GET  /v1/dashboard/health
+```
+
+Every event must be stored as immutable timeline data.
+
+## 3. Order Pipeline State Machine
+
+Create clear state machine:
+
+```text
+PRODUCT_VIEWED
+ADD_TO_CART_CLICKED
+ADD_TO_CART_SUCCESS
+CART_VIEWED
+CHECKOUT_STARTED
+ADDRESS_SUBMITTED
+SHIPPING_CALCULATED
+PAYMENT_INITIATED
+PAYMENT_PENDING
+PAYMENT_SUCCESS
+PAYMENT_FAILED
+ORDER_CREATED
+ORDER_CONFIRMED
+INVOICE_GENERATED
+ORDER_HISTORY_VISIBLE
+COMPLETED
+```
+
+Detect abnormal states:
+
+```text
+ADD_TO_CART_CLICKED but no ADD_TO_CART_SUCCESS within 5 sec
+CHECKOUT_STARTED but no ADDRESS_SUBMITTED within expected time
+PAYMENT_SUCCESS but ORDER_CREATED missing
+ORDER_CREATED but INVOICE_GENERATED failed
+ORDER_CONFIRMED but order not visible in history
+Payment webhook received but order status not updated
+API error rate increased
+Same product failing add-to-cart repeatedly
+Same payment gateway timeout repeated
+```
+
+## 4. Watchdog Rule Engine
+
+Build configurable rule engine.
+
+Example rules:
+
+```json
+{
+  "ruleCode": "PAYMENT_SUCCESS_ORDER_MISSING",
+  "severity": "critical",
+  "condition": "PAYMENT_SUCCESS received but ORDER_CREATED missing within 60 seconds",
+  "recommendation": "Check payment webhook handler, order creation API, database transaction, and payment reconciliation job."
+}
+```
+
+Severity levels:
+
+```text
+info
+warning
+major
+critical
+revenue_blocking
+```
+
+## 5. Incident Detection
+
+When rule fails, create incident automatically.
+
+Incident should include:
+
+* incidentId
+* storeId
+* sessionId
+* buyer mobile/email if available
+* orderId if available
+* cartId
+* affected stage
+* root cause guess
+* severity
+* exact timeline
+* recommended action
+* auto-retry possible: yes/no
+* current status
+* assigned user
+* createdAt
+* resolvedAt
+
+## 6. Admin Dashboard
+
+Create dashboard pages:
+
+### Dashboard Home
+
+Show:
+
+* Total sessions today
+* Checkout started
+* Successful orders
+* Failed checkouts
+* Payment issues
+* Add to cart issues
+* Invoice issues
+* Active incidents
+* Revenue at risk
+
+### Live Pipeline Monitor
+
+Show funnel:
+
+```text
+Product View ? Add to Cart ? Checkout ? Payment ? Order ? Invoice ? Complete
+```
+
+Each stage should show:
+
+* total count
+* success count
+* failure count
+* drop percentage
+* average time
+* active issue count
+
+### Incident Page
+
+Show cards:
+
+```text
+Critical: Payment success but order missing
+Buyer: 98xxxxxx
+Session: CW-xxxx
+Order: ORD-xxxx
+Cause: Webhook received but order status not updated
+Recommended Action: Retry webhook / check DB transaction / contact buyer
+```
+
+### Session Replay Timeline
+
+Not video replay initially. Create event timeline:
+
+```text
+10:01 Product viewed
+10:02 Add to cart clicked
+10:02 Add to cart API timeout
+10:03 Retry success
+10:05 Checkout started
+10:07 Payment initiated
+10:09 Payment success
+10:10 Order creation failed
+```
+
+### Settings Page
+
+Admin can configure:
+
+* Store name
+* API key
+* Alert channels
+* Rule thresholds
+* Payment gateway name
+* Invoice system endpoint
+* Webhook secret
+* Retention days
+* Auto-ticket enable/disable
+
+## 7. Plugin/Adapter Approach
+
+Build adapter layer for:
+
+```text
+custom-react-node
+woocommerce
+shopify-future
+magento-future
+opencart-future
+prestashop-future
+```
+
+For now fully implement:
+
+```text
+custom-react-node
+```
+
+Keep other adapters as clean interface stubs.
+
+Adapter interface:
+
+```ts
+interface EcommerceAdapter {
+  detectProductPage(): boolean;
+  getProductId(): string | null;
+  getCartId(): string | null;
+  getOrderId(): string | null;
+  trackAddToCart(): void;
+  trackCheckout(): void;
+  trackPayment(): void;
+  trackInvoice(): void;
+}
+```
+
+## 8. Payment Gateway Monitoring
+
+Create payment monitoring abstraction.
+
+Track:
+
+* payment initiated
+* redirected to PG
+* PG response success
+* PG response failed
+* webhook received
+* webhook signature valid/invalid
+* order status updated/not updated
+* duplicate webhook
+* delayed webhook
+
+Must support generic payment gateway first.
+
+Do not store sensitive payment data.
+
+## 9. Cause and Recommended Action Engine
+
+For each incident, generate practical cause and action.
+
+Examples:
+
+### Add to Cart Failed
+
+Cause:
+
+```text
+Cart API returned 500 or timeout. Product may be out of stock, pricing mismatch, or cart service is down.
+```
+
+Recommended action:
+
+```text
+Check product stock, product price rule, cart API logs, and recent deployment.
+```
+
+### Payment Success but Order Missing
+
+Cause:
+
+```text
+Payment gateway marked payment as successful, but local order creation did not complete.
+```
+
+Recommended action:
+
+```text
+Run payment reconciliation, retry order creation, check webhook logs, and contact buyer before refund delay.
+```
+
+### Invoice Download Failed
+
+Cause:
+
+```text
+Order exists but invoice PDF generation failed.
+```
+
+Recommended action:
+
+```text
+Check invoice template, GST/tax data, PDF service, and storage permission.
+```
+
+## 10. Alerts
+
+Add alert system abstraction.
+
+Initially support:
+
+* email placeholder
+* webhook placeholder
+* WhatsApp placeholder
+* dashboard notification
+
+Do not hardcode third-party provider.
+
+## 11. Auto Recovery
+
+Create auto-recovery framework but keep actions safe.
+
+Allowed auto actions:
+
+* retry webhook processing
+* retry invoice generation
+* retry order history sync
+* mark incident as recovered after success
+
+Do not auto-refund or auto-cancel order without admin approval.
+
+## 12. Security
+
+Implement:
+
+* public SDK key
+* private admin API key
+* JWT admin login
+* webhook signature validation
+* rate limiting
+* CORS control
+* no sensitive payment data storage
+* PII masking in dashboard
+* audit log for admin actions
+
+## 13. Testing Requirement
+
+Write tests for:
+
+* SDK event sending
+* backend event ingestion
+* duplicate event handling
+* state machine transition
+* failed add-to-cart rule
+* payment success but order missing rule
+* invoice failure rule
+* incident creation
+* recommendation generation
+* dashboard API response
+
+Also create test simulation scripts:
+
+```text
+simulate-successful-order
+simulate-add-to-cart-failure
+simulate-payment-success-order-missing
+simulate-invoice-failure
+simulate-order-history-missing
+```
+
+## 14. Demo Mode
+
+Create demo seed data so we can test dashboard without live store.
+
+Demo should show:
+
+* 100 product views
+* 40 add to cart
+* 25 checkout started
+* 20 payment initiated
+* 16 successful orders
+* 2 payment issues
+* 1 invoice issue
+* 1 order history issue
+
+## 15. Documentation
+
+Create docs:
+
+```text
+docs/INSTALL.md
+docs/SDK_USAGE.md
+docs/ADAPTER_GUIDE.md
+docs/PAYMENT_WEBHOOK_GUIDE.md
+docs/RULE_ENGINE.md
+docs/ADMIN_DASHBOARD.md
+docs/SECURITY.md
+```
+
+## 16. Acceptance Criteria
+
+Project is complete only when:
+
+1. SDK can be added to test e-commerce site.
+2. Events appear in backend.
+3. Buyer journey timeline is visible.
+4. Failed add-to-cart creates incident.
+5. Payment success but order missing creates critical incident.
+6. Invoice failure creates incident.
+7. Dashboard shows live funnel health.
+8. Recommendation engine gives cause and action.
+9. Tests pass.
+10. Code is modular enough to sell as standalone SaaS/plugin.
+
+## Final Instruction to Codex
+
+Write production-quality code. Avoid large files. Add comments where business logic is important. After writing code, run tests, fix errors, and provide a final report containing:
+
+* files created
+* tests added
+* tests passed/failed
+* how to run locally
+* how to integrate SDK into our e-commerce site
+* remaining future adapter work

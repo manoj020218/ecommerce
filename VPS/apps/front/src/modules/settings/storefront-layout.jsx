@@ -231,7 +231,7 @@ export function StorefrontLayout() {
   const supportPhone =
     contactInformation.publicPhone || storeProfile.supportMobile || "";
   const supportWhatsApp =
-    contactInformation.publicWhatsApp || storeProfile.whatsappNumber || "";
+    contactInformation.publicWhatsApp || storeProfile.whatsappNumber || "917240226566";
   const publicAddress =
     contactInformation.publicAddress || storeProfile.address || "";
   const supportTiming =
@@ -317,6 +317,15 @@ export function StorefrontLayout() {
           </div>
         </header>
         <Outlet />
+        <a
+          className="proto-whatsapp-fab"
+          href={buildWhatsAppLink(supportWhatsApp, `Need help from ${storeName}.`)}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Chat on WhatsApp"
+        >
+          <WhatsAppIcon />
+        </a>
       </>
     );
   }

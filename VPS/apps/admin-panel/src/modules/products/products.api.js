@@ -13,6 +13,10 @@ export function fetchProducts(filters = {}) {
   return apiFetch(`/admin/products?${params.toString()}`);
 }
 
+export function fetchProduct(productId) {
+  return apiFetch(`/admin/products/${productId}`);
+}
+
 export function createProduct(payload) {
   return apiFetch("/admin/products", {
     method: "POST",

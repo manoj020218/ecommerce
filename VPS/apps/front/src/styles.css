@@ -41,6 +41,7 @@ body,
   font-family: "Inter", sans-serif;
   color: var(--text);
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 a {
@@ -2025,6 +2026,12 @@ textarea {
   place-items: center;
   box-shadow: 0 16px 32px rgba(34, 197, 94, 0.28);
   z-index: 35;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.proto-whatsapp-fab:hover {
+  transform: scale(1.08);
+  box-shadow: 0 20px 40px rgba(34, 197, 94, 0.38);
 }
 
 .proto-footer-shell {
@@ -2401,7 +2408,9 @@ textarea {
 .proto-product-thumb img {
   width: 100%;
   height: 100%;
+  max-width: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .proto-product-flag,
@@ -3276,6 +3285,40 @@ textarea {
   font-weight: 500;
 }
 
+.proto-shipping-info-line {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.proto-shipping-included {
+  color: #1d4ed8;
+  font-weight: 500;
+}
+
+.proto-shipping-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.proto-shipping-chip-sm {
+  font-size: 10px;
+  padding: 1px 7px;
+}
+
 .proto-feature-chip-row {
   display: flex;
   gap: 10px;
@@ -3980,10 +4023,15 @@ textarea {
 }
 
 @media (max-width: 899px) {
+  .proto-whatsapp-fab {
+    bottom: 76px;
+    right: 14px;
+    width: 48px;
+    height: 48px;
+  }
   .proto-desktop-only,
   .proto-category-nav,
-  .proto-filter-sidebar,
-  .proto-whatsapp-fab {
+  .proto-filter-sidebar {
     display: none;
   }
 
@@ -5696,9 +5744,14 @@ textarea {
 
 /* ── Google SSO button ─────────────────────────────────────────────────────── */
 
+@keyframes proto-google-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.35), 0 4px 16px rgba(66, 133, 244, 0.18); }
+  50% { box-shadow: 0 0 0 8px rgba(66, 133, 244, 0), 0 4px 16px rgba(66, 133, 244, 0.28); }
+}
+
 .proto-google-sso-row {
   max-width: 900px;
-  margin: 0 auto 8px;
+  margin: 0 auto 16px;
   padding: 0 16px;
   display: flex;
   flex-direction: column;
@@ -5710,39 +5763,48 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  max-width: 360px;
-  margin: 0 auto;
-  padding: 12px 20px;
-  font-size: 14px;
-  font-weight: 600;
+  max-width: 100%;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 700;
   color: #1f2937;
   background: #ffffff;
-  border: 1.5px solid #d1d5db;
-  border-radius: 12px;
+  border: 2px solid #4285F4;
+  border-radius: 14px;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   font-family: inherit;
+  animation: proto-google-pulse 2s ease-in-out infinite;
+  letter-spacing: 0.01em;
+}
+
+.proto-google-sso-btn svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .proto-google-sso-btn:hover:not(:disabled) {
-  border-color: #9ca3af;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  background: #f9fafb;
+  border-color: #1a73e8;
+  box-shadow: 0 4px 16px rgba(66, 133, 244, 0.3);
+  background: #f8f9ff;
+  animation: none;
 }
 
 .proto-google-sso-btn:disabled {
   opacity: 0.65;
   cursor: wait;
+  animation: none;
 }
 
 .proto-google-sso-divider {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 16px auto;
-  max-width: 360px;
+  margin: 20px auto;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -6216,3 +6278,26 @@ textarea {
 }
 .proto-acct-link-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 .proto-acct-link-submit:not(:disabled):hover { opacity: 0.88; }
+
+/* ── Payment discount chip ─────────────────────────────── */
+
+.proto-discount-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.proto-discount-chip::before {
+  content: "✓";
+  font-size: 10px;
+  font-weight: 700;
+}

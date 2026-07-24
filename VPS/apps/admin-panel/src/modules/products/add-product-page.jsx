@@ -12,6 +12,7 @@ import {
   fetchProducts,
   uploadProductImage
 } from "./products.api";
+import { fetchShippingClasses } from "../shipping/shipping.api";
 
 const BACKEND_BASE = API_BASE_URL.replace(/\/api$/, "");
 
@@ -131,16 +132,19 @@ function FieldRow({ children, cols = 2 }) {
   );
 }
 
-function Field({ label, hint, required, error, children, full }) {
+function Field({ label, hint, required, error, children, full, noLabel }) {
+  // noLabel=true: use <div> instead of <label> so browser doesn't forward clicks
+  // to the first <button> inside (happens with RichTextEditor toolbar buttons).
+  const Wrapper = noLabel ? "div" : "label";
   return (
     <div style={full ? { marginBottom: 12 } : {}}>
-      <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <Wrapper style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: error ? "var(--danger)" : "var(--text)" }}>
           {label}{required && <span style={{ color: "var(--danger)" }}> *</span>}
           {hint && <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: 6 }}>{hint}</span>}
         </span>
         {children}
-      </label>
+      </Wrapper>
       {error && <p style={{ margin: "3px 0 0", fontSize: 11, color: "var(--danger)" }}>{error}</p>}
     </div>
   );
@@ -241,8 +245,6 @@ function RelatedProductsPicker({ allProducts, selectedIds, onChange }) {
 
   const add = (product) => {
     onChange([...selectedIds, product.id]);
-    setQuery("");
-    setOpen(false);
     inputRef.current?.focus();
   };
 
@@ -479,6 +481,7 @@ const EMPTY_FORM = {
   videos: [], downloads: [],
   metaTitle: "", metaDescription: "", metaKeywords: "",
   googleShoppingTitle: "", googleShoppingDescription: "", googleProductCategory: "", productType: "",
+  priceIncludesGst: false, shippingIncluded: false,
   isActive: true, stockQty: 0, reservedQty: 0,
   stockStatus: "in_stock", allowBackorder: false, maxOrderQty: 1000, lowStockThreshold: 0,
   // Sidebar fields
@@ -496,6 +499,7 @@ export function AddProductPage() {
 
   const [categories, setCategories] = useState([]);
   const [hsnRecords, setHsnRecords] = useState([]);
+  const [shippingClasses, setShippingClasses] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -518,13 +522,15 @@ export function AddProductPage() {
   useEffect(() => {
     const init = async () => {
       try {
-        const [cats, hsn, products] = await Promise.all([
+        const [cats, hsn, products, classes] = await Promise.all([
           fetchCategories({ includeInactive: true, q: "" }),
           fetchHsnTaxRecords({ includeInactive: false, q: "" }),
-          fetchProducts({ includeInactive: false, q: "" })
+          fetchProducts({ includeInactive: false, q: "" }),
+          fetchShippingClasses().catch(() => [])
         ]);
         setCategories(Array.isArray(cats) ? cats : []);
         setHsnRecords(Array.isArray(hsn) ? hsn : []);
+        setShippingClasses(Array.isArray(classes) ? classes.filter((c) => c.isActive) : []);
         setAllProducts(Array.isArray(products) ? products : []);
         setForm(f => ({ ...f, hsnCode: (Array.isArray(hsn) ? hsn : [])[0]?.hsnCode || "" }));
       } catch (e) {
@@ -667,6 +673,8 @@ export function AddProductPage() {
       googleShoppingDescription: form.googleShoppingDescription,
       googleProductCategory: form.googleProductCategory,
       productType: form.productType,
+      priceIncludesGst: Boolean(form.priceIncludesGst),
+      shippingIncluded: Boolean(form.shippingIncluded),
       isActive: Boolean(form.isActive),
       stockQty: Number(form.stockQty || 0),
       reservedQty: Number(form.reservedQty || 0),
@@ -877,6 +885,43 @@ export function AddProductPage() {
                   <input ref={registerRef("moq")} type="number" min="1" name="moq" value={form.moq} onChange={onFC} style={inputStyle()} />
                 </Field>
               </FieldRow>
+
+              {/* Price / Tax / Shipping toggles */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
+                <div
+                  onClick={() => set("priceIncludesGst", !form.priceIncludesGst)}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${form.priceIncludesGst ? "#16a34a" : "#e5e7eb"}`, background: form.priceIncludesGst ? "#f0fdf4" : "#f9fafb", cursor: "pointer" }}
+                >
+                  <div style={{ width: 38, height: 22, borderRadius: 11, background: form.priceIncludesGst ? "#16a34a" : "#d1d5db", position: "relative", flexShrink: 0, marginTop: 2 }}>
+                    <div style={{ position: "absolute", top: 3, left: form.priceIncludesGst ? 19 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: 13, color: form.priceIncludesGst ? "#15803d" : "#374151" }}>
+                      {form.priceIncludesGst ? "Price includes GST" : "Price excludes GST"}
+                    </strong>
+                    <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7280" }}>
+                      {form.priceIncludesGst ? "GST will be extracted from the entered price" : "GST will be added on top of the entered price"}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  onClick={() => set("shippingIncluded", !form.shippingIncluded)}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${form.shippingIncluded ? "#2563eb" : "#e5e7eb"}`, background: form.shippingIncluded ? "#eff6ff" : "#f9fafb", cursor: "pointer" }}
+                >
+                  <div style={{ width: 38, height: 22, borderRadius: 11, background: form.shippingIncluded ? "#2563eb" : "#d1d5db", position: "relative", flexShrink: 0, marginTop: 2 }}>
+                    <div style={{ position: "absolute", top: 3, left: form.shippingIncluded ? 19 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.2s" }} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: 13, color: form.shippingIncluded ? "#1d4ed8" : "#374151" }}>
+                      {form.shippingIncluded ? "Shipping included" : "Shipping charged separately"}
+                    </strong>
+                    <p style={{ margin: "2px 0 0", fontSize: 11, color: "#6b7280" }}>
+                      {form.shippingIncluded ? "Free shipping for this product" : "Buyer pays shipping at checkout"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <FieldRow cols={3}>
                 <Field label="Stock Qty">
                   <input ref={registerRef("stockQty")} type="number" min="0" name="stockQty" value={form.stockQty} onChange={onFC} style={inputStyle()} />
@@ -952,19 +997,26 @@ export function AddProductPage() {
                 </Field>
               </FieldRow>
               <Field label="Shipping Class">
-                <input name="shippingClass" value={form.shippingClass} onChange={onFC} style={inputStyle()} />
+                <select name="shippingClass" value={form.shippingClass} onChange={onFC} style={inputStyle()}>
+                  {shippingClasses.length === 0 && <option value="normal">Normal (default)</option>}
+                  {shippingClasses.map((sc) => (
+                    <option key={sc.id} value={sc.code}>
+                      {sc.name}{sc.rateType === "fixed" ? ` — Flat ₹${sc.fixedAmount}` : sc.baseCharge || sc.perKgRate ? ` — ₹${sc.baseCharge} + ₹${sc.perKgRate}/kg` : ""}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </Section>
 
             {/* Descriptions */}
             <Section title="Descriptions">
-              <Field label="Short Description" hint={`(${stripHtml(form.shortDescription).length}/400)`} full>
+              <Field label="Short Description" hint={`(${stripHtml(form.shortDescription).length}/400)`} full noLabel>
                 <RichTextEditor value={form.shortDescription}
                   onChange={html => set("shortDescription", html)} minRows={3}
                   placeholder="Brief product summary shown in listing cards…" />
               </Field>
               <div style={{ marginTop: 12 }}>
-                <Field label="Full Description" full>
+                <Field label="Full Description" full noLabel>
                   <RichTextEditor value={form.fullDescription}
                     onChange={html => set("fullDescription", html)} minRows={6}
                     placeholder="Detailed product description…" />

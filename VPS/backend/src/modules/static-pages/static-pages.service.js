@@ -1,5 +1,6 @@
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
+const { sanitizeCmsHtml } = require("../../common/html-sanitizer");
 const {
   readStaticPagesStore,
   writeStaticPagesStore
@@ -53,7 +54,7 @@ async function createPage(payload) {
     title: String(payload.title || "").trim(),
     metaTitle: String(payload.metaTitle || "").trim(),
     metaDescription: String(payload.metaDescription || "").trim(),
-    content: String(payload.content || "").trim(),
+    content: sanitizeCmsHtml(String(payload.content || "").trim()),
     isPublished: payload.isPublished !== false,
     isDefault: false,
     showInFooter: payload.showInFooter === true,
@@ -89,7 +90,10 @@ async function updatePage(id, payload) {
     title: payload.title !== undefined ? String(payload.title).trim() : existing.title,
     metaTitle: payload.metaTitle !== undefined ? String(payload.metaTitle).trim() : existing.metaTitle,
     metaDescription: payload.metaDescription !== undefined ? String(payload.metaDescription).trim() : existing.metaDescription,
-    content: payload.content !== undefined ? String(payload.content).trim() : existing.content,
+    content:
+      payload.content !== undefined
+        ? sanitizeCmsHtml(String(payload.content).trim())
+        : existing.content,
     isPublished: payload.isPublished !== undefined ? Boolean(payload.isPublished) : existing.isPublished,
     showInFooter: payload.showInFooter !== undefined ? Boolean(payload.showInFooter) : existing.showInFooter,
     updatedAt: new Date().toISOString()

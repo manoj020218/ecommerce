@@ -942,7 +942,7 @@ function GoogleOAuthSection({ config, saving, error, onSave }) {
 
         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
           Get credentials at <strong>console.cloud.google.com → APIs &amp; Services → Credentials</strong>.<br />
-          Set Authorized redirect URI to: <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4, fontSize: 11 }}>https://test.jenixindia.com/account/google-callback</code>
+          Set Authorized redirect URI to: <code style={{ background: "var(--bg)", padding: "1px 5px", borderRadius: 4, fontSize: 11 }}>https://jenixindia.com/account/google-callback</code>
         </div>
 
         {error && <p style={{ color: "var(--danger)", fontSize: 12, margin: "0 0 12px" }}>{error}</p>}

@@ -149,6 +149,10 @@ Setup scripts in `VPS/scripts/`. Config: `VPS/ecosystem.config.cjs` for PM2.
 
 2. **Keep pages and components small and independent** — fixing one component must not break another. If a file is getting large (>200 lines), split it before adding more. Each page is its own file, one concern per file, backend routes stay thin.
 
+3. **NEVER touch other VPS projects or codebases** — this repo is `jenixindia`. The VPS also hosts other projects (billing-platform, edgefolio, qrunlock, etc.). Never modify files outside `/root/projects/jenixindia/` on the VPS. If a task seems to require touching another codebase, **ask the user first** before proceeding.
+
+4. **Ask before modifying shared infrastructure** — Nginx config, MongoDB, PM2 global settings, and SSL certs are shared across all VPS projects. Always confirm with the user before changing them.
+
 ---
 
 ## Production Environment
@@ -160,7 +164,7 @@ Setup scripts in `VPS/scripts/`. Config: `VPS/ecosystem.config.cjs` for PM2.
 **Live URLs**:
 - Admin panel: `https://admin.jenixindia.com`
 - API: `https://api.jenixindia.com`
-- Storefront (test): `https://test.jenixindia.com`
+- Storefront: `https://jenixindia.com`
 
 **PM2 process**: `jenix-backend` (id 28), port 4100
 
@@ -171,7 +175,7 @@ Setup scripts in `VPS/scripts/`. Config: `VPS/ecosystem.config.cjs` for PM2.
 ### VPS .env (production values)
 ```
 NODE_ENV=production
-CORS_ORIGIN=https://test.jenixindia.com,https://admin.jenixindia.com
+CORS_ORIGIN=https://jenixindia.com,https://www.jenixindia.com,https://admin.jenixindia.com
 UPLOAD_DIR=image-assets/uploads
 MIGRATION_IMAGES_DIR=image-assets/migration
 SUPER_ADMIN_EMAIL=admin@jenixindia.com
@@ -184,8 +188,8 @@ JWT_REFRESH_SECRET=<generated 256-bit value>
 
 ### Nginx config
 Config: `/etc/nginx/sites-available/jenix-test.conf` (symlinked to sites-enabled).
-Three server blocks: test.jenixindia.com (storefront), admin.jenixindia.com (admin panel), api.jenixindia.com (proxy to port 4100). All with SSL via Let's Encrypt.
-Certbot: installed via snap (`snap install --classic certbot`). Cert covers all 3 domains, expires 2026-09-26.
+Server blocks: jenixindia.com + www.jenixindia.com (storefront), admin.jenixindia.com (admin panel), api.jenixindia.com (proxy to port 4100). All with SSL via Let's Encrypt.
+Certbot: installed via snap (`snap install --classic certbot`). Cert covers all 4 domains (jenixindia.com, www.jenixindia.com, admin.jenixindia.com, api.jenixindia.com), expires 2026-09-26.
 
 ### Image assets folder
 All uploads: `image-assets/uploads/` (relative to `VPS/` project root)

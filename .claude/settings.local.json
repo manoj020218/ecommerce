@@ -57,7 +57,14 @@
       "PowerShell(& \"D:\\\\plink_git.bat\" root@154.61.69.200 \"cat /root/projects/jenixindia/VPS/apps/front/dist/index.html\")",
       "PowerShell(& \"D:\\\\plink_git.bat\" -pw \"***REMOVED***\" root@154.61.69.200 \"ls /root/projects/jenixindia/VPS/apps/front/dist/assets/\")",
       "PowerShell(& \"D:\\\\plink_git.bat\" -pw \"***REMOVED***\" root@154.61.69.200 \"cat /root/projects/jenixindia/VPS/apps/front/dist/index.html\")",
-      "PowerShell(& \"D:\\\\plink_git.bat\" -pw \"***REMOVED***\" root@154.61.69.200 \"pm2 restart jenix-backend && pm2 status\")"
+      "PowerShell(& \"D:\\\\plink_git.bat\" -pw \"***REMOVED***\" root@154.61.69.200 \"pm2 restart jenix-backend && pm2 status\")",
+      "Bash(powershell -NoProfile -Command \"Stop-Process -Id 13252 -Force\")",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm config set strict-ssl false)",
+      "Bash(NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm add -w sanitize-html)",
+      "Bash(npm_config_strict_ssl=false NODE_TLS_REJECT_UNAUTHORIZED=0 npm install sanitize-html --no-save --prefix \"$\\(pwd\\)/.tmp-npm-check\")",
+      "Read(//tmp/sanitize-install/**)",
+      "Bash(cp -rn \"/tmp/sanitize-install/node_modules/\"* node_modules/)",
+      "Bash(node -e \"const sanitizeHtml = require\\('sanitize-html'\\); console.log\\('OK:', typeof sanitizeHtml\\);\")"
     ]
   }
 }

@@ -1,7 +1,7 @@
 # UI Refactor Request: Align Live E-commerce Site with UX Prototype Layout
 
 ## Objective
-Refactor the live product detail page layout (`test.jenixindia.com`) to match the structural architecture, B2B features, and design hierarchy of our local UX prototype (`product-detail.html`). Move away from standard B2C template limits to a high-converting, trust-focused B2B/B2C hybrid layout.
+Refactor the live product detail page layout (`jenixindia.com`) to match the structural architecture, B2B features, and design hierarchy of our local UX prototype (`product-detail.html`). Move away from standard B2C template limits to a high-converting, trust-focused B2B/B2C hybrid layout.
 
 ---
 
@@ -55,7 +55,7 @@ Insert a modular table/grid wrapper component beneath the quantity selector logi
 - **Grid Layout (`grid grid-cols-3 gap-3`):**
   - Turn volume breaks into solid clickable/viewable cards (`bg-white rounded-lg p-3 border border-gray-100 text-center shadow-xs`).
   - **Row 1 (Price):** `text-base font-bold text-gray-900`
-  - **Row 2 (Volume):** `text-xs text-gray-500 mt-0.5` (e.g., "1–4 units", "5–19 units", "20+ units").
+  - **Row 2 (Volume):** `text-xs text-gray-500 mt-0.5` (e.g., "1ï¿½4 units", "5ï¿½19 units", "20+ units").
 
 ---
 

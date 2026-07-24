@@ -15,7 +15,6 @@ function createAuthRouter() {
   router.post("/customer/login-email", controller.customerLoginEmail);
   router.post("/customer/password/forgot", controller.customerForgotPassword);
   router.post("/customer/password/reset", controller.customerResetPassword);
-  router.post("/customer/login-google", controller.customerLoginGoogle);
   router.post("/customer/otp/request", controller.customerRequestOtp);
   router.post("/customer/otp/verify", controller.customerVerifyOtp);
   router.post("/customer/refresh", controller.customerRefresh);

@@ -1954,7 +1954,10 @@ async function run() {
     assert.equal(/^\d{4}$/.test(phase10TallyYearly.json.data.rows[0].periodKey), true);
     assert.equal(phase10TallyYearly.json.data.xmlReady, false);
 
-    const phase11AccountCustomerLogin = await requestJson(
+    // Security regression guard: /customer/login-google was an unauthenticated
+    // account-takeover route (trusted client-supplied googleSub/email with zero
+    // verification against Google). Removed — must never come back.
+    const phase11InsecureGoogleLoginGone = await requestJson(
       baseUrl,
       "/api/auth/customer/login-google",
       {
@@ -1963,11 +1966,30 @@ async function run() {
         body: JSON.stringify({
           googleSub: "google-sub-phase11-account",
           email: "phase11.account@example.com",
-          name: "Phase 11 Account User",
-          mobile: "+91-9898989898"
+          name: "Phase 11 Account User"
         })
       }
     );
+    assert.equal(phase11InsecureGoogleLoginGone.response.status, 404);
+
+    const phase11AccountOtpRequest = await requestJson(baseUrl, "/api/auth/customer/otp/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9898989898"
+      })
+    });
+    assert.equal(phase11AccountOtpRequest.response.status, 200);
+
+    const phase11AccountCustomerLogin = await requestJson(baseUrl, "/api/auth/customer/otp/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9898989898",
+        code: phase11AccountOtpRequest.json.data.devCode,
+        name: "Phase 11 Account User"
+      })
+    });
     assert.equal(phase11AccountCustomerLogin.response.status, 200);
     const phase11AccountCustomerToken = phase11AccountCustomerLogin.json.data.accessToken;
 
@@ -2046,19 +2068,24 @@ async function run() {
       true
     );
 
-    const phase11OtherCustomer = await requestJson(
-      baseUrl,
-      "/api/auth/customer/login-google",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          googleSub: "google-sub-phase11-other",
-          email: "other.phase11@example.com",
-          name: "Other Phase11 User"
-        })
-      }
-    );
+    const phase11OtherOtpRequest = await requestJson(baseUrl, "/api/auth/customer/otp/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9898989899"
+      })
+    });
+    assert.equal(phase11OtherOtpRequest.response.status, 200);
+
+    const phase11OtherCustomer = await requestJson(baseUrl, "/api/auth/customer/otp/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9898989899",
+        code: phase11OtherOtpRequest.json.data.devCode,
+        name: "Other Phase11 User"
+      })
+    });
     assert.equal(phase11OtherCustomer.response.status, 200);
     const phase11OtherCustomerToken = phase11OtherCustomer.json.data.accessToken;
 
@@ -2233,7 +2260,7 @@ async function run() {
     assert.equal(
       phase11Reorder.json.data.cart.items.find((row) => row.productId === createdProductId)
         .finalUnitPriceAfterDiscount,
-      4300
+      5074 // salePrice 4300 with 18% GST included (finalUnitPriceAfterDiscount is GST-inclusive)
     );
 
     const phase11GuestCartAdd = await requestJson(baseUrl, "/api/cart/items", {
@@ -3154,7 +3181,7 @@ async function run() {
     assert.equal(Boolean(phase18DealerCartLine), true);
     assert.equal(phase18DealerCartLine.priceSource, "price_group");
     assert.equal(phase18DealerCartLine.compareAtUnitPrice, 5800);
-    assert.equal(phase18DealerCartLine.finalUnitPriceAfterDiscount, 4998);
+    assert.equal(phase18DealerCartLine.finalUnitPriceAfterDiscount, 5897.64); // 5100 * 0.98 direct-bank discount, then 18% GST included
 
     const phase18DealerOnlineBlocked = await requestJson(
       baseUrl,
@@ -3494,7 +3521,7 @@ async function run() {
     assert.equal(Boolean(phase18SpecialCartLine), true);
     assert.equal(phase18SpecialCartLine.priceSource, "customer_specific");
     assert.equal(phase18SpecialCartLine.compareAtUnitPrice, 5800);
-    assert.equal(phase18SpecialCartLine.finalUnitPriceAfterDiscount, 4606);
+    assert.equal(phase18SpecialCartLine.finalUnitPriceAfterDiscount, 5435.08); // 4700 * 0.98 direct-bank discount, then 18% GST included
 
     const phase18SpecialCheckout = await requestJson(baseUrl, "/api/checkout/start", {
       method: "POST",
@@ -4140,12 +4167,23 @@ async function run() {
     assert.equal(zeroResultQuery.response.status, 200);
     assert.equal(zeroResultQuery.json.data.resultCount, 0);
 
-    const googleLogin = await requestJson(baseUrl, "/api/auth/customer/login-google", {
+    // Google login itself requires a real authorization-code exchange with Google's
+    // servers (see /customer/google-exchange), which this offline suite can't
+    // simulate. Email OTP verification is the closest same-guarantee substitute for
+    // exercising "an externally-verified login sets verifiedEmail = true".
+    const emailOtpRequestForLogin = await requestJson(baseUrl, "/api/auth/customer/email-otp/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "google.user@example.com" })
+    });
+    assert.equal(emailOtpRequestForLogin.response.status, 200);
+
+    const googleLogin = await requestJson(baseUrl, "/api/auth/customer/email-otp/verify", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        googleSub: "google-sub-101",
         email: "google.user@example.com",
+        code: emailOtpRequestForLogin.json.data.devCode,
         name: "Google User"
       })
     });

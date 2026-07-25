@@ -4,6 +4,7 @@ import { LoadingBlock } from "../../shared/components/loading-block";
 import { PageHeader } from "../../shared/components/page-header";
 import { hasPermission } from "../../shared/utils/permissions";
 import { useAuthSession } from "../auth/use-auth-session";
+import { WhatsAppConnectCard } from "../whatsapp/whatsapp-connect-card";
 import {
   fetchSettings,
   updateBranding,
@@ -1069,6 +1070,8 @@ export function SettingsPage() {
           ) : null}
         </form>
       </article>
+
+      <WhatsAppConnectCard canManage={canEditCustomCode} />
     </section>
   );
 }

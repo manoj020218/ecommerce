@@ -78,6 +78,7 @@ const {
   createAdminStaticPagesRouter
 } = require("../modules/static-pages/static-pages.routes");
 const { createPublicSeoRouter } = require("../modules/seo/seo.routes");
+const { createWhatsappRouter } = require("../modules/whatsapp/whatsapp.routes");
 
 function createApiRouter() {
   const router = express.Router();
@@ -92,6 +93,7 @@ function createApiRouter() {
   router.use("/admin/products", createAdminProductsRouter());
   router.use("/admin/inventory", createInventoryRouter());
   router.use("/admin/settings", createAdminSettingsRouter());
+  router.use("/admin/whatsapp", createWhatsappRouter());
   router.use("/admin/search", createAdminSearchRouter());
   router.use("/categories", createPublicCategoriesRouter());
   router.use("/products", createPublicProductsRouter());

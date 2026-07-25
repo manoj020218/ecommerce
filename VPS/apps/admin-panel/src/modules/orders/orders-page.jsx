@@ -5,7 +5,7 @@ import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { hasPermission } from "../../shared/utils/permissions";
 import { formatCurrencyInr } from "../../shared/utils/formatters";
-import { fetchOrders, fetchOrderDetail, exportOrdersUrl } from "./orders.api";
+import { fetchOrders, fetchOrderDetail, exportOrdersUrl, updateOrder } from "./orders.api";
 
 const BRAND     = "#E8231A";
 const BRAND_DK  = "#C41D15";
@@ -113,7 +113,7 @@ function addrStr(a) {
   return [a.line1, a.line2, a.city, a.state, a.pincode].filter(Boolean).join(", ");
 }
 
-function SidePanelBtn({ children, variant = "default", onClick }) {
+function SidePanelBtn({ children, variant = "default", onClick, disabled }) {
   const styles = {
     default: { background:"#f3f4f6", color:"#374151", border:"none" },
     brand:   { background:BRAND,     color:"#fff",     border:"none" },
@@ -123,20 +123,23 @@ function SidePanelBtn({ children, variant = "default", onClick }) {
   };
   const s = styles[variant];
   return (
-    <button type="button" onClick={onClick} style={{
+    <button type="button" onClick={onClick} disabled={disabled} style={{
       ...s, width:"100%", padding:"11px 0", borderRadius:12,
-      fontSize:13, fontWeight:600, cursor:"pointer", transition:"opacity 0.15s"
+      fontSize:13, fontWeight:600, cursor: disabled ? "wait" : "pointer",
+      opacity: disabled ? 0.6 : 1, transition:"opacity 0.15s"
     }}
-      onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
-      onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.opacity = "0.85"; }}
+      onMouseLeave={e => { e.currentTarget.style.opacity = disabled ? "0.6" : "1"; }}
     >
       {children}
     </button>
   );
 }
 
-function OrderSidePanel({ orderId, order, loading, onClose, onNavigate }) {
+function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancelOrder }) {
   const panelRef = useRef(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [cancelError, setCancelError] = useState("");
 
   // close on Escape
   useEffect(() => {
@@ -146,6 +149,19 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate }) {
   }, [onClose]);
 
   if (!orderId) return null;
+
+  const handleCancel = async () => {
+    if (!window.confirm("Cancel this order? This cannot be undone.")) return;
+    setCancelSaving(true);
+    setCancelError("");
+    try {
+      await onCancelOrder(orderId);
+    } catch (e) {
+      setCancelError(e.message || "Failed to cancel order.");
+    } finally {
+      setCancelSaving(false);
+    }
+  };
 
   const o   = order || {};
   const pending = isVerifyPending(o);
@@ -311,8 +327,11 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate }) {
                 )}
               </div>
               {!["cancelled","delivered"].includes(String(o.orderStatus || "").toLowerCase()) && (
-                <SidePanelBtn variant="danger" onClick={onNavigate}>Cancel Order</SidePanelBtn>
+                <SidePanelBtn variant="danger" onClick={handleCancel} disabled={cancelSaving}>
+                  {cancelSaving ? "Cancelling…" : "Cancel Order"}
+                </SidePanelBtn>
               )}
+              {cancelError && <p style={{ color:"#dc2626", fontSize:12, margin:0 }}>{cancelError}</p>}
               <SidePanelBtn variant="default" onClick={onNavigate}>View Full Details →</SidePanelBtn>
             </div>
 
@@ -416,6 +435,12 @@ export function OrdersPage() {
 
   const closePanel   = () => { setPanelId(null); setPanelOrder(null); };
   const goToFullPage = () => { if (panelId) navigate(`/orders/${panelId}`); };
+
+  const onCancelOrderFromPanel = async (orderId) => {
+    const updated = await updateOrder(orderId, { orderStatus: "cancelled" });
+    setPanelOrder(updated);
+    setAllRows((prev) => prev.map((row) => (row.id === orderId ? { ...row, ...updated } : row)));
+  };
 
   if (!canView) return <ErrorBlock message="You do not have permission to view orders." />;
   if (loading)  return <LoadingBlock label="Loading orders…" />;
@@ -644,7 +669,7 @@ export function OrdersPage() {
       </div>
 
       {/* ── mobile cards ── */}
-      <div className="mobile-cards" style={{ display:"flex", flexDirection:"column", gap:10 }}>
+      <div className="mobile-cards" style={{ flexDirection:"column", gap:10 }}>
         {pageRows.length === 0 && (
           <p style={{ textAlign:"center", color:"#9ca3af", padding:32, fontSize:13 }}>No orders match your filter.</p>
         )}
@@ -718,6 +743,7 @@ export function OrdersPage() {
         loading={panelLoading}
         onClose={closePanel}
         onNavigate={goToFullPage}
+        onCancelOrder={onCancelOrderFromPanel}
       />
     </div>
   );

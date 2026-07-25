@@ -674,6 +674,76 @@ function EditableCell({ rowId, field, value, type, options, missing, pending, ac
   );
 }
 
+// ── QtyCell (auto-save on Enter/blur, no separate Save click) ─────────────────
+
+function QtyCell({ rowId, value, isActive, setActiveCell, onCommit, saving, justSaved }) {
+  const inputRef = useRef(null);
+  const [draft, setDraft] = useState(String(value ?? 0));
+
+  useEffect(() => {
+    if (isActive) setDraft(String(value ?? 0));
+  }, [isActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (isActive && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isActive]);
+
+  const commit = ({ keepEditing }) => {
+    const next = Math.max(0, parseInt(draft, 10) || 0);
+    onCommit(rowId, next);
+    if (keepEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    } else {
+      setActiveCell(null);
+    }
+  };
+
+  if (isActive) {
+    return (
+      <td style={{ padding: "4px 6px" }}>
+        <input
+          ref={inputRef}
+          type="number"
+          min="0"
+          inputMode="numeric"
+          style={{
+            width: 72, fontSize: 12, padding: "3px 6px", borderRadius: 4,
+            border: "1px solid #93c5fd", outline: "none"
+          }}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onWheel={(e) => e.currentTarget.blur()}
+          onBlur={() => commit({ keepEditing: false })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); commit({ keepEditing: true }); }
+            else if (e.key === "Escape") { e.preventDefault(); setDraft(String(value ?? 0)); setActiveCell(null); }
+            else if (e.key === "Tab") { commit({ keepEditing: false }); }
+          }}
+        />
+        {saving && <span style={{ marginLeft: 6, fontSize: 11, color: "#6b7280" }}>saving…</span>}
+      </td>
+    );
+  }
+
+  return (
+    <td
+      style={{
+        padding: "6px 8px", cursor: "text", fontSize: 12, whiteSpace: "nowrap",
+        background: justSaved ? "#dcfce7" : "transparent",
+        transition: "background 0.6s ease"
+      }}
+      onClick={() => setActiveCell({ rowId, field: "stockQty" })}
+      title="Click to edit — Enter to save"
+    >
+      {value ?? 0}
+    </td>
+  );
+}
+
 // ── ToggleSwitch ──────────────────────────────────────────────────────────────
 
 function ToggleSwitch({ checked, onChange, disabled }) {
@@ -877,6 +947,10 @@ export function ProductsPage() {
   const [listPendingEdits, setListPendingEdits] = useState({});
   const [listActiveCell, setListActiveCell] = useState(null);
   const [listSaving, setListSaving] = useState(false);
+
+  // qty column: auto-saves immediately on Enter/blur, bypasses the batch Save Changes bar
+  const [qtySavingId, setQtySavingId] = useState(null);
+  const [qtySavedFlashId, setQtySavedFlashId] = useState(null);
 
   // pagination (bulk edit)
   const [page, setPage] = useState(1);
@@ -1256,6 +1330,24 @@ export function ProductsPage() {
     } catch (apiError) {
       setError(apiError.message || "Save failed.");
     } finally { setListSaving(false); }
+  };
+
+  const onQtyCommit = async (productId, nextQty) => {
+    const row = rows.find((r) => r.id === productId);
+    if (!row || Number(row.stockQty || 0) === nextQty) return;
+    setQtySavingId(productId);
+    try {
+      // stockQty isn't in the single-product PATCH schema, so use the bulk-patch
+      // endpoint (same one the mass "Set Qty" action uses) even for one row.
+      await bulkPatchProducts([{ id: productId, stockQty: nextQty }]);
+      setRows((prev) => prev.map((r) => (r.id === productId ? { ...r, stockQty: nextQty } : r)));
+      setQtySavedFlashId(productId);
+      setTimeout(() => setQtySavedFlashId((id) => (id === productId ? null : id)), 900);
+    } catch (apiError) {
+      setError(apiError.message || "Qty save failed.");
+    } finally {
+      setQtySavingId(null);
+    }
   };
 
   const onListDiscard = () => {
@@ -1879,7 +1971,6 @@ export function ProductsPage() {
 
                   const valCategory = getListVal(row.id, "categoryId", row.categoryId);
                   const valHsn = getListVal(row.id, "hsnCode", row.hsnCode);
-                  const valQty = getListVal(row.id, "stockQty", row.stockQty);
                   const valSalePrice = getListVal(row.id, "salePrice", row.salePrice);
                   const valBasePrice = getListVal(row.id, "basePrice", row.basePrice);
 
@@ -1957,13 +2048,15 @@ export function ProductsPage() {
                         />
                       )}
 
-                      {/* qty — editable */}
+                      {/* qty — auto-saves on Enter/blur, no separate Save click */}
                       {visibleColumns.has("qty") && (
-                        <EditableCell
-                          rowId={row.id} field="stockQty" value={valQty} type="number"
-                          missing={false} pending={"stockQty" in listEdits}
-                          activeCell={listActiveCell} setActiveCell={setListActiveCell}
-                          onChange={setListCellValue}
+                        <QtyCell
+                          rowId={row.id} value={row.stockQty}
+                          isActive={listActiveCell?.rowId === row.id && listActiveCell?.field === "stockQty"}
+                          setActiveCell={setListActiveCell}
+                          onCommit={onQtyCommit}
+                          saving={qtySavingId === row.id}
+                          justSaved={qtySavedFlashId === row.id}
                         />
                       )}
 

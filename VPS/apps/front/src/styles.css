@@ -3036,6 +3036,8 @@ textarea {
 .proto-product-layout {
   display: grid;
   gap: 18px;
+  width: 100%;
+  min-width: 0;
 }
 
 .proto-filter-sidebar,

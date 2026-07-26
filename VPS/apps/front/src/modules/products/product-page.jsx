@@ -1207,13 +1207,22 @@ export function ProductPage() {
         </div>
 
         {tab === "keyFeatures" ? (
-          <ul className="proto-feature-list">
-            {(keyFeatures.length > 0
-              ? keyFeatures
-              : ["Key buying highlights for this product are being prepared."]).map((feature) => (
-              <li key={feature}>{feature}</li>
-            ))}
-          </ul>
+          keyFeatures.length > 0 ? (
+            <ul className="proto-feature-list">
+              {keyFeatures.map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+            </ul>
+          ) : product.fullDescription || product.shortDescription ? (
+            <div
+              className="proto-tab-copy"
+              dangerouslySetInnerHTML={{ __html: product.fullDescription || product.shortDescription }}
+            />
+          ) : (
+            <p className="proto-tab-copy">
+              Key buying highlights for this product are being prepared.
+            </p>
+          )
         ) : null}
 
         {tab === "description" ? (

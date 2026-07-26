@@ -1738,6 +1738,7 @@ textarea {
   margin: 0 auto;
   padding: 14px 14px 104px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 

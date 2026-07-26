@@ -186,16 +186,34 @@ function ProductCarousel({ title, items }) {
     return null;
   }
 
+  const displayItems = items.length > 4 ? [...items, ...items] : items;
+
   return (
     <section className="proto-section">
       <StorefrontSectionHeader title={title} />
-      <div className="proto-mini-product-track">
-        {items.map((product) => (
-          <ProductMiniCard key={`${title}-${product.id}`} product={product} />
-        ))}
+      <div className="proto-auto-carousel-shell">
+        <div className="proto-auto-carousel-track" style={items.length <= 4 ? { animation: "none" } : {}}>
+          {displayItems.map((product, idx) => (
+            <ProductMiniCard key={`${title}-${product.id}-${idx}`} product={product} />
+          ))}
+        </div>
       </div>
     </section>
   );
+}
+
+function dedupeProductsById(...lists) {
+  const seen = new Set();
+  const merged = [];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const product of list) {
+      if (!product?.id || seen.has(product.id)) continue;
+      seen.add(product.id);
+      merged.push(product);
+    }
+  }
+  return merged;
 }
 
 export function ProductPage() {
@@ -1243,7 +1261,10 @@ export function ProductPage() {
 
       {recommendationError ? <StorefrontAlert tone="warning">{recommendationError}</StorefrontAlert> : null}
 
-      <ProductCarousel title="Related Products" items={recGroups.related} />
+      <ProductCarousel
+        title="Related Products"
+        items={dedupeProductsById(recGroups.related, recGroups.mostVisited).slice(0, 12)}
+      />
       <ProductCarousel title="Frequently Bought Together" items={recGroups.frequentlyBoughtTogether} />
       <ProductCarousel title="Accessories" items={recGroups.accessories} />
 

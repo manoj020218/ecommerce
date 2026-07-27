@@ -88,6 +88,20 @@ function resolveDestinationZone(destination, settings) {
   return SHIPPING_ZONES.ALL_INDIA;
 }
 
+function billableUnitWeightKg(line) {
+  const deadWeightKg = Number(line.deadWeightKg || 0);
+  const lengthCm = Number(line.lengthCm || 0);
+  const widthCm = Number(line.widthCm || 0);
+  const heightCm = Number(line.heightCm || 0);
+
+  const volumetricWeightKg =
+    lengthCm > 0 && widthCm > 0 && heightCm > 0
+      ? (lengthCm * widthCm * heightCm) / 5000
+      : 0;
+
+  return Math.max(0.2, deadWeightKg, volumetricWeightKg);
+}
+
 function resolveBillableWeightKg(lines) {
   let totalWeightKg = 0;
 
@@ -96,22 +110,55 @@ function resolveBillableWeightKg(lines) {
     if (qty <= 0) {
       continue;
     }
-
-    const deadWeightKg = Number(line.deadWeightKg || 0);
-    const lengthCm = Number(line.lengthCm || 0);
-    const widthCm = Number(line.widthCm || 0);
-    const heightCm = Number(line.heightCm || 0);
-
-    const volumetricWeightKg =
-      lengthCm > 0 && widthCm > 0 && heightCm > 0
-        ? (lengthCm * widthCm * heightCm) / 5000
-        : 0;
-
-    const billableUnitWeightKg = Math.max(0.2, deadWeightKg, volumetricWeightKg);
-    totalWeightKg += billableUnitWeightKg * qty;
+    totalWeightKg += billableUnitWeightKg(line) * qty;
   }
 
   return roundMoney(totalWeightKg);
+}
+
+// A shipping class only overrides the default zone-based rate cards when it
+// actually specifies a rate. A weight_based class left at 0/0 (the "Normal"
+// default every product starts on) explicitly means "use the zone-based rate
+// cards" per the admin UI's own hint text — so those lines fall through to
+// the same calculation every product used before this feature existed.
+function classOverridesDefault(shippingClass) {
+  if (!shippingClass || shippingClass.isActive === false) {
+    return false;
+  }
+  if (shippingClass.rateType === "fixed") {
+    return Number(shippingClass.fixedAmount || 0) > 0;
+  }
+  return Number(shippingClass.baseCharge || 0) > 0 || Number(shippingClass.perKgRate || 0) > 0;
+}
+
+function calculateLineOverrideCharge(line, shippingClass) {
+  const qty = Number(line.qty || 0);
+  if (qty <= 0) return 0;
+
+  if (shippingClass.rateType === "fixed") {
+    return roundMoney(Number(shippingClass.fixedAmount || 0) * qty);
+  }
+
+  const perUnitCharge =
+    Number(shippingClass.baseCharge || 0) + Number(shippingClass.perKgRate || 0) * billableUnitWeightKg(line);
+  return roundMoney(perUnitCharge * qty);
+}
+
+function partitionLinesByShippingClass(lines, shippingClasses) {
+  const classByCode = new Map(safeArray(shippingClasses).map((row) => [row.code, row]));
+  const defaultLines = [];
+  const overrideLines = [];
+
+  for (const line of safeArray(lines)) {
+    const shippingClass = classByCode.get(line.shippingClass);
+    if (classOverridesDefault(shippingClass)) {
+      overrideLines.push({ line, shippingClass });
+    } else {
+      defaultLines.push(line);
+    }
+  }
+
+  return { defaultLines, overrideLines };
 }
 
 function findRateCard(rateCards, shippingMethod, zone) {
@@ -136,6 +183,7 @@ function findRateCard(rateCards, shippingMethod, zone) {
 function calculateShippingQuote({ lines, shippingMethod, destination, shippingStore }) {
   const settings = shippingStore?.settings || {};
   const rateCards = safeArray(shippingStore?.rateCards);
+  const totalWeightKg = resolveBillableWeightKg(lines);
 
   if (
     shippingMethod === SHIPPING_METHODS.LOCAL_PICKUP ||
@@ -145,17 +193,50 @@ function calculateShippingQuote({ lines, shippingMethod, destination, shippingSt
       shippingMethod,
       zone: SHIPPING_ZONES.ALL_INDIA,
       zoneLabel: SHIPPING_ZONE_LABELS[SHIPPING_ZONES.ALL_INDIA],
-      totalWeightKg: resolveBillableWeightKg(lines),
+      totalWeightKg,
       rateCardId: null,
       baseCharge: 0,
       perKgCharge: 0,
       remoteExtraCharge: 0,
+      shippingClassCharge: 0,
       shippingCharge: 0
     };
   }
 
-  const totalWeightKg = resolveBillableWeightKg(lines);
+  const { defaultLines, overrideLines } = partitionLinesByShippingClass(
+    lines,
+    shippingStore?.shippingClasses
+  );
+
+  const shippingClassCharge = roundMoney(
+    overrideLines.reduce((sum, { line, shippingClass }) => sum + calculateLineOverrideCharge(line, shippingClass), 0)
+  );
+
   const zone = resolveDestinationZone(destination || {}, settings);
+  const remoteExtraMap = settings.remoteExtraChargeByMethod || {};
+  const remoteExtraCharge =
+    zone === SHIPPING_ZONES.NORTH_EAST_REMOTE
+      ? Number(remoteExtraMap[shippingMethod] || 0)
+      : 0;
+
+  if (defaultLines.length === 0) {
+    // Every line in the cart is on a shipping class that overrides the
+    // default rate cards — nothing left needing a zone-based rate lookup.
+    return {
+      shippingMethod,
+      zone,
+      zoneLabel: SHIPPING_ZONE_LABELS[zone] || SHIPPING_ZONE_LABELS[SHIPPING_ZONES.ALL_INDIA],
+      totalWeightKg,
+      rateCardId: null,
+      baseCharge: 0,
+      perKgCharge: 0,
+      remoteExtraCharge,
+      shippingClassCharge,
+      shippingCharge: roundMoney(shippingClassCharge + remoteExtraCharge)
+    };
+  }
+
+  const defaultWeightKg = resolveBillableWeightKg(defaultLines);
   const rateCard = findRateCard(rateCards, shippingMethod, zone);
 
   if (!rateCard) {
@@ -167,15 +248,9 @@ function calculateShippingQuote({ lines, shippingMethod, destination, shippingSt
 
   const baseCharge = Number(rateCard.baseCharge || 0);
   const perKgCharge = Number(rateCard.perKgCharge || 0);
-  const weightCharge = roundMoney(totalWeightKg * perKgCharge);
+  const weightCharge = roundMoney(defaultWeightKg * perKgCharge);
 
-  const remoteExtraMap = settings.remoteExtraChargeByMethod || {};
-  const remoteExtraCharge =
-    zone === SHIPPING_ZONES.NORTH_EAST_REMOTE
-      ? Number(remoteExtraMap[shippingMethod] || 0)
-      : 0;
-
-  const shippingCharge = roundMoney(baseCharge + weightCharge + remoteExtraCharge);
+  const shippingCharge = roundMoney(baseCharge + weightCharge + remoteExtraCharge + shippingClassCharge);
 
   return {
     shippingMethod,
@@ -186,6 +261,7 @@ function calculateShippingQuote({ lines, shippingMethod, destination, shippingSt
     baseCharge,
     perKgCharge,
     remoteExtraCharge,
+    shippingClassCharge,
     shippingCharge
   };
 }

@@ -493,6 +493,7 @@ export function ProductPage() {
   const recGroups = recommendations?.recommendationGroups || {};
   const guides = Array.isArray(recommendations?.guides) ? recommendations.guides : [];
   const showNotifyWhenAvailable = product?.stockStatus === "out_of_stock";
+  const maxOrderableQty = Math.max(1, Number(product?.maxOrderableQty ?? 1000));
   const dealerOrderRequestFlow = Boolean(
     isAuthenticated && product?.pricing?.usesOrderRequestFlow
   );
@@ -863,11 +864,18 @@ export function ProductPage() {
                 -
               </button>
               <strong>{quantity}</strong>
-              <button type="button" onClick={() => setQuantity((current) => current + 1)}>
+              <button
+                type="button"
+                disabled={quantity >= maxOrderableQty}
+                onClick={() => setQuantity((current) => Math.min(maxOrderableQty, current + 1))}
+              >
                 +
               </button>
             </div>
-            <small>Min. order: {Number(product.moq || 1)} unit</small>
+            <small>
+              Min. order: {Number(product.moq || 1)} unit
+              {quantity >= maxOrderableQty ? " — maximum orderable quantity reached" : ""}
+            </small>
           </div>
 
           {effectiveBulkSlabs.length > 0 ? (

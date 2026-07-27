@@ -386,6 +386,12 @@ function toPublicProduct(product, options = {}) {
     stockVisibility: "hide_quantity",
     isPurchasable:
       calculateAvailableQty(product) > 0 || Boolean(product.allowBackorder),
+    // Caps the storefront qty stepper so a buyer can't select more than can
+    // actually be ordered, without revealing the exact stock count (stays
+    // consistent with stockVisibility: "hide_quantity" above).
+    maxOrderableQty: Boolean(product.allowBackorder)
+      ? Number(product.maxOrderQty || 1000)
+      : Math.max(0, Math.min(calculateAvailableQty(product), Number(product.maxOrderQty || 1000))),
     isActive: Boolean(product.isActive),
     productLabel: product.productLabel || "",
     tags: Array.isArray(product.tags) ? [...product.tags] : [],

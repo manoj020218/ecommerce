@@ -4,6 +4,25 @@ function calculateAvailableQty(product) {
   return Math.max(0, stockQty - reservedQty);
 }
 
+// Single source of truth for deriving the displayed stock status from the
+// real quantity — any write path that changes stockQty/reservedQty must
+// recompute this, or the storefront (which only ever reads stockStatus)
+// silently drifts from actual availability.
+function resolveStockStatus(product) {
+  const availableQty = calculateAvailableQty(product);
+  const lowStockThreshold = Number(product.lowStockThreshold || 0);
+
+  if (availableQty <= 0) {
+    return product.allowBackorder ? "backorder" : "out_of_stock";
+  }
+
+  if (availableQty <= lowStockThreshold) {
+    return "low_stock";
+  }
+
+  return "in_stock";
+}
+
 function roundMoney(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
@@ -401,6 +420,7 @@ function toPublicProductCard(product, options = {}) {
 module.exports = {
   PRODUCT_RELATION_TYPES,
   calculateAvailableQty,
+  resolveStockStatus,
   sanitizePriceGroupPrices,
   sanitizeCustomerSpecificPrices,
   resolveProductUnitPrice,

@@ -2,26 +2,11 @@ const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
-const { calculateAvailableQty } = require("../products/products.model");
+const { calculateAvailableQty, resolveStockStatus } = require("../products/products.model");
 const {
   INVENTORY_MOVEMENT_TYPES,
   sanitizeInventoryMovement
 } = require("./inventory.model");
-
-function resolveStockStatus(product) {
-  const availableQty = calculateAvailableQty(product);
-  const lowStockThreshold = Number(product.lowStockThreshold || 0);
-
-  if (availableQty <= 0) {
-    return product.allowBackorder ? "backorder" : "out_of_stock";
-  }
-
-  if (availableQty <= lowStockThreshold) {
-    return "low_stock";
-  }
-
-  return "in_stock";
-}
 
 function getProductByIdOrThrow(store, productId) {
   const index = store.products.findIndex((product) => product.id === productId);

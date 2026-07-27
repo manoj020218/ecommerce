@@ -25,6 +25,7 @@ const {
 const {
   PRODUCT_RELATION_TYPES,
   calculateAvailableQty,
+  resolveStockStatus,
   createEmptyProductRelations,
   sanitizeCustomerSpecificPrices,
   sanitizePriceGroupPrices,
@@ -508,7 +509,14 @@ function createProductRecordFromPayload(store, payload) {
     metaKeywords: payload.metaKeywords || "",
     stockQty: Number(payload.stockQty || 0),
     reservedQty: Number(payload.reservedQty || 0),
-    stockStatus: payload.stockStatus || "in_stock",
+    stockStatus:
+      payload.stockStatus ||
+      resolveStockStatus({
+        stockQty: Number(payload.stockQty || 0),
+        reservedQty: Number(payload.reservedQty || 0),
+        lowStockThreshold: Number(payload.lowStockThreshold || 0),
+        allowBackorder: Boolean(payload.allowBackorder)
+      }),
     stockVisibility: "hide_quantity",
     allowBackorder: Boolean(payload.allowBackorder),
     maxOrderQty: Number(payload.maxOrderQty || 1000),
@@ -1240,6 +1248,14 @@ async function bulkPatchProducts(updates, actor) {
     if (update.basePrice !== undefined) patch.basePrice = Number(update.basePrice);
     if (update.salePrice !== undefined) patch.salePrice = Number(update.salePrice);
     if (update.isActive !== undefined) patch.isActive = Boolean(update.isActive);
+
+    // Quantity changed but status wasn't explicitly set in this same call —
+    // re-derive it so the storefront (which only ever reads stockStatus,
+    // never the raw quantity) doesn't keep showing a stale "in stock" price
+    // after an admin zeroes out the qty from the products list quick-edit.
+    if (update.stockQty !== undefined && update.stockStatus === undefined) {
+      patch.stockStatus = resolveStockStatus({ ...current, ...patch });
+    }
 
     store.products[index] = { ...current, ...patch, updatedAt: now };
     updated++;

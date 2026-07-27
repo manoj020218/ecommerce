@@ -803,29 +803,37 @@ export function ProductPage() {
             SKU: {product.sku || "--"} {product.modelNumber ? `| Model: ${product.modelNumber}` : ""}
           </p>
 
-          <div className="proto-price-row proto-price-row-large">
-            <strong>{currency(nextVisiblePrice)}</strong>
-            {nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice ? (
-              <span>{currency(nextCompareAtPrice)}</span>
-            ) : null}
-            {saveAmount > 0 ? (
-              <mark>Save {currency(saveAmount)}</mark>
-            ) : null}
-          </div>
-
-          {product.priceIncludesGst ? (
-            <p className="proto-tax-line" style={{ color: "#15803d", fontWeight: 600 }}>
-              <span style={{ background: "#dcfce7", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>Incl. GST</span>
-              Price includes {Number(product.gstRate || 0)}% GST
-              {Number(product.gstRate || 0) > 0 ? <> &nbsp;·&nbsp; GST: {currency(Math.round(nextVisiblePrice - nextVisiblePrice / (1 + Number(product.gstRate) / 100)))}</> : null}
+          {showNotifyWhenAvailable ? (
+            <p className="proto-tax-line" style={{ color: "#b91c1c", fontWeight: 600 }}>
+              Currently out of stock — pricing will show again once restocked.
             </p>
           ) : (
-            <p className="proto-tax-line">
-              Excl. {Number(product.gstRate || 0)}% GST — added at checkout
-              {saveAmount > 0 ? <> &nbsp;|&nbsp; GST: {currency(Math.round(nextVisiblePrice * Number(product.gstRate || 0) / 100))}</> : null}
-            </p>
+            <>
+              <div className="proto-price-row proto-price-row-large">
+                <strong>{currency(nextVisiblePrice)}</strong>
+                {nextCompareAtPrice && nextCompareAtPrice > nextVisiblePrice ? (
+                  <span>{currency(nextCompareAtPrice)}</span>
+                ) : null}
+                {saveAmount > 0 ? (
+                  <mark>Save {currency(saveAmount)}</mark>
+                ) : null}
+              </div>
+
+              {product.priceIncludesGst ? (
+                <p className="proto-tax-line" style={{ color: "#15803d", fontWeight: 600 }}>
+                  <span style={{ background: "#dcfce7", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", fontSize: 12, marginRight: 6 }}>Incl. GST</span>
+                  Price includes {Number(product.gstRate || 0)}% GST
+                  {Number(product.gstRate || 0) > 0 ? <> &nbsp;·&nbsp; GST: {currency(Math.round(nextVisiblePrice - nextVisiblePrice / (1 + Number(product.gstRate) / 100)))}</> : null}
+                </p>
+              ) : (
+                <p className="proto-tax-line">
+                  Excl. {Number(product.gstRate || 0)}% GST — added at checkout
+                  {saveAmount > 0 ? <> &nbsp;|&nbsp; GST: {currency(Math.round(nextVisiblePrice * Number(product.gstRate || 0) / 100))}</> : null}
+                </p>
+              )}
+              <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
+            </>
           )}
-          <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
           {product.shippingIncluded ? (
             <p className="proto-shipping-info-line proto-shipping-included">
               <span className="proto-shipping-chip">Free Shipping</span>

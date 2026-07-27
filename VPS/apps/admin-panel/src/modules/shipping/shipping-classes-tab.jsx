@@ -200,7 +200,7 @@ export function ShippingClassesTab({ canCreate }) {
       )}
 
       {modal && (
-        <Modal onClose={() => setModal(false)} title={editing ? "Edit Shipping Class" : "New Shipping Class"}>
+        <Modal open onClose={() => setModal(false)} title={editing ? "Edit Shipping Class" : "New Shipping Class"}>
           <form onSubmit={handleSave} style={{ display: "grid", gap: 14 }}>
             <div>
               <label style={labelStyle}>Class Name *</label>

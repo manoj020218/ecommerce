@@ -3,6 +3,7 @@ const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { env } = require("../../config/env");
 const { convertToWebp } = require("../../common/image-utils");
+const { sanitizeCmsHtml } = require("../../common/html-sanitizer");
 const {
   readContentStore,
   writeContentStore
@@ -388,8 +389,9 @@ async function createBlog(payload, actor) {
     title: payload.title,
     slug,
     excerpt: payload.excerpt,
-    content: payload.content,
+    content: sanitizeCmsHtml(payload.content),
     featuredImageUrl: payload.featuredImageUrl || "",
+    youtubeUrl: payload.youtubeUrl || "",
     categoryId: payload.categoryId,
     tags: normalized.tags,
     author: payload.author,
@@ -462,6 +464,7 @@ async function updateBlog(blogId, patch, actor) {
     ...patch,
     title: nextTitle,
     slug: nextSlug,
+    content: patch.content !== undefined ? sanitizeCmsHtml(patch.content) : current.content,
     categoryId: mergedInput.categoryId,
     tags: normalized.tags,
     linkedProductIds: normalized.linkedProductIds,
@@ -551,6 +554,7 @@ async function getPublicBlogBySlug(slug) {
   const article = {
     ...toPublicBlogCard(blog, category),
     content: blog.content,
+    youtubeUrl: blog.youtubeUrl || "",
     faqItems: normalizeFaqItems(blog.faqItems),
     seoTitle: blog.seoTitle || blog.title,
     seoDescription: blog.seoDescription || blog.excerpt,

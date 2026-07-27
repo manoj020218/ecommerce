@@ -48,6 +48,7 @@ const EMPTY_FORM = {
   content: "",
   featuredImageUrl: "",
   ogImageUrl: "",
+  youtubeUrl: "",
   categoryId: "",
   tagsText: "",
   author: "Jenix India Team",
@@ -70,6 +71,7 @@ function formFromBlog(blog) {
     content: blog.content || "",
     featuredImageUrl: blog.featuredImageUrl || "",
     ogImageUrl: blog.ogImageUrl || "",
+    youtubeUrl: blog.youtubeUrl || "",
     categoryId: blog.categoryId || "",
     tagsText: (blog.tags || []).join(", "),
     author: blog.author || "Jenix India Team",
@@ -97,6 +99,7 @@ function buildPayload(form) {
     content: form.content,
     featuredImageUrl: form.featuredImageUrl,
     ogImageUrl: form.ogImageUrl,
+    youtubeUrl: form.youtubeUrl,
     categoryId: form.categoryId,
     tags: form.tagsText.split(",").map((t) => t.trim()).filter(Boolean),
     author: form.author,
@@ -211,6 +214,13 @@ function FormatToolbar({ onInsert }) {
     { label: "</>", title: "Code inline", prefix: "<code>", suffix: "</code>" },
   ];
 
+  function onImageClick() {
+    const url = window.prompt("Image URL (paste a link to an already-hosted image):");
+    if (!url || !url.trim()) return;
+    // Selected text (if any) becomes the alt text; otherwise alt is empty.
+    onInsert(`<img src="${url.trim()}" alt="`, `" />`);
+  }
+
   return (
     <div style={{ display: "flex", gap: 4, flexWrap: "wrap", padding: "6px 8px", background: "#f9fafb", border: "1px solid var(--border)", borderBottom: "none", borderRadius: "8px 8px 0 0" }}>
       {tools.map((t) => (
@@ -224,6 +234,15 @@ function FormatToolbar({ onInsert }) {
           {t.label}
         </button>
       ))}
+      <button type="button" title="Insert Image"
+        onClick={onImageClick}
+        style={{
+          padding: "3px 8px", fontSize: 12, fontWeight: 600,
+          background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 5,
+          cursor: "pointer", color: "var(--text)"
+        }}>
+        🖼 Image
+      </button>
     </div>
   );
 }
@@ -661,6 +680,16 @@ export function BlogsPage() {
               hint="1200 × 630 px — used for Facebook/Twitter preview"
             />
           </div>
+
+          <label className="field field-full">
+            <span>YouTube Video URL (optional)</span>
+            <input
+              name="youtubeUrl"
+              value={form.youtubeUrl}
+              onChange={onFormChange}
+              placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..."
+            />
+          </label>
 
           <div className="field field-full" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

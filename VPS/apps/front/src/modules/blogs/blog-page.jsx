@@ -42,6 +42,14 @@ function ProductMiniCard({ product }) {
   );
 }
 
+function extractYoutubeVideoId(url) {
+  if (!url) return "";
+  const match = String(url).match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  return match ? match[1] : "";
+}
+
 function GuideMiniCard({ blog }) {
   return (
     <StorefrontCard as={Link} to={`/guides/${blog.slug}`} className="guide-inline-card" elevated>
@@ -87,16 +95,10 @@ export function BlogPage() {
   }, [slug]);
 
   const article = payload?.article || null;
-  const contentBlocks = useMemo(() => {
-    if (!article?.content) {
-      return [];
-    }
-
-    return article.content
-      .split(/\n{2,}/)
-      .map((block) => block.trim())
-      .filter(Boolean);
-  }, [article?.content]);
+  const youtubeVideoId = useMemo(
+    () => extractYoutubeVideoId(article?.youtubeUrl),
+    [article?.youtubeUrl]
+  );
 
   const articleMeta = [
     formatDate(article?.publishedAt),
@@ -166,11 +168,25 @@ export function BlogPage() {
         />
       </div>
 
-      <StorefrontCard as="section" className="guide-content-card" elevated>
-        {contentBlocks.map((block, index) => (
-          <p key={`${index}-${block.slice(0, 24)}`}>{block}</p>
-        ))}
-      </StorefrontCard>
+      {youtubeVideoId ? (
+        <div className="guide-video-embed" style={{ position: "relative", width: "100%", paddingTop: "56.25%", marginBottom: 20 }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${youtubeVideoId}`}
+            title={article.title}
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none", borderRadius: 12 }}
+          />
+        </div>
+      ) : null}
+
+      <StorefrontCard
+        as="section"
+        className="guide-content-card"
+        elevated
+        dangerouslySetInnerHTML={{ __html: article.content }}
+      />
 
       <StorefrontCard as="section" className="section-card" elevated>
         <StorefrontSectionHeader

@@ -119,6 +119,7 @@ function ProductRailCard({ product, categories, busy, onAddToCart }) {
     comparePrice && comparePrice > price
       ? Math.round(((comparePrice - price) / comparePrice) * 100)
       : 0;
+  const outOfStock = product.isPurchasable === false;
 
   const categoryName =
     product.categoryId && Array.isArray(categories)
@@ -136,7 +137,9 @@ function ProductRailCard({ product, categories, busy, onAddToCart }) {
         ) : (
           <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
         )}
-        {label ? (
+        {outOfStock ? (
+          <span className="proto-product-flag proto-flag-red">Out of Stock</span>
+        ) : label ? (
           <span className={badgeClass(product.productLabel || "")}>
             {label}
           </span>
@@ -156,9 +159,9 @@ function ProductRailCard({ product, categories, busy, onAddToCart }) {
             event.preventDefault();
             onAddToCart(product);
           }}
-          disabled={busy}
+          disabled={busy || outOfStock}
         >
-          {busy ? "Adding..." : "Add to Cart"}
+          {outOfStock ? "Out of Stock" : busy ? "Adding..." : "Add to Cart"}
         </StorefrontButton>
       </div>
     </Link>
@@ -167,6 +170,7 @@ function ProductRailCard({ product, categories, busy, onAddToCart }) {
 
 function NewArrivalCard({ product, busy, onAddToCart }) {
   const price = visiblePrice(product);
+  const outOfStock = product.isPurchasable === false;
 
   return (
     <Link to={`/products/${product.slug}`} className="proto-arrival-card">
@@ -176,6 +180,9 @@ function NewArrivalCard({ product, busy, onAddToCart }) {
         ) : (
           <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
         )}
+        {outOfStock ? (
+          <span className="proto-product-flag proto-flag-red">Out of Stock</span>
+        ) : null}
       </div>
       <div className="proto-arrival-copy">
         <p className="proto-arrival-brand">{product.brand || "Jenix"}</p>
@@ -192,10 +199,12 @@ function NewArrivalCard({ product, busy, onAddToCart }) {
               event.preventDefault();
               onAddToCart(product);
             }}
-            disabled={busy}
-            aria-label="Add to cart"
+            disabled={busy || outOfStock}
+            aria-label={outOfStock ? "Out of stock" : "Add to cart"}
           >
-            {busy ? (
+            {outOfStock ? (
+              <span style={{ fontSize: 10, fontWeight: 700 }}>N/A</span>
+            ) : busy ? (
               <span>…</span>
             ) : (
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" width="16" height="16">

@@ -4686,6 +4686,9 @@ textarea {
 .proto-product-flag.proto-flag-blue {
   background: #3b82f6;
 }
+.proto-product-flag.proto-flag-red {
+  background: #ef4444;
+}
 
 /* 20. Footer body text: 13px muted gray — !important beats the earlier d1d5db rule */
 .proto-footer-column p {

@@ -49,6 +49,7 @@ function compareAtPrice(product) {
 function ProductCard({ product, busy, onAddToCart }) {
   const price = visiblePrice(product);
   const comparePrice = compareAtPrice(product);
+  const outOfStock = product.isPurchasable === false;
 
   return (
     <Link to={`/products/${product.slug}`} className="proto-product-card proto-product-card-grid">
@@ -58,6 +59,9 @@ function ProductCard({ product, busy, onAddToCart }) {
         ) : (
           <div className="proto-product-placeholder">{product.brand || "Jenix"}</div>
         )}
+        {outOfStock ? (
+          <span className="proto-product-flag proto-flag-red">Out of Stock</span>
+        ) : null}
       </div>
       <div className="proto-product-copy">
         <p>{product.brand || "Jenix India"}</p>
@@ -73,9 +77,9 @@ function ProductCard({ product, busy, onAddToCart }) {
             event.preventDefault();
             onAddToCart(product);
           }}
-          disabled={busy}
+          disabled={busy || outOfStock}
         >
-          {busy ? "Adding..." : "Add to Cart"}
+          {outOfStock ? "Out of Stock" : busy ? "Adding..." : "Add to Cart"}
         </StorefrontButton>
       </div>
     </Link>

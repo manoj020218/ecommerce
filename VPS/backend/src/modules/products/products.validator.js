@@ -188,7 +188,13 @@ const updateProductSchema = z.object({
   productLabel: z.string().trim().max(80).optional(),
   isActive: z.boolean().optional(),
   priceIncludesGst: z.boolean().optional(),
-  shippingIncluded: z.boolean().optional()
+  shippingIncluded: z.boolean().optional(),
+  stockQty: qtySchema.optional(),
+  reservedQty: qtySchema.optional(),
+  stockStatus: z.enum(["in_stock", "low_stock", "out_of_stock", "backorder"]).optional(),
+  allowBackorder: z.boolean().optional(),
+  maxOrderQty: z.coerce.number().int().min(1).max(100000).optional(),
+  lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional()
 });
 
 const updateProductRelationsSchema = relationMapSchema.refine(

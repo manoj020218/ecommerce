@@ -648,6 +648,21 @@ async function updateProduct(productId, patch, actor) {
     updatedAt: new Date().toISOString()
   };
 
+  // Same rule as bulkPatchProducts: if a stock-relevant field changed but the
+  // caller didn't also explicitly set stockStatus, re-derive it — otherwise
+  // the admin's single-product edit form can zero out stockQty while leaving
+  // a stale "in_stock" status, and the storefront (which only reads
+  // stockStatus) keeps selling an item with zero available quantity.
+  const stockRelevantFieldsChanged =
+    patch.stockQty !== undefined ||
+    patch.reservedQty !== undefined ||
+    patch.allowBackorder !== undefined ||
+    patch.lowStockThreshold !== undefined;
+
+  if (stockRelevantFieldsChanged && patch.stockStatus === undefined) {
+    next.stockStatus = resolveStockStatus(next);
+  }
+
   store.products[index] = next;
   await writeCatalogStore(store);
 

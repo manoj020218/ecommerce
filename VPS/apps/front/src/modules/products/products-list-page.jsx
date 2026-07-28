@@ -66,11 +66,19 @@ function ProductCard({ product, busy, onAddToCart }) {
       <div className="proto-product-copy">
         <p>{product.brand || "Jenix India"}</p>
         <h3>{product.title}</h3>
-        <div className="proto-price-row">
-          <strong>{currency(price)}</strong>
-          {comparePrice && comparePrice > price ? <span>{currency(comparePrice)}</span> : null}
-        </div>
-        <small>+{Number(product.gstRate || 18)}% GST</small>
+        {outOfStock ? (
+          <p className="proto-tax-line" style={{ color: "#b91c1c", fontWeight: 600 }}>
+            Currently out of stock
+          </p>
+        ) : (
+          <>
+            <div className="proto-price-row">
+              <strong>{currency(price)}</strong>
+              {comparePrice && comparePrice > price ? <span>{currency(comparePrice)}</span> : null}
+            </div>
+            <small>+{Number(product.gstRate || 18)}% GST</small>
+          </>
+        )}
         <StorefrontButton
           type="button"
           onClick={(event) => {

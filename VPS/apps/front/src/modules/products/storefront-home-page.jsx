@@ -148,11 +148,19 @@ function ProductRailCard({ product, categories, busy, onAddToCart }) {
       <div className="proto-product-copy">
         {metaLine ? <p>{metaLine}</p> : null}
         <h3>{product.title}</h3>
-        <div className="proto-price-row">
-          <strong>{currency(price)}</strong>
-          {comparePrice && comparePrice > price ? <span>{currency(comparePrice)}</span> : null}
-        </div>
-        <small>+{Number(product.gstRate || 18)}% GST</small>
+        {outOfStock ? (
+          <p className="proto-tax-line" style={{ color: "#b91c1c", fontWeight: 600 }}>
+            Currently out of stock
+          </p>
+        ) : (
+          <>
+            <div className="proto-price-row">
+              <strong>{currency(price)}</strong>
+              {comparePrice && comparePrice > price ? <span>{currency(comparePrice)}</span> : null}
+            </div>
+            <small>+{Number(product.gstRate || 18)}% GST</small>
+          </>
+        )}
         <StorefrontButton
           type="button"
           onClick={(event) => {
@@ -189,8 +197,14 @@ function NewArrivalCard({ product, busy, onAddToCart }) {
         <h3>{product.title}</h3>
         <div className="proto-arrival-footer">
           <div>
-            <strong>{currency(price)}</strong>
-            <small>+{Number(product.gstRate || 18)}% GST</small>
+            {outOfStock ? (
+              <span style={{ color: "#b91c1c", fontWeight: 600, fontSize: 12 }}>Out of stock</span>
+            ) : (
+              <>
+                <strong>{currency(price)}</strong>
+                <small>+{Number(product.gstRate || 18)}% GST</small>
+              </>
+            )}
           </div>
           <button
             type="button"

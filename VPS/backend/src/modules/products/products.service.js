@@ -189,6 +189,12 @@ function filterProducts(products, filters) {
     );
   }
 
+  if (filters.availability === "in_stock") {
+    rows = rows.filter(
+      (product) => calculateAvailableQty(product) > 0 || Boolean(product.allowBackorder)
+    );
+  }
+
   if (filters.q) {
     const query = filters.q.toLowerCase();
     rows = rows.filter((product) => buildProductSearchText(product).includes(query));

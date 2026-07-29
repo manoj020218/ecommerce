@@ -68,7 +68,8 @@ const listPublicProductsQuerySchema = z.object({
   categoryId: z.string().trim().optional(),
   q: z.string().trim().max(120).optional().default(""),
   limit: z.coerce.number().int().min(1).max(100).optional(),
-  offset: z.coerce.number().int().min(0).optional().default(0)
+  offset: z.coerce.number().int().min(0).optional().default(0),
+  availability: z.enum(["in_stock"]).optional()
 });
 
 const publicProductRecommendationsQuerySchema = z.object({

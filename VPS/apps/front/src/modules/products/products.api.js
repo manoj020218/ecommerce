@@ -21,6 +21,7 @@ export function listProducts(params = {}) {
   if (params.categoryId) query.set("categoryId", params.categoryId);
   if (params.limit != null) query.set("limit", String(params.limit));
   if (params.offset != null) query.set("offset", String(params.offset));
+  if (params.availability) query.set("availability", params.availability);
   const suffix = query.size ? `?${query.toString()}` : "";
   return apiFetch(`/products${suffix}`, { auth: true });
 }

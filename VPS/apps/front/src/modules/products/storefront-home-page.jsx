@@ -391,6 +391,7 @@ export function StorefrontHomePage() {
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);           // first 8 — bestsellers rail
   const [latestProducts, setLatestProducts] = useState([]); // next 8 — new arrivals rail
+  const [categoryRails, setCategoryRails] = useState([]); // one scroller per category, in-stock only
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newArrivalsLoading, setNewArrivalsLoading] = useState(true);
@@ -407,25 +408,26 @@ export function StorefrontHomePage() {
         setNewArrivalsLoading(true);
         setError("");
 
-        // Phase 1: categories + first 8 products + blogs in parallel
+        // Phase 1: categories + first 8 in-stock products + blogs in parallel
         const [categoryRows, firstBatch, blogRows] = await Promise.all([
           listCategories(),
-          listProducts({ limit: 8, offset: 0 }),
+          listProducts({ limit: 8, offset: 0, availability: "in_stock" }),
           listBlogs({ limit: 6 })
         ]);
 
         if (!active) return;
 
-        setCategories(Array.isArray(categoryRows) ? categoryRows : []);
+        const categoryList = Array.isArray(categoryRows) ? categoryRows : [];
+        setCategories(categoryList);
         setBlogs(Array.isArray(blogRows) ? blogRows : []);
 
         const firstItems = firstBatch?.items ?? (Array.isArray(firstBatch) ? firstBatch : []);
         setProducts(firstItems);
         setLoading(false);
 
-        // Phase 2: next 8 products for New Arrivals (loads after hero is already visible)
+        // Phase 2: next 8 in-stock products for New Arrivals (loads after hero is already visible)
         if (firstBatch?.hasMore) {
-          const secondBatch = await listProducts({ limit: 8, offset: 8 });
+          const secondBatch = await listProducts({ limit: 8, offset: 8, availability: "in_stock" });
           if (!active) return;
           const secondItems = secondBatch?.items ?? [];
           setLatestProducts(secondItems.length > 0 ? secondItems : firstItems.slice(0, 8));
@@ -433,6 +435,19 @@ export function StorefrontHomePage() {
           setLatestProducts(firstItems.slice(0, 8));
         }
         setNewArrivalsLoading(false);
+
+        // Phase 3: one in-stock rail per category, loaded last so it never blocks first paint
+        if (categoryList.length > 0) {
+          const railResults = await Promise.all(
+            categoryList.map((category) =>
+              listProducts({ categoryId: category.id, limit: 10, availability: "in_stock" })
+                .then((res) => ({ category, items: res?.items ?? [] }))
+                .catch(() => ({ category, items: [] }))
+            )
+          );
+          if (!active) return;
+          setCategoryRails(railResults.filter((rail) => rail.items.length > 0));
+        }
       } catch (requestError) {
         if (active) {
           setError(requestError.message || "Failed to load the storefront.");
@@ -763,6 +778,29 @@ export function StorefrontHomePage() {
           {newArrivalsLoading ? <ProductSkeletonGrid count={8} /> : null}
         </div>
       </section>
+
+      {categoryRails.map((rail, index) => (
+        <section
+          key={rail.category.id}
+          className={`proto-section${index % 2 === 0 ? " proto-section-surface" : ""}`}
+        >
+          <StorefrontSectionHeader
+            title={rail.category.name}
+            action={<Link to={`/categories/${rail.category.slug}`}>View all →</Link>}
+          />
+          <div className="proto-product-scroller">
+            {rail.items.map((product) => (
+              <ProductRailCard
+                key={product.id}
+                product={product}
+                categories={categories}
+                busy={busyProductId === product.id}
+                onAddToCart={addProductToCart}
+              />
+            ))}
+          </div>
+        </section>
+      ))}
 
       <section className="proto-section proto-section-surface">
         <StorefrontSectionHeader

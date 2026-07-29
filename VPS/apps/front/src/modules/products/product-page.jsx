@@ -132,16 +132,13 @@ function RecentlyViewedCarousel({ currentProductId, onAddToCart, busyProductId }
 
   if (items.length === 0) return null;
 
-  const displayItems = items.length > 4 ? [...items, ...items] : items;
-
   return (
     <section className="proto-section">
       <StorefrontSectionHeader title="Recently Viewed" />
       <div className="proto-auto-carousel-shell">
-        <div className={`proto-auto-carousel-track${items.length > 4 ? "" : " no-scroll"}`}
-          style={items.length <= 4 ? { animation: "none" } : {}}>
-          {displayItems.map((item, idx) => (
-            <Link key={`${item.id}-${idx}`} to={`/products/${item.slug}`} className="proto-recent-card">
+        <div className="proto-auto-carousel-track">
+          {items.map((item) => (
+            <Link key={item.id} to={`/products/${item.slug}`} className="proto-recent-card">
               <div className="proto-recent-card-media">
                 {item.imageUrl ? (
                   <img src={item.imageUrl} alt={item.title} loading="lazy" />
@@ -186,15 +183,13 @@ function ProductCarousel({ title, items }) {
     return null;
   }
 
-  const displayItems = items.length > 4 ? [...items, ...items] : items;
-
   return (
     <section className="proto-section">
       <StorefrontSectionHeader title={title} />
       <div className="proto-auto-carousel-shell">
-        <div className="proto-auto-carousel-track" style={items.length <= 4 ? { animation: "none" } : {}}>
-          {displayItems.map((product, idx) => (
-            <ProductMiniCard key={`${title}-${product.id}-${idx}`} product={product} />
+        <div className="proto-auto-carousel-track">
+          {items.map((product) => (
+            <ProductMiniCard key={product.id} product={product} />
           ))}
         </div>
       </div>

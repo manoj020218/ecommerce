@@ -5961,23 +5961,20 @@ textarea {
 .proto-wa-save-row > :first-child { flex: 7; }
 .proto-wa-save-row > :last-child { flex: 3; }
 
-/* ── Auto-Scroll Carousel (Recent Viewed / Linked Products) ─ */
-@keyframes carousel-scroll-left {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
+/* ── Swipeable Carousel (Recent Viewed / Linked Products) ─── */
 .proto-auto-carousel-shell {
-  overflow: hidden;
   width: 100%;
 }
 .proto-auto-carousel-track {
   display: flex;
   gap: 12px;
-  animation: carousel-scroll-left 30s linear infinite;
-  will-change: transform;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-.proto-auto-carousel-track:hover {
-  animation-play-state: paused;
+.proto-auto-carousel-track::-webkit-scrollbar {
+  display: none;
 }
 .proto-recent-card {
   flex-shrink: 0;

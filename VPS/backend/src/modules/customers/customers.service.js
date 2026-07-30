@@ -1,4 +1,5 @@
 const { HttpError } = require("../../common/http-error");
+const { generateId } = require("../../common/identity");
 const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const {
@@ -33,6 +34,64 @@ function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeMobile(value) {
+  return String(value || "").trim();
+}
+
+// Matches (or, if nothing matches, creates) a lightweight customer record for a
+// guest checkout by email/mobile — the same identity-resolution pattern
+// walkin-orders.service.js already uses for POS orders, applied to the
+// storefront so a guest's orders link to a real customer record instead of
+// leaving order.userId null forever (which made them uncountable and, if they'd
+// never registered, invisible on the Customers page).
+function findOrCreateCustomerByIdentity(authStore, { name, email, mobile }) {
+  const normalizedEmail = normalizeText(email);
+  const normalizedMobile = normalizeMobile(mobile);
+
+  if (!normalizedEmail && !normalizedMobile) {
+    return null;
+  }
+
+  const existing = ensureArray(authStore.users).find((user) => {
+    const emailMatches = normalizedEmail && normalizeText(user.email) === normalizedEmail;
+    const mobileMatches = normalizedMobile && normalizeMobile(user.mobile) === normalizedMobile;
+    return emailMatches || mobileMatches;
+  });
+  if (existing) {
+    ensureCustomerAccountShape(existing);
+    return existing;
+  }
+
+  const now = nowIso();
+  const customer = {
+    id: generateId("user"),
+    name: name || "Guest Customer",
+    email: normalizedEmail,
+    mobile: normalizedMobile,
+    verifiedEmail: false,
+    verifiedMobile: false,
+    passwordHash: null,
+    authProviders: [],
+    companyName: "",
+    customerType: "retail",
+    priceGroup: "",
+    isB2BApproved: false,
+    creditAllowed: false,
+    bankTransferOnly: false,
+    pickupAllowed: true,
+    orderMode: ORDER_MODES.ONLINE,
+    gstin: "",
+    savedAddresses: [],
+    savedProductIds: [],
+    createdAt: now,
+    updatedAt: now,
+    lastLoginAt: null
+  };
+  ensureCustomerAccountShape(customer);
+  authStore.users.push(customer);
+  return customer;
+}
+
 function ensureCustomersStoreShape(store) {
   if (!Array.isArray(store.users)) {
     store.users = [];
@@ -65,20 +124,41 @@ function findOrderOrThrow(authStore, orderId) {
   return order;
 }
 
-function buildCustomerStats(authStore, customerId) {
+// Guest checkouts created before customer-linking existed (or any edge case where
+// linking failed) have order.userId === null — fall back to matching the order's
+// billing email/mobile against this customer's own so those orders still count
+// instead of silently showing 0.
+function orderBelongsToCustomer(order, customer) {
+  if (order.userId === customer.id) {
+    return true;
+  }
+  if (order.userId) {
+    return false;
+  }
+  const customerEmail = normalizeText(customer.email);
+  const customerMobile = String(customer.mobile || "").trim();
+  const orderEmail = normalizeText(order.billingAddress?.email || order.shippingAddress?.email);
+  const orderMobile = String(order.billingAddress?.mobile || order.shippingAddress?.mobile || "").trim();
+  return (
+    (Boolean(customerEmail) && customerEmail === orderEmail) ||
+    (Boolean(customerMobile) && customerMobile === orderMobile)
+  );
+}
+
+function buildCustomerStats(authStore, customer) {
   const orders = ensureArray(authStore.orders)
-    .filter((order) => order.userId === customerId)
-    .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+    .filter((order) => orderBelongsToCustomer(order, customer))
+    .sort((a, b) => Date.parse(b.orderDate || b.createdAt || "") - Date.parse(a.orderDate || a.createdAt || ""));
 
   return {
     orderCount: orders.length,
-    lastOrderAt: orders[0]?.createdAt || null
+    lastOrderAt: orders[0]?.orderDate || orders[0]?.createdAt || null
   };
 }
 
 function sanitizeAdminCustomer(customer, authStore) {
   const b2b = buildCustomerPricingContext(customer) || {};
-  const stats = buildCustomerStats(authStore, customer.id);
+  const stats = buildCustomerStats(authStore, customer);
 
   return {
     id: customer.id,
@@ -132,7 +212,7 @@ function sanitizeB2BOrder(order, customer) {
       0
     ),
     isB2BOrderRequest: Boolean(order.isB2BOrderRequest),
-    createdAt: order.createdAt || null,
+    createdAt: order.orderDate || order.createdAt || null,
     orderRequestReceivedAt: order.orderRequestReceivedAt || null,
     approvedAt: order.approvedAt || null,
     approvedBy: order.approvedBy || null,
@@ -175,10 +255,13 @@ async function listCustomers(filters) {
     );
   }
 
-  return rows
+  const total = rows.length;
+  const items = rows
     .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
     .slice(0, Number(filters.limit || 100))
     .map((customer) => sanitizeAdminCustomer(customer, authStore));
+
+  return { items, total };
 }
 
 async function updateCustomer(customerId, patch, actor) {
@@ -498,8 +581,8 @@ async function listCustomerOrders(customerId) {
   const customer = findCustomerOrThrow(authStore, customerId);
 
   const orders = ensureArray(authStore.orders)
-    .filter((order) => order.userId === customerId)
-    .sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""))
+    .filter((order) => orderBelongsToCustomer(order, customer))
+    .sort((a, b) => Date.parse(b.orderDate || b.createdAt || "") - Date.parse(a.orderDate || a.createdAt || ""))
     .map((order) => sanitizeB2BOrder(order, customer));
 
   return {
@@ -515,5 +598,6 @@ module.exports = {
   listCustomerOrders,
   listOrderRequests,
   approveOrderRequest,
-  updateB2BOrderStatus
+  updateB2BOrderStatus,
+  findOrCreateCustomerByIdentity
 };

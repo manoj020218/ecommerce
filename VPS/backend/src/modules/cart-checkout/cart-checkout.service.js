@@ -17,6 +17,9 @@ const {
   ORDER_MODES
 } = require("../customers/customers.model");
 const {
+  findOrCreateCustomerByIdentity
+} = require("../customers/customers.service");
+const {
   calculateAvailableQty,
   resolveProductUnitPrice
 } = require("../products/products.model");
@@ -872,6 +875,23 @@ function createOrderFromSession(authStore, session, options = {}) {
     session.shippingAddress || {},
     customerSnapshot
   );
+
+  // Guest checkouts never had a customer record before, which made them invisible
+  // on the admin Customers page if the guest never registered. Ensure a customer
+  // record exists (matched or created by email/mobile) purely so admin reporting
+  // can see and count them — deliberately NOT wired into order.userId, which
+  // gates customer-facing order access (linkGuestOrderToCustomer in
+  // customer-account.service.js requires the customer to prove ownership with a
+  // *verified* email/mobile before they can see a guest order; auto-assigning
+  // userId here from unverified checkout-form input would silently bypass that
+  // and could also collide with a genuine customer's own claim attempt).
+  if (session.ownerType !== CART_OWNER_TYPES.CUSTOMER) {
+    findOrCreateCustomerByIdentity(authStore, {
+      name: billingAddress.name || shippingAddress.name || "",
+      email: billingAddress.email || shippingAddress.email || "",
+      mobile: billingAddress.mobile || shippingAddress.mobile || ""
+    });
+  }
 
   return {
     id: generateId("order"),

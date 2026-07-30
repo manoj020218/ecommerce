@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
@@ -124,6 +125,7 @@ function buildEditForm(customer) {
 }
 
 export function CustomersPage() {
+  const navigate = useNavigate();
   const { session } = useAuthSession();
   const canView = hasPermission(session, "customers.view");
   const canEdit = hasPermission(session, "customers.edit");
@@ -134,6 +136,7 @@ export function CustomersPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [customers, setCustomers] = useState([]);
+  const [customerTotal, setCustomerTotal] = useState(0);
   const [orderRequests, setOrderRequests] = useState([]);
   const [filters, setFilters] = useState({ q: "", customerType: "", approvalStatus: "" });
   const [busyKey, setBusyKey] = useState("");
@@ -160,7 +163,9 @@ export function CustomersPage() {
       fetchCustomers({ ...nextFilters, limit: 150 }),
       fetchB2BOrderRequests({ limit: 50 })
     ]);
-    setCustomers(Array.isArray(customersData) ? customersData : []);
+    const customerItems = Array.isArray(customersData) ? customersData : customersData?.items || [];
+    setCustomers(customerItems);
+    setCustomerTotal(Number(customersData?.total ?? customerItems.length));
     setOrderRequests(Array.isArray(orderRequestsData) ? orderRequestsData : []);
   };
 
@@ -345,7 +350,7 @@ export function CustomersPage() {
       {/* ── stat cards ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
         {[
-          { label: "Total Customers",    value: customers.length,                              bg: "#dbeafe", icon: "👥" },
+          { label: "Total Customers",    value: customerTotal,                                 bg: "#dbeafe", icon: "👥" },
           { label: "B2B Approved",       value: customers.filter((c) => c.isB2BApproved).length, bg: "#dcfce7", icon: "✅" },
           { label: "Pending B2B",        value: orderRequests.length,                           bg: "#fef3c7", icon: "📋" },
         ].map(({ label, value, bg, icon }) => (
@@ -834,7 +839,12 @@ export function CustomersPage() {
                   </thead>
                   <tbody>
                     {ordersData.orders.map((order) => (
-                      <tr key={order.id}>
+                      <tr
+                        key={order.id}
+                        onClick={() => navigate(`/orders/${order.id}`)}
+                        style={{ cursor: "pointer" }}
+                        title="View order details"
+                      >
                         <td><strong>{order.orderNo}</strong></td>
                         <td>{formatDateTime(order.createdAt)}</td>
                         <td><StatusBadge value={order.orderStatus} /></td>

@@ -2283,6 +2283,46 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
     };
   }
 
+  const gatewayTxnId = normalizedPayload.gatewayTxnId || payload.gatewayTxnId || "";
+  const result = await finalizeSuccessfulPaymentAttempt(
+    authStore,
+    catalogStore,
+    paymentStore,
+    attempt,
+    session,
+    reservation,
+    gatewayTxnId,
+    changed
+  );
+
+  await addActivityLog({
+    action: result.order ? "payments.webhook.success" : "payments.webhook.duplicate",
+    actorId: session.ownerId,
+    actorRole: session.ownerType,
+    resourceType: "order",
+    resourceId: result.order?.id || result.orderId || attempt.id
+  });
+
+  return result;
+}
+
+// Shared by processPaymentWebhook (server-to-server gateway webhook) and
+// confirmRazorpayCheckout (browser-triggered confirm right after checkout.js
+// reports success) — both paths land here once the caller has independently
+// verified the payment is genuinely authorized, so order-creation only lives
+// in one place instead of drifting between two copies.
+async function finalizeSuccessfulPaymentAttempt(
+  authStore,
+  catalogStore,
+  paymentStore,
+  attempt,
+  session,
+  reservation,
+  gatewayTxnId,
+  changedInput
+) {
+  let changed = changedInput;
+
   if (attempt.status === PAYMENT_ATTEMPT_STATUSES.SUCCESS) {
     const existingOrder = session.orderId ? findOrderById(authStore, session.orderId) : null;
 
@@ -2300,7 +2340,7 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
         ? await ensureInvoiceForOrder(
             existingOrder.id,
             { id: "system", role: "system" },
-            { source: "payment_webhook_duplicate" }
+            { source: "payment_confirm_duplicate" }
           )
         : null;
 
@@ -2343,7 +2383,7 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
   }
 
   attempt.status = PAYMENT_ATTEMPT_STATUSES.SUCCESS;
-  attempt.gatewayTxnId = normalizedPayload.gatewayTxnId || payload.gatewayTxnId || "";
+  attempt.gatewayTxnId = gatewayTxnId || "";
   attempt.updatedAt = nowIso();
   session.status = CHECKOUT_STATUSES.PAID;
   session.updatedAt = nowIso();
@@ -2393,17 +2433,9 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
   const invoiceResult = await ensureInvoiceForOrder(
     order.id,
     { id: "system", role: "system" },
-    { source: "payment_webhook_success" }
+    { source: "payment_confirm_success" }
   );
   await notifyOrderPlaced(order, invoiceResult.invoice);
-
-  await addActivityLog({
-    action: "payments.webhook.success",
-    actorId: session.ownerId,
-    actorRole: session.ownerType,
-    resourceType: "order",
-    resourceId: order.id
-  });
 
   return {
     handled: true,
@@ -2417,6 +2449,70 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
     invoice: invoiceResult.invoice,
     reservationStatus: activeReservation.status
   };
+}
+
+async function confirmRazorpayCheckout(payload) {
+  const attemptId = String(payload.attemptId || "").trim();
+  const razorpayOrderId = String(payload.razorpay_order_id || "").trim();
+  const razorpayPaymentId = String(payload.razorpay_payment_id || "").trim();
+  const razorpaySignature = String(payload.razorpay_signature || "").trim();
+
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  const attempt = authStore.paymentAttempts.find((row) => row.id === attemptId);
+  if (!attempt || attempt.gateway !== "razorpay") {
+    throw new HttpError(404, "Payment attempt not found.");
+  }
+  if (attempt.gatewayOrderId !== razorpayOrderId) {
+    throw new HttpError(409, "Razorpay order does not match this payment attempt.");
+  }
+
+  const gatewayProvider = createPaymentGateway("razorpay");
+  const verification = await gatewayProvider.verifyPayment({
+    razorpay_order_id: razorpayOrderId,
+    razorpay_payment_id: razorpayPaymentId,
+    razorpay_signature: razorpaySignature
+  });
+  if (!verification.verified) {
+    throw new HttpError(400, "Invalid Razorpay payment signature.");
+  }
+
+  const session = authStore.checkoutSessions.find((row) => row.id === attempt.checkoutSessionId);
+  if (!session) {
+    throw new HttpError(404, "Checkout session not found for payment attempt.");
+  }
+
+  const changed = cleanupExpiredReservations(authStore, catalogStore);
+  const reservation = session.reservationId
+    ? authStore.stockReservations.find((row) => row.id === session.reservationId)
+    : null;
+
+  const result = await finalizeSuccessfulPaymentAttempt(
+    authStore,
+    catalogStore,
+    paymentStore,
+    attempt,
+    session,
+    reservation,
+    razorpayPaymentId,
+    changed
+  );
+
+  await addActivityLog({
+    action: result.order ? "payments.client_confirm.success" : "payments.client_confirm.duplicate",
+    actorId: session.ownerId,
+    actorRole: session.ownerType,
+    resourceType: "order",
+    resourceId: result.order?.id || result.orderId || attempt.id
+  });
+
+  return result;
 }
 
 async function processMockPaymentWebhook(payload) {
@@ -2484,6 +2580,7 @@ module.exports = {
   getCheckoutFollowup,
   downloadCheckoutInvoice,
   createPaymentAttempt,
+  confirmRazorpayCheckout,
   processPaymentWebhook,
   processMockPaymentWebhook,
   getGuestCartLegacy,

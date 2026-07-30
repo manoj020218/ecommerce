@@ -32,6 +32,7 @@ function createPaymentsRouter() {
   const router = express.Router();
 
   router.post("/create-attempt", controller.paymentsCreateAttempt);
+  router.post("/razorpay-confirm", controller.paymentsConfirmRazorpay);
   router.post("/webhook/mock", controller.paymentsWebhookMock);
   router.post("/webhook/:gateway", controller.paymentsWebhookGateway);
 

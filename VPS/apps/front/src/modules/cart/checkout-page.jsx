@@ -13,11 +13,13 @@ import {
   StorefrontStickyActionBar
 } from "../../shared/storefront/storefront-ui";
 import {
+  confirmCashfreePayment,
   confirmRazorpayPayment,
   createPaymentAttempt,
   getCart,
   getCheckoutSession,
   getManualGatewayInfo,
+  listOnlineGateways,
   mergeGuestCart,
   startCheckout
 } from "../products/products.api";
@@ -27,6 +29,17 @@ function loadRazorpayScript() {
     if (window.Razorpay) { resolve(true); return; }
     const s = document.createElement("script");
     s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
+function loadCashfreeScript() {
+  return new Promise((resolve) => {
+    if (window.Cashfree) { resolve(true); return; }
+    const s = document.createElement("script");
+    s.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
     s.onload = () => resolve(true);
     s.onerror = () => resolve(false);
     document.body.appendChild(s);
@@ -175,6 +188,8 @@ export function CheckoutPage() {
   const [manualPaymentInstructions, setManualPaymentInstructions] = useState(null);
   const [gatewayInfo, setGatewayInfo] = useState(null);
   const [paymentAttempt, setPaymentAttempt] = useState(null);
+  const [onlineGateways, setOnlineGateways] = useState([]);
+  const [selectedOnlineGateway, setSelectedOnlineGateway] = useState("");
 
   const restoredCheckoutSessionId = searchParams.get("session") || "";
   const effectiveShippingForm = useMemo(
@@ -391,6 +406,25 @@ export function CheckoutPage() {
     };
   }, [paymentMethod]);
 
+  useEffect(() => {
+    let active = true;
+    listOnlineGateways()
+      .then((rows) => {
+        if (!active) return;
+        const gateways = Array.isArray(rows) ? rows : [];
+        setOnlineGateways(gateways);
+        setSelectedOnlineGateway((current) =>
+          gateways.some((g) => g.code === current) ? current : gateways[0]?.code || ""
+        );
+      })
+      .catch(() => {
+        // fall back to backend's default gateway selection if this fails
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   async function handleRefreshTotals() {
     setPreviewLoading(true);
     setError("");
@@ -418,7 +452,8 @@ export function CheckoutPage() {
     try {
       const attempt = await createPaymentAttempt({
         ...(context || {}),
-        checkoutSessionId
+        checkoutSessionId,
+        ...(selectedOnlineGateway ? { gateway: selectedOnlineGateway } : {})
       });
       watchdog.trackPaymentInitiated(cart?.id, attempt?.id);
       setPaymentAttempt(attempt);
@@ -512,8 +547,7 @@ export function CheckoutPage() {
         const attempt = await handleCreatePaymentLink(nextCheckoutSession.id);
         if (!attempt) return;
 
-        // Open Razorpay checkout modal if we have the gateway order ID
-        if (attempt.gatewayOrderId && attempt.gatewayProviderKey) {
+        if (attempt.gateway === "razorpay" && attempt.gatewayOrderId && attempt.gatewayProviderKey) {
           const loaded = await loadRazorpayScript();
           if (!loaded) {
             setError("Failed to load payment gateway. Please check your internet connection and try again.");
@@ -565,7 +599,45 @@ export function CheckoutPage() {
           return; // Navigation handled by the modal handler callback above
         }
 
-        // Fallback if no gateway order ID (e.g. unconfigured gateway)
+        if (attempt.gateway === "cashfree" && attempt.gatewayPaymentSessionId) {
+          const loaded = await loadCashfreeScript();
+          if (!loaded || !window.Cashfree) {
+            setError("Failed to load payment gateway. Please check your internet connection and try again.");
+            setSubmitting(false);
+            return;
+          }
+
+          try {
+            const cashfree = new window.Cashfree({
+              mode: attempt.gatewayMode === "live" ? "production" : "sandbox"
+            });
+            const result = await cashfree.checkout({
+              paymentSessionId: attempt.gatewayPaymentSessionId,
+              redirectTarget: "_modal"
+            });
+
+            if (!result?.paymentDetails) {
+              setError(
+                result?.error?.message || "Payment was not completed. You can try again."
+              );
+              setSubmitting(false);
+              return;
+            }
+
+            try {
+              await confirmCashfreePayment({ attemptId: attempt.attemptId });
+            } catch (_confirmErr) {
+              // Non-fatal: webhook (once configured) will also process it
+            }
+            openOrderSuccess(attempt);
+          } catch (cashfreeError) {
+            setError(cashfreeError.message || "Payment failed. Please try again.");
+            setSubmitting(false);
+          }
+          return;
+        }
+
+        // Fallback if no usable gateway session (e.g. unconfigured gateway)
         openOrderSuccess(attempt);
       } else {
         setNotice(
@@ -935,6 +1007,28 @@ export function CheckoutPage() {
                     </label>
                   ))}
                 </div>
+
+                {paymentMethod === "online" && onlineGateways.length > 1 ? (
+                  <div className="proto-option-stack proto-gateway-stack">
+                    <p className="proto-gateway-stack-label">Choose payment gateway</p>
+                    {onlineGateways.map((gateway) => (
+                      <label
+                        key={gateway.code}
+                        className={`proto-choice-card${selectedOnlineGateway === gateway.code ? " active" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name="onlineGateway"
+                          checked={selectedOnlineGateway === gateway.code}
+                          onChange={() => setSelectedOnlineGateway(gateway.code)}
+                        />
+                        <div>
+                          <strong>{gateway.label}</strong>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
 
                 {paymentMethod !== "online" ? (
                   <div className="proto-manual-payment-card">

@@ -14,7 +14,8 @@ const {
   parseCheckoutViewQuery,
   parseCreatePaymentAttemptPayload,
   parsePaymentWebhookPayload,
-  parseConfirmRazorpayPaymentPayload
+  parseConfirmRazorpayPaymentPayload,
+  parseConfirmCashfreePaymentPayload
 } = require("./cart-checkout.validator");
 
 function mapValidationError(error) {
@@ -139,6 +140,11 @@ const checkoutDownloadInvoice = asyncHandler(async (req, res) => {
   return ok(res, data, "Checkout invoice download prepared.");
 });
 
+const paymentsListOnlineGateways = asyncHandler(async (req, res) => {
+  const data = await service.listOnlineGateways();
+  return ok(res, data, "Online gateways fetched.");
+});
+
 const paymentsCreateAttempt = asyncHandler(async (req, res) => {
   const payload = parseCreatePaymentAttemptPayload(req.body);
   const data = await service.createPaymentAttempt(
@@ -151,6 +157,12 @@ const paymentsCreateAttempt = asyncHandler(async (req, res) => {
 const paymentsConfirmRazorpay = asyncHandler(async (req, res) => {
   const payload = parseConfirmRazorpayPaymentPayload(req.body);
   const data = await service.confirmRazorpayCheckout(payload);
+  return ok(res, data, "Payment confirmed.");
+});
+
+const paymentsConfirmCashfree = asyncHandler(async (req, res) => {
+  const payload = parseConfirmCashfreePaymentPayload(req.body);
+  const data = await service.confirmCashfreeCheckout(payload);
   return ok(res, data, "Payment confirmed.");
 });
 
@@ -184,8 +196,10 @@ module.exports = {
   checkoutGetSession,
   checkoutGetFollowup,
   checkoutDownloadInvoice,
+  paymentsListOnlineGateways,
   paymentsCreateAttempt,
   paymentsConfirmRazorpay,
+  paymentsConfirmCashfree,
   paymentsWebhookMock,
   paymentsWebhookGateway
 };

@@ -2997,6 +2997,18 @@ textarea {
   flex-wrap: wrap;
 }
 
+.proto-gateway-stack {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+.proto-gateway-stack-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin: 0 0 2px;
+}
+
 .proto-filter-chip,
 .proto-filter-reset,
 .proto-filter-option,

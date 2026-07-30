@@ -110,6 +110,10 @@ const confirmRazorpayPaymentSchema = z.object({
   razorpay_signature: z.string().trim().min(2).max(300)
 });
 
+const confirmCashfreePaymentSchema = z.object({
+  attemptId: z.string().trim().min(2).max(140)
+});
+
 const paymentWebhookSchema = z.object({
   attemptId: z.string().trim().min(2).max(140),
   status: z.enum(["success", "failed"]),
@@ -181,6 +185,11 @@ function parseConfirmRazorpayPaymentPayload(payload) {
   return confirmRazorpayPaymentSchema.parse(payload);
 }
 
+function parseConfirmCashfreePaymentPayload(payload) {
+  ensureObject(payload, "Confirm Cashfree payment");
+  return confirmCashfreePaymentSchema.parse(payload);
+}
+
 module.exports = {
   parseGetCartQuery,
   parseAddItemPayload,
@@ -193,5 +202,6 @@ module.exports = {
   parseCheckoutViewQuery,
   parseCreatePaymentAttemptPayload,
   parsePaymentWebhookPayload,
-  parseConfirmRazorpayPaymentPayload
+  parseConfirmRazorpayPaymentPayload,
+  parseConfirmCashfreePaymentPayload
 };

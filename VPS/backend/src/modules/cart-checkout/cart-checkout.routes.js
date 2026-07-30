@@ -31,8 +31,10 @@ function createCheckoutRouter() {
 function createPaymentsRouter() {
   const router = express.Router();
 
+  router.get("/online-gateways", controller.paymentsListOnlineGateways);
   router.post("/create-attempt", controller.paymentsCreateAttempt);
   router.post("/razorpay-confirm", controller.paymentsConfirmRazorpay);
+  router.post("/cashfree-confirm", controller.paymentsConfirmCashfree);
   router.post("/webhook/mock", controller.paymentsWebhookMock);
   router.post("/webhook/:gateway", controller.paymentsWebhookGateway);
 

@@ -99,9 +99,30 @@ class CashfreeGateway extends PaymentGatewayAdapter {
 
     if (!config.appId || !config.secretKey) return { verified: true };
 
-    const data = await this._cfRequest("GET", `/orders/${input.cf_order_id || input.order_id}`, null, config);
+    const orderId = input.cf_order_id || input.order_id;
+    const data = await this._cfRequest("GET", `/orders/${orderId}`, null, config);
     const verified = data.order_status === "PAID";
-    return { verified };
+
+    if (!verified) {
+      return { verified };
+    }
+
+    // order_status alone doesn't carry the actual payment id — fetch the
+    // order's payment list so the caller has a real gatewayTxnId to store
+    // against the order, same as Razorpay's razorpay_payment_id.
+    let cfPaymentId = "";
+    try {
+      const payments = await this._cfRequest("GET", `/orders/${orderId}/payments`, null, config);
+      const successfulPayment = (Array.isArray(payments) ? payments : []).find(
+        (p) => p.payment_status === "SUCCESS"
+      );
+      cfPaymentId = String(successfulPayment?.cf_payment_id || "");
+    } catch (_error) {
+      // Non-fatal — the order is already confirmed PAID above; a missing
+      // payment id here just means the stored gatewayTxnId will be blank.
+    }
+
+    return { verified, cfPaymentId };
   }
 
   async handleWebhook(payload, rawBody, signature) {

@@ -157,6 +157,10 @@ export function downloadCheckoutInvoice(checkoutSessionId, params = {}) {
   );
 }
 
+export function listOnlineGateways() {
+  return apiFetch("/payments/online-gateways");
+}
+
 export function createPaymentAttempt(payload) {
   return apiFetch("/payments/create-attempt", {
     method: "POST",
@@ -167,6 +171,13 @@ export function createPaymentAttempt(payload) {
 
 export function confirmRazorpayPayment(payload) {
   return apiFetch("/payments/razorpay-confirm", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function confirmCashfreePayment(payload) {
+  return apiFetch("/payments/cashfree-confirm", {
     method: "POST",
     body: payload
   });

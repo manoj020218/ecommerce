@@ -2002,6 +2002,19 @@ async function downloadCheckoutInvoice(context, checkoutSessionId, query) {
   return getInvoiceDownload(invoice.id);
 }
 
+async function listOnlineGateways() {
+  const paymentStore = await readPaymentStore();
+  ensurePaymentStoreShape(paymentStore);
+
+  return ensureArray(paymentStore.gateways)
+    .filter((gateway) => gateway.gatewayType === "online" && gateway.isEnabled !== false)
+    .sort((a, b) => Number(a.priority || 100) - Number(b.priority || 100))
+    .map((gateway) => ({
+      code: gateway.code,
+      label: gateway.label || gateway.code
+    }));
+}
+
 async function createPaymentAttempt(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
@@ -2133,6 +2146,7 @@ async function createPaymentAttempt(context, payload) {
     gatewayOrderId: attempt.gatewayOrderId || "",
     gatewayPaymentLink: attempt.gatewayPaymentLink || "",
     gatewayProviderKey: providerOrder.keyId || "",
+    gatewayPaymentSessionId: providerOrder.paymentSessionId || "",
     gatewayMode: providerOrder.mode || "",
     reservation: sanitizeReservation(reservation)
   };
@@ -2515,6 +2529,65 @@ async function confirmRazorpayCheckout(payload) {
   return result;
 }
 
+async function confirmCashfreeCheckout(payload) {
+  const attemptId = String(payload.attemptId || "").trim();
+
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  const attempt = authStore.paymentAttempts.find((row) => row.id === attemptId);
+  if (!attempt || attempt.gateway !== "cashfree") {
+    throw new HttpError(404, "Payment attempt not found.");
+  }
+
+  // Cashfree's client SDK has no signature to check on return — the only
+  // trustworthy confirmation is re-querying the order status directly from
+  // Cashfree's own API (unlike Razorpay's HMAC-signed checkout.js callback).
+  const gatewayProvider = createPaymentGateway("cashfree");
+  const verification = await gatewayProvider.verifyPayment({
+    order_id: attempt.gatewayOrderId
+  });
+  if (!verification.verified) {
+    throw new HttpError(409, "Cashfree payment is not yet confirmed as paid.");
+  }
+
+  const session = authStore.checkoutSessions.find((row) => row.id === attempt.checkoutSessionId);
+  if (!session) {
+    throw new HttpError(404, "Checkout session not found for payment attempt.");
+  }
+
+  const changed = cleanupExpiredReservations(authStore, catalogStore);
+  const reservation = session.reservationId
+    ? authStore.stockReservations.find((row) => row.id === session.reservationId)
+    : null;
+
+  const result = await finalizeSuccessfulPaymentAttempt(
+    authStore,
+    catalogStore,
+    paymentStore,
+    attempt,
+    session,
+    reservation,
+    verification.cfPaymentId || "",
+    changed
+  );
+
+  await addActivityLog({
+    action: result.order ? "payments.client_confirm.success" : "payments.client_confirm.duplicate",
+    actorId: session.ownerId,
+    actorRole: session.ownerType,
+    resourceType: "order",
+    resourceId: result.order?.id || result.orderId || attempt.id
+  });
+
+  return result;
+}
+
 async function processMockPaymentWebhook(payload) {
   return processPaymentWebhook("mock_online", payload);
 }
@@ -2579,8 +2652,10 @@ module.exports = {
   getCheckoutSession,
   getCheckoutFollowup,
   downloadCheckoutInvoice,
+  listOnlineGateways,
   createPaymentAttempt,
   confirmRazorpayCheckout,
+  confirmCashfreeCheckout,
   processPaymentWebhook,
   processMockPaymentWebhook,
   getGuestCartLegacy,

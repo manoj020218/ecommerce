@@ -35,10 +35,8 @@ import {
   fetchB2BOrderRequests,
   fetchCustomerOrders,
   fetchCustomers,
-  fetchManualPayments,
   updateB2BOrderStatus,
-  updateCustomer,
-  verifyManualPayment
+  updateCustomer
 } from "./customers.api";
 
 const BRAND = "#E8231A";
@@ -137,7 +135,6 @@ export function CustomersPage() {
   const [notice, setNotice] = useState("");
   const [customers, setCustomers] = useState([]);
   const [orderRequests, setOrderRequests] = useState([]);
-  const [manualPayments, setManualPayments] = useState([]);
   const [filters, setFilters] = useState({ q: "", customerType: "", approvalStatus: "" });
   const [busyKey, setBusyKey] = useState("");
 
@@ -159,14 +156,12 @@ export function CustomersPage() {
   const [ordersModalOpen, setOrdersModalOpen] = useState(false);
 
   const loadAll = async (nextFilters = filters) => {
-    const [customersData, orderRequestsData, manualPaymentsData] = await Promise.all([
+    const [customersData, orderRequestsData] = await Promise.all([
       fetchCustomers({ ...nextFilters, limit: 150 }),
-      fetchB2BOrderRequests({ limit: 50 }),
-      fetchManualPayments({ status: "pending_verification", limit: 50 })
+      fetchB2BOrderRequests({ limit: 50 })
     ]);
     setCustomers(Array.isArray(customersData) ? customersData : []);
     setOrderRequests(Array.isArray(orderRequestsData) ? orderRequestsData : []);
-    setManualPayments(Array.isArray(manualPaymentsData) ? manualPaymentsData : []);
   };
 
   const bootstrap = async () => {
@@ -321,38 +316,6 @@ export function CustomersPage() {
     }
   };
 
-  const onVerifyManualPayment = async (submissionId) => {
-    setBusyKey(`verify:${submissionId}`);
-    setError("");
-    setNotice("");
-    try {
-      await verifyManualPayment(submissionId, { action: "approve", verificationNote: "Payment matched with bank proof." });
-      await loadAll(filters);
-      setNotice("Manual payment verified.");
-    } catch (apiError) {
-      setError(apiError.message || "Failed to verify manual payment.");
-    } finally {
-      setBusyKey("");
-    }
-  };
-
-  const onRejectManualPayment = async (submissionId) => {
-    const rejectionReason = window.prompt("Enter rejection reason for this payment proof:", "proof_not_clear");
-    if (!rejectionReason) return;
-    setBusyKey(`reject:${submissionId}`);
-    setError("");
-    setNotice("");
-    try {
-      await verifyManualPayment(submissionId, { action: "reject", rejectionReason, verificationNote: rejectionReason });
-      await loadAll(filters);
-      setNotice("Manual payment rejected.");
-    } catch (apiError) {
-      setError(apiError.message || "Failed to reject manual payment.");
-    } finally {
-      setBusyKey("");
-    }
-  };
-
   if (!canView) {
     return <ErrorBlock message="You do not have permission to view customers." />;
   }
@@ -385,7 +348,6 @@ export function CustomersPage() {
           { label: "Total Customers",    value: customers.length,                              bg: "#dbeafe", icon: "👥" },
           { label: "B2B Approved",       value: customers.filter((c) => c.isB2BApproved).length, bg: "#dcfce7", icon: "✅" },
           { label: "Pending B2B",        value: orderRequests.length,                           bg: "#fef3c7", icon: "📋" },
-          { label: "Pending Payments",   value: manualPayments.length,                          bg: "#fce7f3", icon: "💳" },
         ].map(({ label, value, bg, icon }) => (
           <div key={label} style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: "14px 16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             <div style={{ width: 36, height: 36, background: bg, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, marginBottom: 10 }}>{icon}</div>
@@ -695,63 +657,6 @@ export function CustomersPage() {
         ) : (
           <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: "14px 16px", fontSize: 13, color: "#9ca3af", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
             No B2B order requests pending.
-          </div>
-        )}
-      </div>
-
-      {/* ── Manual Payments ── */}
-      <div style={{ marginTop: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: 0 }}>Pending Manual Payments</h3>
-            <p style={{ fontSize: 12, color: "#9ca3af", margin: "2px 0 0" }}>Verify bank transfer or UPI proofs so invoices can be generated.</p>
-          </div>
-          {manualPayments.length > 0 && (
-            <span style={{ fontSize: 12, background: "#fce7f3", color: "#9d174d", borderRadius: 20, padding: "3px 10px", fontWeight: 600 }}>
-              {manualPayments.length} pending
-            </span>
-          )}
-        </div>
-        {manualPayments.length > 0 ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {manualPayments.map((submission) => (
-              <div key={submission.id} style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
-                  <div>
-                    <p style={{ margin: 0, fontWeight: 700, color: "#111827", fontSize: 14 }}>{submission.order?.orderNo || submission.orderNo}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 12, color: "#9ca3af" }}>
-                      {submission.paymentMethod} · UTR {submission.utrNumber}
-                    </p>
-                  </div>
-                  <StatusBadge value={submission.status} />
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "4px 12px", marginBottom: 12, fontSize: 12 }}>
-                  <div style={{ color: "#9ca3af" }}>Total: <span style={{ color: BRAND, fontWeight: 700 }}>{formatCurrencyInr(submission.order?.grandTotal || 0)}</span></div>
-                  <div style={{ color: "#9ca3af" }}>Submitted: <span style={{ color: "#111827", fontWeight: 600 }}>{formatDateTime(submission.submittedAt)}</span></div>
-                  <div style={{ color: "#9ca3af" }}>Order Status: <span style={{ color: "#111827", fontWeight: 600 }}>{submission.order?.orderStatus || "--"}</span></div>
-                  <div style={{ color: "#9ca3af" }}>Proof: <span style={{ color: submission.screenshotUrl ? "#16a34a" : "#dc2626", fontWeight: 600 }}>{submission.screenshotUrl ? "Uploaded" : "Missing"}</span></div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {submission.screenshotUrl ? (
-                    <a className="btn btn-secondary" href={submission.screenshotUrl} target="_blank" rel="noreferrer">Open Proof</a>
-                  ) : null}
-                  {canManage ? (
-                    <button type="button" className="btn btn-primary" onClick={() => onVerifyManualPayment(submission.id)} disabled={busyKey === `verify:${submission.id}`}>
-                      {busyKey === `verify:${submission.id}` ? "Verifying..." : "Verify Payment"}
-                    </button>
-                  ) : null}
-                  {canManage ? (
-                    <button type="button" className="btn btn-secondary" onClick={() => onRejectManualPayment(submission.id)} disabled={busyKey === `reject:${submission.id}`}>
-                      {busyKey === `reject:${submission.id}` ? "Rejecting..." : "Reject"}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #f3f4f6", padding: "14px 16px", fontSize: 13, color: "#9ca3af", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-            No pending manual payment proofs.
           </div>
         )}
       </div>

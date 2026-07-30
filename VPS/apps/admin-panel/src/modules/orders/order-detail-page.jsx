@@ -15,8 +15,11 @@ import {
   fetchShippingCouriers,
   createShipment,
   updateShipmentTracking,
+  updateShipmentStatus,
   uploadShipmentPod,
-  sendTrackingEmail
+  sendTrackingEmail,
+  fetchManualPaymentsForOrder,
+  verifyManualPayment
 } from "./orders.api";
 import { fetchSettings } from "../settings/settings.api";
 
@@ -164,6 +167,10 @@ const CHIP_COLORS = {
   rejected: { bg: "rgba(220,38,38,0.08)", color: "#dc2626", border: "rgba(220,38,38,0.25)" },
   cancelled: { bg: "rgba(220,38,38,0.08)", color: "#dc2626", border: "rgba(220,38,38,0.25)" },
   order_placed: { bg: "rgba(14,165,233,0.08)", color: "#0369a1", border: "rgba(14,165,233,0.25)" },
+  not_processed: { bg: "rgba(234,179,8,0.1)", color: "#92400e", border: "rgba(234,179,8,0.35)" },
+  order_processed: { bg: "rgba(37,99,235,0.08)", color: "#1d4ed8", border: "rgba(37,99,235,0.25)" },
+  invoice_generated: { bg: "rgba(37,99,235,0.08)", color: "#1d4ed8", border: "rgba(37,99,235,0.25)" },
+  order_shipped: { bg: "rgba(147,51,234,0.08)", color: "#7e22ce", border: "rgba(147,51,234,0.25)" },
 };
 
 function StatusChip({ label, value }) {
@@ -187,19 +194,18 @@ function StatusChip({ label, value }) {
 
 const MANUAL_PAYMENT_METHODS_UI = new Set(["direct_bank_transfer", "manual_upi"]);
 
-function PaymentActionBanner({ order, onConfirmPayment, onConfirmOrder, paymentSaving, orderSaving }) {
+function PaymentActionBanner({ order, onConfirmPayment, paymentSaving }) {
   const isManual = MANUAL_PAYMENT_METHODS_UI.has(order.paymentMethod);
   const paymentVerified = order.manualPaymentStatus === "verified";
-  const orderConfirmed = ["processing", "fulfilled", "delivered", "cancelled"].includes(order.orderStatus);
 
-  if (!isManual || (paymentVerified && orderConfirmed)) return null;
+  if (!isManual || paymentVerified) return null;
 
   return (
     <div style={{
       background: "rgba(232,35,26,0.03)", border: "1.5px solid rgba(232,35,26,0.25)",
       borderRadius: 12, padding: "16px 20px", marginBottom: 14
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8231A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
@@ -210,79 +216,76 @@ function PaymentActionBanner({ order, onConfirmPayment, onConfirmOrder, paymentS
           ({humanize(order.paymentMethod)})
         </span>
       </div>
+      <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
+        Verify that the bank transfer / UPI payment has been received in your account before processing this order.
+      </p>
+      <button
+        type="button" className="btn btn-primary btn-small"
+        disabled={paymentSaving}
+        onClick={onConfirmPayment}
+        style={{ background: "#d97706" }}
+      >
+        {paymentSaving ? "Confirming…" : "Confirm Payment Received"}
+      </button>
+      <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--muted)" }}>
+        No payment proof was submitted in-app for this order — use this only if you've verified
+        the transfer another way (e.g. bank statement, WhatsApp screenshot).
+      </p>
+    </div>
+  );
+}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {/* Step 1 — Confirm Payment */}
-        <div style={{
-          background: paymentVerified ? "rgba(22,163,74,0.06)" : "#fff",
-          border: paymentVerified ? "1.5px solid rgba(22,163,74,0.4)" : "1.5px solid rgba(234,179,8,0.45)",
-          borderRadius: 10, padding: "14px 16px"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            {paymentVerified ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            )}
-            <span style={{ fontSize: 12, fontWeight: 700, color: paymentVerified ? "#16a34a" : "#d97706" }}>
-              Step 1 — Confirm Payment Received
-            </span>
-          </div>
-          <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
-            {paymentVerified
-              ? "Payment has been verified. Order total marked as paid."
-              : "Verify that the bank transfer / UPI payment has been received in your account."}
-          </p>
-          {!paymentVerified && (
-            <button
-              type="button" className="btn btn-primary btn-small"
-              disabled={paymentSaving}
-              onClick={onConfirmPayment}
-              style={{ background: "#d97706" }}
-            >
-              {paymentSaving ? "Confirming…" : "Confirm Payment Received"}
-            </button>
-          )}
-          {paymentVerified && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>Payment Verified</span>
-          )}
-        </div>
+// ── Manual payment proof review ───────────────────────────────────────────────
 
-        {/* Step 2 — Confirm Order */}
-        <div style={{
-          background: orderConfirmed ? "rgba(22,163,74,0.06)" : "#fff",
-          border: orderConfirmed ? "1.5px solid rgba(22,163,74,0.4)" : "1.5px solid rgba(37,99,235,0.3)",
-          borderRadius: 10, padding: "14px 16px",
-          opacity: (!paymentVerified && !orderConfirmed) ? 0.65 : 1
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-            {orderConfirmed ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            )}
-            <span style={{ fontSize: 12, fontWeight: 700, color: orderConfirmed ? "#16a34a" : "#2563eb" }}>
-              Step 2 — Confirm Order
-            </span>
+function ManualPaymentSection({ order, submissions, onVerify, onReject, busyKey }) {
+  const isManual = MANUAL_PAYMENT_METHODS_UI.has(order.paymentMethod);
+  if (!isManual || submissions.length === 0) return null;
+
+  return (
+    <div style={{
+      background: "rgba(232,35,26,0.03)", border: "1.5px solid rgba(232,35,26,0.25)",
+      borderRadius: 12, padding: "16px 20px", marginBottom: 14
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#E8231A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#E8231A" }}>Manual Payment Proof</span>
+        <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 4 }}>({humanize(order.paymentMethod)})</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {submissions.map((submission) => (
+          <div key={submission.id} style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>UTR / Ref: {submission.utrNumber || "—"}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>Submitted {formatDateTime(submission.submittedAt)}</div>
+              </div>
+              <StatusChip label="Proof Status" value={submission.status} />
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {submission.screenshotUrl ? (
+                <a className="btn btn-secondary btn-small" href={submission.screenshotUrl} target="_blank" rel="noreferrer">Open Proof</a>
+              ) : (
+                <span style={{ fontSize: 12, color: "var(--danger)" }}>No screenshot uploaded</span>
+              )}
+              {submission.status === "pending_verification" && (
+                <>
+                  <button type="button" className="btn btn-primary btn-small"
+                    disabled={busyKey === `verify:${submission.id}`}
+                    onClick={() => onVerify(submission.id)}>
+                    {busyKey === `verify:${submission.id}` ? "Verifying…" : "Verify Payment"}
+                  </button>
+                  <button type="button" className="btn btn-secondary btn-small"
+                    disabled={busyKey === `reject:${submission.id}`}
+                    onClick={() => onReject(submission.id)}>
+                    {busyKey === `reject:${submission.id}` ? "Rejecting…" : "Reject"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
-          <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
-            {orderConfirmed
-              ? "Order confirmed and moved to processing. Generate invoice and dispatch when ready."
-              : "Accept this order to begin processing. Invoice generation and courier assignment become available after this step."}
-          </p>
-          {!orderConfirmed && (
-            <button
-              type="button" className="btn btn-primary btn-small"
-              disabled={orderSaving}
-              onClick={onConfirmOrder}
-            >
-              {orderSaving ? "Confirming…" : "Confirm Order"}
-            </button>
-          )}
-          {orderConfirmed && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>Order Confirmed</span>
-          )}
-        </div>
+        ))}
       </div>
     </div>
   );
@@ -470,6 +473,123 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
   );
 }
 
+// ── Mark Delivered modal ──────────────────────────────────────────────────────
+
+function DeliveryConfirmModal({ onClose, onSave, saving, error }) {
+  const [confirmed, setConfirmed] = useState(false);
+  const [deliveredAt, setDeliveredAt] = useState(new Date().toISOString().slice(0, 10));
+
+  return (
+    <Modal title="Mark Order as Delivered" open onClose={onClose} width="440px" disableOutsideClick>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span style={{ fontSize: 13, color: "var(--text)" }}>
+            I confirm this order has been delivered to the customer.
+          </span>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Date of Delivery</span>
+          <input
+            type="date" value={deliveredAt}
+            onChange={(e) => setDeliveredAt(e.target.value)}
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+          />
+        </label>
+        {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button" className="btn btn-primary" style={{ background: "#16a34a" }}
+            disabled={saving || !confirmed}
+            onClick={() => onSave({ deliveredAt })}
+          >
+            {saving ? "Saving…" : "Mark as Delivered"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Edit Tracking modal (re-ship with a different courier, etc.) ─────────────
+
+function EditTrackingModal({ trackingDetails, couriers, onClose, onSave, saving, error }) {
+  const matchedCourier = couriers.find(
+    (c) => c.courierCode === trackingDetails.courierCode || c.courierName === trackingDetails.courierName
+  );
+  const [form, setForm] = useState({
+    courierProfileId: matchedCourier?.id || "",
+    trackingId: trackingDetails.trackingId || "",
+    dispatchDate: trackingDetails.dispatchDate || new Date().toISOString().slice(0, 10),
+    expectedDeliveryDate: trackingDetails.expectedDeliveryDate || ""
+  });
+
+  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+  const wasReturned = ["returned", "delivery_failed", "cancelled"].includes(trackingDetails.shipmentStatus);
+
+  return (
+    <Modal title="Edit Shipment Tracking" open onClose={onClose} width="480px" disableOutsideClick>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {wasReturned && (
+          <div style={{ background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: 8, padding: "10px 14px" }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#92400e" }}>
+              This shipment is currently marked <strong>{humanize(trackingDetails.shipmentStatus)}</strong>. Saving new
+              tracking details here will re-mark it as Shipped for the new courier attempt.
+            </p>
+          </div>
+        )}
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Courier Partner</span>
+          <select value={form.courierProfileId} onChange={(e) => set("courierProfileId", e.target.value)}
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, background: "var(--surface)" }}>
+            <option value="">Select courier...</option>
+            {couriers.map((c) => (
+              <option key={c.id} value={c.id}>{c.courierName}</option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Tracking Number / AWB</span>
+          <input value={form.trackingId} onChange={(e) => set("trackingId", e.target.value)}
+            placeholder="Enter tracking / AWB number"
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
+        </label>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Dispatch Date</span>
+            <input type="date" value={form.dispatchDate} onChange={(e) => set("dispatchDate", e.target.value)}
+              style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Expected Delivery</span>
+            <input type="date" value={form.expectedDeliveryDate} onChange={(e) => set("expectedDeliveryDate", e.target.value)}
+              style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
+          </label>
+        </div>
+
+        {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button" className="btn btn-primary" disabled={saving || !form.trackingId || !form.courierProfileId}
+            onClick={() => onSave(form)}
+          >
+            {saving ? "Saving…" : "Save Tracking Details"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Notes editor ─────────────────────────────────────────────────────────────
 
 function NotesEditor({ order, onSave, saving }) {
@@ -564,23 +684,9 @@ function TagsEditor({ tags, onSave, saving }) {
 
 // ── Invoice section ───────────────────────────────────────────────────────────
 
-function InvoiceSection({ orderId, invoice, onInvoiceGenerated }) {
-  const [generating, setGenerating] = useState(false);
+function InvoiceSection({ invoice }) {
   const [err, setErr] = useState("");
   const [downloading, setDownloading] = useState(false);
-
-  const generate = async () => {
-    setGenerating(true);
-    setErr("");
-    try {
-      const result = await generateInvoiceForOrder(orderId, { invoiceDate: new Date().toISOString().slice(0, 10) });
-      onInvoiceGenerated(result?.invoice || result);
-    } catch (e) {
-      setErr(e.message || "Failed to generate invoice.");
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   const download = async () => {
     if (!invoice?.id) return;
@@ -616,9 +722,6 @@ function InvoiceSection({ orderId, invoice, onInvoiceGenerated }) {
             <button type="button" className="btn btn-secondary btn-small" disabled={downloading} onClick={download}>
               {downloading ? "Preparing…" : "Download PDF"}
             </button>
-            <button type="button" className="btn btn-secondary btn-small" onClick={generate} disabled={generating}>
-              {generating ? "Regenerating…" : "Regenerate"}
-            </button>
           </div>
         </div>
         {err && <p style={{ color: "var(--danger)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
@@ -628,13 +731,9 @@ function InvoiceSection({ orderId, invoice, onInvoiceGenerated }) {
 
   return (
     <div style={{ background: "rgba(234,179,8,0.04)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: 8, padding: "12px 14px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>No invoice generated yet.</p>
-        <button type="button" className="btn btn-primary btn-small" disabled={generating} onClick={generate}>
-          {generating ? "Generating…" : "Generate Invoice"}
-        </button>
-      </div>
-      {err && <p style={{ color: "var(--danger)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
+      <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
+        No invoice generated yet — use the action button below to generate it.
+      </p>
     </div>
   );
 }
@@ -663,21 +762,36 @@ export function OrderDetailPage() {
   const [fulfillError, setFulfillError] = useState("");
   const [fulfillSaving, setFulfillSaving] = useState(false);
 
+  const [deliveryModal, setDeliveryModal] = useState(false);
+  const [deliveryError, setDeliveryError] = useState("");
+  const [deliverySaving, setDeliverySaving] = useState(false);
+
+  const [invoiceGenerating, setInvoiceGenerating] = useState(false);
+  const [invoiceError, setInvoiceError] = useState("");
+
+  const [editTrackingModal, setEditTrackingModal] = useState(false);
+  const [editTrackingError, setEditTrackingError] = useState("");
+  const [editTrackingSaving, setEditTrackingSaving] = useState(false);
+
   const [noteSaving, setNoteSaving] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [paymentConfirmSaving, setPaymentConfirmSaving] = useState(false);
-  const [orderConfirmSaving, setOrderConfirmSaving] = useState(false);
+
+  const [manualPayments, setManualPayments] = useState([]);
+  const [manualPaymentBusyKey, setManualPaymentBusyKey] = useState("");
 
   const reload = async () => {
     setError("");
     try {
-      const [ord, inv] = await Promise.allSettled([
+      const [ord, inv, mp] = await Promise.allSettled([
         fetchOrderDetail(orderId),
-        fetchInvoiceForOrder(orderId)
+        fetchInvoiceForOrder(orderId),
+        fetchManualPaymentsForOrder(orderId)
       ]);
       if (ord.status === "fulfilled") setOrder(ord.value);
       else setError(ord.reason?.message || "Failed to load order.");
       if (inv.status === "fulfilled" && inv.value?.invoiceNumber) setInvoice(inv.value);
+      if (mp.status === "fulfilled") setManualPayments(Array.isArray(mp.value) ? mp.value : []);
     } catch (e) {
       setError(e.message || "Failed to load.");
     }
@@ -747,15 +861,91 @@ export function OrderDetailPage() {
     }
   };
 
-  const handleConfirmOrder = async () => {
-    if (!window.confirm("Confirm and accept this order? It will move to Processing status, enabling invoice generation and dispatch.")) return;
-    setOrderConfirmSaving(true);
+  const handleVerifyManualPayment = async (submissionId) => {
+    setManualPaymentBusyKey(`verify:${submissionId}`);
+    setError("");
     try {
-      await handleUpdateOrder({ orderStatus: "processing" });
+      await verifyManualPayment(submissionId, { action: "approve", verificationNote: "Payment matched with bank proof." });
+      await reload();
     } catch (e) {
-      setError(e.message || "Failed to confirm order.");
+      setError(e.message || "Failed to verify manual payment.");
     } finally {
-      setOrderConfirmSaving(false);
+      setManualPaymentBusyKey("");
+    }
+  };
+
+  const handleRejectManualPayment = async (submissionId) => {
+    const rejectionReason = window.prompt("Enter rejection reason for this payment proof:", "proof_not_clear");
+    if (!rejectionReason) return;
+    setManualPaymentBusyKey(`reject:${submissionId}`);
+    setError("");
+    try {
+      await verifyManualPayment(submissionId, { action: "reject", rejectionReason, verificationNote: rejectionReason });
+      await reload();
+    } catch (e) {
+      setError(e.message || "Failed to reject manual payment.");
+    } finally {
+      setManualPaymentBusyKey("");
+    }
+  };
+
+  const handleGenerateInvoice = async () => {
+    setInvoiceGenerating(true);
+    setInvoiceError("");
+    try {
+      const result = await generateInvoiceForOrder(orderId, { invoiceDate: new Date().toISOString().slice(0, 10) });
+      setInvoice(result?.invoice || result);
+    } catch (e) {
+      setInvoiceError(e.message || "Failed to generate invoice.");
+    } finally {
+      setInvoiceGenerating(false);
+    }
+  };
+
+  const handleMarkDelivered = async ({ deliveredAt }) => {
+    const shipmentId = order?.trackingDetails?.shipmentId;
+    if (!shipmentId) {
+      setDeliveryError("No shipment found for this order.");
+      return;
+    }
+    setDeliverySaving(true);
+    setDeliveryError("");
+    try {
+      await updateShipmentStatus(shipmentId, { shipmentStatus: "delivered", deliveredAt });
+      setDeliveryModal(false);
+      await reload();
+    } catch (e) {
+      setDeliveryError(e.message || "Failed to mark as delivered.");
+    } finally {
+      setDeliverySaving(false);
+    }
+  };
+
+  const handleEditTracking = async (form) => {
+    const shipmentId = order?.trackingDetails?.shipmentId;
+    if (!shipmentId) {
+      setEditTrackingError("No shipment found for this order.");
+      return;
+    }
+    setEditTrackingSaving(true);
+    setEditTrackingError("");
+    try {
+      await updateShipmentTracking(shipmentId, form);
+      // A shipment that came back (returned / delivery failed / cancelled) needs to be
+      // re-marked Shipped for the new courier attempt — updateShipmentTracking only
+      // auto-advances pre-dispatch statuses, so push it forward explicitly here.
+      const wasReturned = ["returned", "delivery_failed", "cancelled"].includes(
+        order.trackingDetails.shipmentStatus
+      );
+      if (wasReturned) {
+        await updateShipmentStatus(shipmentId, { shipmentStatus: "shipped" });
+      }
+      setEditTrackingModal(false);
+      await reload();
+    } catch (e) {
+      setEditTrackingError(e.message || "Failed to update tracking details.");
+    } finally {
+      setEditTrackingSaving(false);
     }
   };
 
@@ -869,9 +1059,26 @@ export function OrderDetailPage() {
   if (error && !order) return <ErrorBlock message={error} onRetry={reload} />;
   if (!order) return <ErrorBlock message="Order not found." />;
 
-  const canProcess = !["processing", "fulfilled", "cancelled", "delivered"].includes(order.orderStatus);
-  const canFulfill = order.orderStatus === "processing" && invoice;
-  const canCancel = !["cancelled", "fulfilled", "delivered"].includes(order.orderStatus);
+  // Single controlled pipeline: New -> Processing -> Invoice Generated -> Shipping -> Shipped -> Delivered.
+  // Cancel is only available before processing starts — once an order enters this
+  // pipeline it can no longer be cancelled by mistake, only carried through to delivery.
+  const hasTracking = Boolean(order.trackingDetails?.trackingId);
+  const orderStage =
+    order.orderStatus === "cancelled" ? "cancelled" :
+    order.orderStatus === "delivered" ? "delivered" :
+    (order.orderStatus === "fulfilled" || hasTracking) ? "shipped" :
+    (order.orderStatus === "processing" && invoice) ? "ready_to_ship" :
+    order.orderStatus === "processing" ? "ready_for_invoice" :
+    "new";
+  const canCancel = orderStage === "new";
+  const orderStageValue = {
+    new: "not_processed",
+    ready_for_invoice: "order_processed",
+    ready_to_ship: "invoice_generated",
+    shipped: "order_shipped",
+    delivered: "delivered",
+    cancelled: "cancelled"
+  }[orderStage];
   const customerPhone = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
 
   return (
@@ -897,6 +1104,7 @@ export function OrderDetailPage() {
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <StatusChip label="Order Status" value={order.orderStatus} />
+          <StatusChip label="Fulfillment Stage" value={orderStageValue} />
           <StatusChip label="Acceptance Status" value={order.acceptanceStatus} />
           <StatusChip label="Payment Mode" value={order.paymentMethod} />
           <StatusChip label="Payment Status" value={order.paymentStatus} />
@@ -904,13 +1112,20 @@ export function OrderDetailPage() {
       </div>
 
       {/* Manual payment action banner */}
-      <PaymentActionBanner
+      <ManualPaymentSection
         order={order}
-        onConfirmPayment={handleConfirmPayment}
-        onConfirmOrder={handleConfirmOrder}
-        paymentSaving={paymentConfirmSaving}
-        orderSaving={orderConfirmSaving}
+        submissions={manualPayments}
+        onVerify={handleVerifyManualPayment}
+        onReject={handleRejectManualPayment}
+        busyKey={manualPaymentBusyKey}
       />
+      {manualPayments.length === 0 && (
+        <PaymentActionBanner
+          order={order}
+          onConfirmPayment={handleConfirmPayment}
+          paymentSaving={paymentConfirmSaving}
+        />
+      )}
 
       {/* Payment gateway info */}
       {order.gatewayTxnId && (
@@ -1015,35 +1230,20 @@ export function OrderDetailPage() {
             </div>
             <div style={{
               display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800,
-              color: "#fff", background: "var(--success)", borderRadius: 8, padding: "10px 12px"
+              color: "#fff", background: order.paymentStatus === "paid" ? "var(--success)" : "#d97706",
+              borderRadius: 8, padding: "10px 12px"
             }}>
-              <span>Amount Payable</span>
+              <span>{order.paymentStatus === "paid" ? "Amount Paid" : "Amount Payable"}</span>
               <span>{formatCurrencyInr(order.orderTotal)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Invoice section — must be generated before dispatch */}
+      {/* Invoice section */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-          <h4 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Invoice</h4>
-          {canFulfill && (
-            <button
-              type="button" className="btn btn-primary btn-small"
-              style={{ background: "#16a34a", display: "inline-flex", alignItems: "center", gap: 5 }}
-              onClick={() => { setFulfillModal(true); setFulfillError(""); }}
-            >
-              Dispatch &amp; Fulfill →
-            </button>
-          )}
-        </div>
-        <InvoiceSection orderId={orderId} invoice={invoice} onInvoiceGenerated={setInvoice} />
-        {order.orderStatus === "processing" && !invoice && (
-          <p style={{ margin: "10px 0 0", fontSize: 12, color: "#92400e", background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: 6, padding: "8px 12px" }}>
-            Generate an invoice above before dispatching this order.
-          </p>
-        )}
+        <h4 style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Invoice</h4>
+        <InvoiceSection invoice={invoice} />
       </div>
 
       {/* Tracking info */}
@@ -1052,6 +1252,12 @@ export function OrderDetailPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
             <h4 style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Shipment &amp; Tracking</h4>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button" className="btn btn-secondary btn-small"
+                onClick={() => { setEditTrackingModal(true); setEditTrackingError(""); }}
+              >
+                Edit
+              </button>
               <button
                 type="button" className="btn btn-secondary btn-small"
                 onClick={() => printShippingLabel(order, storeProfile, order.trackingDetails)}
@@ -1124,8 +1330,11 @@ export function OrderDetailPage() {
       )}
 
       {error && <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 14 }}>{error}</p>}
+      {invoiceError && <p style={{ color: "var(--danger)", fontSize: 13, marginBottom: 14 }}>{invoiceError}</p>}
 
-      {/* Action buttons */}
+      {/* Single controlled pipeline action — one button drives Processing -> Invoice ->
+          Shipping -> Delivered, so the same order can't be advanced out of order or
+          twice by accident. */}
       <div style={{ display: "flex", gap: 10, paddingTop: 8 }}>
         {canCancel && (
           <button type="button" className="btn btn-secondary" disabled={cancelSaving} onClick={handleCancelOrder}
@@ -1133,15 +1342,32 @@ export function OrderDetailPage() {
             {cancelSaving ? "Cancelling…" : "Cancel Order"}
           </button>
         )}
-        {canProcess && (
+        {orderStage === "new" && (
           <button type="button" className="btn btn-primary" onClick={() => { setProcessingModal(true); setProcessingError(""); }}>
             Mark as Processing
           </button>
         )}
-        {canFulfill && (
+        {orderStage === "ready_for_invoice" && (
+          <button type="button" className="btn btn-primary" disabled={invoiceGenerating} onClick={handleGenerateInvoice}>
+            {invoiceGenerating ? "Generating…" : "Generate Invoice"}
+          </button>
+        )}
+        {orderStage === "ready_to_ship" && (
           <button type="button" className="btn btn-primary" style={{ background: "#16a34a" }}
             onClick={() => { setFulfillModal(true); setFulfillError(""); }}>
-            Convert to Fulfill
+            Shipping
+          </button>
+        )}
+        {orderStage === "shipped" && (
+          <button type="button" className="btn btn-primary" style={{ background: "#2563eb" }}
+            onClick={() => { setDeliveryModal(true); setDeliveryError(""); }}>
+            Shipped
+          </button>
+        )}
+        {orderStage === "delivered" && (
+          <button type="button" className="btn btn-primary" disabled
+            style={{ background: "#16a34a", opacity: 0.85, cursor: "default" }}>
+            Delivered
           </button>
         )}
       </div>
@@ -1165,6 +1391,14 @@ export function OrderDetailPage() {
           onSave={handleFulfill}
           saving={fulfillSaving}
           error={fulfillError}
+        />
+      )}
+      {deliveryModal && (
+        <DeliveryConfirmModal
+          onClose={() => setDeliveryModal(false)}
+          onSave={handleMarkDelivered}
+          saving={deliverySaving}
+          error={deliveryError}
         />
       )}
     </div>

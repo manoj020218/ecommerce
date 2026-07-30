@@ -143,7 +143,8 @@ const updateShipmentTrackingSchema = z.object({
 
 const updateShipmentStatusSchema = z.object({
   shipmentStatus: shipmentStatusSchema,
-  adminNotes: z.string().trim().max(1000).optional().default("")
+  adminNotes: z.string().trim().max(1000).optional().default(""),
+  deliveredAt: z.string().trim().max(40).optional().default("")
 });
 
 const sendTrackingEmailSchema = z.object({

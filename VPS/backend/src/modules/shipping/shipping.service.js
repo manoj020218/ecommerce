@@ -934,7 +934,11 @@ async function updateShipmentStatus(shipmentId, payload, actor) {
     shipment.adminNotes = payload.adminNotes;
   }
   if (payload.shipmentStatus === SHIPMENT_STATUSES.DELIVERED) {
-    shipment.deliveredAt = shipment.deliveredAt || nowIso();
+    const parsedDeliveredAt = payload.deliveredAt ? new Date(payload.deliveredAt) : null;
+    shipment.deliveredAt =
+      parsedDeliveredAt && !Number.isNaN(parsedDeliveredAt.getTime())
+        ? parsedDeliveredAt.toISOString()
+        : shipment.deliveredAt || nowIso();
   }
   shipment.updatedAt = nowIso();
 

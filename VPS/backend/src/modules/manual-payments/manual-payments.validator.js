@@ -21,6 +21,7 @@ const listManualPaymentsQuerySchema = z.object({
       MANUAL_PAYMENT_STATUSES.REJECTED
     ])
     .optional(),
+  orderId: z.string().trim().max(140).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100)
 });
 

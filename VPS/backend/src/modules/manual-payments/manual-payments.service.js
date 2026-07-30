@@ -306,6 +306,9 @@ async function listManualPaymentSubmissions(filters) {
   if (filters.status) {
     submissions = submissions.filter((row) => row.status === filters.status);
   }
+  if (filters.orderId) {
+    submissions = submissions.filter((row) => row.orderId === filters.orderId);
+  }
 
   submissions = submissions
     .sort((a, b) => Date.parse(b.submittedAt || "") - Date.parse(a.submittedAt || ""))

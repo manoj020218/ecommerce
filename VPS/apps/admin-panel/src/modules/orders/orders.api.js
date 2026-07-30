@@ -53,6 +53,19 @@ export function updateShipmentTracking(shipmentId, payload) {
   return apiFetch(`/admin/shipping/shipments/${shipmentId}/tracking`, { method: "PATCH", body: payload });
 }
 
+export function updateShipmentStatus(shipmentId, payload) {
+  return apiFetch(`/admin/shipping/shipments/${shipmentId}/status`, { method: "PATCH", body: payload });
+}
+
+// Manual payment proof review (scoped to a single order)
+export function fetchManualPaymentsForOrder(orderId) {
+  return apiFetch(`/admin/manual-payments?orderId=${encodeURIComponent(orderId)}`);
+}
+
+export function verifyManualPayment(submissionId, payload) {
+  return apiFetch(`/admin/manual-payments/${submissionId}/verify`, { method: "POST", body: payload });
+}
+
 export function sendTrackingEmail(shipmentId, payload) {
   return apiFetch(`/admin/shipping/shipments/${shipmentId}/tracking-email`, { method: "POST", body: payload });
 }

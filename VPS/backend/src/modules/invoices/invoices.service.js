@@ -933,14 +933,21 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
     buildOrderItemSnapshot(item, productLookup, placeOfSupply)
   );
 
+  // Shipping charges are taxed too (see cart-checkout.service.js calculatePricing) —
+  // that amount isn't tied to any single line item's HSN code, so it isn't part of
+  // buildHsnSummary, but it must still land in the same CGST/SGST/IGST split those
+  // totals feed into or the invoice's tax total won't reconcile with its own lines.
+  const shippingGstAmount = Number(order.shippingGstAmount || 0);
+  const shippingTaxSplit = splitTaxAmounts(0, shippingGstAmount, placeOfSupply.isIntraState);
+
   const cgstTotal = roundMoney(
-    items.reduce((sum, item) => sum + Number(item.cgstAmount || 0), 0)
+    items.reduce((sum, item) => sum + Number(item.cgstAmount || 0), 0) + shippingTaxSplit.cgstAmount
   );
   const sgstTotal = roundMoney(
-    items.reduce((sum, item) => sum + Number(item.sgstAmount || 0), 0)
+    items.reduce((sum, item) => sum + Number(item.sgstAmount || 0), 0) + shippingTaxSplit.sgstAmount
   );
   const igstTotal = roundMoney(
-    items.reduce((sum, item) => sum + Number(item.igstAmount || 0), 0)
+    items.reduce((sum, item) => sum + Number(item.igstAmount || 0), 0) + shippingTaxSplit.igstAmount
   );
   const invoiceId = generateId("invoice");
   const generatedAt = nowIso();
@@ -991,6 +998,7 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
       sgstTotal,
       igstTotal,
       shippingCharge: Number(order.shippingCharge || 0),
+      shippingGstAmount,
       roundOff: Number(order.roundOff || 0),
       grandTotal: Number(order.grandTotal || 0),
       amountInWords: amountToWords(order.grandTotal)

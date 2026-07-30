@@ -187,6 +187,7 @@ export function CheckoutPage() {
     return {
       itemCount: Number(cart?.itemCount || 0),
       productSubtotal: Number(pricing.productSubtotal || 0),
+      taxableValue: Number(pricing.taxableValue || 0),
       discountAmount: Number(pricing.discountAmount || 0),
       gstTotal: Number(pricing.gstTotal || 0),
       shippingCharge: Number(pricing.shippingCharge || 0),
@@ -996,10 +997,10 @@ export function CheckoutPage() {
             </div>
 
             <div className="proto-summary-rows">
-              <div><span>Product Total</span><strong>{formatCurrency(totals.productSubtotal)}</strong></div>
+              <div><span>Product Total</span><strong>{formatCurrency(totals.taxableValue)}</strong></div>
               <div><span>Discount</span><strong>{formatCurrency(totals.discountAmount)}</strong></div>
-              <div><span>GST</span><strong>{formatCurrency(totals.gstTotal)}</strong></div>
               <div><span>Shipping</span><strong>{formatCurrency(totals.shippingCharge)}</strong></div>
+              <div><span>GST</span><strong>{formatCurrency(totals.gstTotal)}</strong></div>
             </div>
 
             <div className="proto-summary-total">

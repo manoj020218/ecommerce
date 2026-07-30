@@ -546,7 +546,25 @@ async function calculatePricing(
     shippingStore
   );
   const shippingCharge = Number(shippingQuote.shippingCharge || 0);
-  const preRoundGrand = roundMoney(taxableValue + gstTotal + shippingCharge);
+
+  // Freight/shipping billed alongside goods is itself taxable under GST — apply
+  // the cart's value-weighted product GST rate to the shipping charge (rather
+  // than a fixed rate) so a mixed-rate cart still taxes shipping proportionally
+  // to what's actually being shipped.
+  let gstRateWeightNumerator = 0;
+  let gstRateWeightDenominator = 0;
+  for (const line of lines) {
+    if (line.taxableValue > 0) {
+      gstRateWeightNumerator += line.taxableValue * Number(line.gstRate || 0);
+      gstRateWeightDenominator += line.taxableValue;
+    }
+  }
+  const blendedGstRate =
+    gstRateWeightDenominator > 0 ? gstRateWeightNumerator / gstRateWeightDenominator : 0;
+  const shippingGstAmount = roundMoney((shippingCharge * blendedGstRate) / 100);
+  const gstTotalWithShipping = roundMoney(gstTotal + shippingGstAmount);
+
+  const preRoundGrand = roundMoney(taxableValue + gstTotalWithShipping + shippingCharge);
   const roundedGrand = Math.round(preRoundGrand);
   const roundOff = roundMoney(roundedGrand - preRoundGrand);
   const grandTotal = roundMoney(preRoundGrand + roundOff);
@@ -556,7 +574,9 @@ async function calculatePricing(
     productSubtotal,
     discountAmount,
     taxableValue,
-    gstTotal,
+    gstTotal: gstTotalWithShipping,
+    productGstAmount: gstTotal,
+    shippingGstAmount,
     shippingCharge,
     roundOff,
     grandTotal,
@@ -899,6 +919,7 @@ function createOrderFromSession(authStore, session, options = {}) {
     discountAmount: Number(session.cart.pricing.discountAmount || 0),
     taxableValue: Number(session.cart.pricing.taxableValue || 0),
     gstTotal: Number(session.cart.pricing.gstTotal || 0),
+    shippingGstAmount: Number(session.cart.pricing.shippingGstAmount || 0),
     shippingCharge: Number(session.cart.pricing.shippingCharge || 0),
     roundOff: Number(session.cart.pricing.roundOff || 0),
     grandTotal: Number(session.cart.pricing.grandTotal || 0),

@@ -32,8 +32,163 @@ const TEMPLATE_KEYS = Object.freeze([
   "dealer_order_request_received",
   "dealer_order_approved",
   "ready_for_pickup",
-  "self_pickup_completed"
+  "self_pickup_completed",
+  "order_processing",
+  "payment_pending",
+  "otp_login_code_whatsapp",
+  "forgot_password_whatsapp",
+  "order_placed_whatsapp",
+  "order_processing_whatsapp",
+  "payment_pending_whatsapp",
+  "manual_payment_verified_whatsapp",
+  "tracking_detail_update_whatsapp"
 ]);
+
+// The 7 customer lifecycle events the storefront actually fires today, each with
+// a matching "<key>_whatsapp" companion — these are what the admin Notifications
+// UI groups and shows first. Real, branded copy (not the generic boilerplate
+// createDefaultTemplate() falls back to for every other, currently-unused key).
+const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
+  { key: "otp_login_code", whatsappKey: "otp_login_code_whatsapp", group: "Account", label: "Login OTP" },
+  { key: "forgot_password", whatsappKey: "forgot_password_whatsapp", group: "Account", label: "Forgot Password" },
+  { key: "order_placed", whatsappKey: "order_placed_whatsapp", group: "Order", label: "Order Placed" },
+  { key: "order_processing", whatsappKey: "order_processing_whatsapp", group: "Order", label: "Order Processed" },
+  { key: "payment_pending", whatsappKey: "payment_pending_whatsapp", group: "Payment", label: "Payment Pending" },
+  { key: "manual_payment_verified", whatsappKey: "manual_payment_verified_whatsapp", group: "Payment", label: "Payment Confirmed" },
+  { key: "tracking_detail_update", whatsappKey: "tracking_detail_update_whatsapp", group: "Shipping", label: "Order Shipped" }
+]);
+
+const BRAND_COLOR = "#E8231A";
+
+function emailShell(bodyHtml) {
+  return [
+    `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#1f2937;">`,
+    `<div style="background:${BRAND_COLOR};padding:18px 24px;border-radius:10px 10px 0 0;">`,
+    `<span style="color:#fff;font-size:18px;font-weight:700;">{{businessName}}</span>`,
+    `</div>`,
+    `<div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;padding:24px;">`,
+    bodyHtml,
+    `<p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Need help? Call or WhatsApp us at {{supportPhone}}.</p>`,
+    `</div>`,
+    `</div>`
+  ].join("");
+}
+
+const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
+  otp_login_code: {
+    label: "Login OTP (Email)",
+    subject: "{{otpCode}} is your {{businessName}} login code",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Use this code to log in to your account:</p>` +
+      `<div style="background:#f9fafb;border:1.5px dashed ${BRAND_COLOR};border-radius:8px;padding:16px;text-align:center;margin:16px 0;">` +
+      `<span style="font-size:28px;font-weight:800;letter-spacing:6px;color:${BRAND_COLOR};">{{otpCode}}</span></div>` +
+      `<p style="font-size:13px;color:#6b7280;">This code expires shortly. If you didn't request this, you can safely ignore this email.</p>`
+    )
+  },
+  otp_login_code_whatsapp: {
+    label: "Login OTP (WhatsApp)",
+    subject: "",
+    body: "Your {{businessName}} login code is *{{otpCode}}*. Do not share this with anyone. It expires shortly."
+  },
+  forgot_password: {
+    label: "Forgot Password (Email)",
+    subject: "Reset your {{businessName}} password",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">We received a request to reset your password. Click below to set a new one:</p>` +
+      `<div style="text-align:center;margin:20px 0;"><a href="{{resetPasswordUrl}}" style="background:${BRAND_COLOR};color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:700;font-size:14px;display:inline-block;">Reset Password</a></div>` +
+      `<p style="font-size:13px;color:#6b7280;">If you didn't request this, you can safely ignore this email — your password won't be changed.</p>`
+    )
+  },
+  forgot_password_whatsapp: {
+    label: "Forgot Password (WhatsApp)",
+    subject: "",
+    body: "Hi {{customerName}}, reset your {{businessName}} password here: {{resetPasswordUrl}}\nDidn't request this? You can ignore this message."
+  },
+  order_placed: {
+    label: "Order Placed (Email)",
+    subject: "Order {{orderNo}} confirmed — thank you!",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Thanks for shopping with us! Your order has been placed successfully.</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Order No.</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderNo}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Order Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Payment Method</td><td style="padding:6px 0;text-align:right;">{{paymentMethod}}</td></tr>` +
+      `</table>` +
+      `<p style="font-size:13px;color:#6b7280;">We'll notify you again once your order is packed and shipped. You can track everything from your account.</p>`
+    )
+  },
+  order_placed_whatsapp: {
+    label: "Order Placed (WhatsApp)",
+    subject: "",
+    body: "🎉 Order confirmed! Hi {{customerName}}, your order *{{orderNo}}* ({{orderTotal}}) has been placed with {{businessName}}. We'll message you again once it ships. Thank you for shopping with us!"
+  },
+  order_processing: {
+    label: "Order Processed (Email)",
+    subject: "Your order {{orderNo}} is being processed",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Good news — we've started processing your order <strong>{{orderNo}}</strong>. Our team is picking and packing your items now.</p>` +
+      `<p style="font-size:13px;color:#6b7280;">We'll send you tracking details as soon as it's handed over to the courier.</p>`
+    )
+  },
+  order_processing_whatsapp: {
+    label: "Order Processed (WhatsApp)",
+    subject: "",
+    body: "📦 Hi {{customerName}}, your order *{{orderNo}}* is now being processed and packed. We'll send tracking details once it ships!"
+  },
+  payment_pending: {
+    label: "Payment Pending (Email)",
+    subject: "Action needed — complete payment for order {{orderNo}}",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Your order <strong>{{orderNo}}</strong> for <strong>{{orderTotal}}</strong> is saved and waiting for payment via {{paymentMethod}}.</p>` +
+      `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:13px;">{{paymentInstructions}}</div>` +
+      `<p style="font-size:13px;color:#6b7280;">Once we receive and verify your payment, we'll begin processing your order right away.</p>`
+    )
+  },
+  payment_pending_whatsapp: {
+    label: "Payment Pending (WhatsApp)",
+    subject: "",
+    body: "⏳ Hi {{customerName}}, your order *{{orderNo}}* ({{orderTotal}}) is waiting for payment via {{paymentMethod}}.\n{{paymentInstructions}}\nWe'll process your order as soon as payment is confirmed."
+  },
+  manual_payment_verified: {
+    label: "Payment Confirmed (Email)",
+    subject: "Payment received for order {{orderNo}} ✅",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">We've confirmed your payment of <strong>{{orderTotal}}</strong> for order <strong>{{orderNo}}</strong>. Thank you!</p>` +
+      `<p style="font-size:14px;">Your order is now being processed and will ship soon.</p>` +
+      `<p style="font-size:13px;color:#6b7280;">Invoice: {{invoiceNo}}</p>`
+    )
+  },
+  manual_payment_verified_whatsapp: {
+    label: "Payment Confirmed (WhatsApp)",
+    subject: "",
+    body: "✅ Payment received! Hi {{customerName}}, we've confirmed your payment of {{orderTotal}} for order *{{orderNo}}*. It's now being processed. Thank you!"
+  },
+  tracking_detail_update: {
+    label: "Order Shipped (Email)",
+    subject: "Your order {{orderNo}} has shipped 🚚",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Your order <strong>{{orderNo}}</strong> is on its way!</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Courier</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{courierName}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Tracking ID</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{trackingId}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Expected Delivery</td><td style="padding:6px 0;text-align:right;">{{expectedDeliveryDate}}</td></tr>` +
+      `</table>` +
+      `<div style="text-align:center;margin:20px 0;"><a href="{{trackingUrl}}" style="background:${BRAND_COLOR};color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:700;font-size:14px;display:inline-block;">Track Your Order</a></div>`
+    )
+  },
+  tracking_detail_update_whatsapp: {
+    label: "Order Shipped (WhatsApp)",
+    subject: "",
+    body: "🚚 Shipped! Hi {{customerName}}, order *{{orderNo}}* is on its way via {{courierName}}.\nTracking ID: {{trackingId}}\nTrack here: {{trackingUrl}}"
+  }
+});
 
 const TEMPLATE_VARIABLES = Object.freeze([
   "customerName",
@@ -51,7 +206,12 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "refundAmount",
   "productName",
   "pickupLocation",
-  "pickupInstructions"
+  "pickupInstructions",
+  "otpCode",
+  "orderTotal",
+  "paymentMethod",
+  "paymentInstructions",
+  "expectedDeliveryDate"
 ]);
 
 const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([
@@ -61,6 +221,20 @@ const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([
 ]);
 
 function createDefaultTemplate(key) {
+  const special = SPECIAL_TEMPLATE_CONTENT[key];
+  if (special) {
+    return {
+      key,
+      channel: key.endsWith("_whatsapp") ? "whatsapp" : "email",
+      label: special.label,
+      subject: special.subject,
+      body: special.body,
+      variables: [...TEMPLATE_VARIABLES],
+      isActive: true,
+      updatedAt: null
+    };
+  }
+
   return {
     key,
     channel: "email",
@@ -104,11 +278,23 @@ function ensureTemplateCoverage(templates) {
   let changed = false;
 
   for (const key of TEMPLATE_KEYS) {
-    if (byKey.has(key)) {
+    if (!byKey.has(key)) {
+      rows.push(createDefaultTemplate(key));
+      changed = true;
       continue;
     }
-    rows.push(createDefaultTemplate(key));
-    changed = true;
+
+    // A row already exists for this key (e.g. seeded before this key had real
+    // content). Only refresh it if no admin has ever saved a customization
+    // (updatedAt === null) and it's still the old boilerplate — never
+    // overwrite a deliberate admin edit.
+    const special = SPECIAL_TEMPLATE_CONTENT[key];
+    const existing = byKey.get(key);
+    if (special && existing.updatedAt === null && existing.subject !== special.subject) {
+      const index = rows.findIndex((row) => row.key === key);
+      rows[index] = createDefaultTemplate(key);
+      changed = true;
+    }
   }
 
   return { templates: rows, changed };
@@ -166,6 +352,7 @@ function sanitizeNotificationLog(log) {
     id: log.id,
     templateKey: log.templateKey,
     toEmail: log.toEmail || "",
+    toMobile: log.toMobile || "",
     status: log.status,
     subject: log.subject || "",
     body: log.body || "",
@@ -201,6 +388,7 @@ module.exports = {
   OFFER_TYPES,
   TEMPLATE_KEYS,
   TEMPLATE_VARIABLES,
+  LIFECYCLE_NOTIFICATION_EVENTS,
   NOTIFY_SUBSCRIPTION_STATUSES,
   createDefaultTemplate,
   cloneDefaultMarketingStore,

@@ -16,6 +16,7 @@ import { HsnTaxPage } from "../modules/hsn-tax/hsn-tax-page";
 import { InventoryPage } from "../modules/inventory/inventory-page";
 import { InvoicesPage } from "../modules/invoices/invoices-page";
 import { MarketingPage } from "../modules/marketing/marketing-page";
+import { NotificationsPage } from "../modules/notifications/notifications-page";
 import { OrdersPage } from "../modules/orders/orders-page";
 import { OrderDetailPage } from "../modules/orders/order-detail-page";
 import { AddProductPage } from "../modules/products/add-product-page";
@@ -69,6 +70,7 @@ export function AppRouter() {
           <Route path="payment-gateways" element={<PaymentGatewaysPage />} />
           <Route path="blogs" element={<BlogsPage />} />
           <Route path="marketing" element={<MarketingPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
           <Route path="abandoned-carts" element={<AbandonedCartsPage />} />
           <Route path="google-merchant" element={<GoogleMerchantPage />} />
           <Route path="facebook-feed" element={<FacebookFeedPage />} />

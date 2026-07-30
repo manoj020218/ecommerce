@@ -703,6 +703,43 @@ tbody tr:hover {
   font-size: 12px;
 }
 
+.notification-event-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.notification-event-card {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-channel-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.notification-channel {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.notification-channel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .module-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -7,6 +7,7 @@ const {
   getManualPaymentInstructions
 } = require("../payment-gateways/payment-gateways.model");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const { notifyCustomerEvent } = require("../marketing/marketing.service");
 
 const MANUAL_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
 
@@ -385,6 +386,8 @@ async function updateOrder(orderId, patch, actor) {
 
   const order = authStore.orders[idx];
 
+  const enteringProcessing = patch.orderStatus === "processing" && order.orderStatus !== "processing";
+
   if (patch.orderStatus !== undefined) {
     const allowed = ["processing", "cancelled", "fulfilled"];
     if (!allowed.includes(patch.orderStatus)) {
@@ -429,6 +432,21 @@ async function updateOrder(orderId, patch, actor) {
     resourceId: orderId,
     metadata: { patch: Object.keys(patch) }
   });
+
+  if (enteringProcessing) {
+    const contact = order.billingAddress || order.shippingAddress || {};
+    await notifyCustomerEvent({
+      eventKey: "order_processing",
+      toEmail: String(contact.email || "").trim().toLowerCase(),
+      toMobile: String(contact.mobile || "").trim(),
+      relatedResourceType: "order",
+      relatedResourceId: order.id,
+      variables: {
+        customerName: contact.companyName || contact.name || order.customerName || "Customer",
+        orderNo: order.orderNo || ""
+      }
+    });
+  }
 
   return getOrderDetail(orderId);
 }

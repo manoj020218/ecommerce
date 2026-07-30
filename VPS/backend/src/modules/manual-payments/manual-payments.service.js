@@ -26,7 +26,8 @@ const {
   trackRecoveryCompleted
 } = require("../abandoned-cart/abandoned-cart.service");
 const {
-  safeSendTemplateNotification
+  safeSendTemplateNotification,
+  notifyCustomerEvent
 } = require("../marketing/marketing.service");
 const {
   MANUAL_PAYMENT_STATUSES,
@@ -135,6 +136,12 @@ function resolveNotificationEmail(order) {
   return String(order?.billingAddress?.email || "")
     .trim()
     .toLowerCase();
+}
+
+function resolveNotificationMobile(order) {
+  return String(
+    order?.shippingAddress?.mobile || order?.billingAddress?.mobile || ""
+  ).trim();
 }
 
 function resolveNotificationCustomerName(order) {
@@ -452,21 +459,14 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
   const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
     source: "manual_payment_verification"
   });
-  await safeSendTemplateNotification({
-    templateKey: "manual_payment_verified",
+  // Only the "payment confirmed" notification fires here — the customer already
+  // got a "payment pending" message with instructions when this order was first
+  // created (cart-checkout.service.js), so re-sending order_placed on top of this
+  // would be a duplicate email/WhatsApp for the same order.
+  await notifyCustomerEvent({
+    eventKey: "manual_payment_verified",
     toEmail: resolveNotificationEmail(order),
-    invoiceId: invoiceResult.invoice?.id || order.invoiceId || null,
-    relatedResourceType: "order",
-    relatedResourceId: order.id,
-    variables: {
-      customerName: resolveNotificationCustomerName(order),
-      orderNo: order.orderNo || "",
-      invoiceNo: invoiceResult.invoice?.invoiceNumber || order.invoiceNumber || ""
-    }
-  });
-  await safeSendTemplateNotification({
-    templateKey: "order_placed",
-    toEmail: resolveNotificationEmail(order),
+    toMobile: resolveNotificationMobile(order),
     invoiceId: invoiceResult.invoice?.id || order.invoiceId || null,
     relatedResourceType: "order",
     relatedResourceId: order.id,
@@ -474,7 +474,7 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
       customerName: resolveNotificationCustomerName(order),
       orderNo: order.orderNo || "",
       invoiceNo: invoiceResult.invoice?.invoiceNumber || order.invoiceNumber || "",
-      cartItems: formatOrderItems(order)
+      orderTotal: `₹${Number(order.grandTotal || 0).toLocaleString("en-IN")}`
     }
   });
 

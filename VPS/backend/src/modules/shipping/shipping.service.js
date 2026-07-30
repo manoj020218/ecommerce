@@ -11,7 +11,8 @@ const {
 } = require("../../database/shipping-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const {
-  safeSendTemplateNotification
+  safeSendTemplateNotification,
+  notifyCustomerEvent
 } = require("../marketing/marketing.service");
 const {
   createShippingProvider
@@ -375,6 +376,12 @@ function resolveOrderContactEmail(order, authStore) {
   }
 
   return "";
+}
+
+function resolveOrderContactMobile(order) {
+  return String(
+    order?.shippingAddress?.mobile || order?.billingAddress?.mobile || ""
+  ).trim();
 }
 
 function resolveOrderContactName(order) {
@@ -887,9 +894,10 @@ async function updateShipmentTracking(shipmentId, payload, actor) {
   applyOrderShipmentStatus(order, shipment.shipmentStatus);
 
   await Promise.all([writeAuthStore(authStore), writeShippingStore(shippingStore)]);
-  await safeSendTemplateNotification({
-    templateKey: "tracking_detail_update",
+  await notifyCustomerEvent({
+    eventKey: "tracking_detail_update",
     toEmail: resolveOrderContactEmail(order, authStore),
+    toMobile: resolveOrderContactMobile(order),
     relatedResourceType: "shipment",
     relatedResourceId: shipment.id,
     variables: {
@@ -897,7 +905,8 @@ async function updateShipmentTracking(shipmentId, payload, actor) {
       orderNo: order?.orderNo || "",
       trackingId: shipment.trackingId || "",
       trackingUrl: shipment.trackingUrl || "",
-      courierName: shipment.courierName || shipment.courierCode || ""
+      courierName: shipment.courierName || shipment.courierCode || "",
+      expectedDeliveryDate: shipment.expectedDeliveryDate || "soon"
     }
   });
 

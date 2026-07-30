@@ -27,6 +27,8 @@ const STATUS_CLASS = {
   template_inactive: "gray",
   skipped_no_recipient: "amber",
   simulated_sent: "green",
+  sent: "green",
+  failed: "red",
   system: "blue",
   custom: "gray",
   storefront: "blue",

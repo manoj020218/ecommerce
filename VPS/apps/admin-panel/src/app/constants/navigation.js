@@ -85,6 +85,12 @@ export const ADMIN_NAV_ITEMS = [
           { key: "google-merchant", label: "Google Merchant", path: "/google-merchant", permission: "settings.view" },
           { key: "facebook-feed",   label: "Facebook Feed",   path: "/facebook-feed",   permission: "settings.view" }
         ]
+      },
+      {
+        key: "notifications",
+        label: "Notifications",
+        path: "/notifications",
+        permission: "marketing.view"
       }
     ]
   },

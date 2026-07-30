@@ -30,7 +30,7 @@ const {
   getCustomerCartLegacy
 } = require("../cart-checkout/cart-checkout.service");
 const { getAllSettings } = require("../settings/settings.service");
-const { safeSendTemplateNotification } = require("../marketing/marketing.service");
+const { safeSendTemplateNotification, notifyCustomerEvent } = require("../marketing/marketing.service");
 
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -585,9 +585,10 @@ async function customerForgotPassword(payload) {
   });
   await writeAuthStore(store);
 
-  await safeSendTemplateNotification({
-    templateKey: "forgot_password",
+  await notifyCustomerEvent({
+    eventKey: "forgot_password",
     toEmail: normalizedEmail,
+    toMobile: user.mobile || "",
     relatedResourceType: "customer_auth",
     relatedResourceId: user.id,
     variables: {
@@ -969,23 +970,16 @@ async function requestEmailOtp({ email }) {
   await writeAuthStore(store);
 
   try {
-    const settings = await getAllSettings();
-    const smtp = settings.setupWizard?.smtpEmail;
-    if (smtp?.host && smtp?.username && smtp?.password && smtp?.fromEmail) {
-      await sendSmtpEmail({
-        smtpConfig: smtp,
-        to: normalizedEmail,
-        subject: "[Jenix] Your verification code",
-        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-          <h2 style="color:#E8231A;margin:0 0 16px">Verify your email</h2>
-          <p style="color:#374151;margin:0 0 24px">Use this code to complete your account setup. It expires in 10 minutes.</p>
-          <div style="background:#f9fafb;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px">
-            <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:#111827">${challengeCode}</span>
-          </div>
-          <p style="color:#9ca3af;font-size:13px;margin:0">If you didn't request this, ignore this email.</p>
-        </div>`
-      });
-    }
+    await notifyCustomerEvent({
+      eventKey: "otp_login_code",
+      toEmail: normalizedEmail,
+      relatedResourceType: "customer_auth",
+      relatedResourceId: challenge.id,
+      variables: {
+        customerName: "Customer",
+        otpCode: challengeCode
+      }
+    });
   } catch (_sendError) {
     // Email send failure is non-fatal — challenge is still valid
   }

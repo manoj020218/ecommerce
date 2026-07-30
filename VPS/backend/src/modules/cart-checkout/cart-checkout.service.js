@@ -49,7 +49,8 @@ const {
   trackRecoveryCompleted
 } = require("../abandoned-cart/abandoned-cart.service");
 const {
-  safeSendTemplateNotification
+  safeSendTemplateNotification,
+  notifyCustomerEvent
 } = require("../marketing/marketing.service");
 const {
   CART_OWNER_TYPES,
@@ -982,6 +983,10 @@ function resolveNotificationCustomerName(addressA, addressB) {
   );
 }
 
+function resolveNotificationMobile(addressA, addressB) {
+  return String(addressA?.mobile || addressB?.mobile || "").trim();
+}
+
 function formatNotificationItems(items) {
   return ensureArray(items)
     .map((item) => `${item.title || item.productId} x${Number(item.qty || 0)}`)
@@ -989,9 +994,10 @@ function formatNotificationItems(items) {
 }
 
 async function notifyOrderPlaced(order, invoice) {
-  return safeSendTemplateNotification({
-    templateKey: "order_placed",
+  return notifyCustomerEvent({
+    eventKey: "order_placed",
     toEmail: resolveNotificationEmail(order.billingAddress, order.shippingAddress),
+    toMobile: resolveNotificationMobile(order.billingAddress, order.shippingAddress),
     invoiceId: invoice?.id || order.invoiceId || null,
     relatedResourceType: "order",
     relatedResourceId: order.id,
@@ -1002,9 +1008,43 @@ async function notifyOrderPlaced(order, invoice) {
       ),
       orderNo: order.orderNo || "",
       invoiceNo: invoice?.invoiceNumber || order.invoiceNumber || "",
-      cartItems: formatNotificationItems(order.items)
+      cartItems: formatNotificationItems(order.items),
+      orderTotal: `₹${Number(order.grandTotal || 0).toLocaleString("en-IN")}`,
+      paymentMethod: humanizePaymentMethod(order.paymentMethod)
     }
   });
+}
+
+function humanizePaymentMethod(method) {
+  const map = {
+    online: "Online Payment",
+    direct_bank_transfer: "Bank Transfer",
+    manual_upi: "UPI",
+    cod: "Cash on Delivery"
+  };
+  return map[method] || String(method || "").replace(/_/g, " ");
+}
+
+const PAYMENT_INSTRUCTION_LABELS = {
+  beneficiaryName: "Beneficiary",
+  upiId: "UPI ID",
+  accountHolderName: "Account Holder",
+  bankName: "Bank",
+  accountNumber: "Account No.",
+  ifsc: "IFSC",
+  acceptedMethods: "Accepted Methods",
+  instructions: "Instructions",
+  note: "Note"
+};
+
+function formatPaymentInstructionsText(instructions) {
+  if (!instructions || typeof instructions !== "object") {
+    return "Contact us for payment details.";
+  }
+  const lines = Object.entries(instructions)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${PAYMENT_INSTRUCTION_LABELS[key] || key}: ${value}`);
+  return lines.length > 0 ? lines.join("\n") : "Contact us for payment details.";
 }
 
 async function notifyPaymentFailure(session, attempt) {
@@ -1866,6 +1906,27 @@ async function startCheckout(context, payload) {
     manualPaymentInstructions = usesOfflineOrderRequest
       ? null
       : getManualPaymentInstructions(payload.paymentMethod, paymentStore);
+
+    if (!usesOfflineOrderRequest) {
+      await notifyCustomerEvent({
+        eventKey: "payment_pending",
+        toEmail: resolveNotificationEmail(session.billingAddress, session.shippingAddress),
+        toMobile: resolveNotificationMobile(session.billingAddress, session.shippingAddress),
+        relatedResourceType: "order",
+        relatedResourceId: checkoutOrder.id,
+        variables: {
+          customerName: resolveNotificationCustomerName(
+            session.billingAddress,
+            session.shippingAddress
+          ),
+          orderNo: checkoutOrder.orderNo || "",
+          orderTotal: `₹${Number(checkoutOrder.grandTotal || 0).toLocaleString("en-IN")}`,
+          paymentMethod: humanizePaymentMethod(payload.paymentMethod),
+          paymentInstructions: formatPaymentInstructionsText(manualPaymentInstructions?.instructions)
+        }
+      });
+    }
+
     clearOwnerCart(authStore, owner);
   }
 

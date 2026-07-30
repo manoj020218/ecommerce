@@ -23,6 +23,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/shipping"))        return "Shipping";
   if (pathname.startsWith("/reports"))         return "Reports";
   if (pathname.startsWith("/marketing"))       return "Marketing";
+  if (pathname.startsWith("/notifications"))   return "Notifications";
   if (pathname.startsWith("/google-merchant")) return "Google Merchant";
   if (pathname.startsWith("/facebook-feed"))   return "Facebook Feed";
   if (pathname.startsWith("/blogs"))           return "Blogs / Knowledge Base";

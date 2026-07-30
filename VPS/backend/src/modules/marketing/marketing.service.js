@@ -2,6 +2,7 @@ const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { env } = require("../../config/env");
 const { sendSmtpEmail } = require("../../integrations/email-providers/smtp.provider");
+const whatsappService = require("../whatsapp/whatsapp.service");
 const {
   readMarketingStore,
   writeMarketingStore
@@ -103,7 +104,12 @@ function buildTemplateVariables(input = {}) {
     refundAmount: input.refundAmount || "",
     productName: input.productName || "",
     pickupLocation: input.pickupLocation || "",
-    pickupInstructions: input.pickupInstructions || ""
+    pickupInstructions: input.pickupInstructions || "",
+    otpCode: input.otpCode || "",
+    orderTotal: input.orderTotal || "",
+    paymentMethod: input.paymentMethod || "",
+    paymentInstructions: input.paymentInstructions || "",
+    expectedDeliveryDate: input.expectedDeliveryDate || ""
   };
 }
 
@@ -259,22 +265,26 @@ function buildNotificationLog(template, settings, input) {
     invoiceDownloadUrl: input.invoiceId ? `${urls.baseUrl}/account` : "",
     ...input.variables
   });
+  const channel = template.channel || "email";
+  const isWhatsApp = channel === "whatsapp";
   const subject = fillTemplateText(template.subject, variables);
   const body = fillTemplateText(template.body, variables);
+  const recipient = isWhatsApp ? normalizeMobile(input.toMobile) : normalizeEmail(input.toEmail);
 
   return {
     id: generateId("notif"),
     templateKey: input.templateKey,
-    toEmail: normalizeEmail(input.toEmail),
+    toEmail: isWhatsApp ? "" : recipient,
+    toMobile: isWhatsApp ? recipient : "",
     status: !template.isActive
       ? "template_inactive"
-      : !input.toEmail
+      : !recipient
         ? "skipped_no_recipient"
         : "simulated_sent",
     subject,
     body,
     variables,
-    channel: "email",
+    channel,
     relatedResourceType: input.relatedResourceType || "",
     relatedResourceId: input.relatedResourceId || "",
     createdAt: nowIso()
@@ -652,6 +662,16 @@ async function sendNotifySubscription(subscriptionId, actor) {
   };
 }
 
+function stripHtmlForWhatsApp(html) {
+  return String(html || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function sendTemplateNotification(input) {
   const [store, settings] = await Promise.all([
     readNormalizedMarketingStore(),
@@ -661,19 +681,31 @@ async function sendTemplateNotification(input) {
   const log = buildNotificationLog(template, settings, input);
 
   if (log.status === "simulated_sent") {
-    const smtp = settings.setupWizard?.smtpEmail;
-    if (smtp?.host && smtp?.username && smtp?.password && smtp?.fromEmail && log.toEmail) {
+    if (log.channel === "whatsapp") {
       try {
-        await sendSmtpEmail({
-          smtpConfig: smtp,
-          to: log.toEmail,
-          subject: log.subject,
-          html: log.body
-        });
+        await whatsappService.sendMessage(log.toMobile, stripHtmlForWhatsApp(log.body));
         log.status = "sent";
-      } catch (emailError) {
+      } catch (whatsappError) {
+        // Not connected / QR needs re-scanning is an expected, recoverable state —
+        // fail this one message, don't let it block the email side of the same event.
         log.status = "failed";
-        log.failureReason = emailError.message || "SMTP send failed";
+        log.failureReason = whatsappError.message || "WhatsApp send failed";
+      }
+    } else {
+      const smtp = settings.setupWizard?.smtpEmail;
+      if (smtp?.host && smtp?.username && smtp?.password && smtp?.fromEmail && log.toEmail) {
+        try {
+          await sendSmtpEmail({
+            smtpConfig: smtp,
+            to: log.toEmail,
+            subject: log.subject,
+            html: log.body
+          });
+          log.status = "sent";
+        } catch (emailError) {
+          log.status = "failed";
+          log.failureReason = emailError.message || "SMTP send failed";
+        }
       }
     }
   }
@@ -692,6 +724,38 @@ async function safeSendTemplateNotification(input) {
   }
 }
 
+// Fires both channels for one lifecycle event without every call site needing to
+// know there are two template rows behind it — pass toEmail/toMobile as available
+// and each channel independently no-ops (skipped_no_recipient) if its contact
+// value or the WhatsApp connection isn't available, rather than failing the event.
+async function notifyCustomerEvent({
+  eventKey,
+  toEmail,
+  toMobile,
+  variables,
+  relatedResourceType,
+  relatedResourceId
+}) {
+  // Sequential, not Promise.all — each send does its own read-modify-write of the
+  // same flat-file marketing store (notificationLogs). Running them concurrently
+  // let the second write silently clobber the first's freshly-appended log entry.
+  const emailResult = await safeSendTemplateNotification({
+    templateKey: eventKey,
+    toEmail,
+    variables,
+    relatedResourceType,
+    relatedResourceId
+  });
+  const whatsappResult = await safeSendTemplateNotification({
+    templateKey: `${eventKey}_whatsapp`,
+    toMobile,
+    variables,
+    relatedResourceType,
+    relatedResourceId
+  });
+  return { email: emailResult, whatsapp: whatsappResult };
+}
+
 module.exports = {
   listOffers,
   createOffer,
@@ -706,5 +770,6 @@ module.exports = {
   listNotifySubscriptions,
   sendNotifySubscription,
   sendTemplateNotification,
-  safeSendTemplateNotification
+  safeSendTemplateNotification,
+  notifyCustomerEvent
 };

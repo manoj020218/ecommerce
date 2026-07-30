@@ -1049,7 +1049,8 @@ async function estimateProductShipping(slug, input) {
       heightCm:
         product.heightCm === null || product.heightCm === undefined
           ? null
-          : Number(product.heightCm)
+          : Number(product.heightCm),
+      shippingIncluded: Boolean(product.shippingIncluded)
     }
   ];
   const destination = {

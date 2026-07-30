@@ -445,7 +445,8 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
       product.heightCm === null || product.heightCm === undefined
         ? null
         : Number(product.heightCm),
-    shippingClass: product.shippingClass || "normal"
+    shippingClass: product.shippingClass || "normal",
+    shippingIncluded: Boolean(product.shippingIncluded)
   };
 }
 

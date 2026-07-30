@@ -1097,7 +1097,8 @@ async function estimateCartShipping(query) {
       heightCm:
         product.heightCm === null || product.heightCm === undefined
           ? null
-          : Number(product.heightCm)
+          : Number(product.heightCm),
+      shippingIncluded: Boolean(product.shippingIncluded)
     });
   }
 

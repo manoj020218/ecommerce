@@ -203,8 +203,29 @@ function calculateShippingQuote({ lines, shippingMethod, destination, shippingSt
     };
   }
 
+  // Lines whose product has shipping folded into its price never contribute
+  // to the shipping charge — that line's delivery cost was already paid for
+  // via the item price, so charging shipping again here would double-bill it.
+  const chargeableLines = safeArray(lines).filter((line) => !line.shippingIncluded);
+
+  if (chargeableLines.length === 0) {
+    const zoneForIncluded = resolveDestinationZone(destination || {}, settings);
+    return {
+      shippingMethod,
+      zone: zoneForIncluded,
+      zoneLabel: SHIPPING_ZONE_LABELS[zoneForIncluded] || SHIPPING_ZONE_LABELS[SHIPPING_ZONES.ALL_INDIA],
+      totalWeightKg,
+      rateCardId: null,
+      baseCharge: 0,
+      perKgCharge: 0,
+      remoteExtraCharge: 0,
+      shippingClassCharge: 0,
+      shippingCharge: 0
+    };
+  }
+
   const { defaultLines, overrideLines } = partitionLinesByShippingClass(
-    lines,
+    chargeableLines,
     shippingStore?.shippingClasses
   );
 

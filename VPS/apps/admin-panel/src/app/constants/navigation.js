@@ -31,7 +31,7 @@ export const ADMIN_NAV_ITEMS = [
     items: [
       {
         key: "catalogue",
-        label: "Products",
+        label: "Catalogue",
         path: "/catalogue",
         permission: "products.view",
         children: [
@@ -40,7 +40,8 @@ export const ADMIN_NAV_ITEMS = [
           { key: "hsn-tax",    label: "HSN / Tax",  path: "/hsn-tax",    permission: "hsn_tax.view" },
           { key: "search",     label: "Search",     path: "/search",     permission: "search.view" }
         ]
-      }
+      },
+      { key: "products", label: "Products", path: "/products", permission: "products.view" }
     ]
   },
   {

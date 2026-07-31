@@ -1025,23 +1025,8 @@ export function OrderDetailPage() {
         expectedDeliveryDate: form.expectedDeliveryDate
       });
 
-      // 6. WhatsApp notification to customer
-      const phone = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
-      if (phone && form.trackingId) {
-        const courierName = selectedCourier?.courierName || "courier";
-        const waMsg = [
-          `Hi ${order.customerName || "there"}, your order #${order.orderNo} has been dispatched!`,
-          `Courier: ${courierName}`,
-          `Tracking ID: ${form.trackingId}`,
-          form.expectedDeliveryDate ? `Expected Delivery: ${form.expectedDeliveryDate}` : "",
-          form.customerNote || order.customerNote || ""
-        ].filter(Boolean).join("\n");
-        const waLink = buildWaLink(phone, waMsg);
-        if (waLink) window.open(waLink, "_blank");
-      }
-
-      // 7. Email notification
-      try { await sendTrackingEmail(shipment.id, {}); } catch { /* non-fatal */ }
+      // Email + WhatsApp are already sent automatically by updateShipmentTracking in
+      // step 2 via the real backend notification system — no separate send needed here.
 
       setFulfillModal(false);
       await reload();

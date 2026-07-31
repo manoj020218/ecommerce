@@ -173,13 +173,20 @@ const paymentsWebhookMock = asyncHandler(async (req, res) => {
 });
 
 const paymentsWebhookGateway = asyncHandler(async (req, res) => {
-  const payload = parsePaymentWebhookPayload(req.body);
+  // Unlike the mock webhook, this carries each real gateway's own native payload
+  // shape (e.g. Razorpay's {event, payload: {payment: {entity}}}), not our internal
+  // {attemptId, status} shape — parsing/validating it is the gateway adapter's job
+  // (gatewayProvider.handleWebhook inside processPaymentWebhook), so it must not be
+  // pre-validated against paymentWebhookSchema here or every real webhook 400s.
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    throw new HttpError(400, "Payment webhook payload must be an object.");
+  }
   const rawBody = req.rawBody || null;
   const signature =
     req.headers["x-razorpay-signature"] ||
     req.headers["x-webhook-signature"] ||
     null;
-  const data = await service.processPaymentWebhook(req.params.gateway, payload, rawBody, signature);
+  const data = await service.processPaymentWebhook(req.params.gateway, req.body, rawBody, signature);
   return ok(res, data, "Payment webhook processed.");
 });
 

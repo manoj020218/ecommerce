@@ -170,6 +170,8 @@ const CHIP_COLORS = {
   not_processed: { bg: "rgba(234,179,8,0.1)", color: "#92400e", border: "rgba(234,179,8,0.35)" },
   order_processed: { bg: "rgba(37,99,235,0.08)", color: "#1d4ed8", border: "rgba(37,99,235,0.25)" },
   invoice_generated: { bg: "rgba(37,99,235,0.08)", color: "#1d4ed8", border: "rgba(37,99,235,0.25)" },
+  packed: { bg: "rgba(126,34,206,0.08)", color: "#7e22ce", border: "rgba(126,34,206,0.25)" },
+  waiting_for_shipping: { bg: "rgba(126,34,206,0.08)", color: "#7e22ce", border: "rgba(126,34,206,0.25)" },
   order_shipped: { bg: "rgba(147,51,234,0.08)", color: "#7e22ce", border: "rgba(147,51,234,0.25)" },
 };
 
@@ -392,7 +394,7 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
   const customerMobile = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
 
   return (
-    <Modal title="Convert to Fulfill — Dispatch Order" open onClose={onClose} width="580px" disableOutsideClick>
+    <Modal title="Mark as Packed" open onClose={onClose} width="580px" disableOutsideClick>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ background: "rgba(37,99,235,0.05)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: 8, padding: "10px 14px" }}>
           <p style={{ margin: 0, fontSize: 12, color: "#1d4ed8", fontWeight: 500 }}>
@@ -452,7 +454,8 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
         {customerMobile && form.trackingId && (
           <div style={{ background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.3)", borderRadius: 8, padding: "10px 14px" }}>
             <p style={{ margin: 0, fontSize: 12, color: "#166534" }}>
-              After dispatch, a WhatsApp message will open for {order.customerName} ({customerMobile}) with tracking info.
+              This just records the tracking details for packing — {order.customerName} ({customerMobile})
+              won't be notified until you mark the order as actually shipped.
             </p>
           </div>
         )}
@@ -465,7 +468,7 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
             type="button" className="btn btn-primary" disabled={saving || !form.trackingId}
             onClick={() => onSave(form)}
           >
-            {saving ? "Dispatching…" : "Dispatch & Fulfill"}
+            {saving ? "Saving…" : "Mark as Packed"}
           </button>
         </div>
       </div>
@@ -761,6 +764,8 @@ export function OrderDetailPage() {
   const [fulfillModal, setFulfillModal] = useState(false);
   const [fulfillError, setFulfillError] = useState("");
   const [fulfillSaving, setFulfillSaving] = useState(false);
+  const [printingLabel, setPrintingLabel] = useState(false);
+  const [markingShipped, setMarkingShipped] = useState(false);
 
   const [deliveryModal, setDeliveryModal] = useState(false);
   const [deliveryError, setDeliveryError] = useState("");
@@ -982,12 +987,13 @@ export function OrderDetailPage() {
     }
   };
 
+  // Records courier + tracking and stops at "packed" — it does NOT jump straight
+  // to shipped/fulfilled anymore. The customer isn't told "shipped" until the
+  // separate Mark as Shipped action after the package actually leaves.
   const handleFulfill = async (form) => {
     setFulfillSaving(true);
     setFulfillError("");
     try {
-      const selectedCourier = couriers.find((c) => c.id === form.courierProfileId);
-
       // 1. Create shipment
       const { shipment } = await createShipment({
         orderId: order.id,
@@ -996,44 +1002,64 @@ export function OrderDetailPage() {
         adminNotes: form.customerNote
       });
 
-      // 2. Update tracking
+      // 2. Record courier + tracking, target status: packed
       if (form.trackingId && form.courierProfileId) {
         await updateShipmentTracking(shipment.id, {
           courierProfileId: form.courierProfileId,
           trackingId: form.trackingId,
           dispatchDate: form.dispatchDate,
           expectedDeliveryDate: form.expectedDeliveryDate,
-          newShipmentStatus: "shipped"
+          targetStatus: "packed"
         });
       }
 
-      // 3. Upload POD image if provided
+      // 3. Upload package image if provided
       if (form.podFile) {
         try { await uploadShipmentPod(shipment.id, form.podFile); } catch { /* non-fatal */ }
       }
 
-      // 4. Save customer note + mark fulfilled
-      await handleUpdateOrder({
-        orderStatus: "fulfilled",
-        customerNote: form.customerNote
-      });
-
-      // 5. Auto-download shipping label
-      printShippingLabel(order, storeProfile, {
-        courierName: selectedCourier?.courierName || "",
-        trackingId: form.trackingId,
-        expectedDeliveryDate: form.expectedDeliveryDate
-      });
-
-      // Email + WhatsApp are already sent automatically by updateShipmentTracking in
-      // step 2 via the real backend notification system — no separate send needed here.
+      // 4. Save customer note (order stays "processing" until actually shipped)
+      if (form.customerNote) {
+        await handleUpdateOrder({ customerNote: form.customerNote });
+      }
 
       setFulfillModal(false);
       await reload();
     } catch (e) {
-      setFulfillError(e.message || "Failed to fulfill order.");
+      setFulfillError(e.message || "Failed to mark order as packed.");
     } finally {
       setFulfillSaving(false);
+    }
+  };
+
+  const handlePrintShippingLabel = async () => {
+    const shipmentId = order?.trackingDetails?.shipmentId;
+    if (!shipmentId) return;
+    printShippingLabel(order, storeProfile, order.trackingDetails);
+    setPrintingLabel(true);
+    setError("");
+    try {
+      await updateShipmentStatus(shipmentId, { shipmentStatus: "ready_to_dispatch" });
+      await reload();
+    } catch (e) {
+      setError(e.message || "Failed to update shipment status.");
+    } finally {
+      setPrintingLabel(false);
+    }
+  };
+
+  const handleMarkShipped = async () => {
+    const shipmentId = order?.trackingDetails?.shipmentId;
+    if (!shipmentId) return;
+    setMarkingShipped(true);
+    setError("");
+    try {
+      await updateShipmentStatus(shipmentId, { shipmentStatus: "shipped" });
+      await reload();
+    } catch (e) {
+      setError(e.message || "Failed to mark order as shipped.");
+    } finally {
+      setMarkingShipped(false);
     }
   };
 
@@ -1044,14 +1070,17 @@ export function OrderDetailPage() {
   if (error && !order) return <ErrorBlock message={error} onRetry={reload} />;
   if (!order) return <ErrorBlock message="Order not found." />;
 
-  // Single controlled pipeline: New -> Processing -> Invoice Generated -> Shipping -> Shipped -> Delivered.
-  // Cancel is only available before processing starts — once an order enters this
-  // pipeline it can no longer be cancelled by mistake, only carried through to delivery.
-  const hasTracking = Boolean(order.trackingDetails?.trackingId);
+  // Single controlled pipeline: New -> Processing -> Invoice Generated -> Packed ->
+  // Waiting for Shipping -> Shipped -> Delivered. Cancel is only available before
+  // processing starts — once an order enters this pipeline it can no longer be
+  // cancelled by mistake, only carried through to delivery.
+  const shipmentStatus = order.shipmentStatus || "";
   const orderStage =
     order.orderStatus === "cancelled" ? "cancelled" :
     order.orderStatus === "delivered" ? "delivered" :
-    (order.orderStatus === "fulfilled" || hasTracking) ? "shipped" :
+    ["shipped", "in_transit", "out_for_delivery"].includes(shipmentStatus) ? "shipped" :
+    shipmentStatus === "ready_to_dispatch" ? "waiting_for_shipping" :
+    shipmentStatus === "packed" ? "packed" :
     (order.orderStatus === "processing" && invoice) ? "ready_to_ship" :
     order.orderStatus === "processing" ? "ready_for_invoice" :
     "new";
@@ -1060,6 +1089,8 @@ export function OrderDetailPage() {
     new: "not_processed",
     ready_for_invoice: "order_processed",
     ready_to_ship: "invoice_generated",
+    packed: "packed",
+    waiting_for_shipping: "waiting_for_shipping",
     shipped: "order_shipped",
     delivered: "delivered",
     cancelled: "cancelled"
@@ -1340,7 +1371,19 @@ export function OrderDetailPage() {
         {orderStage === "ready_to_ship" && (
           <button type="button" className="btn btn-primary" style={{ background: "#16a34a" }}
             onClick={() => { setFulfillModal(true); setFulfillError(""); }}>
-            Shipping
+            Packed
+          </button>
+        )}
+        {orderStage === "packed" && (
+          <button type="button" className="btn btn-primary" style={{ background: "#7e22ce" }}
+            disabled={printingLabel} onClick={handlePrintShippingLabel}>
+            {printingLabel ? "Printing…" : "Print Shipping Address"}
+          </button>
+        )}
+        {orderStage === "waiting_for_shipping" && (
+          <button type="button" className="btn btn-primary" style={{ background: "#2563eb" }}
+            disabled={markingShipped} onClick={handleMarkShipped}>
+            {markingShipped ? "Marking…" : "Mark as Shipped"}
           </button>
         )}
         {orderStage === "shipped" && (

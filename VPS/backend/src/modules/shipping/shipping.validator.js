@@ -138,7 +138,13 @@ const updateShipmentTrackingSchema = z.object({
   courierProfileId: z.string().trim().min(2).max(150),
   trackingId: z.string().trim().min(2).max(180),
   dispatchDate: z.string().trim().max(40).optional().default(""),
-  expectedDeliveryDate: z.string().trim().max(40).optional().default("")
+  expectedDeliveryDate: z.string().trim().max(40).optional().default(""),
+  // Lets the caller stop at an intermediate stage (packed / waiting for pickup)
+  // instead of always jumping straight to shipped the moment tracking is entered.
+  targetStatus: z
+    .enum([SHIPMENT_STATUSES.PACKED, SHIPMENT_STATUSES.READY_TO_DISPATCH, SHIPMENT_STATUSES.SHIPPED])
+    .optional()
+    .default(SHIPMENT_STATUSES.SHIPPED)
 });
 
 const updateShipmentStatusSchema = z.object({

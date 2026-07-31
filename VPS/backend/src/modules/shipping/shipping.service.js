@@ -348,6 +348,17 @@ function applyOrderShipmentStatus(order, shipmentStatus) {
     order.orderStatus = "delivered";
   } else if (shipmentStatus === SHIPMENT_STATUSES.CANCELLED) {
     order.orderStatus = "cancelled";
+  } else if (
+    [
+      SHIPMENT_STATUSES.SHIPPED,
+      SHIPMENT_STATUSES.IN_TRANSIT,
+      SHIPMENT_STATUSES.OUT_FOR_DELIVERY
+    ].includes(shipmentStatus)
+  ) {
+    // Orders list page's "Shipped" tab filters on orderStatus === "fulfilled" —
+    // keep that in sync now that shipmentStatus can sit at packed/ready_to_dispatch
+    // for a while before actually reaching shipped.
+    order.orderStatus = "fulfilled";
   }
 }
 
@@ -870,13 +881,17 @@ async function updateShipmentTracking(shipmentId, payload, actor) {
     trackingUrlTemplate: courier.trackingUrlTemplate
   });
 
+  // Entering tracking info no longer forces straight to "shipped" — the caller
+  // says how far this gets it (packed / ready_to_dispatch / shipped), so a
+  // warehouse can record courier + AWB at packing time without prematurely
+  // telling the customer their order has shipped before it's actually picked up.
   let nextStatus = shipment.shipmentStatus;
   if (
     shipment.shipmentStatus === SHIPMENT_STATUSES.PENDING_PACKING ||
     shipment.shipmentStatus === SHIPMENT_STATUSES.PACKED ||
     shipment.shipmentStatus === SHIPMENT_STATUSES.READY_TO_DISPATCH
   ) {
-    nextStatus = SHIPMENT_STATUSES.SHIPPED;
+    nextStatus = payload.targetStatus || SHIPMENT_STATUSES.SHIPPED;
   }
 
   shipment.courierProfileId = courier.id;
@@ -894,21 +909,26 @@ async function updateShipmentTracking(shipmentId, payload, actor) {
   applyOrderShipmentStatus(order, shipment.shipmentStatus);
 
   await Promise.all([writeAuthStore(authStore), writeShippingStore(shippingStore)]);
-  await notifyCustomerEvent({
-    eventKey: "tracking_detail_update",
-    toEmail: resolveOrderContactEmail(order, authStore),
-    toMobile: resolveOrderContactMobile(order),
-    relatedResourceType: "shipment",
-    relatedResourceId: shipment.id,
-    variables: {
-      customerName: resolveOrderContactName(order),
-      orderNo: order?.orderNo || "",
-      trackingId: shipment.trackingId || "",
-      trackingUrl: shipment.trackingUrl || "",
-      courierName: shipment.courierName || shipment.courierCode || "",
-      expectedDeliveryDate: shipment.expectedDeliveryDate || "soon"
-    }
-  });
+
+  // Only tell the customer "your order has shipped" once it genuinely has —
+  // packed/ready_to_dispatch just record courier + AWB ahead of pickup.
+  if (nextStatus === SHIPMENT_STATUSES.SHIPPED) {
+    await notifyCustomerEvent({
+      eventKey: "tracking_detail_update",
+      toEmail: resolveOrderContactEmail(order, authStore),
+      toMobile: resolveOrderContactMobile(order),
+      relatedResourceType: "shipment",
+      relatedResourceId: shipment.id,
+      variables: {
+        customerName: resolveOrderContactName(order),
+        orderNo: order?.orderNo || "",
+        trackingId: shipment.trackingId || "",
+        trackingUrl: shipment.trackingUrl || "",
+        courierName: shipment.courierName || shipment.courierCode || "",
+        expectedDeliveryDate: shipment.expectedDeliveryDate || "soon"
+      }
+    });
+  }
 
   await addActivityLog({
     action: "shipping.tracking.updated",
@@ -938,6 +958,7 @@ async function updateShipmentStatus(shipmentId, payload, actor) {
     throw new HttpError(404, "Shipment not found.");
   }
 
+  const previousStatus = shipment.shipmentStatus;
   shipment.shipmentStatus = payload.shipmentStatus;
   if (payload.adminNotes) {
     shipment.adminNotes = payload.adminNotes;
@@ -955,6 +976,26 @@ async function updateShipmentStatus(shipmentId, payload, actor) {
   applyOrderShipmentStatus(order, shipment.shipmentStatus);
 
   await Promise.all([writeAuthStore(authStore), writeShippingStore(shippingStore)]);
+
+  // Covers the packed -> shipped flip when tracking was already entered earlier
+  // (updateShipmentTracking only notifies when it reaches "shipped" directly).
+  if (payload.shipmentStatus === SHIPMENT_STATUSES.SHIPPED && previousStatus !== SHIPMENT_STATUSES.SHIPPED) {
+    await notifyCustomerEvent({
+      eventKey: "tracking_detail_update",
+      toEmail: resolveOrderContactEmail(order, authStore),
+      toMobile: resolveOrderContactMobile(order),
+      relatedResourceType: "shipment",
+      relatedResourceId: shipment.id,
+      variables: {
+        customerName: resolveOrderContactName(order),
+        orderNo: order?.orderNo || "",
+        trackingId: shipment.trackingId || "",
+        trackingUrl: shipment.trackingUrl || "",
+        courierName: shipment.courierName || shipment.courierCode || "",
+        expectedDeliveryDate: shipment.expectedDeliveryDate || "soon"
+      }
+    });
+  }
 
   await addActivityLog({
     action: "shipping.status.updated",

@@ -55,88 +55,73 @@ function safeAddrStr(v) {
 function generateShippingLabelHtml(order, storeProfile, trackingInfo) {
   const storeName = storeProfile?.storeName || "Jenix India";
   const fromAddress = safeAddrStr(storeProfile?.pickupAddress || storeProfile?.address);
+  const fromPhone = storeProfile?.supportMobile || storeProfile?.whatsappNumber || "";
 
   const toAddr = order.shippingAddress || order.billingAddress || {};
   const toName = toAddr.name || order.customerName || "";
+  const toCompany = toAddr.companyName || "";
   const toPhone = toAddr.mobile || order.customerMobile || "";
-  const toAddress = formatAddress(toAddr);
+  const toLine1 = toAddr.addressLine1 || "";
+  const toLine2 = toAddr.addressLine2 || "";
+  const toCityState = [toAddr.city, toAddr.state].filter(Boolean).join(", ");
+  const toPincode = toAddr.pincode || "";
 
-  const items = (order.fulfillmentItems && order.fulfillmentItems.length > 0)
-    ? order.fulfillmentItems.map(i => ({ title: i.title, qty: i.fulfillQty ?? i.qty ?? 1 }))
-    : (order.items || []).map(i => ({ title: i.title, qty: i.qty ?? 1 }));
+  const trackingRows = trackingInfo?.trackingId ? `
+    <div class="meta-row"><span>AWB</span><strong>${trackingInfo.trackingId}</strong></div>
+    <div class="meta-row"><span>Courier</span><strong>${trackingInfo.courierName || "—"}</strong></div>` : "";
 
-  const itemRows = items.map(item =>
-    `<tr><td>${item.title || ""}</td><td class="qty">${item.qty}</td></tr>`
-  ).join("");
-
-  const trackingHtml = trackingInfo?.trackingId ? `
-    <div class="tracking">
-      <div class="sec-label">Tracking Details</div>
-      <div class="trow"><span>Courier:</span> <strong>${trackingInfo.courierName || "—"}</strong></div>
-      <div class="trow"><span>AWB / Tracking ID:</span> <strong>${trackingInfo.trackingId}</strong></div>
-      ${trackingInfo.expectedDeliveryDate ? `<div class="trow"><span>Expected Delivery:</span> <strong>${trackingInfo.expectedDeliveryDate}</strong></div>` : ""}
-    </div>` : "";
-
+  // Amazon-style: the delivery address dominates the label (large name/address/PIN),
+  // the from-address is a small strip up top, order/tracking info is small text at
+  // the bottom — courier staff scan the address, not an item list or order box.
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>Shipping Label — Order #${order.orderNo || order.id}</title>
+<title>Shipping Label — ${order.orderNo || order.id}</title>
 <style>
-  @page { size: A6; margin: 6mm; }
+  @page { size: A6; margin: 5mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; background: #fff; }
-  .label { width: 100%; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
-  .header h2 { font-size: 11pt; font-weight: 700; letter-spacing: 1.5pt; }
-  .from-to { display: flex; gap: 0; border-bottom: 1.5px solid #000; padding-bottom: 3mm; margin-bottom: 3mm; }
-  .from { flex: 1; padding-right: 3mm; border-right: 1px dashed #bbb; }
-  .to { flex: 1.2; padding-left: 3mm; }
-  .sec-label { font-size: 6.5pt; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5pt; border-bottom: 1px solid #ddd; padding-bottom: 0.5mm; margin-bottom: 1.5mm; }
-  .name { font-size: 9.5pt; font-weight: 700; margin-bottom: 1mm; line-height: 1.3; }
-  .addr { font-size: 8pt; line-height: 1.5; color: #222; }
-  .phone { font-size: 8pt; font-weight: 600; margin-top: 1mm; }
-  .order-box { border: 2px solid #000; border-radius: 2mm; padding: 2mm 3mm; margin-bottom: 3mm; text-align: center; }
-  .order-box .ol { font-size: 7pt; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5pt; }
-  .order-box .ov { font-size: 17pt; font-weight: 700; letter-spacing: 1.5pt; line-height: 1.2; }
-  table.items { width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 3mm; }
-  table.items th { text-align: left; font-size: 7pt; font-weight: 700; color: #555; border-bottom: 1px solid #aaa; padding-bottom: 1mm; }
-  table.items th.qty { text-align: center; width: 10mm; }
-  table.items td { padding: 1.5mm 0; border-bottom: 1px solid #eee; line-height: 1.4; vertical-align: top; }
-  table.items td.qty { text-align: center; font-weight: 700; }
-  .tracking { border-top: 1px dashed #aaa; padding-top: 2.5mm; margin-bottom: 2.5mm; }
-  .tracking .sec-label { margin-bottom: 1.5mm; }
-  .trow { font-size: 8pt; margin-bottom: 0.5mm; }
-  .footer { border-top: 1px solid #ddd; padding-top: 2mm; font-size: 7pt; color: #888; text-align: center; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; }
+  .label { width: 100%; display: flex; flex-direction: column; min-height: 100%; }
+
+  .to-block { flex: 1; }
+  .to-tag { font-size: 10pt; font-weight: 700; letter-spacing: 1pt; text-transform: uppercase; color: #000; margin-bottom: 3mm; }
+  .to-name { font-size: 20pt; font-weight: 800; line-height: 1.25; margin-bottom: 2mm; }
+  .to-company { font-size: 11pt; font-weight: 600; color: #333; margin-bottom: 2mm; }
+  .to-addr-line { font-size: 15pt; font-weight: 600; line-height: 1.45; }
+  .to-pincode-row { font-size: 22pt; font-weight: 800; letter-spacing: 0.5pt; margin-top: 2.5mm; }
+  .to-phone { font-size: 14pt; font-weight: 700; margin-top: 3.5mm; }
+
+  .meta { border-top: 1.5px solid #000; padding-top: 3mm; margin-top: 5mm; }
+  .order-id-row { font-size: 11pt; font-weight: 700; color: #000; margin-bottom: 2mm; }
+  .meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 9pt; color: #555; margin-bottom: 1.5mm; }
+  .meta-row strong { font-size: 9.5pt; color: #000; }
+
+  .from-row { font-size: 7pt; color: #444; line-height: 1.4; padding-top: 2.5mm; border-top: 1px solid #000; margin-top: 5mm; }
+  .from-row .from-tag { font-weight: 700; color: #000; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; margin-right: 2mm; }
+
   @media print { body { -webkit-print-color-adjust: exact; } }
 </style>
 </head>
 <body>
 <div class="label">
-  <div class="header"><h2>SHIPPING LABEL</h2></div>
-  <div class="from-to">
-    <div class="from">
-      <div class="sec-label">From</div>
-      <div class="name">${storeName}</div>
-      <div class="addr">${fromAddress}</div>
-    </div>
-    <div class="to">
-      <div class="sec-label">To</div>
-      <div class="name">${toName}</div>
-      <div class="addr">${toAddress}</div>
-      ${toPhone ? `<div class="phone">${toPhone}</div>` : ""}
-    </div>
+  <div class="to-block">
+    <div class="to-tag">Deliver To</div>
+    <div class="to-name">${toName}</div>
+    ${toCompany ? `<div class="to-company">${toCompany}</div>` : ""}
+    ${toLine1 ? `<div class="to-addr-line">${toLine1}</div>` : ""}
+    ${toLine2 ? `<div class="to-addr-line">${toLine2}</div>` : ""}
+    ${toCityState ? `<div class="to-addr-line">${toCityState}</div>` : ""}
+    ${toPincode ? `<div class="to-pincode-row">PIN ${toPincode}</div>` : ""}
+    ${toPhone ? `<div class="to-phone">Ph: ${toPhone}</div>` : ""}
   </div>
-  <div class="order-box">
-    <div class="ol">Order No</div>
-    <div class="ov">${order.orderNo || order.id}</div>
+
+  <div class="meta">
+    <div class="order-id-row">Order: ${order.orderNo || order.id}</div>
+    ${trackingRows}
   </div>
-  <table class="items">
-    <thead><tr><th>Item Description</th><th class="qty">Qty</th></tr></thead>
-    <tbody>${itemRows}</tbody>
-  </table>
-  ${trackingHtml}
-  <div class="footer">Generated ${new Date().toLocaleDateString("en-IN")} &nbsp;·&nbsp; ${storeName}</div>
+
+  <div class="from-row"><span class="from-tag">From</span>${storeName} — ${fromAddress}${fromPhone ? ` — ${fromPhone}` : ""}</div>
 </div>
 <script>window.onload = function() { window.print(); };</script>
 </body>

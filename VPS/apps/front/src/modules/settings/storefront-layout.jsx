@@ -576,6 +576,12 @@ export function StorefrontLayout() {
           type="button"
           className="proto-mobile-link"
           onClick={() => {
+            // Just focusing the header input wasn't a visible enough action on a
+            // phone — a buyer tapping "Search" expects something to clearly
+            // happen. Navigating to the product catalog (where the search bar
+            // sits front and center) makes that obvious, then focuses the input
+            // so they can start typing immediately.
+            navigate("/products");
             window.scrollTo({ top: 0, behavior: "smooth" });
             document.getElementById("storefront-search-input")?.focus();
           }}

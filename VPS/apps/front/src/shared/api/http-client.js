@@ -1,6 +1,13 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:4100/api";
 
+// A stored token can outlive its actual server-side validity (natural JWT
+// expiry) without ever being cleared client-side, since isAuthenticated only
+// checks that a token string exists. Any authenticated call that comes back
+// 401 dispatches this so the session can be cleared everywhere at once,
+// instead of every caller having to notice and handle a stale session itself.
+export const SESSION_EXPIRED_EVENT = "jenix:customer-session-expired";
+
 class ApiError extends Error {
   constructor(message, status, payload = null) {
     super(message);
@@ -77,6 +84,11 @@ export async function apiFetch(path, options = {}) {
       payload?.message ||
       payload?.error ||
       `Request failed with status ${response.status}.`;
+
+    if (auth && response.status === 401 && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+
     throw new ApiError(message, response.status, payload);
   }
 

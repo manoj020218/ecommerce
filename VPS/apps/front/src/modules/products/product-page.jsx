@@ -401,9 +401,12 @@ export function ProductPage() {
           setSaved(Array.isArray(items) && items.some((item) => item.id === product.id));
         }
       })
-      .catch((requestError) => {
+      .catch(() => {
+        // Non-critical background check (e.g. a stale/expired token, which
+        // self-clears via SESSION_EXPIRED_EVENT) — fail quietly, not with a
+        // raw backend error message on the page.
         if (mounted) {
-          setSaveError(requestError.message || "Saved products could not be loaded.");
+          setSaved(false);
         }
       });
 
@@ -939,7 +942,13 @@ export function ProductPage() {
                   const action = saved ? removeSavedProduct(product.id) : saveProduct(product.id);
                   action
                     .then(() => { setSaved((current) => !current); })
-                    .catch((requestError) => { setSaveError(requestError.message || "Save action failed."); })
+                    .catch((requestError) => {
+                      setSaveError(
+                        requestError.status === 401
+                          ? "Your session has expired — please log in again to save products."
+                          : "Couldn't save this product. Please try again."
+                      );
+                    })
                     .finally(() => { setSaveLoading(false); });
                 }}
                 disabled={saveLoading}

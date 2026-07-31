@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { apiFetch } from "../api/http-client";
+import { apiFetch, SESSION_EXPIRED_EVENT } from "../api/http-client";
 
 const SESSION_STORAGE_KEY = "jenix.front.customerSession";
 const LEGACY_TOKEN_KEY = "jenix.front.customerToken";
@@ -142,6 +142,18 @@ export function CustomerSessionProvider({ children }) {
       active = false;
     };
   }, [session]);
+
+  // A stored token can go stale (natural JWT expiry) without ever being
+  // cleared — any authenticated call that comes back 401 fires this so the
+  // session clears everywhere at once, rather than each page having to
+  // notice and handle a dead token on its own.
+  useEffect(() => {
+    function handleSessionExpired() {
+      clearSession();
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
 
   return (
     <CustomerSessionContext.Provider

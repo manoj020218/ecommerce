@@ -478,9 +478,56 @@ async function exportOrdersCsv(filters) {
   return lines.join("\r\n");
 }
 
+const STUCK_PAYMENT_THRESHOLD_MINUTES = 15;
+
+// Flags checkout sessions where the buyer reached the payment gateway (an attempt
+// was created) but the confirm round-trip never came back — this is the orphaned
+// payment class: gateway captured the money, we have no order. A missing/unregistered
+// webhook is the usual cause. See paymentAttempts for the gateway order/txn id to
+// cross-check directly in Razorpay/Cashfree's dashboard.
+async function listStuckPaymentSessions() {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+  const sessions = ensureArray(authStore.checkoutSessions);
+  const attempts = ensureArray(authStore.paymentAttempts);
+  const thresholdMs = STUCK_PAYMENT_THRESHOLD_MINUTES * 60 * 1000;
+  const now = Date.now();
+
+  const stuck = sessions.filter((session) => {
+    if (session.status !== "payment_attempt_created" || session.paymentMethod !== "online") {
+      return false;
+    }
+    const createdAt = Date.parse(session.createdAt || "");
+    return !Number.isNaN(createdAt) && now - createdAt >= thresholdMs;
+  });
+
+  const rows = stuck.map((session) => {
+    const attempt = attempts.find((row) => row.checkoutSessionId === session.id) || null;
+    const contact = session.billingAddress || session.shippingAddress || {};
+    const createdAt = Date.parse(session.createdAt || "");
+
+    return {
+      checkoutSessionId: session.id,
+      createdAt: session.createdAt,
+      stuckForMinutes: Number.isNaN(createdAt) ? null : Math.floor((now - createdAt) / 60000),
+      customerName: contact.name || contact.companyName || "",
+      customerEmail: contact.email || "",
+      customerMobile: contact.mobile || "",
+      amount: session.cart?.pricing?.grandTotal ?? null,
+      gateway: attempt?.gateway || "",
+      gatewayOrderId: attempt?.gatewayOrderId || "",
+      attemptId: attempt?.id || ""
+    };
+  });
+
+  rows.sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+  return rows;
+}
+
 module.exports = {
   listOrders,
   getOrderDetail,
   updateOrder,
-  exportOrdersCsv
+  exportOrdersCsv,
+  listStuckPaymentSessions
 };

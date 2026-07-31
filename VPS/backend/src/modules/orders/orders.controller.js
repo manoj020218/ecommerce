@@ -47,9 +47,15 @@ const adminExportOrders = asyncHandler(async (req, res) => {
   res.send(csv);
 });
 
+const adminListStuckPaymentSessions = asyncHandler(async (req, res) => {
+  const data = await service.listStuckPaymentSessions();
+  return ok(res, data, "Stuck payment sessions fetched.");
+});
+
 module.exports = {
   adminListOrders,
   adminGetOrderDetail,
   adminUpdateOrder,
-  adminExportOrders
+  adminExportOrders,
+  adminListStuckPaymentSessions
 };

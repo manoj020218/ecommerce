@@ -27,6 +27,10 @@ export function exportOrdersUrl(params = {}) {
   return `/api/admin/orders/export${query ? `?${query}` : ""}`;
 }
 
+export function fetchStuckPaymentSessions() {
+  return apiFetch("/admin/orders/stuck-payments");
+}
+
 // Invoices
 export function generateInvoiceForOrder(orderId, payload = {}) {
   return apiFetch(`/admin/invoices/order/${orderId}/generate`, { method: "POST", body: payload });

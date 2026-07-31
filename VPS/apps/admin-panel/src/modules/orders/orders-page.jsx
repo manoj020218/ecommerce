@@ -5,7 +5,7 @@ import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { hasPermission } from "../../shared/utils/permissions";
 import { formatCurrencyInr } from "../../shared/utils/formatters";
-import { fetchOrders, fetchOrderDetail, exportOrdersUrl, updateOrder } from "./orders.api";
+import { fetchOrders, fetchOrderDetail, exportOrdersUrl, updateOrder, fetchStuckPaymentSessions } from "./orders.api";
 
 const BRAND     = "#E8231A";
 const BRAND_DK  = "#C41D15";
@@ -342,6 +342,52 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancel
   );
 }
 
+// ── stuck payments alert ─────────────────────────────────────────────────────
+
+function StuckPaymentsAlert({ rows }) {
+  if (!rows.length) return null;
+
+  return (
+    <div style={{
+      background:"rgba(239,68,68,0.06)", border:"1px solid #fca5a5",
+      borderRadius:16, padding:"14px 16px", marginBottom:14
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+        <span style={{ fontSize:16 }}>⚠️</span>
+        <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#b91c1c" }}>
+          Payment received but no order created ({rows.length})
+        </p>
+      </div>
+      <p style={{ margin:"0 0 10px", fontSize:12, color:"#7f1d1d" }}>
+        These customers reached the payment gateway but the order was never created — usually
+        because their browser closed before confirming. Verify the payment with the gateway
+        order/txn ID below before reconciling manually.
+      </p>
+      <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+        {rows.map((row) => (
+          <div key={row.checkoutSessionId} style={{
+            display:"flex", flexWrap:"wrap", alignItems:"center", gap:"4px 12px",
+            background:"#fff", border:"1px solid #fee2e2", borderRadius:10,
+            padding:"8px 12px", fontSize:12
+          }}>
+            <strong style={{ color:"#111827" }}>{row.customerName || "Unknown"}</strong>
+            <span style={{ color:"#374151", fontWeight:700 }}>{formatCurrencyInr(row.amount)}</span>
+            <span style={{ color:"#6b7280" }}>{row.customerEmail}</span>
+            <span style={{ color:"#6b7280" }}>{row.customerMobile}</span>
+            <span style={{ color:"#9ca3af" }}>via {row.gateway || "unknown gateway"}</span>
+            {row.gatewayOrderId && (
+              <span style={{ color:"#9ca3af", fontFamily:"monospace", fontSize:11 }}>{row.gatewayOrderId}</span>
+            )}
+            <span style={{ marginLeft:"auto", color:"#b91c1c", fontWeight:600, whiteSpace:"nowrap" }}>
+              stuck {row.stuckForMinutes != null ? `${row.stuckForMinutes}m` : "—"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export function OrdersPage() {
@@ -352,6 +398,7 @@ export function OrdersPage() {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [allRows, setAllRows]     = useState([]);
+  const [stuckPayments, setStuckPayments] = useState([]);
 
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch]       = useState("");
@@ -371,6 +418,12 @@ export function OrdersPage() {
       setAllRows(Array.isArray(data?.rows) ? data.rows : []);
     } catch (e) {
       setError(e.message || "Failed to load orders.");
+    }
+    try {
+      const stuck = await fetchStuckPaymentSessions();
+      setStuckPayments(Array.isArray(stuck) ? stuck : []);
+    } catch {
+      // non-critical — don't block the orders list on this
     }
   };
 
@@ -460,6 +513,8 @@ export function OrdersPage() {
           + Add Order
         </button>
       </div>
+
+      <StuckPaymentsAlert rows={stuckPayments} />
 
       {/* status tabs */}
       <div style={{ display:"flex", gap:8, overflowX:"auto", marginBottom:14, paddingBottom:2, scrollbarWidth:"none" }}>

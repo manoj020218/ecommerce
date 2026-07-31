@@ -16,11 +16,16 @@ function createOrdersRouter() {
     requireAdminPermission(ORDERS_PERMISSIONS.VIEW),
     controller.adminListOrders
   );
-  // export must come before /:orderId to avoid route conflict
+  // export and stuck-payments must come before /:orderId to avoid route conflict
   router.get(
     "/export",
     requireAdminPermission(ORDERS_PERMISSIONS.VIEW),
     controller.adminExportOrders
+  );
+  router.get(
+    "/stuck-payments",
+    requireAdminPermission(ORDERS_PERMISSIONS.VIEW),
+    controller.adminListStuckPaymentSessions
   );
   router.get(
     "/:orderId",

@@ -30,9 +30,11 @@ function isPendingPayment(order) {
   return payStatus !== "paid";
 }
 
-function getDashboardStats() {
-  const authStore = readAuthStore();
-  const catalogStore = readCatalogStore();
+async function getDashboardStats() {
+  const [authStore, catalogStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore()
+  ]);
 
   const orders = Array.isArray(authStore.orders) ? authStore.orders : [];
   const products = Array.isArray(catalogStore.products) ? catalogStore.products : [];

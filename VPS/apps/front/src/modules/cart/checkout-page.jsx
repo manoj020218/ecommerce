@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getCustomerAccountBootstrap } from "../account/account.api";
-import { useCustomerSession } from "../../shared/auth/customer-session";
+import { getCustomerAccountBootstrap, loginCustomerEmail } from "../account/account.api";
+import { GoogleSignInButton } from "../account/account-login-page";
+import { createCustomerSession, useCustomerSession } from "../../shared/auth/customer-session";
 import { resetGuestSessionId } from "../../shared/cart/guest-session";
 import {
   StorefrontAlert,
@@ -166,10 +167,90 @@ function buildOrderSuccessUrl({ sessionId, orderId, orderNo, paymentLink }) {
   return `/checkout/success?${params.toString()}`;
 }
 
+// Shown before the checkout form for anyone not signed in — login is the primary
+// path (like Flipkart/Myntra), guest checkout is a smaller secondary link below.
+function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTotal }) {
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const payload = await loginCustomerEmail(form);
+      onSignedIn(createCustomerSession(payload));
+    } catch (requestError) {
+      setError(requestError.message || "Sign in failed. Check your email and password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article className="proto-checkout-card proto-checkout-login-gate">
+      <div className="proto-checkout-card-head">
+        <h2>Sign in to check out</h2>
+        <span>
+          {itemCount} item{itemCount === 1 ? "" : "s"} · {formatCurrency(grandTotal)}
+        </span>
+      </div>
+
+      {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
+
+      <GoogleSignInButton redirectPath="/checkout" />
+
+      <form className="stack-form" onSubmit={handleLogin}>
+        <div className="field-grid">
+          <StorefrontInput
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+            placeholder="name@example.com"
+            required
+          />
+          <StorefrontInput
+            label="Password"
+            type="password"
+            value={form.password}
+            onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            placeholder="Your password"
+            required
+          />
+        </div>
+        <StorefrontButton type="submit" disabled={busy} fullWidth>
+          {busy ? "Signing in..." : "Login & Continue"}
+        </StorefrontButton>
+      </form>
+
+      <div className="proto-inline-actions">
+        <StorefrontButton to="/account/login?redirect=%2Fcheckout" variant="light">
+          New here? Create Account
+        </StorefrontButton>
+      </div>
+
+      <div className="proto-checkout-guest-divider">
+        <span>or</span>
+      </div>
+
+      <button type="button" className="proto-checkout-guest-link" onClick={onContinueAsGuest}>
+        Continue as Guest →
+      </button>
+    </article>
+  );
+}
+
 export function CheckoutPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { customer, isAuthenticated, loading: sessionLoading } = useCustomerSession();
+  const { customer, isAuthenticated, loading: sessionLoading, setSession } = useCustomerSession();
+  // Skip the login gate when resuming an existing checkout session (e.g. a retry
+  // link) — they've already been through this decision once for this checkout.
+  const [guestOverride, setGuestOverride] = useState(
+    () => new URLSearchParams(window.location.search).has("session")
+  );
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -688,6 +769,59 @@ export function CheckoutPage() {
   const manualInstructionEntries = Object.entries(
     manualPaymentInstructions?.instructions || gatewayInfo?.instructions || {}
   ).filter(([, value]) => Boolean(value));
+
+  if (!isAuthenticated && !guestOverride && items.length > 0) {
+    return (
+      <main className="proto-main-shell proto-checkout-page">
+        <StorefrontPageHeader
+          eyebrow="Checkout"
+          title="Sign in to check out faster"
+          description="Track this order, save your address, and reorder in one click by signing in — or continue as a guest."
+          actions={<StorefrontButton to="/cart" variant="light">Back to Cart</StorefrontButton>}
+        />
+        <div className="proto-checkout-layout">
+          <section className="proto-checkout-main">
+            <CheckoutLoginGate
+              itemCount={items.length}
+              grandTotal={totals.grandTotal}
+              onSignedIn={(session) => {
+                setSession(session);
+              }}
+              onContinueAsGuest={() => setGuestOverride(true)}
+            />
+          </section>
+          <aside className="proto-checkout-sidebar">
+            <article className="proto-order-summary-card">
+              <h2>Order Summary</h2>
+              <div className="proto-checkout-items">
+                {items.map((item) => (
+                  <div key={item.productId} className="proto-checkout-item">
+                    <div className="proto-checkout-item-media">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.title} loading="lazy" />
+                      ) : (
+                        <span>{item.sku || "Jenix"}</span>
+                      )}
+                    </div>
+                    <div className="proto-checkout-item-copy">
+                      <p>{item.title}</p>
+                      <span>Qty {Number(item.qty || 0)}</span>
+                      <strong>{formatCurrency(item.lineTotal)}</strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="proto-summary-total">
+                <span>Grand Total</span>
+                <strong>{formatCurrency(totals.grandTotal)}</strong>
+                <small>inclusive of all taxes</small>
+              </div>
+            </article>
+          </aside>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="proto-main-shell proto-checkout-page">

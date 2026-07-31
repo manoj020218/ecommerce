@@ -17,7 +17,7 @@ import {
 } from "./account.api";
 import { getGoogleAuthConfig } from "./google-auth.api";
 
-function GoogleSignInButton({ redirectPath }) {
+export function GoogleSignInButton({ redirectPath }) {
   const [config, setConfig] = useState(null);
   const [busy, setBusy] = useState(false);
   const fetched = useRef(false);

@@ -624,6 +624,44 @@ function buildStrictCartLines(catalogStore, cartItems, options = {}) {
   return lines;
 }
 
+// Drops any cart items that no longer resolve (archived/inactive product,
+// zero stock with no backorder, etc.) before a strict-checked write. Without
+// this, adding or updating ONE item runs enforceStockCheck against the WHOLE
+// cart — a single unrelated stale item left over from an earlier visit (the
+// product went out of stock, got archived, ...) would permanently block
+// adding anything else, since the strict check has no way to distinguish
+// "the item you're touching" from "something already sitting in the cart".
+function dropInvalidCartItems(catalogStore, cart, customerPricingContext, excludeProductId = null) {
+  const validItems = [];
+  let droppedAny = false;
+
+  for (const item of ensureArray(cart.items)) {
+    if (excludeProductId && item.productId === excludeProductId) {
+      // Left to the caller's own strict check, so a customer acting on THIS
+      // item (adding/updating it) sees why it failed instead of it just
+      // silently disappearing from their cart.
+      validItems.push(item);
+      continue;
+    }
+    try {
+      buildCartLineFromItem(catalogStore, item, {
+        enforceStockCheck: false,
+        customerPricingContext
+      });
+      validItems.push(item);
+    } catch (_error) {
+      droppedAny = true;
+    }
+  }
+
+  if (droppedAny) {
+    cart.items = validItems;
+    cart.updatedAt = nowIso();
+  }
+
+  return droppedAny;
+}
+
 function buildCartView(owner, cart, lines, pricing) {
   return sanitizeCartView({
     ownerType: owner.ownerType,
@@ -1170,6 +1208,10 @@ async function addCartItem(context, payload) {
   let changed = cleanupExpiredReservations(authStore, catalogStore);
 
   const cart = ensureCartRecord(authStore, owner, true);
+  if (dropInvalidCartItems(catalogStore, cart, customerPricingContext, payload.productId)) {
+    changed = true;
+  }
+
   const existing = cart.items.find((item) => item.productId === payload.productId);
   if (existing) {
     existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
@@ -1237,6 +1279,10 @@ async function updateCartItem(context, productId, payload) {
     productId,
     qty: Number(payload.qty || 0)
   };
+
+  if (dropInvalidCartItems(catalogStore, cart, customerPricingContext, productId)) {
+    changed = true;
+  }
 
   const lines = buildStrictCartLines(catalogStore, cart.items, {
     enforceStockCheck: true,

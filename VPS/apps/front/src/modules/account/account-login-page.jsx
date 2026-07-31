@@ -16,6 +16,7 @@ import {
   verifyCustomerOtp
 } from "./account.api";
 import { getGoogleAuthConfig } from "./google-auth.api";
+import { getExistingGuestSessionId } from "../cart/cart.utils";
 
 export function GoogleSignInButton({ redirectPath }) {
   const [config, setConfig] = useState(null);
@@ -34,7 +35,12 @@ export function GoogleSignInButton({ redirectPath }) {
 
   function handleGoogleLogin() {
     setBusy(true);
-    const state = encodeURIComponent(JSON.stringify({ redirect: redirectPath }));
+    // Without this, the guest cart is silently dropped after Google sign-in —
+    // the callback page already merges it, it just needs the session id here.
+    const guestSessionId = getExistingGuestSessionId();
+    const state = encodeURIComponent(
+      JSON.stringify({ redirect: redirectPath, guestSessionId: guestSessionId || null })
+    );
     const redirectUri = encodeURIComponent(`${window.location.origin}/account/google-callback`);
     const scope = encodeURIComponent("openid email profile");
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&state=${state}&access_type=online`;

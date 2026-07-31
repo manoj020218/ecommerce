@@ -640,7 +640,18 @@ export function CheckoutPage() {
 
       if (paymentMethod === "online" && nextCheckoutSession?.id) {
         const attempt = await handleCreatePaymentLink(nextCheckoutSession.id);
-        if (!attempt) return;
+        if (!attempt) {
+          // The checkout session was created but the payment attempt (stock
+          // reservation) wasn't — clear it instead of leaving a "Latest
+          // Checkout Session" card with a Create Payment Link button sitting
+          // right next to the error, which looked like a live retry option
+          // when the same request would just fail again.
+          setCheckoutSession(null);
+          setOrderSummary(null);
+          setSearchParams({}, { replace: true });
+          refreshCartPreview().catch(() => {});
+          return;
+        }
 
         if (attempt.gateway === "razorpay" && attempt.gatewayOrderId && attempt.gatewayProviderKey) {
           const loaded = await loadRazorpayScript();

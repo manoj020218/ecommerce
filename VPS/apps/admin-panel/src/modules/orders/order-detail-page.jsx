@@ -1098,7 +1098,7 @@ export function OrderDetailPage() {
   const customerPhone = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
 
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 1100, margin: "0 auto" }}>
+    <div className="order-detail-shell" style={{ maxWidth: 1100, margin: "0 auto" }}>
       {/* Breadcrumb + back */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
         <div style={{ fontSize: 12, color: "var(--muted)" }}>
@@ -1185,7 +1185,7 @@ export function OrderDetailPage() {
       </div>
 
       {/* Products + Summary */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: 14, marginBottom: 14 }}>
+      <div className="order-detail-content-grid" style={{ display: "grid", gap: 14, marginBottom: 14 }}>
         {/* Products table */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -1351,7 +1351,7 @@ export function OrderDetailPage() {
       {/* Single controlled pipeline action — one button drives Processing -> Invoice ->
           Shipping -> Delivered, so the same order can't be advanced out of order or
           twice by accident. */}
-      <div style={{ display: "flex", gap: 10, paddingTop: 8 }}>
+      <div className="order-detail-action-row" style={{ display: "flex", gap: 10, paddingTop: 8 }}>
         {canCancel && (
           <button type="button" className="btn btn-secondary" disabled={cancelSaving} onClick={handleCancelOrder}
             style={{ color: "var(--danger)", borderColor: "rgba(220,38,38,0.3)" }}>

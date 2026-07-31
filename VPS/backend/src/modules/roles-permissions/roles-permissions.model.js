@@ -39,6 +39,7 @@ const AVAILABLE_PERMISSIONS = Object.freeze([
   "invoices.export_tally",
   "shipping.view",
   "shipping.create",
+  "shipping.manage_config",
   "shipping.update_tracking",
   "shipping.mark_delivered",
   "shipping.upload_pod",

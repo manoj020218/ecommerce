@@ -49,7 +49,7 @@ function createAdminShippingRouter() {
   );
   router.patch(
     "/settings",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminPatchShippingSettings
   );
   router.get(
@@ -59,12 +59,12 @@ function createAdminShippingRouter() {
   );
   router.post(
     "/rate-cards",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminCreateRateCard
   );
   router.patch(
     "/rate-cards/:rateCardId",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminUpdateRateCard
   );
 
@@ -75,12 +75,12 @@ function createAdminShippingRouter() {
   );
   router.post(
     "/couriers",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminCreateCourier
   );
   router.patch(
     "/couriers/:courierProfileId",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminUpdateCourier
   );
 
@@ -91,12 +91,12 @@ function createAdminShippingRouter() {
   );
   router.post(
     "/classes",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminCreateShippingClass
   );
   router.patch(
     "/classes/:classId",
-    requireAdminPermission(SHIPPING_PERMISSIONS.CREATE),
+    requireAdminPermission(SHIPPING_PERMISSIONS.MANAGE_CONFIG),
     controller.adminUpdateShippingClass
   );
 

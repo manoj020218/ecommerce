@@ -13,6 +13,7 @@ import {
   StorefrontStickyActionBar
 } from "../../shared/storefront/storefront-ui";
 import {
+  cancelPaymentAttempt,
   confirmCashfreePayment,
   confirmRazorpayPayment,
   createPaymentAttempt,
@@ -438,6 +439,19 @@ export function CheckoutPage() {
     }
   }
 
+  // Fire-and-forget: releases the stock reservation tied to an abandoned/cancelled
+  // payment attempt right away, instead of leaving it held until its ~15min TTL
+  // expires. Without this, retrying a low-stock item right after cancelling gets
+  // wrongly rejected as "not available" — blocked by the buyer's own abandoned hold.
+  function releaseAbandonedAttempt(attemptId) {
+    if (!attemptId) return;
+    const context = resolveCartContext(false);
+    if (!isAuthenticated && !context?.sessionId) return;
+    cancelPaymentAttempt({ ...(context || {}), attemptId }).catch(() => {
+      // best-effort — natural TTL expiry is still a fallback
+    });
+  }
+
   async function handleCreatePaymentLink(checkoutSessionId) {
     const context = resolveCartContext(false);
     if (!isAuthenticated && !context?.sessionId) {
@@ -584,6 +598,7 @@ export function CheckoutPage() {
             },
             modal: {
               ondismiss: function () {
+                releaseAbandonedAttempt(attempt.attemptId);
                 setError("Payment was not completed. You can try again.");
                 setSubmitting(false);
               }
@@ -592,6 +607,7 @@ export function CheckoutPage() {
 
           const rzp = new window.Razorpay(rzpOptions);
           rzp.on("payment.failed", function (resp) {
+            releaseAbandonedAttempt(attempt.attemptId);
             setError(`Payment failed: ${resp.error?.description || "Please try again."}`);
             setSubmitting(false);
           });
@@ -617,6 +633,7 @@ export function CheckoutPage() {
             });
 
             if (!result?.paymentDetails) {
+              releaseAbandonedAttempt(attempt.attemptId);
               setError(
                 result?.error?.message || "Payment was not completed. You can try again."
               );
@@ -631,6 +648,7 @@ export function CheckoutPage() {
             }
             openOrderSuccess(attempt);
           } catch (cashfreeError) {
+            releaseAbandonedAttempt(attempt.attemptId);
             setError(cashfreeError.message || "Payment failed. Please try again.");
             setSubmitting(false);
           }
@@ -693,7 +711,10 @@ export function CheckoutPage() {
 
       <div className="proto-checkout-layout">
         <section className="proto-checkout-main">
-          {checkoutSession ? (
+          {/* Suppressed while auto-redirecting to an online gateway right after
+              submit — otherwise this flashes on screen for a moment before the
+              Razorpay/Cashfree widget opens, which is just noise for the buyer. */}
+          {checkoutSession && !(submitting && paymentMethod === "online") ? (
             <article className="proto-checkout-card">
               <div className="proto-checkout-card-head">
                 <h2>Latest Checkout Session</h2>

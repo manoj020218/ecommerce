@@ -103,6 +103,11 @@ const createPaymentAttemptSchema = z.object({
   gateway: z.string().trim().min(2).max(120).optional()
 });
 
+const cancelPaymentAttemptSchema = z.object({
+  sessionId: sessionIdSchema.optional(),
+  attemptId: z.string().trim().min(2).max(140)
+});
+
 const confirmRazorpayPaymentSchema = z.object({
   attemptId: z.string().trim().min(2).max(140),
   razorpay_payment_id: z.string().trim().min(2).max(140),
@@ -175,6 +180,11 @@ function parseCreatePaymentAttemptPayload(payload) {
   return createPaymentAttemptSchema.parse(payload);
 }
 
+function parseCancelPaymentAttemptPayload(payload) {
+  ensureObject(payload, "Cancel payment attempt");
+  return cancelPaymentAttemptSchema.parse(payload);
+}
+
 function parsePaymentWebhookPayload(payload) {
   ensureObject(payload, "Payment webhook");
   return paymentWebhookSchema.parse(payload);
@@ -201,6 +211,7 @@ module.exports = {
   parseCheckoutStartPayload,
   parseCheckoutViewQuery,
   parseCreatePaymentAttemptPayload,
+  parseCancelPaymentAttemptPayload,
   parsePaymentWebhookPayload,
   parseConfirmRazorpayPaymentPayload,
   parseConfirmCashfreePaymentPayload

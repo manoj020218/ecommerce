@@ -169,6 +169,14 @@ export function createPaymentAttempt(payload) {
   });
 }
 
+export function cancelPaymentAttempt(payload) {
+  return apiFetch("/payments/cancel-attempt", {
+    method: "POST",
+    auth: true,
+    body: payload
+  });
+}
+
 export function confirmRazorpayPayment(payload) {
   return apiFetch("/payments/razorpay-confirm", {
     method: "POST",

@@ -2233,6 +2233,75 @@ async function createPaymentAttempt(context, payload) {
   };
 }
 
+// Called when the buyer dismisses/cancels the gateway checkout widget without
+// paying. Without this, an abandoned attempt's stock reservation sits ACTIVE
+// until its ~15min TTL expires — since gateways don't send a webhook for a
+// bare dismiss (no payment was ever attempted with the bank), a buyer who
+// cancels and immediately retries a low-stock item gets wrongly told it's
+// unavailable, blocked by their own abandoned hold. This releases it right away.
+async function cancelPaymentAttempt(context, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null
+  });
+
+  const [authStore, catalogStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+
+  const attempt = authStore.paymentAttempts.find((row) => row.id === payload.attemptId);
+  if (!attempt) {
+    return { cancelled: false };
+  }
+
+  const session = authStore.checkoutSessions.find(
+    (row) => row.id === attempt.checkoutSessionId
+  );
+  assertCheckoutOwnership(session, owner);
+
+  let changed = false;
+
+  if (attempt.status === PAYMENT_ATTEMPT_STATUSES.CREATED) {
+    attempt.status = PAYMENT_ATTEMPT_STATUSES.FAILED;
+    attempt.failureReason = "customer_cancelled";
+    attempt.updatedAt = nowIso();
+    changed = true;
+  }
+
+  const reservation = session.reservationId
+    ? authStore.stockReservations.find((row) => row.id === session.reservationId)
+    : null;
+
+  if (reservation && reservation.status === RESERVATION_STATUSES.ACTIVE) {
+    const released = releaseReservationInternal(
+      catalogStore,
+      reservation,
+      "customer_cancelled",
+      RESERVATION_STATUSES.RELEASED
+    );
+    if (released) {
+      changed = true;
+    }
+  }
+
+  if (session.status === CHECKOUT_STATUSES.PAYMENT_ATTEMPT_CREATED) {
+    session.status = CHECKOUT_STATUSES.STARTED;
+    session.updatedAt = nowIso();
+    changed = true;
+  }
+
+  if (changed) {
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true
+    });
+  }
+
+  return { cancelled: true };
+}
+
 async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
   const normalizedGatewayCode = String(gatewayCode || "mock_online")
     .trim()
@@ -2735,6 +2804,7 @@ module.exports = {
   downloadCheckoutInvoice,
   listOnlineGateways,
   createPaymentAttempt,
+  cancelPaymentAttempt,
   confirmRazorpayCheckout,
   confirmCashfreeCheckout,
   processPaymentWebhook,

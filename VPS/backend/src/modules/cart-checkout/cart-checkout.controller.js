@@ -13,6 +13,7 @@ const {
   parseCheckoutStartPayload,
   parseCheckoutViewQuery,
   parseCreatePaymentAttemptPayload,
+  parseCancelPaymentAttemptPayload,
   parsePaymentWebhookPayload,
   parseConfirmRazorpayPaymentPayload,
   parseConfirmCashfreePaymentPayload
@@ -154,6 +155,15 @@ const paymentsCreateAttempt = asyncHandler(async (req, res) => {
   return created(res, data, "Payment attempt created.");
 });
 
+const paymentsCancelAttempt = asyncHandler(async (req, res) => {
+  const payload = parseCancelPaymentAttemptPayload(req.body);
+  const data = await service.cancelPaymentAttempt(
+    cartContext(req, payload.sessionId),
+    payload
+  );
+  return ok(res, data, "Payment attempt cancelled.");
+});
+
 const paymentsConfirmRazorpay = asyncHandler(async (req, res) => {
   const payload = parseConfirmRazorpayPaymentPayload(req.body);
   const data = await service.confirmRazorpayCheckout(payload);
@@ -205,6 +215,7 @@ module.exports = {
   checkoutDownloadInvoice,
   paymentsListOnlineGateways,
   paymentsCreateAttempt,
+  paymentsCancelAttempt,
   paymentsConfirmRazorpay,
   paymentsConfirmCashfree,
   paymentsWebhookMock,

@@ -229,12 +229,22 @@ function AssetUploadCard({
   );
 }
 
+const SETTINGS_TABS = [
+  { key: "storeProfile", label: "Store Profile" },
+  { key: "branding", label: "Branding" },
+  { key: "seo", label: "SEO Defaults" },
+  { key: "contact", label: "Contact Information" },
+  { key: "customCode", label: "Custom Code / Tags" },
+  { key: "whatsapp", label: "WhatsApp" }
+];
+
 export function SettingsPage() {
   const { session } = useAuthSession();
   const canView = hasPermission(session, "settings.view");
   const canEdit = hasPermission(session, "settings.edit");
   const canEditCustomCode = session?.admin?.role === "super_admin";
 
+  const [activeTab, setActiveTab] = useState(SETTINGS_TABS[0].key);
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(() => cloneSettings(EMPTY_SETTINGS));
   const [error, setError] = useState("");
@@ -370,7 +380,20 @@ export function SettingsPage() {
       {notice ? <p className="alert-info">{notice}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}
 
-      <article className="settings-card">
+      <div className="settings-tabs">
+        {SETTINGS_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={`settings-tab${activeTab === tab.key ? " active" : ""}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <article className="settings-card" hidden={activeTab !== "storeProfile"}>
         <div className="settings-card-head">
           <div>
             <h3>Store Profile</h3>
@@ -569,7 +592,7 @@ export function SettingsPage() {
         </form>
       </article>
 
-      <article className="settings-card">
+      <article className="settings-card" hidden={activeTab !== "branding"}>
         <div className="settings-card-head">
           <div>
             <h3>Branding</h3>
@@ -640,7 +663,7 @@ export function SettingsPage() {
         </div>
       </article>
 
-      <article className="settings-card">
+      <article className="settings-card" hidden={activeTab !== "seo"}>
         <div className="settings-card-head">
           <div>
             <h3>SEO Defaults</h3>
@@ -768,7 +791,7 @@ export function SettingsPage() {
         </form>
       </article>
 
-      <article className="settings-card">
+      <article className="settings-card" hidden={activeTab !== "contact"}>
         <div className="settings-card-head">
           <div>
             <h3>Contact Information</h3>
@@ -920,7 +943,7 @@ export function SettingsPage() {
         </form>
       </article>
 
-      <article className="settings-card">
+      <article className="settings-card" hidden={activeTab !== "customCode"}>
         <div className="settings-card-head">
           <div>
             <h3>Custom Code / Tags</h3>
@@ -1071,7 +1094,9 @@ export function SettingsPage() {
         </form>
       </article>
 
-      <WhatsAppConnectCard canManage={canEditCustomCode} />
+      <div hidden={activeTab !== "whatsapp"}>
+        <WhatsAppConnectCard canManage={canEditCustomCode} />
+      </div>
     </section>
   );
 }

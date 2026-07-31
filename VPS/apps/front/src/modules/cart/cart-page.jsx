@@ -349,7 +349,7 @@ export function CartPage() {
                       <line x1="3" y1="6" x2="21" y2="6" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" />
                       <path d="M16 10a4 4 0 01-8 0" stroke="var(--brand)" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <span>Easy Return</span>
+                    <span>Fast Dispatch</span>
                   </div>
                 </div>
               </div>

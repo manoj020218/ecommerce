@@ -256,6 +256,14 @@ export function StorefrontLayout() {
   const isCartRoute = location.pathname === "/cart";
   const isAccountRoute = location.pathname.startsWith("/account");
 
+  // React Router doesn't reset scroll on navigation like a traditional site —
+  // without this, switching bottom-nav tabs (or any link) keeps whatever
+  // scroll position the previous page was at, so a new page can open already
+  // scrolled partway or all the way down instead of showing its top content.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   useEffect(() => {
     listCategories()
       .then((rows) => {

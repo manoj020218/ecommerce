@@ -3800,7 +3800,9 @@ async function run() {
     assert.equal(phase19PendingOrder.json.data.order.orderStatus, "payment_pending");
     const phase19PendingOrderId = phase19PendingOrder.json.data.order.id;
 
-    const phase19InvoiceBlockedBeforePayment = await requestJson(
+    // Unpaid orders no longer block invoice generation — they get a Proforma
+    // Invoice (separate numbering series) instead of the real Tax Invoice.
+    const phase19ProformaBeforePayment = await requestJson(
       baseUrl,
       `/api/admin/walkin-orders/${phase19PendingOrderId}/generate-invoice`,
       {
@@ -3809,7 +3811,18 @@ async function run() {
         body: JSON.stringify({})
       }
     );
-    assert.equal(phase19InvoiceBlockedBeforePayment.response.status, 409);
+    assert.equal(phase19ProformaBeforePayment.response.status, 200);
+    assert.equal(
+      phase19ProformaBeforePayment.json.data.invoice.documentType,
+      "proforma_invoice"
+    );
+    assert.equal(
+      phase19ProformaBeforePayment.json.data.invoice.invoiceNumber.startsWith(
+        "PROFORMA-"
+      ),
+      true
+    );
+    const phase19ProformaInvoiceId = phase19ProformaBeforePayment.json.data.invoice.id;
 
     const phase19PaymentConfirm = await requestJson(
       baseUrl,
@@ -3830,6 +3843,16 @@ async function run() {
       "invoice_generated"
     );
     assert.equal(Boolean(phase19PaymentConfirm.json.data.invoice?.id), true);
+    // Paying supersedes the Proforma with a real Tax Invoice — a different
+    // document, not the same proforma record just relabeled.
+    assert.equal(
+      phase19PaymentConfirm.json.data.invoice.documentType,
+      "tax_invoice"
+    );
+    assert.notEqual(
+      phase19PaymentConfirm.json.data.invoice.id,
+      phase19ProformaInvoiceId
+    );
 
     const phase19DispatchedOrder = await requestJson(
       baseUrl,

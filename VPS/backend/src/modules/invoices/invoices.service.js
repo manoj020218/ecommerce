@@ -5,6 +5,7 @@ const { readCatalogStore } = require("../../database/catalog-store");
 const { readInvoiceStore, writeInvoiceStore } = require("../../database/invoice-store");
 const { jsonFileStore } = require("../../database/json-file-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const { resolveGstStateCode, resolveGstStateName } = require("../../common/india-gst-states");
 const {
   roundMoney,
   ensureArray,
@@ -12,7 +13,8 @@ const {
   sanitizeInvoice,
   sanitizeInvoiceSummary,
   resolveFinancialYearLabel,
-  buildInvoiceNumber
+  buildInvoiceNumber,
+  buildProformaInvoiceNumber
 } = require("./invoices.model");
 
 function nowIso() {
@@ -24,9 +26,14 @@ function formatDateOnly(dateInput) {
 }
 
 function normalizeStateCode(value) {
-  return String(value || "")
-    .trim()
-    .toUpperCase();
+  return resolveGstStateCode(value);
+}
+
+// Free-text address forms let a state code and state name land in either field —
+// try the code field first, then fall back to resolving the name field, so a stray
+// "RAJASTHAN" typed into either box still resolves to "08" instead of mismatching.
+function resolveStateCodeFromFields(codeValue, nameValue) {
+  return normalizeStateCode(codeValue) || normalizeStateCode(nameValue);
 }
 
 function ensureAuthStoreShape(store) {
@@ -41,14 +48,15 @@ function ensureAuthStoreShape(store) {
 function resolveSellerSnapshot(settings) {
   const storeProfile = settings.storeProfile || {};
   const invoiceSettings = settings.invoiceSettings || {};
+  const sellerStateCode = resolveStateCodeFromFields(storeProfile.stateCode, storeProfile.state);
 
   return {
     storeName: storeProfile.storeName || "Jenix India",
     legalBusinessName: storeProfile.legalBusinessName || "",
     gstin: storeProfile.gstin || "",
     address: storeProfile.address || "",
-    state: storeProfile.state || "",
-    stateCode: normalizeStateCode(storeProfile.stateCode),
+    state: storeProfile.state || resolveGstStateName(sellerStateCode) || "",
+    stateCode: sellerStateCode,
     supportEmail: storeProfile.supportEmail || "",
     supportMobile: storeProfile.supportMobile || "",
     whatsappNumber: storeProfile.whatsappNumber || "",
@@ -73,6 +81,7 @@ function resolveBuyerSnapshot(order, authStore) {
   const customer = order.userId
     ? ensureArray(authStore.users).find((user) => user.id === order.userId)
     : null;
+  const buyerStateCode = resolveStateCodeFromFields(source.stateCode, source.state);
 
   return {
     name: source.name || customer?.name || "Customer",
@@ -84,11 +93,53 @@ function resolveBuyerSnapshot(order, authStore) {
       source.addressLine1 || source.address || source.line1 || source.street || "",
     addressLine2: source.addressLine2 || source.line2 || "",
     city: source.city || "",
-    state: source.state || "",
-    stateCode: normalizeStateCode(source.stateCode),
+    state: source.state || resolveGstStateName(buyerStateCode) || "",
+    stateCode: buyerStateCode,
     pincode: String(source.pincode || "").trim(),
     country: source.country || "India"
   };
+}
+
+// Ship-To is only rendered as a distinct block when the shipping address is both
+// present and materially different from the billing address; otherwise the invoice
+// shows the same data in both columns instead of a separate, possibly-stale block.
+function resolveShippingSnapshot(order, authStore, billingSnapshot) {
+  const shippingAddress = order.shippingAddress || {};
+  if (!shippingAddress || Object.keys(shippingAddress).length === 0) {
+    return { ...billingSnapshot, sameAsBilling: true };
+  }
+
+  const customer = order.userId
+    ? ensureArray(authStore.users).find((user) => user.id === order.userId)
+    : null;
+  const shipStateCode = resolveStateCodeFromFields(shippingAddress.stateCode, shippingAddress.state);
+
+  const shipping = {
+    name: shippingAddress.name || customer?.name || billingSnapshot.name,
+    companyName: shippingAddress.companyName || "",
+    addressLine1:
+      shippingAddress.addressLine1 ||
+      shippingAddress.address ||
+      shippingAddress.line1 ||
+      shippingAddress.street ||
+      "",
+    addressLine2: shippingAddress.addressLine2 || shippingAddress.line2 || "",
+    city: shippingAddress.city || "",
+    state: shippingAddress.state || resolveGstStateName(shipStateCode) || "",
+    stateCode: shipStateCode,
+    pincode: String(shippingAddress.pincode || "").trim(),
+    country: shippingAddress.country || "India",
+    mobile: shippingAddress.mobile || billingSnapshot.mobile
+  };
+
+  const sameAsBilling =
+    shipping.addressLine1 === billingSnapshot.addressLine1 &&
+    shipping.addressLine2 === billingSnapshot.addressLine2 &&
+    shipping.city === billingSnapshot.city &&
+    shipping.stateCode === billingSnapshot.stateCode &&
+    shipping.pincode === billingSnapshot.pincode;
+
+  return { ...shipping, sameAsBilling };
 }
 
 function resolvePlaceOfSupply(seller, buyer) {
@@ -364,9 +415,19 @@ function renderInfoPairs(entries) {
 function renderInvoiceHtml(invoice) {
   const seller = invoice.seller || {};
   const buyer = invoice.buyer || {};
+  const shipping = invoice.shipping || buyer;
   const display = invoice.display || {};
   const pricing = invoice.pricing || {};
   const placeOfSupply = invoice.placeOfSupply || {};
+  const isProforma = invoice.documentType === "proforma_invoice";
+  const shipToAddress = joinTextParts([
+    shipping.addressLine1,
+    shipping.addressLine2,
+    shipping.city,
+    shipping.state,
+    shipping.pincode,
+    shipping.country
+  ]);
   const buyerAddress = joinTextParts([
     buyer.addressLine1,
     buyer.addressLine2,
@@ -385,9 +446,20 @@ function renderInvoiceHtml(invoice) {
     seller.supportEmail,
     seller.whatsappNumber ? `WhatsApp: ${seller.whatsappNumber}` : ""
   ]);
-  const itemsHtml = ensureArray(invoice.items)
-    .map(
-      (item, index) => `
+  // Tally's sales-invoice entry format: Sr No / Description / HSN-or-SAC / Qty /
+  // Rate WITHOUT GST / Per / Amount. GST itself is summarized separately in the
+  // Totals block below, not per line — so "Rate" and "Amount" here are always the
+  // pre-tax taxableValue, never the GST-inclusive finalUnitPrice.
+  const invoiceItems = ensureArray(invoice.items);
+  const itemsQtyTotal = invoiceItems.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+  const itemsAmountTotal = roundMoney(
+    invoiceItems.reduce((sum, item) => sum + Number(item.taxableValue || 0), 0)
+  );
+  const itemsHtml = invoiceItems
+    .map((item, index) => {
+      const qty = Number(item.qty || 0);
+      const rateWithoutGst = qty > 0 ? roundMoney(Number(item.taxableValue || 0) / qty) : 0;
+      return `
         <tr>
           <td>${index + 1}</td>
           <td>
@@ -395,15 +467,13 @@ function renderInvoiceHtml(invoice) {
             <div class="subtext">${escapeHtml(item.sku || item.productId || "--")}</div>
           </td>
           <td>${escapeHtml(item.hsnCode || "--")}</td>
-          <td>${escapeHtml(String(Number(item.qty || 0)))}</td>
-          <td>${escapeHtml(formatCurrencyInr(item.finalUnitPrice || 0))}</td>
+          <td>${escapeHtml(String(qty))}</td>
+          <td>${escapeHtml(formatCurrencyInr(rateWithoutGst))}</td>
+          <td>Nos</td>
           <td>${escapeHtml(formatCurrencyInr(item.taxableValue || 0))}</td>
-          <td>${escapeHtml(formatPercent(item.gstRate || 0))}</td>
-          <td>${escapeHtml(formatCurrencyInr(item.gstAmount || 0))}</td>
-          <td>${escapeHtml(formatCurrencyInr(item.lineTotal || 0))}</td>
         </tr>
-      `
-    )
+      `;
+    })
     .join("");
   const hsnSummaryHtml =
     display.showHsnSummary !== false && ensureArray(invoice.hsnSummary).length
@@ -542,6 +612,21 @@ function renderInvoiceHtml(invoice) {
       .header-side p {
         margin: 8px 0 0;
       }
+      .doc-title-proforma {
+        color: #b45309;
+      }
+      .doc-note {
+        display: inline-block;
+        margin-top: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: #fef3e0;
+        color: #b45309;
+        border: 1px solid #f3d9ad;
+        padding: 3px 8px;
+      }
       .meta-grid,
       .party-grid,
       .totals-grid {
@@ -598,6 +683,16 @@ function renderInvoiceHtml(invoice) {
       }
       td strong {
         display: block;
+      }
+      tfoot td {
+        font-weight: 700;
+        background: #f9fafb;
+      }
+      .subtext {
+        font-size: 11px;
+        color: #6b7280;
+        font-style: italic;
+        margin: 4px 0 0;
       }
       .totals-grid {
         grid-template-columns: 1.4fr 1fr;
@@ -683,8 +778,9 @@ function renderInvoiceHtml(invoice) {
           </div>
         </div>
         <div class="header-side">
-          <h2>Tax Invoice</h2>
-          <p><strong>${escapeHtml(invoice.invoiceNumber || "--")}</strong></p>
+          <h2 class="${isProforma ? "doc-title-proforma" : ""}">${isProforma ? "Proforma Invoice" : "Tax Invoice"}</h2>
+          ${isProforma ? `<span class="doc-note">Not a tax invoice — payment pending</span>` : ""}
+          <p>Invoice Number: <strong>${escapeHtml(invoice.invoiceNumber || "--")}</strong></p>
           <p>Generated on ${escapeHtml(formatInvoiceDateLabel(invoice.generatedAt || invoice.invoiceDate))}</p>
         </div>
       </section>
@@ -719,12 +815,11 @@ function renderInvoiceHtml(invoice) {
           <p>GSTIN: ${escapeHtml(buyer.gstin || "--")}</p>
         </article>
         <article class="block">
-          <h3>Seller Details</h3>
-          <p>State: ${escapeHtml(seller.state || "--")}</p>
-          <p>State Code: ${escapeHtml(seller.stateCode || "--")}</p>
-          <p>Support Email: ${escapeHtml(seller.supportEmail || "--")}</p>
-          <p>Support Mobile: ${escapeHtml(seller.supportMobile || "--")}</p>
-          <p>WhatsApp: ${escapeHtml(seller.whatsappNumber || "--")}</p>
+          <h3>Ship To</h3>
+          <p><strong>${escapeHtml(shipping.companyName || shipping.name || buyer.companyName || buyer.name || "Customer")}</strong></p>
+          <p>${escapeHtml(shipToAddress || buyerAddress || "Shipping address not available")}</p>
+          <p>Mobile: ${escapeHtml(shipping.mobile || buyer.mobile || "--")}</p>
+          ${shipping.sameAsBilling === false ? "" : `<p class="subtext">Same address as Billed To.</p>`}
         </article>
       </section>
 
@@ -733,20 +828,27 @@ function renderInvoiceHtml(invoice) {
         <table>
           <thead>
             <tr>
-              <th>#</th>
-              <th>Description</th>
-              <th>HSN</th>
+              <th>Sr No.</th>
+              <th>Item Description</th>
+              <th>HSN/SAC</th>
               <th>Qty</th>
-              <th>Unit Price</th>
-              <th>Taxable Value</th>
-              <th>GST Rate</th>
-              <th>GST Amount</th>
-              <th>Total</th>
+              <th>Rate w/o GST</th>
+              <th>Per</th>
+              <th>Amount</th>
             </tr>
           </thead>
           <tbody>
             ${itemsHtml}
           </tbody>
+          <tfoot>
+            <tr class="items-total">
+              <td colspan="3">Total</td>
+              <td>${escapeHtml(String(itemsQtyTotal))}</td>
+              <td></td>
+              <td></td>
+              <td>${escapeHtml(formatCurrencyInr(itemsAmountTotal))}</td>
+            </tr>
+          </tfoot>
         </table>
       </section>
 
@@ -768,6 +870,16 @@ function renderInvoiceHtml(invoice) {
                 <td>${escapeHtml(formatCurrencyInr(pricing.productSubtotal || 0))}</td>
               </tr>
               ${
+                display.showShippingLine !== false || Number(pricing.shippingCharge || 0) !== 0
+                  ? `
+                    <tr>
+                      <td>Shipping</td>
+                      <td>${escapeHtml(formatCurrencyInr(pricing.shippingCharge || 0))}</td>
+                    </tr>
+                  `
+                  : ""
+              }
+              ${
                 display.showDiscountLine !== false || Number(pricing.discountAmount || 0) !== 0
                   ? `
                     <tr>
@@ -781,27 +893,24 @@ function renderInvoiceHtml(invoice) {
                 <td>Taxable Value</td>
                 <td>${escapeHtml(formatCurrencyInr(pricing.taxableValue || 0))}</td>
               </tr>
-              <tr>
-                <td>CGST Total</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.cgstTotal || 0))}</td>
-              </tr>
-              <tr>
-                <td>SGST Total</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.sgstTotal || 0))}</td>
-              </tr>
-              <tr>
-                <td>IGST Total</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.igstTotal || 0))}</td>
-              </tr>
               ${
-                display.showShippingLine !== false || Number(pricing.shippingCharge || 0) !== 0
+                placeOfSupply.isIntraState
                   ? `
                     <tr>
-                      <td>Shipping</td>
-                      <td>${escapeHtml(formatCurrencyInr(pricing.shippingCharge || 0))}</td>
+                      <td>CGST Total</td>
+                      <td>${escapeHtml(formatCurrencyInr(pricing.cgstTotal || 0))}</td>
+                    </tr>
+                    <tr>
+                      <td>SGST Total</td>
+                      <td>${escapeHtml(formatCurrencyInr(pricing.sgstTotal || 0))}</td>
                     </tr>
                   `
-                  : ""
+                  : `
+                    <tr>
+                      <td>IGST Total</td>
+                      <td>${escapeHtml(formatCurrencyInr(pricing.igstTotal || 0))}</td>
+                    </tr>
+                  `
               }
               <tr>
                 <td>Round Off</td>
@@ -872,6 +981,15 @@ function resolveNextSequence(invoiceStore, invoiceSettings, financialYearLabel) 
   return nextNumber;
 }
 
+// Proforma numbering is a single running counter, separate from the real
+// per-financial-year Tax Invoice sequence above — draft/unpaid documents must
+// never consume a number from the statutory series.
+function resolveNextProformaSequence(invoiceStore) {
+  const nextNumber = Number(invoiceStore.proformaSequence?.lastNumber || 0) + 1;
+  invoiceStore.proformaSequence = { lastNumber: nextNumber, updatedAt: nowIso() };
+  return nextNumber;
+}
+
 function findOrderByIdOrNo(authStore, orderId) {
   return ensureArray(authStore.orders).find(
     (order) => order.id === orderId || order.orderNo === orderId
@@ -879,9 +997,17 @@ function findOrderByIdOrNo(authStore, orderId) {
 }
 
 function findInvoiceByOrderId(invoiceStore, orderId) {
-  return ensureArray(invoiceStore.invoices).find(
+  const matches = ensureArray(invoiceStore.invoices).filter(
     (invoice) => invoice.orderId === orderId || invoice.orderNo === orderId
   );
+  if (matches.length === 0) {
+    return null;
+  }
+  // An order can accumulate a Proforma first and a real Tax Invoice later once
+  // paid — prefer the most recently generated document as "the" invoice.
+  return matches.sort(
+    (a, b) => Date.parse(b.generatedAt || 0) - Date.parse(a.generatedAt || 0)
+  )[0];
 }
 
 function filterInvoicesByDateRange(invoices, filters) {
@@ -907,6 +1033,7 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
   const invoiceSettings = settings.invoiceSettings || {};
   const seller = resolveSellerSnapshot(settings);
   const buyer = resolveBuyerSnapshot(order, authStore);
+  const shipping = resolveShippingSnapshot(order, authStore, buyer);
   const placeOfSupply = resolvePlaceOfSupply(seller, buyer);
   const productLookup = new Map(
     ensureArray(catalogStore.products).map((product) => [product.id, product])
@@ -919,16 +1046,21 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
     invoiceDateSource,
     invoiceSettings.financialYearFormat
   );
-  const sequenceNumber = resolveNextSequence(
-    invoiceStore,
-    invoiceSettings,
-    financialYearLabel
-  );
-  const invoiceNumber = buildInvoiceNumber(
-    invoiceSettings,
-    financialYearLabel,
-    sequenceNumber
-  );
+
+  // A real Tax Invoice number is only ever assigned once payment is confirmed —
+  // an unpaid order gets a Proforma Invoice instead, drawn from its own separate
+  // numbering series so the statutory Tax Invoice sequence stays gap-free.
+  const isPaid = String(order.paymentStatus || "").toLowerCase() === "paid";
+  const documentType = isPaid ? "tax_invoice" : "proforma_invoice";
+  let sequenceNumber;
+  let invoiceNumber;
+  if (isPaid) {
+    sequenceNumber = resolveNextSequence(invoiceStore, invoiceSettings, financialYearLabel);
+    invoiceNumber = buildInvoiceNumber(invoiceSettings, financialYearLabel, sequenceNumber);
+  } else {
+    sequenceNumber = resolveNextProformaSequence(invoiceStore);
+    invoiceNumber = buildProformaInvoiceNumber(sequenceNumber);
+  }
   const items = ensureArray(order.items).map((item) =>
     buildOrderItemSnapshot(item, productLookup, placeOfSupply)
   );
@@ -958,6 +1090,7 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
     orderNo: order.orderNo || "",
     checkoutSessionId: order.checkoutSessionId || null,
     invoiceNumber,
+    documentType,
     invoiceDate,
     financialYearLabel,
     sequenceNumber,
@@ -972,6 +1105,7 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
     isLocked: true,
     seller,
     buyer,
+    shipping,
     placeOfSupply,
     display: {
       logoUrl: seller.logoUrl,
@@ -1020,15 +1154,19 @@ async function ensureInvoiceForOrder(orderId, actor = null, options = {}) {
   if (!order) {
     throw new HttpError(404, "Order not found for invoice generation.");
   }
-  if (String(order.paymentStatus || "").toLowerCase() !== "paid") {
-    throw new HttpError(409, "Invoice can be generated only after payment is confirmed.");
+  if (String(order.orderStatus || "").toLowerCase() === "cancelled") {
+    throw new HttpError(409, "Invoice cannot be generated for a cancelled order.");
   }
 
+  const isPaid = String(order.paymentStatus || "").toLowerCase() === "paid";
+
+  // A Proforma generated while unpaid must not be handed back once the order is
+  // paid — that case falls through so a real Tax Invoice gets built below instead.
   if (order.invoiceId) {
     const existingById = ensureArray(invoiceStore.invoices).find(
       (invoice) => invoice.id === order.invoiceId
     );
-    if (existingById) {
+    if (existingById && !(isPaid && existingById.documentType === "proforma_invoice")) {
       return {
         created: false,
         invoice: sanitizeInvoice(existingById)
@@ -1037,7 +1175,7 @@ async function ensureInvoiceForOrder(orderId, actor = null, options = {}) {
   }
 
   const existingByOrder = findInvoiceByOrderId(invoiceStore, order.id);
-  if (existingByOrder) {
+  if (existingByOrder && !(isPaid && existingByOrder.documentType === "proforma_invoice")) {
     order.invoiceId = existingByOrder.id;
     order.invoiceNumber = existingByOrder.invoiceNumber;
     order.invoiceGeneratedAt = existingByOrder.generatedAt;
@@ -1070,6 +1208,7 @@ async function ensureInvoiceForOrder(orderId, actor = null, options = {}) {
     metadata: {
       orderId: order.id,
       invoiceNumber: invoice.invoiceNumber,
+      documentType: invoice.documentType,
       source: options.source || "system"
     }
   });

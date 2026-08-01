@@ -56,7 +56,9 @@ const STATUS_CLASS = {
   out_for_delivery: "blue",
   delivery_failed: "red",
   returned: "red",
-  picked_up: "green"
+  picked_up: "green",
+  tax_invoice: "green",
+  proforma_invoice: "amber"
 };
 
 export function StatusBadge({ value, label }) {

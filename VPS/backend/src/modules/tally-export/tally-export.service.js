@@ -80,6 +80,9 @@ async function exportInvoicesAsTallyCsv(filters, actor) {
   ensureInvoiceStoreShape(invoiceStore);
 
   let invoices = ensureArray(invoiceStore.invoices);
+  // Proforma Invoices are unpaid drafts, not confirmed sales — Tally's books must
+  // only ever see the real Tax Invoice once one exists for the order.
+  invoices = invoices.filter((invoice) => invoice.documentType !== "proforma_invoice");
   invoices = filterInvoicesByDateRange(invoices, filters).sort((a, b) =>
     String(a.invoiceDate || "").localeCompare(String(b.invoiceDate || ""))
   );

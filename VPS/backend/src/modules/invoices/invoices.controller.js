@@ -43,7 +43,8 @@ const adminGetInvoiceForOrder = asyncHandler(async (req, res) => {
 const adminGenerateInvoice = asyncHandler(async (req, res) => {
   const payload = parseGenerateInvoicePayload(req.body || {});
   const data = await service.generateInvoice(req.params.orderId, payload, req.actor);
-  return ok(res, data, data.created ? "Invoice generated." : "Invoice already exists.");
+  const label = data.invoice?.documentType === "proforma_invoice" ? "Proforma Invoice" : "Tax Invoice";
+  return ok(res, data, data.created ? `${label} generated.` : `${label} already exists.`);
 });
 
 const adminDownloadInvoice = asyncHandler(async (req, res) => {

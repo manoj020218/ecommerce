@@ -18,6 +18,9 @@ function ensureInvoiceStoreShape(store) {
   if (!Array.isArray(store.tallyExports)) {
     store.tallyExports = [];
   }
+  if (!store.proformaSequence || typeof store.proformaSequence !== "object") {
+    store.proformaSequence = { lastNumber: 0, updatedAt: null };
+  }
 }
 
 function cloneInvoice(invoice) {
@@ -34,6 +37,7 @@ function sanitizeInvoiceSummary(invoice) {
     orderId: invoice.orderId,
     orderNo: invoice.orderNo,
     invoiceNumber: invoice.invoiceNumber,
+    documentType: invoice.documentType || "tax_invoice",
     invoiceDate: invoice.invoiceDate,
     financialYearLabel: invoice.financialYearLabel,
     sequenceNumber: Number(invoice.sequenceNumber || 0),
@@ -74,6 +78,10 @@ function buildInvoiceNumber(settings, financialYearLabel, sequenceNumber) {
   return [prefix, financialYearLabel, sequence, postfix].filter(Boolean).join("/");
 }
 
+function buildProformaInvoiceNumber(sequenceNumber) {
+  return `PROFORMA-${String(Number(sequenceNumber || 0)).padStart(2, "0")}`;
+}
+
 module.exports = {
   FINANCIAL_YEAR_FORMATS,
   roundMoney,
@@ -82,5 +90,6 @@ module.exports = {
   sanitizeInvoice,
   sanitizeInvoiceSummary,
   resolveFinancialYearLabel,
-  buildInvoiceNumber
+  buildInvoiceNumber,
+  buildProformaInvoiceNumber
 };

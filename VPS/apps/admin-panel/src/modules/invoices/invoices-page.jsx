@@ -184,10 +184,11 @@ export function InvoicesPage() {
       await loadInvoices(filters);
       setSelectedInvoice(result.invoice);
       setInvoiceModalOpen(true);
+      const label = result.invoice?.documentType === "proforma_invoice" ? "Proforma Invoice" : "Tax Invoice";
       setNotice(
         result.created
-          ? `Invoice generated: ${result.invoice?.invoiceNumber || generateForm.orderId}`
-          : `Existing invoice opened: ${result.invoice?.invoiceNumber || generateForm.orderId}`
+          ? `${label} generated: ${result.invoice?.invoiceNumber || generateForm.orderId}`
+          : `Existing ${label.toLowerCase()} opened: ${result.invoice?.invoiceNumber || generateForm.orderId}`
       );
     } catch (apiError) {
       setError(apiError.message || "Failed to generate invoice.");
@@ -393,6 +394,7 @@ export function InvoicesPage() {
                     <td>{invoice.orderNo || invoice.orderId}</td>
                     <td>{invoice.customerName || "Customer"}</td>
                     <td>
+                      <StatusBadge value={invoice.documentType || "tax_invoice"} />{" "}
                       <StatusBadge value={invoice.paymentStatus || "pending"} />
                     </td>
                     <td>{formatCurrencyInr(invoice.grandTotal || 0)}</td>
@@ -428,7 +430,7 @@ export function InvoicesPage() {
               <article key={invoice.id} className="card">
                 <div className="card-head">
                   <h4>{invoice.invoiceNumber}</h4>
-                  <StatusBadge value={invoice.paymentStatus || "pending"} />
+                  <StatusBadge value={invoice.documentType || "tax_invoice"} />
                 </div>
                 <p className="muted">{invoice.orderNo || invoice.orderId}</p>
                 <p className="muted">{invoice.customerName || "Customer"}</p>

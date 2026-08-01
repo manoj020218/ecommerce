@@ -52,6 +52,7 @@ const {
   safeSendTemplateNotification,
   notifyCustomerEvent
 } = require("../marketing/marketing.service");
+const { getAllSettings } = require("../settings/settings.service");
 const {
   CART_OWNER_TYPES,
   PAYMENT_METHODS,
@@ -1165,26 +1166,99 @@ function formatNotificationItems(items) {
     .join(", ");
 }
 
+function escapeHtmlForEmail(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatInrForEmail(value) {
+  return `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+// Same shape (product / qty / unit price / amount) as the invoice items table,
+// rendered as an inline-styled HTML table so it survives email client CSS
+// stripping. Built here rather than as a static template string since it
+// varies per order — passed in as the `itemsTable` template variable.
+function buildOrderItemsEmailTable(items) {
+  const rows = ensureArray(items)
+    .map(
+      (item) => `<tr>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;">${escapeHtmlForEmail(item.title || item.productId)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:center;">${Number(item.qty || 0)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatInrForEmail(item.unitPriceUsed)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${formatInrForEmail(item.lineTotal)}</td>` +
+        `</tr>`
+    )
+    .join("");
+
+  return (
+    `<table style="width:100%;font-size:13px;border-collapse:collapse;margin:12px 0;">` +
+    `<thead><tr style="background:#f9fafb;">` +
+    `<th style="padding:8px 6px;text-align:left;border-bottom:2px solid #e5e7eb;">Product</th>` +
+    `<th style="padding:8px 6px;text-align:center;border-bottom:2px solid #e5e7eb;">Qty</th>` +
+    `<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e5e7eb;">Unit Price</th>` +
+    `<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e5e7eb;">Amount</th>` +
+    `</tr></thead><tbody>${rows}</tbody></table>`
+  );
+}
+
 async function notifyOrderPlaced(order, invoice) {
-  return notifyCustomerEvent({
+  const itemsTable = buildOrderItemsEmailTable(order.items);
+  const customerName = resolveNotificationCustomerName(order.billingAddress, order.shippingAddress);
+  const customerEmail = resolveNotificationEmail(order.billingAddress, order.shippingAddress);
+  const customerMobile = resolveNotificationMobile(order.billingAddress, order.shippingAddress);
+  const orderTotal = `₹${Number(order.grandTotal || 0).toLocaleString("en-IN")}`;
+  const paymentMethod = humanizePaymentMethod(order.paymentMethod);
+
+  const customerResult = await notifyCustomerEvent({
     eventKey: "order_placed",
-    toEmail: resolveNotificationEmail(order.billingAddress, order.shippingAddress),
-    toMobile: resolveNotificationMobile(order.billingAddress, order.shippingAddress),
+    toEmail: customerEmail,
+    toMobile: customerMobile,
     invoiceId: invoice?.id || order.invoiceId || null,
     relatedResourceType: "order",
     relatedResourceId: order.id,
     variables: {
-      customerName: resolveNotificationCustomerName(
-        order.billingAddress,
-        order.shippingAddress
-      ),
+      customerName,
       orderNo: order.orderNo || "",
       invoiceNo: invoice?.invoiceNumber || order.invoiceNumber || "",
       cartItems: formatNotificationItems(order.items),
-      orderTotal: `₹${Number(order.grandTotal || 0).toLocaleString("en-IN")}`,
-      paymentMethod: humanizePaymentMethod(order.paymentMethod)
+      itemsTable,
+      orderTotal,
+      paymentMethod
     }
   });
+
+  // Best-effort business alert to the configured support inbox — deliberately
+  // not allowed to affect the customer-facing notification result above, so
+  // it's fetched/sent after and swallows its own errors via safeSend.
+  try {
+    const settings = await getAllSettings();
+    const adminEmail = settings.storeProfile?.supportEmail || "";
+    if (adminEmail) {
+      await safeSendTemplateNotification({
+        templateKey: "order_placed_admin",
+        toEmail: adminEmail,
+        relatedResourceType: "order",
+        relatedResourceId: order.id,
+        variables: {
+          customerName,
+          customerEmail,
+          customerMobile,
+          orderNo: order.orderNo || "",
+          itemsTable,
+          orderTotal,
+          paymentMethod
+        }
+      });
+    }
+  } catch (_adminNotifyError) {
+    // Non-fatal — order placement must never fail because the admin alert did.
+  }
+
+  return customerResult;
 }
 
 function humanizePaymentMethod(method) {

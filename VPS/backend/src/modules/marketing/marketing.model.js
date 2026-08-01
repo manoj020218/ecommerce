@@ -14,6 +14,7 @@ const TEMPLATE_KEYS = Object.freeze([
   "forgot_password",
   "otp_login_code",
   "order_placed",
+  "order_placed_admin",
   "awaiting_payment",
   "payment_failed",
   "payment_successful",
@@ -114,8 +115,11 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
       `<p style="font-size:14px;">Thanks for shopping with us! Your order has been placed successfully.</p>` +
       `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">` +
       `<tr><td style="padding:6px 0;color:#6b7280;">Order No.</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderNo}}</td></tr>` +
-      `<tr><td style="padding:6px 0;color:#6b7280;">Order Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
       `<tr><td style="padding:6px 0;color:#6b7280;">Payment Method</td><td style="padding:6px 0;text-align:right;">{{paymentMethod}}</td></tr>` +
+      `</table>` +
+      `{{itemsTable}}` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:4px 0 16px;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Order Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
       `</table>` +
       `<p style="font-size:13px;color:#6b7280;">We'll notify you again once your order is packed and shipped. You can track everything from your account.</p>`
     )
@@ -124,6 +128,25 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     label: "Order Placed (WhatsApp)",
     subject: "",
     body: "🎉 Order confirmed! Hi {{customerName}}, your order *{{orderNo}}* ({{orderTotal}}) has been placed with {{businessName}}. We'll message you again once it ships. Thank you for shopping with us!"
+  },
+  order_placed_admin: {
+    label: "New Order Alert (Admin Email)",
+    subject: "New order {{orderNo}} — {{orderTotal}}",
+    body: emailShell(
+      `<p style="font-size:14px;">A new order was just placed on {{businessName}}.</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Order No.</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderNo}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Customer</td><td style="padding:6px 0;text-align:right;">{{customerName}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;text-align:right;">{{customerEmail}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Mobile</td><td style="padding:6px 0;text-align:right;">{{customerMobile}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Payment Method</td><td style="padding:6px 0;text-align:right;">{{paymentMethod}}</td></tr>` +
+      `</table>` +
+      `{{itemsTable}}` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:4px 0 16px;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Order Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
+      `</table>` +
+      `<p style="font-size:13px;color:#6b7280;">Open the admin panel to view full order and shipping details.</p>`
+    )
   },
   order_processing: {
     label: "Order Processed (Email)",
@@ -200,6 +223,9 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "trackingUrl",
   "courierName",
   "cartItems",
+  "itemsTable",
+  "customerEmail",
+  "customerMobile",
   "invoiceDownloadUrl",
   "supportPhone",
   "businessName",

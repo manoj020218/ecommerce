@@ -11,7 +11,8 @@ const ALLOWED_CODES = new Set([
   "shiprocket", "delhivery", "shiprazor",
   "razorpay", "cashfree", "phonepe", "ccavenue", "payu", "paytm", "cod",
   "googleProductFeed", "facebookProductFeed", "facebookPixel",
-  "googleAnalytics", "googleTagManager", "whatsapp", "abandonedCart"
+  "googleAnalytics", "googleTagManager", "whatsapp", "abandonedCart",
+  "commerceWatchdog"
 ]);
 
 function nowIso() {

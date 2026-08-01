@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { PageHeader } from "../../shared/components/page-header";
@@ -249,7 +249,8 @@ export function SettingsPage() {
   const canEditCustomCode = session?.admin?.role === "super_admin";
 
   const navigate = useNavigate();
-  const { tab: tabParam } = useParams();
+  const location = useLocation();
+  const tabParam = location.pathname.replace(/^\/settings\/?/, "");
   const activeTab = SETTINGS_TAB_KEYS.includes(tabParam) ? tabParam : SETTINGS_TABS[0].key;
 
   function goToTab(key) {

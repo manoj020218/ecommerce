@@ -106,6 +106,19 @@ const INTEGRATIONS = {
         { key: "enableLiveChat", label: "Show live chat widget on storefront", type: "checkbox" },
         { key: "liveChatMessage", label: "Pre-fill chat message (optional)", type: "text", placeholder: "Hi! I have a query about my order." }
       ]
+    },
+    {
+      code: "commerceWatchdog",
+      label: "Commerce Watchdog",
+      logo: "🛡️",
+      description: "Monitors checkout/payment failures — save the dashboard login once, then click to open",
+      // Card body opens this URL directly (with credentials attached) once configured,
+      // instead of requiring the basic-auth prompt on every visit.
+      dashboardUrl: "https://watchdog-api.iotsoft.in/",
+      fields: [
+        { key: "username", label: "Dashboard Username", type: "text" },
+        { key: "password", label: "Dashboard Password", type: "password" }
+      ]
     }
   ]
 };
@@ -279,23 +292,30 @@ function Toggle({ checked, onChange, disabled }) {
 
 // ── Generic integration card (shipping / others) ──────────────────────────────
 
-function IntegrationCard({ meta, config, onToggle, onConfigure, saving }) {
+function IntegrationCard({ meta, config, onToggle, onConfigure, onOpen, saving }) {
   const isEnabled = config?.enabled || false;
   const hasConfig = meta.fields.length > 0;
   const isConfigured = hasConfig && meta.fields.some(
     (f) => f.type === "checkbox" ? Boolean(config?.[f.key]) : (f.type !== "select" && f.type !== "number" && (config?.[f.key] || "").trim())
   );
+  // Cards with a dashboardUrl (e.g. Commerce Watchdog) open straight to the
+  // external tool once credentials are saved, instead of only exposing Configure.
+  const isClickToOpen = Boolean(meta.dashboardUrl) && isConfigured;
   return (
-    <div style={{
-      background: "var(--surface)",
-      border: `1.5px solid ${isEnabled ? "var(--success)" : "var(--border)"}`,
-      borderRadius: 12, padding: "12px 12px 14px",
-      display: "flex", flexDirection: "column", alignItems: "center",
-      position: "relative", minWidth: 0, minHeight: 140,
-      transition: "border-color 0.2s, box-shadow 0.2s",
-      boxShadow: isEnabled ? "0 0 0 3px rgba(22,163,74,0.08)" : "none"
-    }}>
-      <div style={{ position: "absolute", top: 10, right: 10 }}>
+    <div
+      onClick={isClickToOpen ? onOpen : undefined}
+      style={{
+        background: "var(--surface)",
+        border: `1.5px solid ${isEnabled ? "var(--success)" : "var(--border)"}`,
+        borderRadius: 12, padding: "12px 12px 14px",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        position: "relative", minWidth: 0, minHeight: 140,
+        transition: "border-color 0.2s, box-shadow 0.2s",
+        boxShadow: isEnabled ? "0 0 0 3px rgba(22,163,74,0.08)" : "none",
+        cursor: isClickToOpen ? "pointer" : "default"
+      }}
+    >
+      <div style={{ position: "absolute", top: 10, right: 10 }} onClick={(e) => e.stopPropagation()}>
         <Toggle checked={isEnabled} onChange={onToggle} disabled={saving} />
       </div>
       <div style={{
@@ -309,10 +329,10 @@ function IntegrationCard({ meta, config, onToggle, onConfigure, saving }) {
         <span style={{
           fontSize: 10, color: isEnabled ? "var(--success)" : isConfigured ? "var(--info)" : "var(--muted)", fontWeight: 500
         }}>
-          {isEnabled ? "Active" : isConfigured ? "Configured" : hasConfig ? "Not configured" : "Ready"}
+          {isClickToOpen ? "Click to open dashboard" : isEnabled ? "Active" : isConfigured ? "Configured" : hasConfig ? "Not configured" : "Ready"}
         </span>
         {hasConfig && (
-          <button type="button" onClick={onConfigure} style={{
+          <button type="button" onClick={(e) => { e.stopPropagation(); onConfigure(); }} style={{
             fontSize: 11, fontWeight: 600, color: "var(--brand)",
             background: "none", border: "none", cursor: "pointer", padding: "2px 0", textDecoration: "underline"
           }}>Configure</button>
@@ -1124,6 +1144,21 @@ export function IntegrationsPage() {
     }
   };
 
+  // Builds the dashboard URL with credentials embedded (https://user:pass@host/)
+  // so the browser sends Basic Auth automatically — no repeated login prompt.
+  const handleOpenDashboard = (meta) => {
+    const cfg = configs[meta.code] || {};
+    if (!meta.dashboardUrl || !cfg.username || !cfg.password) return;
+    try {
+      const url = new URL(meta.dashboardUrl);
+      url.username = cfg.username;
+      url.password = cfg.password;
+      window.open(url.toString(), "_blank", "noopener,noreferrer");
+    } catch {
+      window.open(meta.dashboardUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
   const handleSaveConfig = async (form) => {
     if (!configuring) return;
     setSaving(configuring.code);
@@ -1323,6 +1358,7 @@ export function IntegrationsPage() {
             key={meta.code} meta={meta} config={configs[meta.code]}
             onToggle={(val) => handleToggle(meta.code, val)}
             onConfigure={() => { setConfiguring(meta); setSaveError(""); }}
+            onOpen={() => handleOpenDashboard(meta)}
             saving={saving === meta.code}
           />
         ))}

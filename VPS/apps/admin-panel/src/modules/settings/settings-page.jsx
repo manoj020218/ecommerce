@@ -11,6 +11,7 @@ import {
   updateBranding,
   updateContactInformation,
   updateCustomCode,
+  updateInvoiceSettings,
   updateSeoDefaults,
   updateStoreProfile,
   uploadBrandingAsset
@@ -80,6 +81,19 @@ const EMPTY_SETTINGS = {
     googleTagManagerId: "",
     googleAnalyticsId: "",
     facebookPixelId: ""
+  },
+  invoiceSettings: {
+    invoicePrefix: "",
+    invoicePostfix: "",
+    financialYearFormat: "YYYY-YY",
+    invoiceStartingNumber: 1,
+    invoiceNumberPadding: 6,
+    invoiceTerms: "",
+    invoiceFooter: "",
+    showBankDetails: true,
+    showHsnSummary: true,
+    showShippingLine: true,
+    showDiscountLine: true
   },
   meta: {
     updatedAt: "",
@@ -235,6 +249,7 @@ const SETTINGS_TABS = [
   { key: "branding", label: "Branding" },
   { key: "seo", label: "SEO Defaults" },
   { key: "contact", label: "Contact Information" },
+  { key: "invoiceSettings", label: "Invoice Settings" },
   { key: "customCode", label: "Custom Code / Tags" },
   { key: "whatsapp", label: "WhatsApp" },
   { key: "commerce-watchdog", label: "Commerce Watchdog" }
@@ -949,6 +964,163 @@ export function SettingsPage() {
                 {savingSection === "contactInformation"
                   ? "Saving..."
                   : "Save Contact Information"}
+              </button>
+            </div>
+          ) : null}
+        </form>
+      </article>
+
+      <article className="settings-card" hidden={activeTab !== "invoiceSettings"}>
+        <div className="settings-card-head">
+          <div>
+            <h3>Invoice Settings</h3>
+            <p>Invoice numbering, and the Terms &amp; Conditions / disclaimer text printed on every generated invoice.</p>
+          </div>
+        </div>
+        <form
+          className="form-grid wide"
+          onSubmit={(event) => {
+            event.preventDefault();
+            saveSection(
+              "invoiceSettings",
+              () => updateInvoiceSettings(settings.invoiceSettings),
+              "Invoice settings updated."
+            );
+          }}
+        >
+          <label className="field">
+            <span>Invoice Number Prefix</span>
+            <input
+              value={settings.invoiceSettings.invoicePrefix}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "invoicePrefix", event.target.value)
+              }
+              placeholder="JNX"
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="field">
+            <span>Invoice Number Postfix</span>
+            <input
+              value={settings.invoiceSettings.invoicePostfix}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "invoicePostfix", event.target.value)
+              }
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="field">
+            <span>Financial Year Format</span>
+            <select
+              value={settings.invoiceSettings.financialYearFormat}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "financialYearFormat", event.target.value)
+              }
+              disabled={!canEdit}
+            >
+              <option value="YYYY-YY">2026-27</option>
+              <option value="YYYY-YYYY">2026-2027</option>
+              <option value="YY-YY">26-27</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Starting Number</span>
+            <input
+              type="number" min="1"
+              value={settings.invoiceSettings.invoiceStartingNumber}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "invoiceStartingNumber", Number(event.target.value))
+              }
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="field">
+            <span>Number Padding (digits)</span>
+            <input
+              type="number" min="1" max="12"
+              value={settings.invoiceSettings.invoiceNumberPadding}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "invoiceNumberPadding", Number(event.target.value))
+              }
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="field field-full">
+            <span>Terms &amp; Conditions</span>
+            <textarea
+              rows="4"
+              value={settings.invoiceSettings.invoiceTerms}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "invoiceTerms", event.target.value)
+              }
+              placeholder="e.g. Goods once sold will not be taken back unless approved under store policy."
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="field field-full">
+            <span>Footer / Disclaimer</span>
+            <textarea
+              rows="3"
+              value={settings.invoiceSettings.invoiceFooter}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "invoiceFooter", event.target.value)
+              }
+              placeholder="e.g. This is a system-generated invoice and does not require a physical signature."
+              disabled={!canEdit}
+            />
+          </label>
+          <label className="inline-check field-full">
+            <input
+              type="checkbox"
+              checked={Boolean(settings.invoiceSettings.showBankDetails)}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "showBankDetails", event.target.checked)
+              }
+              disabled={!canEdit}
+            />
+            <span>Show bank/payment details block</span>
+          </label>
+          <label className="inline-check field-full">
+            <input
+              type="checkbox"
+              checked={Boolean(settings.invoiceSettings.showHsnSummary)}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "showHsnSummary", event.target.checked)
+              }
+              disabled={!canEdit}
+            />
+            <span>Show HSN summary table</span>
+          </label>
+          <label className="inline-check field-full">
+            <input
+              type="checkbox"
+              checked={Boolean(settings.invoiceSettings.showShippingLine)}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "showShippingLine", event.target.checked)
+              }
+              disabled={!canEdit}
+            />
+            <span>Show shipping line in totals (even when ₹0)</span>
+          </label>
+          <label className="inline-check field-full">
+            <input
+              type="checkbox"
+              checked={Boolean(settings.invoiceSettings.showDiscountLine)}
+              onChange={(event) =>
+                updateSectionValue("invoiceSettings", "showDiscountLine", event.target.checked)
+              }
+              disabled={!canEdit}
+            />
+            <span>Show discount line in totals (even when ₹0)</span>
+          </label>
+          {canEdit ? (
+            <div className="form-actions">
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={savingSection === "invoiceSettings"}
+              >
+                {savingSection === "invoiceSettings" ? "Saving..." : "Save Invoice Settings"}
               </button>
             </div>
           ) : null}

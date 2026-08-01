@@ -1094,6 +1094,15 @@ tbody tr:hover {
   gap: 14px;
 }
 
+/* `.settings-card { display: grid }` above has the same specificity as the
+   browser's built-in `[hidden] { display: none }` rule, and being an author
+   rule it wins the tie — so the native `hidden` attribute was silently doing
+   nothing and every tab's section rendered stacked at once regardless of
+   which tab was active. This explicit override restores it. */
+.settings-card[hidden] {
+  display: none;
+}
+
 .settings-card-head {
   display: flex;
   align-items: flex-start;

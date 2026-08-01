@@ -48,3 +48,10 @@ export function updateCustomCode(payload) {
     body: payload
   });
 }
+
+export function updateInvoiceSettings(payload) {
+  return apiFetch("/admin/settings/invoice-settings", {
+    method: "PUT",
+    body: payload
+  });
+}

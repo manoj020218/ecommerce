@@ -78,6 +78,7 @@ export function AppRouter() {
           <Route path="setup-wizard" element={<SetupWizardPage />} />
           <Route path="seo" element={<SeoPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/:tab" element={<SettingsPage />} />
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="discounts" element={<DiscountsPage />} />
           <Route path="web-builder" element={<WebBuilderPage />} />

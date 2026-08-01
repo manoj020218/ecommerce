@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { PageHeader } from "../../shared/components/page-header";
@@ -235,8 +236,11 @@ const SETTINGS_TABS = [
   { key: "seo", label: "SEO Defaults" },
   { key: "contact", label: "Contact Information" },
   { key: "customCode", label: "Custom Code / Tags" },
-  { key: "whatsapp", label: "WhatsApp" }
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "commerce-watchdog", label: "Commerce Watchdog" }
 ];
+
+const SETTINGS_TAB_KEYS = SETTINGS_TABS.map((tab) => tab.key);
 
 export function SettingsPage() {
   const { session } = useAuthSession();
@@ -244,7 +248,14 @@ export function SettingsPage() {
   const canEdit = hasPermission(session, "settings.edit");
   const canEditCustomCode = session?.admin?.role === "super_admin";
 
-  const [activeTab, setActiveTab] = useState(SETTINGS_TABS[0].key);
+  const navigate = useNavigate();
+  const { tab: tabParam } = useParams();
+  const activeTab = SETTINGS_TAB_KEYS.includes(tabParam) ? tabParam : SETTINGS_TABS[0].key;
+
+  function goToTab(key) {
+    navigate(`/settings/${key}`);
+  }
+
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState(() => cloneSettings(EMPTY_SETTINGS));
   const [error, setError] = useState("");
@@ -386,7 +397,7 @@ export function SettingsPage() {
             key={tab.key}
             type="button"
             className={`settings-tab${activeTab === tab.key ? " active" : ""}`}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => goToTab(tab.key)}
           >
             {tab.label}
           </button>
@@ -1097,6 +1108,34 @@ export function SettingsPage() {
       <div hidden={activeTab !== "whatsapp"}>
         <WhatsAppConnectCard canManage={canEditCustomCode} />
       </div>
+
+      <article className="settings-card" hidden={activeTab !== "commerce-watchdog"}>
+        <div className="settings-card-head">
+          <div>
+            <h3>Commerce Watchdog</h3>
+            <p>
+              Monitors the buyer journey from product view through checkout and payment,
+              and raises incidents when something breaks (payment succeeded but no order
+              created, checkout abandoned, invoice failed, etc.).
+            </p>
+          </div>
+        </div>
+        <p>
+          Watchdog runs as a separate service and has its own dashboard — funnel health,
+          incidents list, and per-session timelines. It isn&apos;t embedded here directly
+          since it needs its own login.
+        </p>
+        <div className="form-actions">
+          <a
+            className="btn btn-primary"
+            href="https://watchdog-api.iotsoft.in/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open Commerce Watchdog Dashboard
+          </a>
+        </div>
+      </article>
     </section>
   );
 }

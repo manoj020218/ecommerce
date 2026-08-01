@@ -126,6 +126,13 @@ export const ADMIN_NAV_ITEMS = [
           { key: "setup-wizard",     label: "Setup Wizard",           path: "/setup-wizard",     permission: "settings.view" },
           { key: "seo",              label: "SEO",                    path: "/seo",              permission: "settings.view" }
         ]
+      },
+      {
+        key: "commerce-watchdog",
+        label: "Commerce Watchdog ↗",
+        path: "https://watchdog-api.iotsoft.in/",
+        permission: "settings.view",
+        external: true
       }
     ]
   }

@@ -95,15 +95,26 @@ export function AdminLayout() {
               <p className="sidebar-group">{group.group}</p>
               {group.items.map((item) => (
                 <div key={item.key}>
-                  <NavLink
-                    to={item.path}
-                    end={!(item.children?.length > 0)}
-                    className={({ isActive }) =>
-                      `sidebar-link${isActive ? " active" : ""}`
-                    }
-                  >
-                    {item.label}
-                  </NavLink>
+                  {item.external ? (
+                    <a
+                      href={item.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="sidebar-link"
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <NavLink
+                      to={item.path}
+                      end={!(item.children?.length > 0)}
+                      className={({ isActive }) =>
+                        `sidebar-link${isActive ? " active" : ""}`
+                      }
+                    >
+                      {item.label}
+                    </NavLink>
+                  )}
                   {item.children?.map((child) => (
                     <NavLink
                       key={child.key}
@@ -149,15 +160,27 @@ export function AdminLayout() {
       </div>
 
       <nav className="mobile-nav">
-        {mobileItems.map((item) => (
-          <NavLink
-            key={item.key}
-            to={item.path}
-            className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}
-          >
-            {item.label}
-          </NavLink>
-        ))}
+        {mobileItems.map((item) =>
+          item.external ? (
+            <a
+              key={item.key}
+              href={item.path}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mobile-link"
+            >
+              {item.label}
+            </a>
+          ) : (
+            <NavLink
+              key={item.key}
+              to={item.path}
+              className={({ isActive }) => `mobile-link${isActive ? " active" : ""}`}
+            >
+              {item.label}
+            </NavLink>
+          )
+        )}
       </nav>
     </div>
   );

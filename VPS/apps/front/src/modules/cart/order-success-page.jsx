@@ -721,7 +721,7 @@ export function OrderSuccessPage() {
                 <UpiPaymentPanel
                   upiId={manualInstructions.upiId}
                   payeeName={manualInstructions.beneficiaryName || "Jenix India"}
-                  amount={order?.grandTotal}
+                  amount={order?.orderTotal || order?.pricing?.grandTotal || 0}
                   orderNo={order?.orderNo}
                   note={`Order ${order?.orderNo || ""}`}
                   onDesktopShown={() => {

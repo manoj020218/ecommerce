@@ -48,6 +48,10 @@ export function fetchInvoiceDownloadData(invoiceId) {
   return apiFetch(`/admin/invoices/${invoiceId}/download`);
 }
 
+export function correctInvoiceBuyer(invoiceId, payload) {
+  return apiFetch(`/admin/invoices/${invoiceId}/buyer-details`, { method: "PATCH", body: payload });
+}
+
 // Shipping / Couriers
 export function fetchShippingCouriers() {
   return apiFetch("/admin/shipping/couriers");

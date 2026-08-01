@@ -364,6 +364,16 @@ function formatCurrencyInr(value) {
   }).format(Number(value || 0));
 }
 
+// Same numeric formatting as formatCurrencyInr but without the ₹ symbol — the
+// approved invoice redesign only shows the currency symbol in the Totals
+// block; the line-items and HSN tables show bare numbers (matches Tally).
+function formatNumberInr(value) {
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Number(value || 0));
+}
+
 function formatInvoiceDateLabel(value) {
   if (!value) {
     return "--";
@@ -412,6 +422,18 @@ function renderInfoPairs(entries) {
     .join("");
 }
 
+function humanizePaymentMethodLabel(method) {
+  const labels = {
+    online: "Online",
+    razorpay: "Online (Razorpay)",
+    cashfree: "Online (Cashfree)",
+    manual_upi: "Manual UPI",
+    direct_bank_transfer: "Bank Transfer",
+    cod: "Cash on Delivery"
+  };
+  return labels[method] || (method ? String(method) : "--");
+}
+
 function renderInvoiceHtml(invoice) {
   const seller = invoice.seller || {};
   const buyer = invoice.buyer || {};
@@ -436,16 +458,20 @@ function renderInvoiceHtml(invoice) {
     buyer.pincode,
     buyer.country
   ]);
-  const sellerAddress = joinTextParts([
-    seller.address,
-    seller.pickupAddress,
-    seller.state
-  ]);
-  const sellerContact = joinTextParts([
-    seller.supportMobile,
-    seller.supportEmail,
-    seller.whatsappNumber ? `WhatsApp: ${seller.whatsappNumber}` : ""
-  ]);
+  const sellerContactLine = [
+    seller.gstin ? `GSTIN ${escapeHtml(seller.gstin)}` : "",
+    seller.supportEmail ? escapeHtml(seller.supportEmail) : "",
+    seller.supportMobile ? escapeHtml(seller.supportMobile) : ""
+  ]
+    .filter(Boolean)
+    .join(" &middot; ");
+  const sellerBrandLine = [
+    escapeHtml(seller.address || "Seller address not configured"),
+    sellerContactLine
+  ]
+    .filter(Boolean)
+    .join("<br>");
+
   // Tally's sales-invoice entry format: Sr No / Description / HSN-or-SAC / Qty /
   // Rate WITHOUT GST / Per / Amount. GST itself is summarized separately in the
   // Totals block below, not per line — so "Rate" and "Amount" here are always the
@@ -461,54 +487,61 @@ function renderInvoiceHtml(invoice) {
       const rateWithoutGst = qty > 0 ? roundMoney(Number(item.taxableValue || 0) / qty) : 0;
       return `
         <tr>
-          <td>${index + 1}</td>
-          <td>
-            <strong>${escapeHtml(item.title || "Item")}</strong>
-            <div class="subtext">${escapeHtml(item.sku || item.productId || "--")}</div>
-          </td>
+          <td class="sr">${index + 1}</td>
+          <td>${escapeHtml(item.title || "Item")}</td>
           <td>${escapeHtml(item.hsnCode || "--")}</td>
-          <td>${escapeHtml(String(qty))}</td>
-          <td>${escapeHtml(formatCurrencyInr(rateWithoutGst))}</td>
+          <td class="num">${escapeHtml(String(qty))}</td>
+          <td class="num">${escapeHtml(formatNumberInr(rateWithoutGst))}</td>
           <td>Nos</td>
-          <td>${escapeHtml(formatCurrencyInr(item.taxableValue || 0))}</td>
+          <td class="num">${escapeHtml(formatNumberInr(item.taxableValue || 0))}</td>
         </tr>
       `;
     })
     .join("");
-  const hsnSummaryHtml =
-    display.showHsnSummary !== false && ensureArray(invoice.hsnSummary).length
-      ? `
-        <section class="panel">
-          <h3>HSN Summary</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>HSN</th>
-                <th>GST Rate</th>
-                <th>Taxable Value</th>
-                <th>Tax Amount</th>
-                <th>Line Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${ensureArray(invoice.hsnSummary)
-                .map(
-                  (row) => `
-                    <tr>
-                      <td>${escapeHtml(row.hsnCode || "--")}</td>
-                      <td>${escapeHtml(formatPercent(row.gstRate || 0))}</td>
-                      <td>${escapeHtml(formatCurrencyInr(row.taxableValue || 0))}</td>
-                      <td>${escapeHtml(formatCurrencyInr(row.totalTaxAmount || 0))}</td>
-                      <td>${escapeHtml(formatCurrencyInr(row.lineTotal || 0))}</td>
-                    </tr>
-                  `
-                )
-                .join("")}
-            </tbody>
-          </table>
-        </section>
-      `
-      : "";
+
+  // HSN summary splits by CGST+SGST or IGST to match the Totals block below —
+  // never both, matching whichever tax pairing actually applies for this order.
+  const hsnRows = display.showHsnSummary !== false ? ensureArray(invoice.hsnSummary) : [];
+  const hsnSummaryHtml = hsnRows.length
+    ? `
+      <div class="hsn-summary">
+        <div class="h-title">HSN Summary</div>
+        <table class="hsn">
+          <thead>
+            <tr>
+              <th>HSN/SAC</th>
+              <th class="num">Taxable Value</th>
+              ${
+                placeOfSupply.isIntraState
+                  ? `<th class="num">CGST</th><th class="num">SGST</th>`
+                  : `<th class="num">IGST</th>`
+              }
+              <th class="num">Total Tax</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${hsnRows
+              .map(
+                (row) => `
+                  <tr>
+                    <td>${escapeHtml(row.hsnCode || "--")}</td>
+                    <td class="num">${escapeHtml(formatNumberInr(row.taxableValue || 0))}</td>
+                    ${
+                      placeOfSupply.isIntraState
+                        ? `<td class="num">${escapeHtml(formatNumberInr(row.cgstAmount || 0))}</td><td class="num">${escapeHtml(formatNumberInr(row.sgstAmount || 0))}</td>`
+                        : `<td class="num">${escapeHtml(formatNumberInr(row.igstAmount || 0))}</td>`
+                    }
+                    <td class="num">${escapeHtml(formatNumberInr(row.totalTaxAmount || 0))}</td>
+                  </tr>
+                `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    `
+    : "";
+
   const bankDetails = [];
   if (seller.bankName) {
     bankDetails.push(["Bank", seller.bankName]);
@@ -517,7 +550,7 @@ function renderInvoiceHtml(invoice) {
     bankDetails.push(["Account Holder", seller.accountHolderName]);
   }
   if (seller.accountNumber) {
-    bankDetails.push(["Account Number", seller.accountNumber]);
+    bankDetails.push(["Account No.", seller.accountNumber]);
   }
   if (seller.ifsc) {
     bankDetails.push(["IFSC", seller.ifsc]);
@@ -525,19 +558,32 @@ function renderInvoiceHtml(invoice) {
   if (seller.upiId) {
     bankDetails.push(["UPI ID", seller.upiId]);
   }
+
   const customFields = ensureArray(display.customInvoiceFields).filter(
     (field) => field?.label && field?.value
   );
   const customFieldsHtml = customFields.length
     ? `
-      <section class="panel">
-        <h3>Additional Details</h3>
-        <div class="meta-grid">
-          ${renderInfoPairs(customFields.map((field) => [field.label, field.value]))}
-        </div>
-      </section>
+      <div class="hsn-summary">
+        <div class="h-title">Additional Details</div>
+        <table class="hsn">
+          <tbody>
+            ${customFields
+              .map(
+                (field) =>
+                  `<tr><td style="width:220px;">${escapeHtml(field.label)}</td><td>${escapeHtml(field.value)}</td></tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
     `
     : "";
+
+  // The approved redesign doesn't have a dedicated Terms/Notes panel — fold
+  // any configured terms/footer text into one small print line at the very
+  // bottom instead of dropping it outright.
+  const footerNote = joinTextParts([display.terms, display.footer]);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -546,416 +592,230 @@ function renderInvoiceHtml(invoice) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(invoice.invoiceNumber || "Invoice")}</title>
     <style>
-      :root {
-        color-scheme: light;
+      :root{
+        --ink:#1c2129; --sub:#5b6472; --line:#dbe1e8; --paper:#ffffff;
+        --accent:#14324f; --accent-soft:#eaf0f6;
+        --warn:#b45309; --warn-soft:#fef3e0;
       }
-      * {
-        box-sizing: border-box;
+      *{ box-sizing:border-box; }
+      body{
+        background:#eef1f4; margin:0; padding:24px 16px 48px;
+        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+        color:var(--ink);
       }
-      body {
-        margin: 0;
-        padding: 24px;
-        background: #f3f4f6;
-        color: #111827;
-        font-family: Arial, Helvetica, sans-serif;
+      .paper-wrap{ display:flex; justify-content:center; }
+      .paper{
+        width:100%; max-width:900px; background:var(--paper);
+        border:1px solid var(--line); border-radius:4px;
+        padding:30px 34px 26px;
       }
-      .invoice-shell {
-        max-width: 1040px;
-        margin: 0 auto;
-        background: #ffffff;
-        border: 1px solid #d1d5db;
-        padding: 32px;
+      .masthead{
+        display:flex; justify-content:space-between; align-items:flex-start;
+        padding-bottom:16px; border-bottom:2px solid var(--ink); margin-bottom:16px; gap:16px;
       }
-      .header {
-        display: flex;
-        justify-content: space-between;
-        gap: 24px;
-        border-bottom: 2px solid #111827;
-        padding-bottom: 20px;
-        margin-bottom: 24px;
+      .masthead .brand{ font-size:17px; font-weight:800; letter-spacing:-0.01em; }
+      .masthead .brand-line{ font-size:11.5px; color:var(--sub); margin-top:3px; line-height:1.5; max-width:380px; }
+      .masthead .doc-type{ text-align:right; flex-shrink:0; }
+      .masthead .doc-type h2{ margin:0; font-size:20px; letter-spacing:0.03em; font-weight:800; }
+      .doc-type.tax h2{ color:var(--accent); }
+      .doc-type.proforma h2{ color:var(--warn); }
+      .proforma-note{
+        display:inline-block; margin-top:5px; font-size:10px; font-weight:700; letter-spacing:0.04em;
+        text-transform:uppercase; background:var(--warn-soft); color:var(--warn);
+        padding:3px 8px; border-radius:4px; border:1px solid #f3d9ad;
       }
-      .brand-row {
-        display: flex;
-        gap: 18px;
-        align-items: flex-start;
+      .inv-no-row{ margin-top:9px; font-size:13px; }
+      .inv-no-row .label{ color:var(--sub); margin-right:6px; }
+      .inv-no-row .value{ font-weight:700; }
+      .inv-date-row{ margin-top:3px; font-size:11.5px; color:var(--sub); }
+      .party-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+      .party-block{ border:1px solid var(--line); border-radius:6px; padding:13px 15px; }
+      .party-block .party-label{
+        font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;
+        color:var(--accent); margin-bottom:8px;
       }
-      .brand-logo {
-        width: 72px;
-        max-height: 72px;
-        object-fit: contain;
+      .party-block .party-name{ font-size:13.5px; font-weight:700; margin-bottom:3px; }
+      .party-block .party-line{ font-size:12px; color:var(--sub); line-height:1.55; }
+      .party-block .party-line strong{ color:var(--ink); font-weight:600; }
+      .same-as-billing{ margin-top:8px; font-size:10.5px; color:var(--sub); font-style:italic; }
+      .meta-strip{
+        display:flex; gap:22px; flex-wrap:wrap; font-size:11.5px; color:var(--sub);
+        padding:10px 2px 16px; border-bottom:1px solid var(--line); margin-bottom:16px;
       }
-      .brand h1 {
-        margin: 0;
-        font-size: 28px;
+      .meta-strip strong{ color:var(--ink); font-weight:600; }
+      table.items{ width:100%; border-collapse:collapse; margin-bottom:18px; font-size:12px; }
+      table.items thead th{
+        background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:10.5px;
+        letter-spacing:0.02em; text-transform:uppercase; text-align:left; padding:8px 9px;
+        border:1px solid var(--line);
       }
-      .brand p,
-      .subtext,
-      .meta-label,
-      .block p,
-      .footer-note {
-        color: #4b5563;
+      table.items thead th.num{ text-align:right; }
+      table.items tbody td{ padding:8px 9px; border:1px solid var(--line); vertical-align:top; }
+      table.items tbody td.num{ text-align:right; }
+      table.items tbody td.sr{ color:var(--sub); }
+      table.items tfoot td{ padding:8px 9px; border:1px solid var(--line); font-weight:700; background:#fafbfc; }
+      table.items tfoot td.num{ text-align:right; }
+      .totals-wrap{ display:flex; justify-content:flex-end; margin-bottom:20px; }
+      table.totals{ width:300px; border-collapse:collapse; font-size:12.5px; }
+      table.totals td{ padding:6px 4px; }
+      table.totals td.t-label{ color:var(--sub); }
+      table.totals td.t-value{ text-align:right; font-weight:600; }
+      table.totals tr.grand td{ border-top:2px solid var(--ink); padding-top:10px; font-size:15px; font-weight:800; }
+      table.totals tr.grand td.t-value{ color:var(--accent); }
+      .hsn-summary{ margin-bottom:18px; }
+      .hsn-summary .h-title{ font-size:10.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--sub); margin-bottom:8px; }
+      table.hsn{ width:100%; border-collapse:collapse; font-size:11.5px; }
+      table.hsn th{ background:#fafbfc; font-weight:700; text-align:left; padding:6px 8px; border:1px solid var(--line); color:var(--sub); font-size:10.5px; }
+      table.hsn th.num{ text-align:right; }
+      table.hsn td{ padding:6px 8px; border:1px solid var(--line); }
+      table.hsn td.num{ text-align:right; }
+      .bottom-grid{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:8px; }
+      .bank-box .b-title{ font-size:10.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; color:var(--sub); margin-bottom:8px; }
+      .bank-box .b-row{ font-size:11.5px; color:var(--sub); margin-bottom:3px; }
+      .bank-box .b-row strong{ color:var(--ink); }
+      .sig-box{ text-align:right; }
+      .sig-box .s-for{ font-size:11.5px; color:var(--sub); margin-bottom:34px; }
+      .sig-box .s-line{ border-top:1px solid var(--ink); font-size:11px; color:var(--sub); padding-top:5px; display:inline-block; min-width:170px; }
+      .sig-box img{ max-width:150px; max-height:60px; object-fit:contain; margin-bottom:6px; }
+      .footer-note{ margin-top:22px; padding-top:14px; border-top:1px solid var(--line); font-size:10.5px; color:var(--sub); line-height:1.6; }
+      @media (max-width:720px){
+        .party-grid, .bottom-grid{ grid-template-columns:1fr; }
+        .masthead{ flex-direction:column; gap:12px; }
+        .masthead .doc-type{ text-align:left; }
+        .paper{ padding:20px; }
+        .sig-box{ text-align:left; }
       }
-      .brand p,
-      .block p,
-      .footer-note {
-        margin: 6px 0 0;
-        line-height: 1.5;
-      }
-      .header-side {
-        min-width: 280px;
-        text-align: right;
-      }
-      .header-side h2 {
-        margin: 0;
-        font-size: 24px;
-      }
-      .header-side p {
-        margin: 8px 0 0;
-      }
-      .doc-title-proforma {
-        color: #b45309;
-      }
-      .doc-note {
-        display: inline-block;
-        margin-top: 6px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        background: #fef3e0;
-        color: #b45309;
-        border: 1px solid #f3d9ad;
-        padding: 3px 8px;
-      }
-      .meta-grid,
-      .party-grid,
-      .totals-grid {
-        display: grid;
-        gap: 16px;
-      }
-      .meta-grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        margin-bottom: 24px;
-      }
-      .party-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        margin-bottom: 24px;
-      }
-      .meta-card,
-      .block,
-      .panel,
-      .totals-card {
-        border: 1px solid #d1d5db;
-        padding: 14px 16px;
-        background: #ffffff;
-      }
-      .meta-label {
-        display: block;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        margin-bottom: 8px;
-      }
-      .block h3,
-      .panel h3,
-      .totals-card h3 {
-        margin: 0 0 12px;
-        font-size: 16px;
-      }
-      .panel {
-        margin-top: 20px;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 12px;
-      }
-      th,
-      td {
-        border: 1px solid #d1d5db;
-        padding: 10px;
-        text-align: left;
-        vertical-align: top;
-        font-size: 14px;
-      }
-      th {
-        background: #f9fafb;
-      }
-      td strong {
-        display: block;
-      }
-      tfoot td {
-        font-weight: 700;
-        background: #f9fafb;
-      }
-      .subtext {
-        font-size: 11px;
-        color: #6b7280;
-        font-style: italic;
-        margin: 4px 0 0;
-      }
-      .totals-grid {
-        grid-template-columns: 1.4fr 1fr;
-        margin-top: 20px;
-      }
-      .totals-table td:first-child {
-        width: 64%;
-      }
-      .grand-total td {
-        font-size: 16px;
-        font-weight: 700;
-      }
-      .signature {
-        margin-top: 24px;
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
-      }
-      .signature-box {
-        width: 280px;
-        text-align: center;
-      }
-      .signature-box img {
-        max-width: 180px;
-        max-height: 80px;
-        object-fit: contain;
-        margin-bottom: 10px;
-      }
-      .print-note {
-        margin-top: 24px;
-        font-size: 12px;
-        color: #6b7280;
-      }
-      @media print {
-        body {
-          padding: 0;
-          background: #ffffff;
-        }
-        .invoice-shell {
-          border: 0;
-          max-width: none;
-        }
-      }
-      @media (max-width: 840px) {
-        body {
-          padding: 0;
-        }
-        .invoice-shell {
-          border: 0;
-          padding: 18px;
-        }
-        .header,
-        .signature {
-          flex-direction: column;
-        }
-        .header-side {
-          text-align: left;
-          min-width: 0;
-        }
-        .meta-grid,
-        .party-grid,
-        .totals-grid {
-          grid-template-columns: 1fr;
-        }
+      @media print{
+        body{ padding:0; background:#fff; }
+        .paper{ border:0; }
       }
     </style>
   </head>
   <body>
-    <main class="invoice-shell">
-      <section class="header">
-        <div class="brand-row">
-          ${
-            seller.logoUrl
-              ? `<img class="brand-logo" src="${escapeHtml(seller.logoUrl)}" alt="Logo" />`
-              : ""
-          }
-          <div class="brand">
-            <h1>${escapeHtml(seller.legalBusinessName || seller.storeName || "Jenix India")}</h1>
-            <p>${escapeHtml(seller.storeName || "Jenix India")}</p>
-            <p>${escapeHtml(sellerAddress || "Seller address not configured")}</p>
-            <p>${escapeHtml(sellerContact || "Seller contact details not configured")}</p>
-            <p>GSTIN: ${escapeHtml(seller.gstin || "--")}</p>
+    <div class="paper-wrap">
+      <div class="paper">
+
+        <div class="masthead">
+          <div>
+            <div class="brand">${escapeHtml(seller.legalBusinessName || seller.storeName || "Jenix India")}</div>
+            <div class="brand-line">${sellerBrandLine}</div>
+          </div>
+          <div class="doc-type ${isProforma ? "proforma" : "tax"}">
+            <h2>${isProforma ? "PROFORMA INVOICE" : "TAX INVOICE"}</h2>
+            ${isProforma ? `<div class="proforma-note">Not a tax invoice — payment pending</div>` : ""}
+            <div class="inv-no-row"><span class="label">Invoice Number:</span><span class="value">${escapeHtml(invoice.invoiceNumber || "--")}</span></div>
+            <div class="inv-date-row">Invoice Date: ${escapeHtml(formatInvoiceDateLabel(invoice.invoiceDate))} &middot; Order: ${escapeHtml(invoice.orderNo || invoice.orderId || "--")}</div>
           </div>
         </div>
-        <div class="header-side">
-          <h2 class="${isProforma ? "doc-title-proforma" : ""}">${isProforma ? "Proforma Invoice" : "Tax Invoice"}</h2>
-          ${isProforma ? `<span class="doc-note">Not a tax invoice — payment pending</span>` : ""}
-          <p>Invoice Number: <strong>${escapeHtml(invoice.invoiceNumber || "--")}</strong></p>
-          <p>Generated on ${escapeHtml(formatInvoiceDateLabel(invoice.generatedAt || invoice.invoiceDate))}</p>
+
+        <div class="party-grid">
+          <div class="party-block">
+            <div class="party-label">Billed To</div>
+            <div class="party-name">${escapeHtml(buyer.companyName || buyer.name || "Customer")}</div>
+            ${buyer.companyName && buyer.name ? `<div class="party-line">${escapeHtml(buyer.name)}</div>` : ""}
+            <div class="party-line">${escapeHtml(buyerAddress || "Buyer address not available")}</div>
+            <div class="party-line" style="margin-top:6px;"><strong>Mobile:</strong> ${escapeHtml(buyer.mobile || "--")} &middot; <strong>Email:</strong> ${escapeHtml(buyer.email || "--")}</div>
+            ${buyer.gstin ? `<div class="party-line"><strong>GSTIN:</strong> ${escapeHtml(buyer.gstin)}</div>` : ""}
+          </div>
+          <div class="party-block">
+            <div class="party-label">Ship To</div>
+            <div class="party-name">${escapeHtml(shipping.companyName || shipping.name || buyer.companyName || buyer.name || "Customer")}</div>
+            <div class="party-line">${escapeHtml(shipToAddress || buyerAddress || "Shipping address not available")}</div>
+            <div class="party-line" style="margin-top:6px;"><strong>Mobile:</strong> ${escapeHtml(shipping.mobile || buyer.mobile || "--")}</div>
+            ${shipping.sameAsBilling === false ? "" : `<div class="same-as-billing">Same address as Billed To.</div>`}
+          </div>
         </div>
-      </section>
 
-      <section class="meta-grid">
-        ${renderInfoPairs([
-          ["Invoice Date", formatInvoiceDateLabel(invoice.invoiceDate)],
-          ["Order Number", invoice.orderNo || invoice.orderId || "--"],
-          ["Payment Status", invoice.paymentStatus || "--"],
-          ["Payment Method", invoice.paymentMethod || "--"],
-          ["Transaction ID", invoice.gatewayTxnId || "--"],
-          [
-            "Place of Supply",
-            joinTextParts([
-              placeOfSupply.state,
-              placeOfSupply.stateCode ? `Code ${placeOfSupply.stateCode}` : ""
-            ]) || "--"
-          ],
-          ["Financial Year", invoice.financialYearLabel || "--"],
-          ["Amount in Words", pricing.amountInWords || "--"]
-        ])}
-      </section>
+        <div class="meta-strip">
+          <span>Place of Supply: <strong>${escapeHtml(joinTextParts([placeOfSupply.state, placeOfSupply.stateCode ? `(${placeOfSupply.stateCode})` : ""]) || "--")}</strong></span>
+          <span>Payment: <strong>${invoice.paymentStatus === "paid" ? "Paid" : "Pending"} &mdash; ${escapeHtml(humanizePaymentMethodLabel(invoice.paymentMethod))}</strong></span>
+          <span>Reverse Charge: <strong>No</strong></span>
+        </div>
 
-      <section class="party-grid">
-        <article class="block">
-          <h3>Billed To</h3>
-          <p><strong>${escapeHtml(buyer.companyName || buyer.name || "Customer")}</strong></p>
-          <p>${escapeHtml(buyer.name || "--")}</p>
-          <p>${escapeHtml(buyerAddress || "Buyer address not available")}</p>
-          <p>Email: ${escapeHtml(buyer.email || "--")}</p>
-          <p>Mobile: ${escapeHtml(buyer.mobile || "--")}</p>
-          <p>GSTIN: ${escapeHtml(buyer.gstin || "--")}</p>
-        </article>
-        <article class="block">
-          <h3>Ship To</h3>
-          <p><strong>${escapeHtml(shipping.companyName || shipping.name || buyer.companyName || buyer.name || "Customer")}</strong></p>
-          <p>${escapeHtml(shipToAddress || buyerAddress || "Shipping address not available")}</p>
-          <p>Mobile: ${escapeHtml(shipping.mobile || buyer.mobile || "--")}</p>
-          ${shipping.sameAsBilling === false ? "" : `<p class="subtext">Same address as Billed To.</p>`}
-        </article>
-      </section>
-
-      <section class="panel">
-        <h3>Invoice Items</h3>
-        <table>
+        <table class="items">
           <thead>
             <tr>
-              <th>Sr No.</th>
+              <th style="width:32px;">Sr</th>
               <th>Item Description</th>
-              <th>HSN/SAC</th>
-              <th>Qty</th>
-              <th>Rate w/o GST</th>
-              <th>Per</th>
-              <th>Amount</th>
+              <th style="width:78px;">HSN/SAC</th>
+              <th class="num" style="width:44px;">Qty</th>
+              <th class="num" style="width:96px;">Rate w/o GST</th>
+              <th style="width:44px;">Per</th>
+              <th class="num" style="width:96px;">Amount</th>
             </tr>
           </thead>
           <tbody>
             ${itemsHtml}
           </tbody>
           <tfoot>
-            <tr class="items-total">
+            <tr>
               <td colspan="3">Total</td>
-              <td>${escapeHtml(String(itemsQtyTotal))}</td>
+              <td class="num">${escapeHtml(String(itemsQtyTotal))}</td>
               <td></td>
               <td></td>
-              <td>${escapeHtml(formatCurrencyInr(itemsAmountTotal))}</td>
+              <td class="num">${escapeHtml(formatNumberInr(itemsAmountTotal))}</td>
             </tr>
           </tfoot>
         </table>
-      </section>
 
-      ${hsnSummaryHtml}
-      ${customFieldsHtml}
-
-      <section class="totals-grid">
-        <article class="totals-card">
-          <h3>Terms and Notes</h3>
-          <p>${escapeHtml(display.terms || "Goods once sold will not be taken back unless approved under store policy.")}</p>
-          <p>${escapeHtml(display.footer || "This is a system-generated invoice.")}</p>
-        </article>
-        <article class="totals-card">
-          <h3>Totals</h3>
-          <table class="totals-table">
+        <div class="totals-wrap">
+          <table class="totals">
             <tbody>
-              <tr>
-                <td>Product Subtotal</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.productSubtotal || 0))}</td>
-              </tr>
+              <tr><td class="t-label">Product Subtotal</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.productSubtotal || 0))}</td></tr>
               ${
                 display.showShippingLine !== false || Number(pricing.shippingCharge || 0) !== 0
-                  ? `
-                    <tr>
-                      <td>Shipping</td>
-                      <td>${escapeHtml(formatCurrencyInr(pricing.shippingCharge || 0))}</td>
-                    </tr>
-                  `
+                  ? `<tr><td class="t-label">Shipping</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.shippingCharge || 0))}</td></tr>`
                   : ""
               }
               ${
                 display.showDiscountLine !== false || Number(pricing.discountAmount || 0) !== 0
-                  ? `
-                    <tr>
-                      <td>Discount</td>
-                      <td>${escapeHtml(formatCurrencyInr(pricing.discountAmount || 0))}</td>
-                    </tr>
-                  `
+                  ? `<tr><td class="t-label">Discount</td><td class="t-value">${Number(pricing.discountAmount || 0) > 0 ? "&minus;" : ""}${escapeHtml(formatCurrencyInr(pricing.discountAmount || 0))}</td></tr>`
                   : ""
               }
-              <tr>
-                <td>Taxable Value</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.taxableValue || 0))}</td>
-              </tr>
+              <tr><td class="t-label">Taxable Value</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.taxableValue || 0))}</td></tr>
               ${
                 placeOfSupply.isIntraState
                   ? `
-                    <tr>
-                      <td>CGST Total</td>
-                      <td>${escapeHtml(formatCurrencyInr(pricing.cgstTotal || 0))}</td>
-                    </tr>
-                    <tr>
-                      <td>SGST Total</td>
-                      <td>${escapeHtml(formatCurrencyInr(pricing.sgstTotal || 0))}</td>
-                    </tr>
+                    <tr class="tax-row"><td class="t-label">CGST Total</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.cgstTotal || 0))}</td></tr>
+                    <tr class="tax-row"><td class="t-label">SGST Total</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.sgstTotal || 0))}</td></tr>
                   `
-                  : `
-                    <tr>
-                      <td>IGST Total</td>
-                      <td>${escapeHtml(formatCurrencyInr(pricing.igstTotal || 0))}</td>
-                    </tr>
-                  `
+                  : `<tr class="tax-row"><td class="t-label">IGST Total</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.igstTotal || 0))}</td></tr>`
               }
-              <tr>
-                <td>Round Off</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.roundOff || 0))}</td>
-              </tr>
-              <tr class="grand-total">
-                <td>Grand Total</td>
-                <td>${escapeHtml(formatCurrencyInr(pricing.grandTotal || 0))}</td>
-              </tr>
+              <tr><td class="t-label">Round Off</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.roundOff || 0))}</td></tr>
+              <tr class="grand"><td class="t-label">Grand Total</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.grandTotal || 0))}</td></tr>
             </tbody>
           </table>
-        </article>
-      </section>
-
-      ${
-        display.showBankDetails !== false && bankDetails.length
-          ? `
-            <section class="panel">
-              <h3>Bank / Payment Details</h3>
-              <div class="meta-grid">
-                ${renderInfoPairs(bankDetails)}
-              </div>
-            </section>
-          `
-          : ""
-      }
-
-      <section class="signature">
-        <div class="footer-note">
-          <p>This invoice was generated for GST compliance and order fulfilment records.</p>
-          <p>Please keep this document for warranty, tax, and transport reference where applicable.</p>
         </div>
-        <div class="signature-box">
+
+        ${hsnSummaryHtml}
+        ${customFieldsHtml}
+
+        <div class="bottom-grid">
           ${
-            display.authorizedSignatoryImageUrl
-              ? `<img src="${escapeHtml(display.authorizedSignatoryImageUrl)}" alt="Authorized signatory" />`
-              : ""
+            display.showBankDetails !== false && bankDetails.length
+              ? `
+                <div class="bank-box">
+                  <div class="b-title">Payment Details</div>
+                  ${bankDetails.map(([label, value]) => `<div class="b-row"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</div>`).join("")}
+                </div>
+              `
+              : "<div></div>"
           }
-          <strong>Authorized Signatory</strong>
-          <p>${escapeHtml(seller.legalBusinessName || seller.storeName || "Jenix India")}</p>
+          <div class="sig-box">
+            ${
+              display.authorizedSignatoryImageUrl
+                ? `<img src="${escapeHtml(display.authorizedSignatoryImageUrl)}" alt="Authorized signatory" />`
+                : ""
+            }
+            <div class="s-for">For ${escapeHtml(seller.legalBusinessName || seller.storeName || "Jenix India")}</div>
+            <div class="s-line">Authorised Signatory</div>
+          </div>
         </div>
-      </section>
 
-      <p class="print-note">Printable HTML invoice generated by the Jenix admin system.</p>
-    </main>
+        ${footerNote ? `<div class="footer-note">${escapeHtml(footerNote)}</div>` : ""}
+
+      </div>
+    </div>
   </body>
 </html>`;
 }
@@ -1255,6 +1115,80 @@ async function getInvoiceById(invoiceId) {
   return sanitizeInvoice(invoice);
 }
 
+// Corrects a buyer's identity/contact details (name, company, GSTIN, email,
+// mobile, address line/city/pincode) on an ALREADY-ISSUED invoice — e.g. a
+// buyer forgot to enter their GSTIN at checkout. Deliberately does not touch
+// state/stateCode/country, invoiceNumber, or any pricing/GST field: those
+// were already charged and require a credit note to change properly, not an
+// in-place edit. The order's billingAddress is the source of truth — this
+// patches it, then re-derives the invoice's stored buyer snapshot from it,
+// so both stay consistent for any future re-render.
+const CORRECTABLE_BUYER_FIELDS = [
+  "companyName",
+  "name",
+  "gstin",
+  "email",
+  "mobile",
+  "addressLine1",
+  "addressLine2",
+  "city",
+  "pincode"
+];
+
+async function correctInvoiceBuyerDetails(invoiceId, patch, actor) {
+  const [authStore, invoiceStore] = await Promise.all([readAuthStore(), readInvoiceStore()]);
+  ensureAuthStoreShape(authStore);
+  ensureInvoiceStoreShape(invoiceStore);
+
+  const invoiceIdx = ensureArray(invoiceStore.invoices).findIndex((row) => row.id === invoiceId);
+  if (invoiceIdx === -1) {
+    throw new HttpError(404, "Invoice not found.");
+  }
+  const invoice = invoiceStore.invoices[invoiceIdx];
+
+  const order = ensureArray(authStore.orders).find((row) => row.id === invoice.orderId);
+  if (!order) {
+    throw new HttpError(404, "Order not found for this invoice.");
+  }
+
+  const changedFields = CORRECTABLE_BUYER_FIELDS.filter((key) => patch[key] !== undefined);
+  if (changedFields.length === 0) {
+    throw new HttpError(400, "No buyer fields to update.");
+  }
+
+  const before = { ...invoice.buyer };
+
+  order.billingAddress = { ...(order.billingAddress || {}) };
+  for (const key of changedFields) {
+    order.billingAddress[key] = patch[key];
+  }
+  order.updatedAt = nowIso();
+
+  const updatedBuyer = resolveBuyerSnapshot(order, authStore);
+  invoice.buyer = updatedBuyer;
+  invoice.correctionHistory = ensureArray(invoice.correctionHistory);
+  invoice.correctionHistory.push({
+    correctedAt: nowIso(),
+    correctedBy: actor?.id || "admin",
+    fieldsChanged: changedFields,
+    reason: patch.reason || ""
+  });
+  invoiceStore.invoices[invoiceIdx] = invoice;
+
+  await Promise.all([writeAuthStore(authStore), writeInvoiceStore(invoiceStore)]);
+
+  await addActivityLog({
+    action: "invoice.buyer_corrected",
+    actorId: actor?.id,
+    actorRole: actor?.role,
+    resourceType: "invoice",
+    resourceId: invoiceId,
+    metadata: { before, after: updatedBuyer, fieldsChanged: changedFields }
+  });
+
+  return sanitizeInvoice(invoice);
+}
+
 async function getInvoiceForOrder(orderId) {
   const invoiceStore = await readInvoiceStore();
   ensureInvoiceStoreShape(invoiceStore);
@@ -1293,5 +1227,6 @@ module.exports = {
   getInvoiceForOrder,
   generateInvoice,
   getInvoiceDownload,
+  correctInvoiceBuyerDetails,
   filterInvoicesByDateRange
 };

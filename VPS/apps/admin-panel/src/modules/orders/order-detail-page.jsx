@@ -13,6 +13,7 @@ import {
   generateInvoiceForOrder,
   fetchInvoiceForOrder,
   fetchInvoiceDownloadData,
+  correctInvoiceBuyer,
   fetchShippingCouriers,
   createShipment,
   updateShipmentTracking,
@@ -844,9 +845,86 @@ function TagsEditor({ tags, onSave, saving }) {
 
 // ── Invoice section ───────────────────────────────────────────────────────────
 
-function InvoiceSection({ invoice }) {
+const BUYER_DETAIL_FIELDS = [
+  ["Company Name", "companyName"],
+  ["Contact Name", "name"],
+  ["GSTIN", "gstin"],
+  ["Email", "email"],
+  ["Mobile", "mobile"],
+  ["Address Line 1", "addressLine1"],
+  ["Address Line 2", "addressLine2"],
+  ["City", "city"],
+  ["Pincode", "pincode"]
+];
+
+function EditBuyerDetailsModal({ invoice, onClose, onSave, saving, error }) {
+  const buyer = invoice.buyer || {};
+  const [form, setForm] = useState(() => {
+    const init = { reason: "" };
+    for (const [, key] of BUYER_DETAIL_FIELDS) init[key] = buyer[key] || "";
+    return init;
+  });
+  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  return (
+    <Modal title="Edit Buyer Details" open onClose={onClose} width="560px" disableOutsideClick>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>
+          Corrects the buyer's name/company/GSTIN/contact/address on this invoice — same invoice
+          number, doesn't touch tax already charged. State can't be changed here since it drives
+          Place of Supply; a state correction needs a credit note instead.
+        </p>
+        {BUYER_DETAIL_FIELDS.map(([label, key]) => (
+          <label key={key} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{label}</span>
+            <input
+              type="text" value={form[key]}
+              onChange={(e) => set(key, e.target.value)}
+              style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+            />
+          </label>
+        ))}
+        <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Reason (internal note, optional)</span>
+          <input
+            type="text" value={form.reason}
+            onChange={(e) => set("reason", e.target.value)}
+            placeholder="e.g. Buyer provided GSTIN after order was placed"
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+          />
+        </label>
+        {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onSave(form)}>
+            {saving ? "Saving…" : "Save Correction"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function InvoiceSection({ invoice, onInvoiceUpdated }) {
   const [err, setErr] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  const handleSaveBuyerEdit = async (form) => {
+    setEditSaving(true);
+    setEditError("");
+    try {
+      const updated = await correctInvoiceBuyer(invoice.id, form);
+      onInvoiceUpdated?.(updated);
+      setEditModal(false);
+    } catch (e) {
+      setEditError(e.message || "Failed to save correction.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const download = async () => {
     if (!invoice?.id) return;
@@ -879,12 +957,24 @@ function InvoiceSection({ invoice }) {
             <div style={{ fontSize: 11, color: "var(--muted)" }}>{formatDateTime(invoice.invoiceDate || invoice.createdAt)}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button type="button" className="btn btn-secondary btn-small" onClick={() => { setEditModal(true); setEditError(""); }}>
+              Edit Buyer Details
+            </button>
             <button type="button" className="btn btn-secondary btn-small" disabled={downloading} onClick={download}>
               {downloading ? "Preparing…" : "Download PDF"}
             </button>
           </div>
         </div>
         {err && <p style={{ color: "var(--danger)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
+        {editModal && (
+          <EditBuyerDetailsModal
+            invoice={invoice}
+            onClose={() => setEditModal(false)}
+            onSave={handleSaveBuyerEdit}
+            saving={editSaving}
+            error={editError}
+          />
+        )}
       </div>
     );
   }
@@ -1451,7 +1541,7 @@ export function OrderDetailPage() {
       {/* Invoice section */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
         <h4 style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Invoice</h4>
-        <InvoiceSection invoice={invoice} />
+        <InvoiceSection invoice={invoice} onInvoiceUpdated={setInvoice} />
       </div>
 
       {/* Tracking info */}

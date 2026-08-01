@@ -31,6 +31,11 @@ function createInvoicesRouter() {
     requireAdminPermission(INVOICES_PERMISSIONS.DOWNLOAD),
     controller.adminDownloadInvoice
   );
+  router.patch(
+    "/:invoiceId/buyer-details",
+    requireAdminPermission(INVOICES_PERMISSIONS.EDIT_BUYER_DETAILS),
+    controller.adminCorrectInvoiceBuyer
+  );
   router.get(
     "/:invoiceId",
     requireAdminPermission(INVOICES_PERMISSIONS.VIEW),

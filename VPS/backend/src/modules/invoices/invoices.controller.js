@@ -4,7 +4,8 @@ const { ok } = require("../../common/http-response");
 const service = require("./invoices.service");
 const {
   parseListInvoicesQuery,
-  parseGenerateInvoicePayload
+  parseGenerateInvoicePayload,
+  parseCorrectInvoiceBuyerPayload
 } = require("./invoices.validator");
 
 function mapValidationError(error) {
@@ -52,10 +53,17 @@ const adminDownloadInvoice = asyncHandler(async (req, res) => {
   return ok(res, data, "Invoice HTML download prepared.");
 });
 
+const adminCorrectInvoiceBuyer = asyncHandler(async (req, res) => {
+  const patch = parseCorrectInvoiceBuyerPayload(req.body || {});
+  const data = await service.correctInvoiceBuyerDetails(req.params.invoiceId, patch, req.actor);
+  return ok(res, data, "Buyer details corrected.");
+});
+
 module.exports = {
   adminListInvoices,
   adminGetInvoice,
   adminGetInvoiceForOrder,
   adminGenerateInvoice,
-  adminDownloadInvoice
+  adminDownloadInvoice,
+  adminCorrectInvoiceBuyer
 };

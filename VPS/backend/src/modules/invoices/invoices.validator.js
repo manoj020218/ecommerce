@@ -17,6 +17,28 @@ const generateInvoicePayloadSchema = z.object({
   invoiceDate: isoDateSchema.optional()
 });
 
+// Deliberately excludes state/stateCode/country — those determine Place of
+// Supply and the CGST+SGST-vs-IGST split already charged on this invoice.
+// Correcting a name/GSTIN typo is safe after issuance; changing the buyer's
+// state after tax has been charged is not (needs a credit note instead).
+const correctInvoiceBuyerPayloadSchema = z
+  .object({
+    companyName: z.string().trim().max(200).optional(),
+    name: z.string().trim().max(200).optional(),
+    gstin: z.string().trim().max(20).optional(),
+    email: z.string().trim().max(200).optional(),
+    mobile: z.string().trim().max(30).optional(),
+    addressLine1: z.string().trim().max(300).optional(),
+    addressLine2: z.string().trim().max(300).optional(),
+    city: z.string().trim().max(120).optional(),
+    pincode: z.string().trim().max(12).optional(),
+    reason: z.string().trim().max(400).optional().default("")
+  })
+  .strict()
+  .refine((patch) => Object.keys(patch).some((k) => k !== "reason"), {
+    message: "At least one buyer field must be provided."
+  });
+
 function ensureObject(payload, label) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new HttpError(400, `${label} payload must be an object.`);
@@ -32,7 +54,13 @@ function parseGenerateInvoicePayload(payload) {
   return generateInvoicePayloadSchema.parse(payload || {});
 }
 
+function parseCorrectInvoiceBuyerPayload(payload) {
+  ensureObject(payload || {}, "Correct invoice buyer details");
+  return correctInvoiceBuyerPayloadSchema.parse(payload || {});
+}
+
 module.exports = {
   parseListInvoicesQuery,
-  parseGenerateInvoicePayload
+  parseGenerateInvoicePayload,
+  parseCorrectInvoiceBuyerPayload
 };

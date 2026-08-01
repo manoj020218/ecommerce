@@ -32,6 +32,10 @@ const verifyManualPaymentPayloadSchema = z.object({
   rejectionReason: z.string().trim().max(600).optional().default("")
 });
 
+const requestWhatsAppReminderPayloadSchema = z.object({
+  orderId: z.string().trim().min(2).max(160)
+});
+
 function ensureObject(payload, label) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new HttpError(400, `${label} payload must be an object.`);
@@ -52,8 +56,14 @@ function parseVerifyManualPaymentPayload(payload) {
   return verifyManualPaymentPayloadSchema.parse(payload);
 }
 
+function parseRequestWhatsAppReminderPayload(payload) {
+  ensureObject(payload, "Request WhatsApp reminder");
+  return requestWhatsAppReminderPayloadSchema.parse(payload);
+}
+
 module.exports = {
   parseSubmitManualPaymentPayload,
   parseListManualPaymentsQuery,
-  parseVerifyManualPaymentPayload
+  parseVerifyManualPaymentPayload,
+  parseRequestWhatsAppReminderPayload
 };

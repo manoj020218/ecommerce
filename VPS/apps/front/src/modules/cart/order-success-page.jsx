@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router-dom";
-import { submitManualPaymentProof, requestEmailOtp, verifyEmailOtp, linkGuestCheckout } from "../account/account.api";
+import {
+  submitManualPaymentProof,
+  requestEmailOtp,
+  verifyEmailOtp,
+  linkGuestCheckout,
+  requestWhatsAppScreenshotReminder
+} from "../account/account.api";
 import { getGoogleAuthConfig } from "../account/google-auth.api";
+import { UpiPaymentPanel } from "../../shared/upi-payment-kit/UpiPaymentPanel.jsx";
 import { createCustomerSession, useCustomerSession } from "../../shared/auth/customer-session";
 import {
   canSubmitManualPaymentProof,
@@ -348,6 +355,17 @@ export function OrderSuccessPage() {
     note: "",
     file: null
   });
+  const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
+
+  useEffect(() => {
+    if (!manualPaymentForm.file || !manualPaymentForm.file.type?.startsWith("image/")) {
+      setManualPaymentPreviewUrl("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(manualPaymentForm.file);
+    setManualPaymentPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [manualPaymentForm.file]);
 
   const gaPurchaseFiredRef = useRef(false);
 
@@ -699,6 +717,20 @@ export function OrderSuccessPage() {
                 title="Payment Instructions"
                 description="Use these details if this order requires manual bank transfer or UPI verification."
               />
+              {paymentMethod === "manual_upi" && manualInstructions?.upiId ? (
+                <UpiPaymentPanel
+                  upiId={manualInstructions.upiId}
+                  payeeName={manualInstructions.beneficiaryName || "Jenix India"}
+                  amount={order?.grandTotal}
+                  orderNo={order?.orderNo}
+                  note={`Order ${order?.orderNo || ""}`}
+                  onDesktopShown={() => {
+                    if (order?.id) {
+                      requestWhatsAppScreenshotReminder(order.id).catch(() => {});
+                    }
+                  }}
+                />
+              ) : null}
               {manualInstructionEntries.length > 0 ? (
                 <div className="proto-summary-rows proto-summary-rows-compact">
                   {manualInstructionEntries.map(([key, value]) => (
@@ -746,6 +778,21 @@ export function OrderSuccessPage() {
                       }
                       required
                     />
+                    {manualPaymentPreviewUrl ? (
+                      <div className="field-span-2" style={{ marginTop: 4 }}>
+                        <img
+                          src={manualPaymentPreviewUrl}
+                          alt="Payment screenshot preview"
+                          style={{
+                            maxWidth: 220,
+                            maxHeight: 220,
+                            borderRadius: 8,
+                            border: "1px solid #e5e7eb",
+                            objectFit: "contain"
+                          }}
+                        />
+                      </div>
+                    ) : null}
                     <StorefrontTextArea
                       label="Note"
                       fieldClassName="field-span-2"
@@ -761,7 +808,7 @@ export function OrderSuccessPage() {
                     />
                   </div>
                   <StorefrontButton type="submit" disabled={manualPaymentBusy}>
-                    {manualPaymentBusy ? "Submitting..." : "Submit Payment Proof"}
+                    {manualPaymentBusy ? "Submitting..." : "For Approval"}
                   </StorefrontButton>
                 </form>
               ) : order?.manualPaymentStatus === "submitted" ? (

@@ -5,7 +5,8 @@ const service = require("./manual-payments.service");
 const {
   parseSubmitManualPaymentPayload,
   parseListManualPaymentsQuery,
-  parseVerifyManualPaymentPayload
+  parseVerifyManualPaymentPayload,
+  parseRequestWhatsAppReminderPayload
 } = require("./manual-payments.validator");
 
 function mapValidationError(error) {
@@ -71,9 +72,16 @@ const adminVerifyManualPayment = asyncHandler(async (req, res) => {
   return ok(res, data, "Manual payment verification updated.");
 });
 
+const publicRequestWhatsAppReminder = asyncHandler(async (req, res) => {
+  const payload = parseRequestWhatsAppReminderPayload(req.body);
+  const data = await service.requestPaymentScreenshotReminder(payload.orderId);
+  return ok(res, data, data.sent ? "Reminder sent." : "Reminder not sent.");
+});
+
 module.exports = {
   publicGetManualGatewayInfo,
   publicSubmitManualPayment,
   adminListManualPayments,
-  adminVerifyManualPayment
+  adminVerifyManualPayment,
+  publicRequestWhatsAppReminder
 };

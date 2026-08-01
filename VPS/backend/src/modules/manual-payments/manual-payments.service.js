@@ -33,6 +33,10 @@ const {
   MANUAL_PAYMENT_STATUSES,
   sanitizeManualPaymentSubmission
 } = require("./manual-payments.model");
+const {
+  sendPaymentScreenshotReminder
+} = require("../../common/upi-payment-kit/whatsapp-reminder");
+const whatsappService = require("../whatsapp/whatsapp.service");
 
 function nowIso() {
   return new Date().toISOString();
@@ -513,9 +517,53 @@ async function getPublicGatewayInfo(paymentMethod) {
   };
 }
 
+// Fires a WhatsApp nudge to the buyer's own mobile number reminding them to
+// upload the payment screenshot — for desktop checkouts, where the
+// screenshot is usually sitting on their phone, not the computer they're
+// checking out on. Uses the portable upi-payment-kit reminder helper,
+// wired here to this project's existing Baileys-based WhatsApp session
+// (whatsapp.service.js) — that's the only jenix-specific part.
+async function requestPaymentScreenshotReminder(orderId) {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+
+  const order = findOrderByIdOrNo(authStore, orderId);
+  if (!order) {
+    throw new HttpError(404, "Order not found.");
+  }
+  if (order.paymentStatus === "paid") {
+    return { sent: false, reason: "already_paid" };
+  }
+  if (order.whatsappReminderSentAt) {
+    return { sent: false, reason: "already_sent" };
+  }
+
+  const contact = order.billingAddress || order.shippingAddress || {};
+  const result = await sendPaymentScreenshotReminder({
+    sendMessage: (mobile, text) => whatsappService.sendMessage(mobile, text),
+    mobile: contact.mobile || "",
+    customerName: contact.name || contact.companyName || "",
+    orderNo: order.orderNo || "",
+    amount: order.grandTotal
+  });
+
+  if (result.sent) {
+    order.whatsappReminderSentAt = nowIso();
+    await writeAuthStore(authStore);
+    await addActivityLog({
+      action: "manual_payment.whatsapp_reminder_sent",
+      resourceType: "order",
+      resourceId: order.id
+    });
+  }
+
+  return result;
+}
+
 module.exports = {
   submitManualPayment,
   listManualPaymentSubmissions,
   verifyManualPaymentSubmission,
-  getPublicGatewayInfo
+  getPublicGatewayInfo,
+  requestPaymentScreenshotReminder
 };

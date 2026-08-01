@@ -43,6 +43,7 @@ function createPublicManualPaymentsRouter() {
   const router = express.Router();
   router.get("/info", controller.publicGetManualGatewayInfo);
   router.post("/submit", upload.single("file"), controller.publicSubmitManualPayment);
+  router.post("/whatsapp-reminder", controller.publicRequestWhatsAppReminder);
   return router;
 }
 

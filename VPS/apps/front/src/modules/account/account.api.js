@@ -215,3 +215,11 @@ export function submitManualPaymentProof(formData) {
     body: formData
   });
 }
+
+export function requestWhatsAppScreenshotReminder(orderId) {
+  return apiFetch("/payments/manual/whatsapp-reminder", {
+    method: "POST",
+    auth: true,
+    body: { orderId }
+  });
+}

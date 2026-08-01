@@ -11,7 +11,24 @@ function toUpiAmount(amount) {
 // scheme lets the same builder produce the generic `upi://` link and the
 // app-specific ones (`tez://`, `phonepe://`, `paytmmp://`) — all of them
 // accept the identical UPI query params, only the URI scheme differs.
-export function buildUpiPaymentLink({ payeeVpa, payeeName, amount, note, referenceId, scheme = "upi" }) {
+//
+// Deliberately omits `tr` (transaction reference) by default: that field is
+// meant for registered-merchant/aggregator UPI flows. Sending it against a
+// plain personal/current-account VPA (not onboarded as a UPI merchant with a
+// PSP) has been observed to make PhonePe reject the request outright with a
+// generic "Something went wrong" error, even though the VPA itself is valid
+// — the safest, most broadly-compatible intent sticks to pa/pn/am/cu/tn.
+// Pass `includeReference: true` if your payee VPA *is* a registered
+// merchant VPA and you want `tr` included.
+export function buildUpiPaymentLink({
+  payeeVpa,
+  payeeName,
+  amount,
+  note,
+  referenceId,
+  includeReference = false,
+  scheme = "upi"
+}) {
   if (!payeeVpa) {
     return "";
   }
@@ -25,7 +42,7 @@ export function buildUpiPaymentLink({ payeeVpa, payeeName, amount, note, referen
   if (note) {
     params.set("tn", note);
   }
-  if (referenceId) {
+  if (includeReference && referenceId) {
     params.set("tr", referenceId);
   }
 

@@ -67,7 +67,12 @@ export function UpiPaymentPanel({ upiId, payeeName, amount, orderNo, note, onDes
   const [mobile] = useState(() => isMobileDevice());
   const firedRef = useRef(false);
 
-  const links = upiId
+  // A zero/undefined amount (e.g. a render before order data has loaded)
+  // would produce an "am=0.00" intent — several UPI apps reject that with
+  // the same generic error as an invalid payee, so guard it explicitly
+  // rather than let a race condition look like a broken VPA.
+  const validAmount = Number(amount) > 0;
+  const links = upiId && validAmount
     ? buildAppSpecificUpiLinks({ payeeVpa: upiId, payeeName, amount, note, referenceId: orderNo })
     : null;
 

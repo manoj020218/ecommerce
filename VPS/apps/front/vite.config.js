@@ -12,7 +12,27 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // Default generateSW behavior binds ALL navigations to the
+        // precached index.html (cache-first), which bypasses nginx
+        // entirely on repeat visits — including the server-side 301
+        // redirects for renamed product slugs. A phone that visited the
+        // site once would then open an old Google-indexed product URL,
+        // get served the stale cached shell client-side (never hitting
+        // nginx's redirect), and show "Product not found" for a product
+        // that actually exists under its new slug. Disabling the implicit
+        // fallback and handling navigations as NetworkFirst instead keeps
+        // offline support (falls back to cache after the timeout) while
+        // guaranteeing live users always get a fresh redirect resolution.
+        navigateFallback: undefined,
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "pages",
+              networkTimeoutSeconds: 5
+            }
+          },
           {
             urlPattern: /\.(?:js|css)$/i,
             handler: "NetworkFirst",

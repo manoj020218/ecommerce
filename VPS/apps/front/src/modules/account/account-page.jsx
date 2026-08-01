@@ -9,8 +9,10 @@ import {
   StorefrontChip,
   StorefrontInput,
   StorefrontLoadingState,
-  StorefrontSectionHeader
+  StorefrontSectionHeader,
+  StorefrontSelect
 } from "../../shared/storefront/storefront-ui";
+import { INDIA_GST_STATES } from "../../shared/india-gst-states";
 import {
   createCustomerAddress,
   deleteCustomerAddress,
@@ -784,28 +786,24 @@ export function CustomerAccountPage() {
                 }
                 required
               />
-              <StorefrontInput
+              <StorefrontSelect
                 label="State"
-                value={addressForm.state}
-                onChange={(event) =>
-                  setAddressForm((current) => ({
-                    ...current,
-                    state: event.target.value
-                  }))
-                }
-                required
-              />
-              <StorefrontInput
-                label="State Code"
                 value={addressForm.stateCode}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextState = INDIA_GST_STATES.find((row) => row.code === event.target.value);
                   setAddressForm((current) => ({
                     ...current,
-                    stateCode: event.target.value
-                  }))
-                }
+                    stateCode: nextState?.code || "",
+                    state: nextState?.name || ""
+                  }));
+                }}
                 required
-              />
+              >
+                <option value="">Select state</option>
+                {INDIA_GST_STATES.map((row) => (
+                  <option key={row.code} value={row.code}>{row.name}</option>
+                ))}
+              </StorefrontSelect>
               <StorefrontInput
                 label="Pincode"
                 value={addressForm.pincode}

@@ -150,7 +150,29 @@ function RecentlyViewedCarousel({ currentProductId, onAddToCart, busyProductId }
               </div>
               <div className="proto-recent-card-body">
                 <p>{item.title}</p>
-                <strong>{currency(item.price)}</strong>
+                <div className="proto-arrival-footer">
+                  <strong>{currency(item.price)}</strong>
+                  {onAddToCart ? (
+                    <button
+                      type="button"
+                      className="proto-arrival-add"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        onAddToCart(item);
+                      }}
+                      disabled={busyProductId === item.id}
+                      aria-label="Add to cart"
+                    >
+                      {busyProductId === item.id ? (
+                        <span>…</span>
+                      ) : (
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2" width="16" height="16">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                      )}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </Link>
           ))}
@@ -263,6 +285,7 @@ export function ProductPage() {
   const [cartActionBusy, setCartActionBusy] = useState("");
   const [cartActionError, setCartActionError] = useState("");
   const [cartActionNotice, setCartActionNotice] = useState("");
+  const [recentAddBusyId, setRecentAddBusyId] = useState("");
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -618,6 +641,26 @@ export function ProductPage() {
       setCartActionError(requestError.message || "Unable to update cart.");
     } finally {
       setCartActionBusy("");
+    }
+  };
+
+  const addRecentToCart = async (item) => {
+    setRecentAddBusyId(item.id);
+    setCartActionError("");
+    setCartActionNotice("");
+
+    try {
+      await addCartItem({
+        ...buildCartContext(isAuthenticated),
+        productId: item.id,
+        qty: 1
+      });
+      notifyStorefrontCartUpdated();
+      setCartActionNotice(`${item.title} added to cart.`);
+    } catch (requestError) {
+      setCartActionError(requestError.message || "Unable to add this product to the cart.");
+    } finally {
+      setRecentAddBusyId("");
     }
   };
 
@@ -1297,7 +1340,11 @@ export function ProductPage() {
       <ProductCarousel title="Frequently Bought Together" items={recGroups.frequentlyBoughtTogether} />
       <ProductCarousel title="Accessories" items={recGroups.accessories} />
 
-      <RecentlyViewedCarousel currentProductId={product.id} />
+      <RecentlyViewedCarousel
+        currentProductId={product.id}
+        onAddToCart={addRecentToCart}
+        busyProductId={recentAddBusyId}
+      />
 
       {(() => {
         const linked = [

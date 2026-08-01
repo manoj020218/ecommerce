@@ -11,8 +11,10 @@ import {
   StorefrontInput,
   StorefrontLoadingState,
   StorefrontPageHeader,
+  StorefrontSelect,
   StorefrontStickyActionBar
 } from "../../shared/storefront/storefront-ui";
+import { INDIA_GST_STATES } from "../../shared/india-gst-states";
 import {
   cancelPaymentAttempt,
   confirmCashfreePayment,
@@ -1024,20 +1026,24 @@ export function CheckoutPage() {
                     placeholder="City"
                     required
                   />
-                  <StorefrontInput
+                  <StorefrontSelect
                     label="State"
-                    value={billingForm.state}
-                    onChange={(event) => setBillingForm((current) => ({ ...current, state: event.target.value }))}
-                    placeholder="State"
-                    required
-                  />
-                  <StorefrontInput
-                    label="State Code"
                     value={billingForm.stateCode}
-                    onChange={(event) => setBillingForm((current) => ({ ...current, stateCode: event.target.value }))}
-                    placeholder="State Code"
+                    onChange={(event) => {
+                      const nextState = INDIA_GST_STATES.find((row) => row.code === event.target.value);
+                      setBillingForm((current) => ({
+                        ...current,
+                        stateCode: nextState?.code || "",
+                        state: nextState?.name || ""
+                      }));
+                    }}
                     required
-                  />
+                  >
+                    <option value="">Select state</option>
+                    {INDIA_GST_STATES.map((row) => (
+                      <option key={row.code} value={row.code}>{row.name}</option>
+                    ))}
+                  </StorefrontSelect>
                   <StorefrontInput
                     label="Pincode"
                     value={billingForm.pincode}
@@ -1094,20 +1100,24 @@ export function CheckoutPage() {
                       placeholder="Shipping City"
                       required
                     />
-                    <StorefrontInput
+                    <StorefrontSelect
                       label="Shipping State"
-                      value={shippingForm.state}
-                      onChange={(event) => setShippingForm((current) => ({ ...current, state: event.target.value }))}
-                      placeholder="Shipping State"
-                      required
-                    />
-                    <StorefrontInput
-                      label="Shipping State Code"
                       value={shippingForm.stateCode}
-                      onChange={(event) => setShippingForm((current) => ({ ...current, stateCode: event.target.value }))}
-                      placeholder="Shipping State Code"
+                      onChange={(event) => {
+                        const nextState = INDIA_GST_STATES.find((row) => row.code === event.target.value);
+                        setShippingForm((current) => ({
+                          ...current,
+                          stateCode: nextState?.code || "",
+                          state: nextState?.name || ""
+                        }));
+                      }}
                       required
-                    />
+                    >
+                      <option value="">Select state</option>
+                      {INDIA_GST_STATES.map((row) => (
+                        <option key={row.code} value={row.code}>{row.name}</option>
+                      ))}
+                    </StorefrontSelect>
                     <StorefrontInput
                       label="Shipping Pincode"
                       value={shippingForm.pincode}

@@ -22,6 +22,10 @@ export function updateOrder(orderId, patch) {
   return apiFetch(`/admin/orders/${orderId}`, { method: "PATCH", body: patch });
 }
 
+export function editOrderItems(orderId, payload) {
+  return apiFetch(`/admin/orders/${orderId}/items`, { method: "PATCH", body: payload });
+}
+
 export function exportOrdersUrl(params = {}) {
   const query = buildQuery(params);
   return `/api/admin/orders/export${query ? `?${query}` : ""}`;

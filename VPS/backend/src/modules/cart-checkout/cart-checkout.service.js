@@ -487,7 +487,8 @@ async function calculatePricing(
   shippingMethod,
   destination,
   shippingStore,
-  paymentStore
+  paymentStore,
+  options = {}
 ) {
   const itemCount = lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
   const productSubtotal = roundMoney(
@@ -502,6 +503,13 @@ async function calculatePricing(
     directDiscountPercent > 0
       ? roundMoney(productSubtotal * (Number(directDiscountPercent) / 100))
       : 0;
+  // Admin-applied ad-hoc discount (e.g. correcting an order pre-payment) stacks
+  // on top of the automatic direct-payment discount, then flows through the
+  // same per-line proportional allocation below as a single combined amount.
+  const extraDiscountAmount = roundMoney(Math.max(0, Number(options.extraDiscountAmount || 0)));
+  if (extraDiscountAmount > 0) {
+    discountAmount = roundMoney(discountAmount + extraDiscountAmount);
+  }
   if (discountAmount > productSubtotal) {
     discountAmount = productSubtotal;
   }
@@ -996,6 +1004,132 @@ function createOrderFromSession(authStore, session, options = {}) {
     paymentVerifiedAt: null,
     createdAt: nowIso()
   };
+}
+
+// Admin-driven correction of an already-created (but not yet paid) order's
+// items — e.g. the buyer asked to swap a product before completing payment.
+// Order pricing/items are a frozen snapshot from checkout time, and stock
+// reservation/consumption at payment-confirmation time is driven from the
+// underlying checkout session's cart (see finalizeSuccessfulPaymentAttempt),
+// NOT from order.items — so this keeps both in sync. Otherwise the invoice
+// would show the new product while stock still gets deducted for the old one.
+async function recalculateOrderItems(orderId, newItems, extraDiscountAmount, actor) {
+  // Deliberately owns the full read-mutate-write cycle on a single authStore
+  // instance — loading order/session/catalog from separate store reads and
+  // persisting only one of them back would silently drop whichever mutation
+  // happened on the object graph that never got written.
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+
+  const order = ensureArray(authStore.orders).find((row) => row.id === orderId);
+  if (!order) {
+    throw new HttpError(404, "Order not found.");
+  }
+
+  const session = ensureArray(authStore.checkoutSessions).find(
+    (row) => row.id === order.checkoutSessionId
+  );
+  if (!session) {
+    throw new HttpError(409, "Checkout session for this order was not found.");
+  }
+
+  const lines = buildStrictCartLines(catalogStore, newItems, {
+    enforceStockCheck: true,
+    customerPricingContext: session.customerSnapshot || null
+  });
+  if (lines.length === 0) {
+    throw new HttpError(400, "Order must have at least one item.");
+  }
+
+  const pricing = await calculatePricing(
+    lines,
+    order.paymentMethod,
+    order.shippingMethod,
+    order.shippingAddress,
+    shippingStore,
+    paymentStore,
+    { extraDiscountAmount }
+  );
+
+  // Release whatever stock this order was already holding, then reserve fresh
+  // stock for the corrected item list — same function startCheckout itself
+  // uses, so availability/backorder rules stay identical.
+  const oldReservation = ensureArray(authStore.stockReservations).find(
+    (row) => row.checkoutSessionId === session.id && row.status === RESERVATION_STATUSES.ACTIVE
+  );
+  if (oldReservation) {
+    releaseReservationInternal(
+      catalogStore,
+      oldReservation,
+      "order_items_edited",
+      RESERVATION_STATUSES.RELEASED
+    );
+  }
+  const newReservation = reserveStockForCheckout(authStore, catalogStore, {
+    owner: { ownerType: session.ownerType, ownerId: session.ownerId },
+    checkoutSessionId: session.id,
+    ttlMinutes: STOCK_RESERVATION_MINUTES,
+    lines
+  });
+
+  session.reservationId = newReservation.id;
+  session.reservationExpiresAt = newReservation.expiresAt;
+  session.cart = {
+    ...session.cart,
+    items: lines.map((line) => ({ productId: line.productId, qty: line.qty })),
+    pricing
+  };
+  session.updatedAt = nowIso();
+
+  order.items = lines.map((line) => ({
+    productId: line.productId,
+    title: line.title,
+    sku: line.sku,
+    hsnCode: line.hsnCode || "",
+    qty: line.qty,
+    finalUnitPrice: line.finalUnitPriceAfterDiscount,
+    priceSource: line.priceSource || "base",
+    bulkApplied: Boolean(line.bulkApplied),
+    bulkRule: line.bulkRule || null,
+    gstRate: line.gstRate,
+    taxableValue: line.taxableValue,
+    gstAmount: line.gstAmount,
+    lineTotal: line.lineTotal
+  }));
+  order.productSubtotal = pricing.productSubtotal;
+  order.discountAmount = pricing.discountAmount;
+  order.taxableValue = pricing.taxableValue;
+  order.gstTotal = pricing.gstTotal;
+  order.shippingGstAmount = pricing.shippingGstAmount;
+  order.shippingCharge = pricing.shippingCharge;
+  order.roundOff = pricing.roundOff;
+  order.grandTotal = pricing.grandTotal;
+  if (order.manualPaymentStatus && order.manualPaymentStatus !== "awaiting_submission") {
+    // Any payment proof already submitted was for the old total — reset it so
+    // it can't be accidentally verified against the corrected amount.
+    order.manualPaymentStatus = "awaiting_submission";
+  }
+  order.updatedAt = nowIso();
+
+  await persistStores(authStore, catalogStore, { writeAuth: true, writeCatalog: true });
+
+  await addActivityLog({
+    action: "order.items_edited",
+    actorId: actor?.id,
+    actorRole: actor?.role,
+    resourceType: "order",
+    resourceId: order.id,
+    metadata: {
+      newGrandTotal: order.grandTotal,
+      extraDiscountAmount: pricing.discountAmount
+    }
+  });
+
+  return order;
 }
 
 function resolveNotificationEmail(addressA, addressB) {
@@ -2844,6 +2978,7 @@ module.exports = {
   createCartShare,
   getSharedCart,
   claimSharedCart,
+  recalculateOrderItems,
   startCheckout,
   getCheckoutSession,
   getCheckoutFollowup,

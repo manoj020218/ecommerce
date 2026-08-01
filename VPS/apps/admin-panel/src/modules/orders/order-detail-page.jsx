@@ -9,6 +9,7 @@ import { formatCurrencyInr, formatDateTime } from "../../shared/utils/formatters
 import {
   fetchOrderDetail,
   updateOrder,
+  editOrderItems,
   generateInvoiceForOrder,
   fetchInvoiceForOrder,
   fetchInvoiceDownloadData,
@@ -21,7 +22,13 @@ import {
   fetchManualPaymentsForOrder,
   verifyManualPayment
 } from "./orders.api";
+import { searchWalkInProducts } from "../walkin-orders/walkin-orders.api";
 import { fetchSettings } from "../settings/settings.api";
+
+// Mirrors MANUAL_PAYMENT_METHODS in backend/src/modules/orders/orders.service.js —
+// only these payment methods are safe to edit items on pre-payment (no risk of
+// a gateway webhook confirming the old amount mid-edit).
+const EDITABLE_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -355,6 +362,171 @@ function ProcessingModal({ order, onClose, onSave, saving, error }) {
             onClick={() => onSave({ fulfillmentItems: items, adminNote: note })}
           >
             {saving ? "Saving…" : "Mark as Processing"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Edit Items modal ──────────────────────────────────────────────────────────
+
+function EditItemsModal({ order, onClose, onSave, saving, error }) {
+  const [items, setItems] = useState(() =>
+    (order.items || []).map((item) => ({
+      productId: item.productId,
+      title: item.title,
+      sku: item.sku,
+      qty: item.qty
+    }))
+  );
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  const updateQty = (productId, qty) =>
+    setItems((prev) => prev.map((it) => it.productId === productId ? { ...it, qty: Math.max(1, Number(qty) || 1) } : it));
+
+  const removeItem = (productId) =>
+    setItems((prev) => prev.filter((it) => it.productId !== productId));
+
+  const addProduct = (product) => {
+    setItems((prev) => {
+      if (prev.some((it) => it.productId === product.id)) {
+        return prev.map((it) => it.productId === product.id ? { ...it, qty: it.qty + 1 } : it);
+      }
+      return [...prev, { productId: product.id, title: product.title, sku: product.sku, qty: 1 }];
+    });
+    setQuery("");
+    setResults([]);
+  };
+
+  const runSearch = async (q) => {
+    setQuery(q);
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const rows = await searchWalkInProducts({ q: q.trim(), limit: 8 });
+      setResults(Array.isArray(rows) ? rows : []);
+    } catch {
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  return (
+    <Modal title="Edit Order Items" open onClose={onClose} width="620px" disableOutsideClick>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--muted)" }}>
+          Only available before payment is confirmed. Prices, GST, and shipping are
+          recalculated from current catalogue values — this does not simply relabel
+          the old total.
+        </p>
+
+        <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
+                <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, fontSize: 11, color: "var(--muted)" }}>Product</th>
+                <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, fontSize: 11, color: "var(--muted)", width: 90 }}>Qty</th>
+                <th style={{ padding: "8px 12px", width: 40 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 && (
+                <tr><td colSpan={3} style={{ padding: 14, textAlign: "center", color: "var(--muted)" }}>No items — add a product below.</td></tr>
+              )}
+              {items.map((item) => (
+                <tr key={item.productId} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <td style={{ padding: "10px 12px" }}>
+                    <div style={{ fontWeight: 600 }}>{item.title}</div>
+                    {item.sku && <div style={{ fontSize: 11, color: "var(--muted)" }}>SKU: {item.sku}</div>}
+                  </td>
+                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                    <input
+                      type="number" min="1" value={item.qty}
+                      onChange={(e) => updateQty(item.productId, e.target.value)}
+                      style={{ width: 60, padding: "5px 8px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 5, textAlign: "center" }}
+                    />
+                  </td>
+                  <td style={{ padding: "10px 12px", textAlign: "center" }}>
+                    <button type="button" onClick={() => removeItem(item.productId)}
+                      style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}
+                      title="Remove item">×</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ position: "relative" }}>
+          <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Add Product</span>
+            <input
+              type="text" value={query} placeholder="Search by name, SKU, HSN..."
+              onChange={(e) => runSearch(e.target.value)}
+              style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+            />
+          </label>
+          {(searching || results.length > 0) && query && (
+            <div style={{
+              position: "absolute", top: "100%", left: 0, right: 0, zIndex: 5, marginTop: 4,
+              background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)", maxHeight: 220, overflowY: "auto"
+            }}>
+              {searching && <div style={{ padding: 10, fontSize: 12, color: "var(--muted)" }}>Searching…</div>}
+              {!searching && results.length === 0 && (
+                <div style={{ padding: 10, fontSize: 12, color: "var(--muted)" }}>No matching products.</div>
+              )}
+              {results.map((product) => (
+                <button
+                  key={product.id} type="button" onClick={() => addProduct(product)}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "8px 12px",
+                    background: "none", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", fontSize: 13
+                  }}
+                >
+                  <div style={{ fontWeight: 600 }}>{product.title}</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    SKU: {product.sku} · {formatCurrencyInr(product.salePrice || product.basePrice || 0)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: 220 }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Additional Discount (₹)</span>
+          <input
+            type="number" min="0" value={discountAmount}
+            onChange={(e) => setDiscountAmount(Math.max(0, Number(e.target.value) || 0))}
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+          />
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            On top of any automatic payment-method discount. Not a %.
+          </span>
+        </label>
+
+        {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button" className="btn btn-primary"
+            disabled={saving || items.length === 0}
+            onClick={() => onSave({
+              items: items.map((it) => ({ productId: it.productId, qty: it.qty })),
+              discountAmount
+            })}
+          >
+            {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
       </div>
@@ -746,6 +918,10 @@ export function OrderDetailPage() {
   const [processingError, setProcessingError] = useState("");
   const [processingSaving, setProcessingSaving] = useState(false);
 
+  const [editItemsModal, setEditItemsModal] = useState(false);
+  const [editItemsError, setEditItemsError] = useState("");
+  const [editItemsSaving, setEditItemsSaving] = useState(false);
+
   const [fulfillModal, setFulfillModal] = useState(false);
   const [fulfillError, setFulfillError] = useState("");
   const [fulfillSaving, setFulfillSaving] = useState(false);
@@ -824,6 +1000,20 @@ export function OrderDetailPage() {
       setProcessingError(e.message || "Failed to mark as processing.");
     } finally {
       setProcessingSaving(false);
+    }
+  };
+
+  const handleEditItems = async (payload) => {
+    setEditItemsSaving(true);
+    setEditItemsError("");
+    try {
+      const updated = await editOrderItems(orderId, payload);
+      setOrder(updated);
+      setEditItemsModal(false);
+    } catch (e) {
+      setEditItemsError(e.message || "Failed to update order items.");
+    } finally {
+      setEditItemsSaving(false);
     }
   };
 
@@ -1070,6 +1260,13 @@ export function OrderDetailPage() {
     order.orderStatus === "processing" ? "ready_for_invoice" :
     "new";
   const canCancel = orderStage === "new";
+  // Mirrors the backend eligibility check in orders.service.js editOrderItems —
+  // kept here too so the button doesn't even appear when it would just 409.
+  const canEditItems =
+    order.paymentStatus !== "paid" &&
+    !["cancelled", "fulfilled"].includes(order.orderStatus) &&
+    EDITABLE_PAYMENT_METHODS.has(order.paymentMethod) &&
+    !invoice;
   const orderStageValue = {
     new: "not_processed",
     ready_for_invoice: "order_processed",
@@ -1173,6 +1370,16 @@ export function OrderDetailPage() {
       <div className="order-detail-content-grid" style={{ display: "grid", gap: 14, marginBottom: 14 }}>
         {/* Products table */}
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden" }}>
+          {canEditItems && (
+            <div style={{ display: "flex", justifyContent: "flex-end", padding: "10px 14px 0" }}>
+              <button
+                type="button" className="btn btn-secondary btn-small"
+                onClick={() => { setEditItemsModal(true); setEditItemsError(""); }}
+              >
+                Edit Items
+              </button>
+            </div>
+          )}
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
@@ -1412,6 +1619,15 @@ export function OrderDetailPage() {
           onSave={handleMarkDelivered}
           saving={deliverySaving}
           error={deliveryError}
+        />
+      )}
+      {editItemsModal && (
+        <EditItemsModal
+          order={order}
+          onClose={() => setEditItemsModal(false)}
+          onSave={handleEditItems}
+          saving={editItemsSaving}
+          error={editItemsError}
         />
       )}
     </div>

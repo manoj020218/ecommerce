@@ -8,6 +8,7 @@ const {
 } = require("../payment-gateways/payment-gateways.model");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { notifyCustomerEvent } = require("../marketing/marketing.service");
+const { recalculateOrderItems } = require("../cart-checkout/cart-checkout.service");
 
 const MANUAL_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
 
@@ -451,6 +452,50 @@ async function updateOrder(orderId, patch, actor) {
   return getOrderDetail(orderId);
 }
 
+// Lets admin correct a not-yet-paid order's items/discount — e.g. the buyer
+// asked to swap a product before completing payment. Deliberately restricted:
+// - manual/offline payment methods only. An online-gateway order (Razorpay/
+//   Cashfree) could have a payment mid-flight at the gateway the instant an
+//   admin edits it, and the webhook would then confirm the OLD amount against
+//   the NEW order total.
+// - blocked once an invoice (even a Proforma) already exists — voiding/
+//   regenerating an already-issued invoice is a separate concern.
+// The actual item/pricing/stock-reservation recalculation lives in
+// cart-checkout.service.js, which already owns the checkout-session and
+// stock-reservation machinery this has to stay in sync with.
+async function editOrderItems(orderId, patch, actor) {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+
+  const order = ensureArray(authStore.orders).find((row) => row.id === orderId);
+  if (!order) {
+    throw new HttpError(404, "Order not found.");
+  }
+  if (order.paymentStatus === "paid") {
+    throw new HttpError(409, "Cannot edit items on a paid order.");
+  }
+  if (["cancelled", "fulfilled"].includes(order.orderStatus)) {
+    throw new HttpError(409, "Order is in a final state and cannot be edited.");
+  }
+  if (!MANUAL_PAYMENT_METHODS.has(order.paymentMethod)) {
+    throw new HttpError(
+      409,
+      "Only manual/offline payment orders (bank transfer, manual UPI) can have items edited."
+    );
+  }
+  if (order.invoiceId) {
+    throw new HttpError(409, "An invoice already exists for this order — cannot edit items.");
+  }
+
+  // recalculateOrderItems logs its own "order.items_edited" activity entry.
+  // It re-reads the order itself (rather than reusing the `order` object
+  // above) so its read-mutate-write cycle stays on one consistent authStore
+  // instance instead of two independently-loaded copies.
+  await recalculateOrderItems(orderId, patch.items, patch.discountAmount || 0, actor);
+
+  return getOrderDetail(orderId);
+}
+
 function escapeCSV(value) {
   const str = String(value ?? "").replace(/"/g, '""');
   return /[",\n\r]/.test(str) ? `"${str}"` : str;
@@ -528,6 +573,7 @@ module.exports = {
   listOrders,
   getOrderDetail,
   updateOrder,
+  editOrderItems,
   exportOrdersCsv,
   listStuckPaymentSessions
 };

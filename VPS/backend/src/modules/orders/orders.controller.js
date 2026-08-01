@@ -2,7 +2,11 @@ const { ZodError } = require("zod");
 const { HttpError } = require("../../common/http-error");
 const { ok } = require("../../common/http-response");
 const service = require("./orders.service");
-const { parseListOrdersQuery, parseUpdateOrderPayload } = require("./orders.validator");
+const {
+  parseListOrdersQuery,
+  parseUpdateOrderPayload,
+  parseEditOrderItemsPayload
+} = require("./orders.validator");
 
 function mapValidationError(error) {
   if (error instanceof ZodError) {
@@ -39,6 +43,12 @@ const adminUpdateOrder = asyncHandler(async (req, res) => {
   return ok(res, data, "Order updated.");
 });
 
+const adminEditOrderItems = asyncHandler(async (req, res) => {
+  const patch = parseEditOrderItemsPayload(req.body || {});
+  const data = await service.editOrderItems(req.params.orderId, patch, req.actor);
+  return ok(res, data, "Order items updated.");
+});
+
 const adminExportOrders = asyncHandler(async (req, res) => {
   const filters = parseListOrdersQuery(req.query || {});
   const csv = await service.exportOrdersCsv(filters);
@@ -56,6 +66,7 @@ module.exports = {
   adminListOrders,
   adminGetOrderDetail,
   adminUpdateOrder,
+  adminEditOrderItems,
   adminExportOrders,
   adminListStuckPaymentSessions
 };

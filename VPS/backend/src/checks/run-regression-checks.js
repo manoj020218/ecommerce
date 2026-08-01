@@ -3999,6 +3999,187 @@ async function run() {
     );
     assert.equal(phase19CancelDenied.response.status, 403);
 
+    // ── Phase 20: admin edit-items on a not-yet-paid storefront order ──────────
+    // Regression target for the item-swap bug this feature was built to avoid:
+    // stock must be deducted for the NEW product at payment-verification time,
+    // never the old one, and only manual/offline unpaid orders may be edited.
+
+    const phase20ProductX = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 20 Swap Source Camera",
+        categoryId,
+        brand: "Jenix",
+        mpn: "JNX-P20-X",
+        hsnCode: "8525",
+        basePrice: 3000,
+        salePrice: 2800,
+        deadWeightKg: 1,
+        shortDescription: "Phase 20 test product X.",
+        fullDescription: "Phase 20 test product X.",
+        stockQty: 10,
+        lowStockThreshold: 2
+      })
+    });
+    assert.equal(phase20ProductX.response.status, 201);
+    const phase20ProductXId = phase20ProductX.json.data.id;
+
+    const phase20ProductY = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 20 Swap Target Camera",
+        categoryId,
+        brand: "Jenix",
+        mpn: "JNX-P20-Y",
+        hsnCode: "8525",
+        basePrice: 4000,
+        salePrice: 3600,
+        deadWeightKg: 1,
+        shortDescription: "Phase 20 test product Y.",
+        fullDescription: "Phase 20 test product Y.",
+        stockQty: 10,
+        lowStockThreshold: 2
+      })
+    });
+    assert.equal(phase20ProductY.response.status, 201);
+    const phase20ProductYId = phase20ProductY.json.data.id;
+
+    await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase20-swap",
+        productId: phase20ProductXId,
+        qty: 1
+      })
+    });
+
+    const phase20Checkout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase20-swap",
+        paymentMethod: "manual_upi",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Phase20 Buyer",
+          email: "phase20.buyer@example.com",
+          mobile: "+919000000333",
+          addressLine1: "1 Test Lane",
+          city: "Gurugram",
+          state: "Haryana",
+          stateCode: "06",
+          pincode: "122001"
+        },
+        shippingAddress: {
+          name: "Phase20 Buyer",
+          email: "phase20.buyer@example.com",
+          pincode: "122001",
+          state: "Haryana",
+          stateCode: "06"
+        }
+      })
+    });
+    assert.equal(phase20Checkout.response.status, 200);
+    assert.equal(phase20Checkout.json.data.order.paymentStatus, "pending");
+    const phase20OrderId = phase20Checkout.json.data.order.id;
+
+    // Editing an online-payment-method order must be rejected (webhook race risk).
+    const phase20OnlineEditDenied = await requestJson(
+      baseUrl,
+      `/api/admin/orders/${phase9OrderId}/items`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ items: [{ productId: phase20ProductYId, qty: 1 }] })
+      }
+    );
+    assert.equal(phase20OnlineEditDenied.response.status, 409);
+
+    // A staff account with only orders.view + orders.edit (no walkin-orders
+    // permissions) can still use this endpoint — proves the permission wiring,
+    // not just the super_admin bypass.
+    const phase20Edit = await requestJson(
+      baseUrl,
+      `/api/admin/orders/${phase20OrderId}/items`,
+      {
+        method: "PATCH",
+        headers: authHeaders(phase19EditorToken),
+        body: JSON.stringify({
+          items: [{ productId: phase20ProductYId, qty: 2 }],
+          discountAmount: 50
+        })
+      }
+    );
+    assert.equal(phase20Edit.response.status, 200);
+    assert.equal(phase20Edit.json.data.items.length, 1);
+    assert.equal(phase20Edit.json.data.items[0].productId, phase20ProductYId);
+    assert.equal(phase20Edit.json.data.items[0].qty, 2);
+
+    const phase20ManualForm = new FormData();
+    phase20ManualForm.append("sessionId", "phase20-swap");
+    phase20ManualForm.append("orderId", phase20OrderId);
+    phase20ManualForm.append("paymentMethod", "manual_upi");
+    phase20ManualForm.append("utrNumber", "UTR-PHASE20-001");
+    phase20ManualForm.append("note", "Phase 20 swapped-item payment.");
+    phase20ManualForm.append(
+      "file",
+      new Blob([tinyPngBytes], { type: "image/png" }),
+      "payment-proof.png"
+    );
+    const phase20ManualSubmitResponse = await fetch(
+      `${baseUrl}/api/payments/manual/submit`,
+      { method: "POST", body: phase20ManualForm }
+    );
+    const phase20ManualSubmitJson = await phase20ManualSubmitResponse.json();
+    assert.equal(phase20ManualSubmitResponse.status, 201);
+    const phase20SubmissionId = phase20ManualSubmitJson.data.submission.id;
+
+    const phase20Verify = await requestJson(
+      baseUrl,
+      `/api/admin/manual-payments/${phase20SubmissionId}/verify`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          action: "approve",
+          gatewayTxnId: "phase20_bank_txn",
+          verificationNote: "Phase 20 verified."
+        })
+      }
+    );
+    assert.equal(phase20Verify.response.status, 200);
+    assert.equal(phase20Verify.json.data.order.paymentStatus, "paid");
+
+    // The bug this feature is designed to avoid: stock must be deducted from
+    // the NEW product (Y, qty 2) and the OLD product (X) must be untouched.
+    const phase20ProductXAfter = await requestJson(
+      baseUrl,
+      `/api/admin/products/${phase20ProductXId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    const phase20ProductYAfter = await requestJson(
+      baseUrl,
+      `/api/admin/products/${phase20ProductYId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase20ProductXAfter.json.data.stockQty, 10);
+    assert.equal(phase20ProductYAfter.json.data.stockQty, 8);
+
+    // Once paid (and therefore invoiced), items can no longer be edited.
+    const phase20PostPaidEditDenied = await requestJson(
+      baseUrl,
+      `/api/admin/orders/${phase20OrderId}/items`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ items: [{ productId: phase20ProductXId, qty: 1 }] })
+      }
+    );
+    assert.equal(phase20PostPaidEditDenied.response.status, 409);
+
     const phase16SalesMonth = String(
       phase10InvoiceForOnlineOrder.json.data.invoiceDate || ""
     ).slice(0, 7);

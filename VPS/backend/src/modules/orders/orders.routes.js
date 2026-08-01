@@ -37,6 +37,11 @@ function createOrdersRouter() {
     requireAdminPermission(ORDERS_PERMISSIONS.VIEW),
     controller.adminUpdateOrder
   );
+  router.patch(
+    "/:orderId/items",
+    requireAdminPermission(ORDERS_PERMISSIONS.EDIT),
+    controller.adminEditOrderItems
+  );
 
   return router;
 }

@@ -34,6 +34,19 @@ const updateOrderSchema = z.object({
   fulfillmentItems: z.array(fulfillmentItemSchema).max(100).optional()
 }).strict();
 
+const editOrderItemsSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.string().trim().min(1),
+        qty: z.coerce.number().int().min(1).max(9999)
+      })
+    )
+    .min(1, "Order must have at least one item.")
+    .max(50),
+  discountAmount: z.coerce.number().min(0).max(10000000).optional().default(0)
+}).strict();
+
 function parseListOrdersQuery(query) {
   return listOrdersQuerySchema.parse(query || {});
 }
@@ -42,4 +55,12 @@ function parseUpdateOrderPayload(body) {
   return updateOrderSchema.parse(body || {});
 }
 
-module.exports = { parseListOrdersQuery, parseUpdateOrderPayload };
+function parseEditOrderItemsPayload(body) {
+  return editOrderItemsSchema.parse(body || {});
+}
+
+module.exports = {
+  parseListOrdersQuery,
+  parseUpdateOrderPayload,
+  parseEditOrderItemsPayload
+};

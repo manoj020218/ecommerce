@@ -742,9 +742,14 @@ export function AddProductPage() {
         <span>Add Product</span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, gap: 12 }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: 0 }}>Add Product</h1>
-        <button type="button" className="btn btn-secondary btn-small" onClick={() => navigate("/products")}>← Back</button>
+        <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+          <button type="submit" form="add-product-form" className="btn btn-primary btn-small" disabled={saving}>
+            {saving ? "Creating…" : "Create Product"}
+          </button>
+          <button type="button" className="btn btn-secondary btn-small" onClick={() => navigate("/products")}>← Back</button>
+        </div>
       </div>
 
       {/* Error banner */}
@@ -758,7 +763,7 @@ export function AddProductPage() {
         </div>
       )}
 
-      <form onSubmit={onSubmit}>
+      <form id="add-product-form" onSubmit={onSubmit}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, alignItems: "start" }}>
 
           {/* ── LEFT COLUMN ── */}

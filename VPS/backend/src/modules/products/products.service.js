@@ -527,6 +527,8 @@ function createProductRecordFromPayload(store, payload) {
     allowBackorder: Boolean(payload.allowBackorder),
     maxOrderQty: Number(payload.maxOrderQty || 1000),
     lowStockThreshold: Number(payload.lowStockThreshold || 0),
+    priceIncludesGst: Boolean(payload.priceIncludesGst),
+    shippingIncluded: Boolean(payload.shippingIncluded),
     isActive: Boolean(payload.isActive),
     createdAt: now,
     updatedAt: now

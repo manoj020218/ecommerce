@@ -26,8 +26,40 @@ export function createCustomer(payload) {
   });
 }
 
+export function fetchCustomer(customerId) {
+  return apiFetch(`/admin/customers/${customerId}`);
+}
+
 export function fetchCustomerOrders(customerId) {
   return apiFetch(`/admin/customers/${customerId}/orders`);
+}
+
+export function fetchCustomerCart(customerId) {
+  return apiFetch(`/admin/customers/${customerId}/cart`);
+}
+
+export function fetchCustomerAddresses(customerId) {
+  return apiFetch(`/admin/customers/${customerId}/addresses`);
+}
+
+export function createCustomerAddress(customerId, payload) {
+  return apiFetch(`/admin/customers/${customerId}/addresses`, {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function updateCustomerAddress(customerId, addressId, payload) {
+  return apiFetch(`/admin/customers/${customerId}/addresses/${addressId}`, {
+    method: "PATCH",
+    body: payload
+  });
+}
+
+export function deleteCustomerAddress(customerId, addressId) {
+  return apiFetch(`/admin/customers/${customerId}/addresses/${addressId}`, {
+    method: "DELETE"
+  });
 }
 
 export function updateCustomer(customerId, payload) {

@@ -500,6 +500,11 @@ export function CustomersPage() {
                   {/* actions */}
                   <td style={{ padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
+                      <button type="button" onClick={() => navigate(`/customers/${customer.id}`)}
+                        style={{ fontSize: 12, color: BRAND, fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
+                        View
+                      </button>
+                      <span style={{ color: "#e5e7eb" }}>|</span>
                       <button type="button" onClick={() => openOrdersModal(customer)}
                         style={{ fontSize: 12, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }}>
                         Orders
@@ -571,6 +576,10 @@ export function CustomersPage() {
                 {customer.gstin ? <div style={{ color: "#9ca3af" }}>GSTIN: <span style={{ color: "#111827", fontWeight: 600 }}>{customer.gstin}</span></div> : null}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => navigate(`/customers/${customer.id}`)}
+                  style={{ flex: 1, fontSize: 13, fontWeight: 600, color: BRAND, border: "1px solid rgba(232,35,26,0.3)", background: "rgba(232,35,26,0.04)", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
+                  View
+                </button>
                 <button type="button" onClick={() => openOrdersModal(customer)}
                   style={{ flex: 1, fontSize: 13, fontWeight: 500, color: "#6b7280", border: "1px solid #e5e7eb", background: "#fff", borderRadius: 8, padding: "7px 0", cursor: "pointer" }}>
                   Orders

@@ -16,7 +16,8 @@ const listRecoveriesQuerySchema = z.object({
   stage: z
     .enum(Object.values(RECOVERY_STAGES))
     .optional(),
-  dueOnly: z.coerce.boolean().optional().default(false)
+  dueOnly: z.coerce.boolean().optional().default(false),
+  customerId: optionalString(80)
 });
 
 const runRemindersPayloadSchema = z.object({

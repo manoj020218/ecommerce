@@ -4935,6 +4935,122 @@ async function run() {
       true
     );
 
+    // ── Phase 21: admin customer detail page endpoints ──────────────────────
+    const phase21CustomerId = phase11AccountCustomerLogin.json.data.customer.id;
+
+    const phase21GetCustomer = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase21GetCustomer.response.status, 200);
+    assert.equal(phase21GetCustomer.json.data.id, phase21CustomerId);
+    assert.equal(Array.isArray(phase21GetCustomer.json.data.savedAddresses), true);
+
+    const phase21UpdateCustomer = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          name: "Phase 21 Renamed Customer",
+          email: "phase21.renamed@example.com"
+        })
+      }
+    );
+    assert.equal(phase21UpdateCustomer.response.status, 200);
+    assert.equal(phase21UpdateCustomer.json.data.name, "Phase 21 Renamed Customer");
+    assert.equal(phase21UpdateCustomer.json.data.email, "phase21.renamed@example.com");
+
+    const phase21Cart = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}/cart`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase21Cart.response.status, 200);
+    assert.equal(Array.isArray(phase21Cart.json.data.items), true);
+
+    const phase21CreateAddress = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}/addresses`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({
+          label: "Phase 21 Office",
+          name: "Phase 21 Renamed Customer",
+          mobile: "+91-9898989898",
+          addressLine1: "221B Phase 21 Street",
+          city: "Hyderabad",
+          state: "Telangana",
+          stateCode: "36",
+          pincode: "500051",
+          country: "India"
+        })
+      }
+    );
+    assert.equal(phase21CreateAddress.response.status, 201);
+    assert.equal(phase21CreateAddress.json.data.label, "Phase 21 Office");
+    const phase21AddressId = phase21CreateAddress.json.data.id;
+    assert.equal(Boolean(phase21AddressId), true);
+
+    const phase21ListAddresses = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}/addresses`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase21ListAddresses.response.status, 200);
+    assert.equal(
+      phase21ListAddresses.json.data.some((row) => row.id === phase21AddressId),
+      true
+    );
+
+    const phase21UpdateAddress = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}/addresses/${phase21AddressId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ city: "Secunderabad" })
+      }
+    );
+    assert.equal(phase21UpdateAddress.response.status, 200);
+    assert.equal(phase21UpdateAddress.json.data.city, "Secunderabad");
+
+    const phase21DeleteAddress = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}/addresses/${phase21AddressId}`,
+      {
+        method: "DELETE",
+        headers: authHeaders(superAdminToken)
+      }
+    );
+    assert.equal(phase21DeleteAddress.response.status, 200);
+    assert.equal(phase21DeleteAddress.json.data.deleted, true);
+
+    const phase21ListAddressesAfterDelete = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}/addresses`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase21ListAddressesAfterDelete.response.status, 200);
+    assert.equal(
+      phase21ListAddressesAfterDelete.json.data.some((row) => row.id === phase21AddressId),
+      false
+    );
+
+    const phase21AbandonedByCustomer = await requestJson(
+      baseUrl,
+      `/api/admin/abandoned-carts?customerId=${phase21CustomerId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase21AbandonedByCustomer.response.status, 200);
+    assert.equal(
+      phase21AbandonedByCustomer.json.data.every((row) => row.userId === phase21CustomerId),
+      true
+    );
+
     // eslint-disable-next-line no-console
     console.log("Regression checks passed.");
   } finally {

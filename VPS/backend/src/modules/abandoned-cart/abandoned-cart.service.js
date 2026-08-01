@@ -405,6 +405,10 @@ async function listRecoveries(filters) {
     records = records.filter((row) => row.stage === filters.stage);
   }
 
+  if (filters.customerId) {
+    records = records.filter((row) => row.userId === filters.customerId);
+  }
+
   if (filters.dueOnly) {
     records = records.filter((row) => {
       const reminderTarget = resolveReminderTarget(row);

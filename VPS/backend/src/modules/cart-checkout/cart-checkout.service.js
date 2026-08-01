@@ -3018,6 +3018,59 @@ async function getCustomerCartLegacy(customerId) {
   return sanitizeLegacyCartForAuth(owner, cart);
 }
 
+// Read-only admin view of a customer's live (not yet checked out, not yet
+// abandoned) cart — product title/price enriched the same way the
+// storefront cart is, via the same pricing resolver, so figures shown to
+// admin match what the customer actually sees. Never creates a cart record
+// or persists anything, unlike getCart()/addCartItem() which are part of
+// the live storefront flow.
+async function getCustomerCartForAdmin(customerId) {
+  const [authStore, catalogStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore()
+  ]);
+  ensurePhase7StoreShape(authStore);
+
+  const owner = { ownerType: CART_OWNER_TYPES.CUSTOMER, ownerId: customerId };
+  const cart = ensureCartRecord(authStore, owner, false);
+  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+
+  const lines = [];
+  for (const item of ensureArray(cart?.items)) {
+    try {
+      lines.push(
+        buildCartLineFromItem(catalogStore, item, {
+          enforceStockCheck: false,
+          customerPricingContext
+        })
+      );
+    } catch (_error) {
+      // Stale line — product removed/deactivated since it was added.
+      // Skip it for display rather than failing the whole admin view.
+    }
+  }
+
+  const itemCount = lines.reduce((sum, line) => sum + Number(line.qty || 0), 0);
+  const cartValue = roundMoney(
+    lines.reduce((sum, line) => sum + Number(line.lineSubtotal || 0), 0)
+  );
+
+  return {
+    userId: customerId,
+    items: lines.map((line) => ({
+      productId: line.productId,
+      title: line.title,
+      imageUrl: line.imageUrl,
+      qty: line.qty,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineSubtotal
+    })),
+    itemCount,
+    cartValue,
+    updatedAt: cart?.updatedAt || null
+  };
+}
+
 async function addGuestCartItemLegacy(payload) {
   const authStore = await readAuthStore();
   ensurePhase7StoreShape(authStore);
@@ -3045,6 +3098,7 @@ async function addGuestCartItemLegacy(payload) {
 
 module.exports = {
   getCart,
+  getCustomerCartForAdmin,
   addCartItem,
   updateCartItem,
   deleteCartItem,

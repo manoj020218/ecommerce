@@ -9,6 +9,7 @@ import { LoginPage } from "../modules/auth/login-page";
 import { CataloguePage } from "../modules/catalogue/catalogue-page";
 import { CategoriesPage } from "../modules/categories/categories-page";
 import { CustomersPage } from "../modules/customers/customers-page";
+import { CustomerDetailPage } from "../modules/customers/customer-detail-page";
 import { FacebookFeedPage } from "../modules/facebook-feed/facebook-feed-page";
 import { GoogleMerchantPage } from "../modules/google-merchant/google-merchant-page";
 import { ProductsPage } from "../modules/products/products-page";
@@ -58,6 +59,7 @@ export function AppRouter() {
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:orderId" element={<OrderDetailPage />} />
           <Route path="customers" element={<CustomersPage />} />
+          <Route path="customers/:customerId" element={<CustomerDetailPage />} />
           <Route path="walk-in-orders" element={<WalkInOrdersPage />} />
           <Route path="walk-in-orders/add" element={<AddWalkInOrderPage />} />
           <Route path="invoices" element={<InvoicesPage />} />

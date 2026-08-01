@@ -40,6 +40,36 @@ function createCustomersRouter() {
     requireAdminPermission(CUSTOMERS_PERMISSIONS.VIEW),
     controller.adminGetCustomerOrders
   );
+  router.get(
+    "/:customerId/cart",
+    requireAdminPermission(CUSTOMERS_PERMISSIONS.VIEW),
+    controller.adminGetCustomerCart
+  );
+  router.get(
+    "/:customerId/addresses",
+    requireAdminPermission(CUSTOMERS_PERMISSIONS.VIEW),
+    controller.adminListCustomerAddresses
+  );
+  router.post(
+    "/:customerId/addresses",
+    requireCustomerManagePermission,
+    controller.adminCreateCustomerAddress
+  );
+  router.patch(
+    "/:customerId/addresses/:addressId",
+    requireCustomerManagePermission,
+    controller.adminUpdateCustomerAddress
+  );
+  router.delete(
+    "/:customerId/addresses/:addressId",
+    requireCustomerManagePermission,
+    controller.adminDeleteCustomerAddress
+  );
+  router.get(
+    "/:customerId",
+    requireAdminPermission(CUSTOMERS_PERMISSIONS.VIEW),
+    controller.adminGetCustomer
+  );
   router.patch("/:customerId", requireCustomerManagePermission, controller.adminUpdateCustomer);
   router.get(
     "/order-requests/list",

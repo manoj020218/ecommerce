@@ -6,7 +6,8 @@ const {
   PAYMENT_METHODS
 } = require("../cart-checkout/cart-checkout.model");
 const {
-  ensureCustomerAccountShape
+  ensureCustomerAccountShape,
+  sanitizeCustomerAddress
 } = require("../customer-account/customer-account.model");
 const {
   CUSTOMER_TYPES,
@@ -176,6 +177,7 @@ function sanitizeAdminCustomer(customer, authStore) {
     orderMode: b2b.orderMode || ORDER_MODES.ONLINE,
     verifiedEmail: Boolean(customer.verifiedEmail),
     verifiedMobile: Boolean(customer.verifiedMobile),
+    savedAddresses: ensureArray(customer.savedAddresses).map(sanitizeCustomerAddress),
     createdAt: customer.createdAt || null,
     lastLoginAt: customer.lastLoginAt || null,
     ...stats
@@ -268,6 +270,34 @@ async function updateCustomer(customerId, patch, actor) {
   const authStore = await readAuthStore();
   ensureCustomersStoreShape(authStore);
   const customer = findCustomerOrThrow(authStore, customerId);
+
+  if (patch.email !== undefined) {
+    const nextEmail = String(patch.email || "").trim().toLowerCase();
+    if (nextEmail && nextEmail !== normalizeText(customer.email)) {
+      const dup = ensureArray(authStore.users).find(
+        (u) => u.id !== customer.id && normalizeText(u.email) === nextEmail
+      );
+      if (dup) {
+        throw new HttpError(409, `A customer with email ${nextEmail} already exists.`);
+      }
+    }
+    customer.email = nextEmail;
+  }
+  if (patch.mobile !== undefined) {
+    const nextMobile = normalizeMobile(patch.mobile);
+    if (nextMobile && nextMobile !== normalizeMobile(customer.mobile)) {
+      const dup = ensureArray(authStore.users).find(
+        (u) => u.id !== customer.id && normalizeMobile(u.mobile) === nextMobile
+      );
+      if (dup) {
+        throw new HttpError(409, `A customer with mobile ${nextMobile} already exists.`);
+      }
+    }
+    customer.mobile = nextMobile;
+  }
+  if (patch.name !== undefined) {
+    customer.name = String(patch.name || "").trim();
+  }
 
   if (patch.customerType !== undefined) {
     customer.customerType = normalizeCustomerType(patch.customerType);
@@ -574,6 +604,13 @@ async function createCustomer(payload, actor) {
   return sanitizeAdminCustomer(customer, authStore);
 }
 
+async function getCustomer(customerId) {
+  const authStore = await readAuthStore();
+  ensureCustomersStoreShape(authStore);
+  const customer = findCustomerOrThrow(authStore, customerId);
+  return sanitizeAdminCustomer(customer, authStore);
+}
+
 async function listCustomerOrders(customerId) {
   const authStore = await readAuthStore();
   ensureCustomersStoreShape(authStore);
@@ -593,6 +630,7 @@ async function listCustomerOrders(customerId) {
 
 module.exports = {
   listCustomers,
+  getCustomer,
   updateCustomer,
   createCustomer,
   listCustomerOrders,

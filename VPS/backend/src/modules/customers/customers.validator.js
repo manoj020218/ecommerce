@@ -20,6 +20,9 @@ const listCustomersQuerySchema = z.object({
 });
 
 const updateCustomerPayloadSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  email: z.string().trim().email("Valid email required").max(200).optional().or(z.literal("")),
+  mobile: z.string().trim().max(20).optional(),
   customerType: customerTypeSchema.optional(),
   priceGroup: z.string().trim().max(120).optional(),
   isB2BApproved: z.boolean().optional(),

@@ -386,23 +386,31 @@ export function StorefrontLayout() {
               onBlur={() => setIsSearchFocused(false)}
               placeholder="Search cameras, smart locks, gate motors..."
             />
-            {searchText && !isSearchFocused ? (
-              <button
-                type="button"
-                aria-label="Clear search"
-                className="proto-search-clear-btn"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  setSearchText("");
-                }}
-              >
-                <ClearIcon />
-              </button>
-            ) : (
+            {/* The search (submit) button used to be swapped out for a Clear
+                button whenever isSearchFocused was false — but tapping the
+                search button itself blurs the input first, so on mobile the
+                tap could land after the swap already happened, hitting
+                Clear instead of Search. The submit button now always stays
+                put; Clear renders alongside it (gated on searchText alone,
+                not focus) instead of replacing it. */}
+            <div className="proto-header-search-actions">
+              {searchText ? (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  className="proto-search-clear-btn"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    setSearchText("");
+                  }}
+                >
+                  <ClearIcon />
+                </button>
+              ) : null}
               <button type="submit" aria-label="Search storefront">
                 <SearchIcon />
               </button>
-            )}
+            </div>
           </form>
 
           <div className="proto-header-actions">

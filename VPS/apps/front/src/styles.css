@@ -1861,6 +1861,11 @@ textarea {
   padding: 15px 16px;
 }
 
+.proto-header-search-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+
 .proto-header-search button {
   border: 0;
   background: var(--brand);

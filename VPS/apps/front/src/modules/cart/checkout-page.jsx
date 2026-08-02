@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCustomerAccountBootstrap, loginCustomerEmail } from "../account/account.api";
 import { GoogleSignInButton } from "../account/account-login-page";
@@ -61,6 +61,7 @@ import {
   notifyStorefrontCartUpdated
 } from "./cart.utils";
 import { watchdog } from "../../shared/watchdog-client";
+import { OrderDetailModal } from "./order-detail-modal";
 
 const PAYMENT_DESCRIPTIONS = {
   online: "Credit/Debit card, UPI, and net banking through the online gateway.",
@@ -191,7 +192,13 @@ function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTota
   }
 
   return (
-    <article className="proto-checkout-card proto-checkout-login-gate">
+    <article className="proto-checkout-card proto-checkout-login-gate proto-login-gate-v2">
+      <div className="proto-login-gate-badge" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="10" width="16" height="10" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+        </svg>
+      </div>
       <div className="proto-checkout-card-head">
         <h2>Sign in to check out</h2>
         <span>
@@ -202,6 +209,8 @@ function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTota
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
 
       <GoogleSignInButton redirectPath="/checkout" />
+
+      <div className="proto-login-gate-divider"><span>or sign in with email</span></div>
 
       <form className="stack-form" onSubmit={handleLogin}>
         <div className="field-grid">
@@ -222,22 +231,22 @@ function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTota
             required
           />
         </div>
-        <StorefrontButton type="submit" disabled={busy} fullWidth>
+        <button type="submit" className="proto-login-gate-btn proto-btn proto-btn-primary" disabled={busy}>
           {busy ? "Signing in..." : "Login & Continue"}
-        </StorefrontButton>
+        </button>
       </form>
 
-      <div className="proto-inline-actions">
-        <StorefrontButton to="/account/login?redirect=%2Fcheckout" variant="light">
-          New here? Create Account
-        </StorefrontButton>
-      </div>
+      <StorefrontButton
+        to="/account/login?redirect=%2Fcheckout"
+        variant="light"
+        className="proto-login-gate-btn"
+      >
+        New here? Create Account
+      </StorefrontButton>
 
-      <div className="proto-checkout-guest-divider">
-        <span>or</span>
-      </div>
+      <div className="proto-login-gate-divider"><span>or</span></div>
 
-      <button type="button" className="proto-checkout-guest-link" onClick={onContinueAsGuest}>
+      <button type="button" className="proto-login-gate-btn proto-btn proto-btn-light" onClick={onContinueAsGuest}>
         Continue as Guest →
       </button>
     </article>
@@ -253,6 +262,15 @@ export function CheckoutPage() {
   const [guestOverride, setGuestOverride] = useState(
     () => new URLSearchParams(window.location.search).has("session")
   );
+  // Step 1 (Address) / 2 (Shipping & Payment) / 3 (Review & Place). Advances
+  // automatically as each step's own "Continue" button is pressed (validating
+  // only that step's fields via the browser's own required/format checks), but
+  // a completed step stays tappable — its collapsed summary has an Edit action
+  // that jumps activeStep back without losing anything already unlocked ahead.
+  const [activeStep, setActiveStep] = useState(1);
+  const [maxStepReached, setMaxStepReached] = useState(1);
+  const formRef = useRef(null);
+  const [orderDetailModalOpen, setOrderDetailModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -509,6 +527,28 @@ export function CheckoutPage() {
       active = false;
     };
   }, []);
+
+  // Validates only whatever step 1's inputs are currently mounted (step 2/3
+  // fields aren't in the DOM yet at this point, so reportValidity() can't see
+  // or block on them) before collapsing step 1 and unlocking step 2.
+  function goToStep(stepNumber) {
+    if (formRef.current && stepNumber > activeStep && !formRef.current.reportValidity()) {
+      return;
+    }
+    setActiveStep(stepNumber);
+    setMaxStepReached((current) => Math.max(current, stepNumber));
+  }
+
+  function addressStepSummary() {
+    const parts = [billingForm.name, billingForm.addressLine1, billingForm.city, billingForm.pincode].filter(Boolean);
+    return parts.join(", ") || "Address not yet entered";
+  }
+
+  function shippingPaymentStepSummary() {
+    const shippingLabel = SHIPPING_METHOD_OPTIONS.find((option) => option.value === shippingMethod)?.label || shippingMethod;
+    const paymentLabel = PAYMENT_METHOD_OPTIONS.find((option) => option.value === paymentMethod)?.label || paymentMethod;
+    return `${shippingLabel} · ${paymentLabel}`;
+  }
 
   async function handleRefreshTotals() {
     setPreviewLoading(true);
@@ -807,7 +847,10 @@ export function CheckoutPage() {
           </section>
           <aside className="proto-checkout-sidebar">
             <article className="proto-order-summary-card">
-              <h2>Order Summary</h2>
+              <button type="button" className="proto-order-summary-heading-btn" onClick={() => setOrderDetailModalOpen(true)}>
+                <h2>Order Summary</h2>
+                <span>View details ›</span>
+              </button>
               <div className="proto-checkout-items">
                 {items.map((item) => (
                   <div key={item.productId} className="proto-checkout-item">
@@ -826,14 +869,20 @@ export function CheckoutPage() {
                   </div>
                 ))}
               </div>
-              <div className="proto-summary-total">
+              <button type="button" className="proto-summary-total proto-summary-total-btn" onClick={() => setOrderDetailModalOpen(true)}>
                 <span>Grand Total</span>
                 <strong>{formatCurrency(totals.grandTotal)}</strong>
-                <small>inclusive of all taxes</small>
-              </div>
+                <small>inclusive of all taxes · tap to view breakdown</small>
+              </button>
             </article>
           </aside>
         </div>
+        <OrderDetailModal
+          open={orderDetailModalOpen}
+          onClose={() => setOrderDetailModalOpen(false)}
+          items={items}
+          pricing={cart?.pricing || {}}
+        />
       </main>
     );
   }
@@ -848,11 +897,24 @@ export function CheckoutPage() {
       />
 
       <div className="proto-checkout-steps">
-        <div className="active"><span>1</span><strong>Delivery Address</strong></div>
-        <div className="proto-step-connector" />
-        <div className="active"><span>2</span><strong>Payment</strong></div>
-        <div className="proto-step-connector" />
-        <div><span>3</span><strong>Review & Place</strong></div>
+        {[
+          { n: 1, label: "Delivery Address" },
+          { n: 2, label: "Shipping & Payment" },
+          { n: 3, label: "Review & Place" }
+        ].map((step, index) => (
+          <div key={step.n} style={{ display: "contents" }}>
+            {index > 0 ? <div className="proto-step-connector" /> : null}
+            <button
+              type="button"
+              className={step.n === activeStep ? "active" : step.n < activeStep ? "done" : ""}
+              disabled={step.n > maxStepReached}
+              onClick={() => goToStep(step.n)}
+            >
+              <span>{step.n < activeStep ? "✓" : step.n}</span>
+              <strong>{step.label}</strong>
+            </button>
+          </div>
+        ))}
       </div>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
@@ -915,8 +977,18 @@ export function CheckoutPage() {
               />
             </article>
           ) : (
-            <form id="checkout-form" className="proto-checkout-stack" onSubmit={handleSubmit}>
-              <article className="proto-checkout-card">
+            <form id="checkout-form" className="proto-checkout-stack" onSubmit={handleSubmit} ref={formRef}>
+              {activeStep !== 1 ? (
+                <div className="proto-step-summary-card">
+                  <div>
+                    <div className="proto-step-summary-title"><span className="check">✓</span>Delivery Address</div>
+                    <p>{addressStepSummary()}</p>
+                  </div>
+                  <button type="button" className="proto-step-edit-btn" onClick={() => goToStep(1)}>Edit</button>
+                </div>
+              ) : null}
+
+              <article className="proto-checkout-card" hidden={activeStep !== 1}>
                 <div className="proto-checkout-card-head">
                   <h2>Delivery Address</h2>
                   {!isAuthenticated ? <span>Guest checkout</span> : null}
@@ -1138,9 +1210,30 @@ export function CheckoutPage() {
                     />
                   </div>
                 ) : null}
+
+                <div className="proto-inline-actions">
+                  <button type="button" className="proto-login-gate-btn proto-btn proto-btn-primary" style={{ width: "auto", padding: "0 24px" }} onClick={() => goToStep(2)}>
+                    Continue to Shipping &amp; Payment →
+                  </button>
+                </div>
               </article>
 
-              <article className="proto-checkout-card">
+              {activeStep !== 1 && activeStep !== 2 ? (
+                <div className="proto-step-summary-card">
+                  <div>
+                    <div className="proto-step-summary-title"><span className="check">✓</span>Shipping &amp; Payment</div>
+                    <p>{shippingPaymentStepSummary()}</p>
+                  </div>
+                  <button type="button" className="proto-step-edit-btn" onClick={() => goToStep(2)}>Edit</button>
+                </div>
+              ) : null}
+              {activeStep === 1 ? (
+                <div className="proto-step-locked-row">
+                  <span>2</span> Shipping &amp; Payment — complete delivery address first
+                </div>
+              ) : null}
+
+              <article className="proto-checkout-card" hidden={activeStep !== 2}>
                 <div className="proto-checkout-card-head">
                   <h2>Shipping Method</h2>
                 </div>
@@ -1165,7 +1258,7 @@ export function CheckoutPage() {
                 </div>
               </article>
 
-              <article className="proto-checkout-card">
+              <article className="proto-checkout-card" hidden={activeStep !== 2}>
                 <div className="proto-checkout-card-head">
                   <h2>Payment Method</h2>
                 </div>
@@ -1236,25 +1329,51 @@ export function CheckoutPage() {
                     )}
                   </div>
                 ) : null}
+
+                {activeStep === 2 ? (
+                  <div className="proto-inline-actions">
+                    <button type="button" className="proto-login-gate-btn proto-btn proto-btn-primary" style={{ width: "auto", padding: "0 24px" }} onClick={() => goToStep(3)}>
+                      Continue to Review →
+                    </button>
+                  </div>
+                ) : null}
               </article>
 
-              <div className="proto-inline-actions">
-                <StorefrontButton type="submit" disabled={submitting}>
-                  {submitting ? "Submitting..." : paymentMethod === "online" ? "Place Order & Pay" : "Place Order"}
-                </StorefrontButton>
-                {!isAuthenticated ? (
-                  <StorefrontButton to="/account/login?redirect=%2Fcheckout" variant="light">
-                    Login for Order Tracking
-                  </StorefrontButton>
-                ) : null}
-              </div>
+              {activeStep < 3 ? (
+                <div className="proto-step-locked-row">
+                  <span>3</span> Review &amp; Place — complete the steps above first
+                </div>
+              ) : (
+                <article className="proto-checkout-card proto-review-card">
+                  <div className="proto-checkout-card-head">
+                    <h2>Review &amp; Place Order</h2>
+                  </div>
+                  <button type="button" className="proto-review-total-row" onClick={() => setOrderDetailModalOpen(true)}>
+                    <span>Grand Total · {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}</span>
+                    <strong>{formatCurrency(totals.grandTotal)} <span className="proto-review-total-caret">View details ›</span></strong>
+                  </button>
+                  <div className="proto-inline-actions">
+                    <StorefrontButton type="submit" disabled={submitting}>
+                      {submitting ? "Submitting..." : paymentMethod === "online" ? "Place Order & Pay" : "Place Order"}
+                    </StorefrontButton>
+                    {!isAuthenticated ? (
+                      <StorefrontButton to="/account/login?redirect=%2Fcheckout" variant="light">
+                        Login for Order Tracking
+                      </StorefrontButton>
+                    ) : null}
+                  </div>
+                </article>
+              )}
             </form>
           )}
         </section>
 
         <aside className="proto-checkout-sidebar">
           <article className="proto-order-summary-card">
-            <h2>Order Summary</h2>
+            <button type="button" className="proto-order-summary-heading-btn" onClick={() => setOrderDetailModalOpen(true)}>
+              <h2>Order Summary</h2>
+              <span>View details ›</span>
+            </button>
 
             <div className="proto-checkout-items">
               {items.map((item) => (
@@ -1284,11 +1403,11 @@ export function CheckoutPage() {
               <div><span>GST</span><strong>{formatCurrency(totals.gstTotal)}</strong></div>
             </div>
 
-            <div className="proto-summary-total">
+            <button type="button" className="proto-summary-total proto-summary-total-btn" onClick={() => setOrderDetailModalOpen(true)}>
               <span>Grand Total</span>
               <strong>{formatCurrency(totals.grandTotal)}</strong>
-              <small>inclusive of all taxes</small>
-            </div>
+              <small>inclusive of all taxes · tap to view breakdown</small>
+            </button>
 
             <div className="proto-inline-actions">
               <StorefrontButton
@@ -1306,13 +1425,36 @@ export function CheckoutPage() {
 
       {items.length > 0 ? (
         <StorefrontStickyActionBar className="proto-sticky-place-order">
-          <StorefrontButton type="submit" form="checkout-form" fullWidth>
-            {paymentMethod === "online"
-              ? `Place Order · ${formatCurrency(totals.grandTotal)}`
-              : `Place Order · ${formatCurrency(totals.grandTotal)}`}
-          </StorefrontButton>
+          {activeStep === 1 ? (
+            <button
+              type="button"
+              className="storefront-button proto-btn proto-btn-primary storefront-button-full proto-btn-full"
+              onClick={() => goToStep(2)}
+            >
+              Continue to Shipping &amp; Payment →
+            </button>
+          ) : activeStep === 2 ? (
+            <button
+              type="button"
+              className="storefront-button proto-btn proto-btn-primary storefront-button-full proto-btn-full"
+              onClick={() => goToStep(3)}
+            >
+              Continue to Review →
+            </button>
+          ) : (
+            <StorefrontButton type="submit" form="checkout-form" fullWidth disabled={submitting}>
+              {submitting ? "Submitting..." : `Place Order · ${formatCurrency(totals.grandTotal)}`}
+            </StorefrontButton>
+          )}
         </StorefrontStickyActionBar>
       ) : null}
+
+      <OrderDetailModal
+        open={orderDetailModalOpen}
+        onClose={() => setOrderDetailModalOpen(false)}
+        items={items}
+        pricing={cart?.pricing || {}}
+      />
     </main>
   );
 }

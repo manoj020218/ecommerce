@@ -397,6 +397,43 @@ function buildReminderMessage(record, supportInfo) {
   }`;
 }
 
+function escapeHtmlForReminderEmail(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatInrForReminderEmail(value) {
+  return `₹${Number(value || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+}
+
+// Same product/qty/unit-price/amount shape as the other order emails —
+// built locally rather than imported from cart-checkout.service.js, which
+// already requires this file (for the cart-lifecycle trackers below),
+// so importing it back here would create a require cycle.
+function buildCartItemsEmailTable(cartItems) {
+  const rows = ensureArray(cartItems)
+    .map(
+      (item) => `<tr>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;">${escapeHtmlForReminderEmail(item.title || item.productId)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:center;">${Number(item.qty || 0)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${formatInrForReminderEmail(item.lineTotal)}</td>` +
+        `</tr>`
+    )
+    .join("");
+
+  return (
+    `<table style="width:100%;font-size:13px;border-collapse:collapse;margin:12px 0;">` +
+    `<thead><tr style="background:#f9fafb;">` +
+    `<th style="padding:8px 6px;text-align:left;border-bottom:2px solid #e5e7eb;">Product</th>` +
+    `<th style="padding:8px 6px;text-align:center;border-bottom:2px solid #e5e7eb;">Qty</th>` +
+    `<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e5e7eb;">Amount</th>` +
+    `</tr></thead><tbody>${rows}</tbody></table>`
+  );
+}
+
 async function listRecoveries(filters) {
   const recoveryStore = await refreshRecoveryStore(nowIso());
   let records = sortNewestFirst(ensureArray(recoveryStore.recoveries));
@@ -508,6 +545,32 @@ async function runReminderDispatch(payload, actor) {
       recoveryUrl: record.recoveryUrl,
       messagePreview
     };
+
+    // Lazy require: marketing.service.js already requires this file (for
+    // getRecoverySummary), so a top-level require here would be a circular
+    // require — by the time this function actually runs (a real request or
+    // the scheduler, always after app startup finishes), both modules'
+    // exports are fully populated, which is what makes a deferred require
+    // here safe where a top-level one wouldn't be.
+    const { safeSendTemplateNotification } = require("../marketing/marketing.service");
+    const sendResult = await safeSendTemplateNotification({
+      templateKey: reminderTarget.channel === "email" ? "order_left_in_cart" : "order_left_in_cart_whatsapp",
+      toEmail: reminderTarget.channel === "email" ? reminderTarget.target : undefined,
+      toMobile: reminderTarget.channel === "whatsapp" ? reminderTarget.target : undefined,
+      relatedResourceType: "abandoned_cart_recovery",
+      relatedResourceId: record.id,
+      variables: {
+        customerName: record.customerName || "there",
+        itemsTable: buildCartItemsEmailTable(record.cartItems),
+        orderTotal: formatInrForReminderEmail(record.cartValue),
+        recoveryUrl: record.recoveryUrl,
+        whatsappNumber: supportInfo.supportWhatsApp || supportInfo.supportPhone || "",
+        whatsappLink: supportInfo.supportWhatsApp
+          ? `https://wa.me/${String(supportInfo.supportWhatsApp).replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Hi, I'd like help completing my order — cart worth ${formatInrForReminderEmail(record.cartValue)}.`)}`
+          : ""
+      }
+    });
+    reminder.sendStatus = sendResult?.status || "skipped_no_recipient";
 
     record.reminders.push(reminder);
     record.reminderCount = Number(record.reminderCount || 0) + 1;

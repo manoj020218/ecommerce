@@ -2517,9 +2517,18 @@ async function run() {
       }
     );
     assert.equal(phase12RunReminderA.response.status, 200);
+    const phase12ReminderARow = phase12RunReminderA.json.data.reminders.find(
+      (row) => row.recoveryId === phase12ReminderRecovery.id
+    );
+    assert.equal(Boolean(phase12ReminderARow), true);
+    // Proves the reminder actually attempted a real send through the branded
+    // order_left_in_cart template (not just recorded a preview string like
+    // before) — any defined status means the notification pipeline ran
+    // end-to-end without throwing, regardless of whether SMTP is configured
+    // in this environment.
     assert.equal(
-      phase12RunReminderA.json.data.reminders.some(
-        (row) => row.recoveryId === phase12ReminderRecovery.id
+      ["sent", "simulated_sent", "failed", "skipped_no_recipient", "template_inactive"].includes(
+        phase12ReminderARow.sendStatus
       ),
       true
     );

@@ -56,7 +56,8 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
   { key: "order_processing", whatsappKey: "order_processing_whatsapp", group: "Order", label: "Order Processed" },
   { key: "payment_pending", whatsappKey: "payment_pending_whatsapp", group: "Payment", label: "Payment Pending" },
   { key: "manual_payment_verified", whatsappKey: "manual_payment_verified_whatsapp", group: "Payment", label: "Payment Confirmed" },
-  { key: "tracking_detail_update", whatsappKey: "tracking_detail_update_whatsapp", group: "Shipping", label: "Order Shipped" }
+  { key: "tracking_detail_update", whatsappKey: "tracking_detail_update_whatsapp", group: "Shipping", label: "Order Shipped" },
+  { key: "order_left_in_cart", whatsappKey: "order_left_in_cart_whatsapp", group: "Recovery", label: "Cart Left Behind" }
 ]);
 
 const BRAND_COLOR = "#E8231A";
@@ -210,6 +211,33 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     label: "Order Shipped (WhatsApp)",
     subject: "",
     body: "🚚 Shipped! Hi {{customerName}}, order *{{orderNo}}* is on its way via {{courierName}}.\nTracking ID: {{trackingId}}\nTrack here: {{trackingUrl}}"
+  },
+  order_left_in_cart: {
+    label: "Cart Left Behind (Email)",
+    subject: "You left something in your cart — {{businessName}}",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Your cart is still saved — pick up right where you left off:</p>` +
+      `{{itemsTable}}` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:4px 0 16px;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Cart Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
+      `</table>` +
+      `<div style="text-align:center;margin:20px 0;"><a href="{{recoveryUrl}}" style="background:${BRAND_COLOR};color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:700;font-size:14px;display:inline-block;">Continue My Order →</a></div>` +
+      (
+        `<div style="display:flex;align-items:center;gap:10px;border:1px solid #e5e7eb;border-radius:10px;padding:11px 13px;background:#f0fdf4;margin-bottom:6px;">` +
+        `<a href="{{whatsappLink}}" style="text-decoration:none;display:flex;align-items:center;gap:10px;width:100%;">` +
+        `<span style="width:32px;height:32px;border-radius:50%;background:#25d366;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff;font-size:16px;">&#9743;</span>` +
+        `<span><span style="display:block;font-size:12.5px;font-weight:700;color:#1f2937;">Need help finishing your order?</span>` +
+        `<span style="display:block;font-size:12px;color:#15803d;font-weight:600;">Tap to WhatsApp us · {{whatsappNumber}}</span></span>` +
+        `</a></div>`
+      ) +
+      `<p style="font-size:12px;color:#9ca3af;margin-top:14px;">This cart is held for you, not the stock — items may sell out.</p>`
+    )
+  },
+  order_left_in_cart_whatsapp: {
+    label: "Cart Left Behind (WhatsApp)",
+    subject: "",
+    body: "Hi {{customerName}}, you left items worth {{orderTotal}} in your cart at {{businessName}}. Continue here: {{recoveryUrl}}"
   }
 });
 
@@ -237,7 +265,10 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "orderTotal",
   "paymentMethod",
   "paymentInstructions",
-  "expectedDeliveryDate"
+  "expectedDeliveryDate",
+  "recoveryUrl",
+  "whatsappNumber",
+  "whatsappLink"
 ]);
 
 const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([

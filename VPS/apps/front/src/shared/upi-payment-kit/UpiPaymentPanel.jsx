@@ -62,10 +62,22 @@ const styles = {
   }
 };
 
-export function UpiPaymentPanel({ upiId, payeeName, amount, orderNo, note, onDesktopShown }) {
+export function UpiPaymentPanel({ upiId, payeeName, amount, orderNo, note, onDesktopShown, onMobileAppTap }) {
   const canvasRef = useRef(null);
   const [mobile] = useState(() => isMobileDevice());
   const firedRef = useRef(false);
+  const mobileTapFiredRef = useRef(false);
+
+  function handleMobileAppTap() {
+    // Tapping an app link means they left this tab to (hopefully) pay — the
+    // same "remind them to come back and upload the screenshot" moment the
+    // desktop QR view fires from onDesktopShown, just triggered by leaving
+    // instead of by seeing the code. Fires once per visit either way.
+    if (!mobileTapFiredRef.current && onMobileAppTap) {
+      mobileTapFiredRef.current = true;
+      onMobileAppTap();
+    }
+  }
 
   // A zero/undefined amount (e.g. a render before order data has loaded)
   // would produce an "am=0.00" intent — several UPI apps reject that with
@@ -99,7 +111,7 @@ export function UpiPaymentPanel({ upiId, payeeName, amount, orderNo, note, onDes
         <p style={styles.hint}>Tap to pay ₹{Number(amount || 0).toFixed(2)} with your UPI app:</p>
         <div style={styles.appRow}>
           {APP_BUTTONS.map((app) => (
-            <a key={app.key} href={links[app.key]} style={styles.appBtn}>
+            <a key={app.key} href={links[app.key]} style={styles.appBtn} onClick={handleMobileAppTap}>
               {app.label}
             </a>
           ))}

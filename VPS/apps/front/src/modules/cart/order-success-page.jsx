@@ -26,6 +26,7 @@ import {
   getCheckoutOrderFollowup
 } from "../products/products.api";
 import { getExistingGuestSessionId } from "./cart.utils";
+import { OrderDetailModal } from "./order-detail-modal";
 import { watchdog } from "../../shared/watchdog-client";
 import {
   StorefrontAlert,
@@ -159,6 +160,25 @@ function resolveNextStep({ order, session, hasManualInstructions, pickupAddress 
   }
 
   return "Dispatch will begin after payment confirmation and order verification.";
+}
+
+// Which of the 3 "what happens next" phases the order is actually in right
+// now — the list itself always shows all 3 steps (so the buyer still knows
+// what's coming), but which one is "done" vs "active" vs "upcoming" reflects
+// the real order, not a fixed script.
+function resolveCurrentPhase(order) {
+  const paymentStatus = order?.paymentStatus || "";
+  const manualPaymentStatus = order?.manualPaymentStatus || "";
+  const shipmentStatus = order?.shipmentStatus || "pending_packing";
+
+  const paymentDone = paymentStatus === "paid" || manualPaymentStatus === "verified";
+  const dispatchDone = ["shipped", "delivered", "picked_up"].includes(shipmentStatus);
+  const processingDone = dispatchDone || shipmentStatus !== "pending_packing";
+
+  if (!paymentDone) return 1;
+  if (!processingDone) return 2;
+  if (!dispatchDone) return 3;
+  return 4;
 }
 
 function buildCheckoutAccessParams(isAuthenticated) {
@@ -356,6 +376,7 @@ export function OrderSuccessPage() {
     file: null
   });
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
+  const [orderDetailModalOpen, setOrderDetailModalOpen] = useState(false);
 
   useEffect(() => {
     if (!manualPaymentForm.file || !manualPaymentForm.file.type?.startsWith("image/")) {
@@ -438,6 +459,28 @@ export function OrderSuccessPage() {
     };
   }, [isAuthenticated, sessionId]);
 
+  // Quietly re-checks order state while payment is still pending, so a buyer
+  // whose payment gets verified while this tab is open sees it update on its
+  // own instead of needing a manual reload. Stops once the order reaches a
+  // terminal payment state — no point polling a paid or failed order forever.
+  useEffect(() => {
+    const currentStatus = order?.paymentStatus || checkoutSession?.status || "";
+    const isTerminal = ["paid", "failed", "cancelled"].includes(currentStatus);
+    if (!sessionId || isTerminal) {
+      return undefined;
+    }
+
+    let active = true;
+    const intervalId = setInterval(() => {
+      loadSuccessState({ showSpinner: false, isActive: () => active });
+    }, 45000);
+
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [order?.paymentStatus, checkoutSession?.status, sessionId, isAuthenticated]);
+
   // GA4 purchase conversion — fires once when order data arrives
   useEffect(() => {
     if ((!order && !checkoutSession) || gaPurchaseFiredRef.current) return;
@@ -503,6 +546,16 @@ export function OrderSuccessPage() {
     order?.pricing?.grandTotal ||
     checkoutSession?.cart?.pricing?.grandTotal ||
     0;
+  const pricingForModal = order
+    ? {
+        productSubtotal: order.productSubtotal,
+        taxableValue: order.taxableValue,
+        discountAmount: order.discountAmount,
+        shippingCharge: order.shippingCharge,
+        gstTotal: order.gstTotal,
+        grandTotal: total
+      }
+    : checkoutSession?.cart?.pricing || { grandTotal: total };
   const paymentStatus = order?.paymentStatus || checkoutSession?.status || "pending";
   const orderStatus = order?.orderStatus || checkoutSession?.status || "started";
   const shipmentStatus = order?.shipmentStatus || "pending_packing";
@@ -513,6 +566,7 @@ export function OrderSuccessPage() {
     Boolean(value)
   );
   const canSubmitManualPayment = canSubmitManualPaymentProof(order);
+  const currentPhase = resolveCurrentPhase(order);
   const nextStepCopy = resolveNextStep({
     order,
     session: checkoutSession,
@@ -659,62 +713,13 @@ export function OrderSuccessPage() {
 
       <div className="proto-checkout-layout proto-success-layout">
         <section className="proto-checkout-main">
-          <StorefrontCard className="proto-checkout-card">
-            <StorefrontSectionHeader
-              title="Order Snapshot"
-              description="Core order, payment, and dispatch details captured from the checkout session."
-            />
-            <div className="proto-feature-chip-row">
-              <StorefrontBadge tone={statusTone(paymentStatus)}>
-                Payment: {humanizeStatus(paymentStatus)}
-              </StorefrontBadge>
-              <StorefrontBadge tone={statusTone(orderStatus)}>
-                Order: {humanizeStatus(orderStatus)}
-              </StorefrontBadge>
-              <StorefrontBadge tone={statusTone(shipmentStatus)}>
-                Shipment: {humanizeStatus(shipmentStatus)}
-              </StorefrontBadge>
-            </div>
-            <div className="proto-summary-rows">
-              <div>
-                <span>Order Number</span>
-                <strong>{effectiveOrderNo || "--"}</strong>
-              </div>
-              <div>
-                <span>Checkout Session</span>
-                <strong>{checkoutSession?.id || "--"}</strong>
-              </div>
-              <div>
-                <span>Created On</span>
-                <strong>{formatDate(order?.orderDate || checkoutSession?.createdAt)}</strong>
-              </div>
-              <div>
-                <span>Payment Method</span>
-                <strong>{humanizeStatus(paymentMethod)}</strong>
-              </div>
-              <div>
-                <span>Shipping Method</span>
-                <strong>{humanizeStatus(shippingMethod)}</strong>
-              </div>
-              <div>
-                <span>Grand Total</span>
-                <strong>{formatCurrency(total)}</strong>
-              </div>
-            </div>
-            <StorefrontAlert tone="warning">{nextStepCopy}</StorefrontAlert>
-            {!isAuthenticated && guestOrderLink ? (
-              <StorefrontAlert>
-                Keep this guest order link on the same browser for payment proof, invoice
-                download, and support follow-up. You can also sign in later and link the
-                order from your account using the same contact details.
-              </StorefrontAlert>
-            ) : null}
-          </StorefrontCard>
-
+          {/* Action-first: if there's something the buyer actually needs to do
+              (upload payment proof), that goes above the informational
+              snapshot — not third in line behind two read-only sections. */}
           {manualInstructionEntries.length > 0 || canSubmitManualPayment ? (
             <StorefrontCard className="proto-checkout-card">
               <StorefrontSectionHeader
-                title="Payment Instructions"
+                title={canSubmitManualPayment ? "Awaiting Your Payment Proof" : "Payment Instructions"}
                 description="Use these details if this order requires manual bank transfer or UPI verification."
               />
               {paymentMethod === "manual_upi" && manualInstructions?.upiId ? (
@@ -725,6 +730,11 @@ export function OrderSuccessPage() {
                   orderNo={order?.orderNo}
                   note={`Order ${order?.orderNo || ""}`}
                   onDesktopShown={() => {
+                    if (order?.id) {
+                      requestWhatsAppScreenshotReminder(order.id).catch(() => {});
+                    }
+                  }}
+                  onMobileAppTap={() => {
                     if (order?.id) {
                       requestWhatsAppScreenshotReminder(order.id).catch(() => {});
                     }
@@ -822,6 +832,58 @@ export function OrderSuccessPage() {
 
           <StorefrontCard className="proto-checkout-card">
             <StorefrontSectionHeader
+              title="Order Snapshot"
+              description="Core order, payment, and dispatch details captured from the checkout session."
+            />
+            <div className="proto-feature-chip-row">
+              <StorefrontBadge tone={statusTone(paymentStatus)}>
+                Payment: {humanizeStatus(paymentStatus)}
+              </StorefrontBadge>
+              <StorefrontBadge tone={statusTone(orderStatus)}>
+                Order: {humanizeStatus(orderStatus)}
+              </StorefrontBadge>
+              <StorefrontBadge tone={statusTone(shipmentStatus)}>
+                Shipment: {humanizeStatus(shipmentStatus)}
+              </StorefrontBadge>
+            </div>
+            <div className="proto-summary-rows">
+              <div>
+                <span>Order Number</span>
+                <strong>{effectiveOrderNo || "--"}</strong>
+              </div>
+              <div>
+                <span>Checkout Session</span>
+                <strong>{checkoutSession?.id || "--"}</strong>
+              </div>
+              <div>
+                <span>Created On</span>
+                <strong>{formatDate(order?.orderDate || checkoutSession?.createdAt)}</strong>
+              </div>
+              <div>
+                <span>Payment Method</span>
+                <strong>{humanizeStatus(paymentMethod)}</strong>
+              </div>
+              <div>
+                <span>Shipping Method</span>
+                <strong>{humanizeStatus(shippingMethod)}</strong>
+              </div>
+              <button type="button" className="proto-grand-total-row-btn" onClick={() => setOrderDetailModalOpen(true)}>
+                <span>Grand Total</span>
+                <strong>{formatCurrency(total)} <span className="proto-review-total-caret">View details ›</span></strong>
+              </button>
+            </div>
+            <StorefrontAlert tone="warning">{nextStepCopy}</StorefrontAlert>
+            {!isAuthenticated && guestOrderLink ? (
+              <StorefrontAlert>
+                Keep this guest order link on the same browser for payment proof, invoice
+                download, and support follow-up. You can also sign in later and link the
+                order from your account using the same contact details.
+              </StorefrontAlert>
+            ) : null}
+          </StorefrontCard>
+
+          <StorefrontCard className="proto-checkout-card">
+            <StorefrontSectionHeader
               title="Items"
               description={`${items.length} line item${items.length === 1 ? "" : "s"} in this checkout.`}
             />
@@ -856,25 +918,37 @@ export function OrderSuccessPage() {
               description="Here's what to expect after placing your order."
             />
             <ol className="proto-next-steps">
-              <li>
-                <div className="proto-step-circle amber">1</div>
+              <li className={currentPhase > 1 ? "done" : currentPhase === 1 ? "active" : "upcoming"}>
+                <div className="proto-step-circle amber">{currentPhase > 1 ? "✓" : 1}</div>
                 <div>
-                  <strong>Payment Verification (2–4 hrs)</strong>
-                  <p>Our team verifies your payment and confirms your order.</p>
+                  <strong>{currentPhase > 1 ? "Payment Verified" : "Payment Verification (2–4 hrs)"}</strong>
+                  <p>
+                    {currentPhase > 1
+                      ? "Your payment has been confirmed."
+                      : "Our team verifies your payment and confirms your order."}
+                  </p>
                 </div>
               </li>
-              <li>
-                <div className="proto-step-circle blue">2</div>
+              <li className={currentPhase > 2 ? "done" : currentPhase === 2 ? "active" : "upcoming"}>
+                <div className="proto-step-circle blue">{currentPhase > 2 ? "✓" : 2}</div>
                 <div>
-                  <strong>Order Processing (1 business day)</strong>
-                  <p>We&apos;ll pack your items and generate your GST invoice.</p>
+                  <strong>{currentPhase > 2 ? "Order Processed" : "Order Processing (1 business day)"}</strong>
+                  <p>
+                    {currentPhase > 2
+                      ? "Packed and ready — your GST invoice has been generated."
+                      : "We'll pack your items and generate your GST invoice."}
+                  </p>
                 </div>
               </li>
-              <li>
-                <div className="proto-step-circle green">3</div>
+              <li className={currentPhase > 3 ? "done" : currentPhase === 3 ? "active" : "upcoming"}>
+                <div className="proto-step-circle green">{currentPhase > 3 ? "✓" : 3}</div>
                 <div>
-                  <strong>Dispatch &amp; Tracking (5–7 days)</strong>
-                  <p>You&apos;ll receive a tracking link via SMS and email once dispatched.</p>
+                  <strong>{currentPhase > 3 ? "Dispatched" : "Dispatch & Tracking (5–7 days)"}</strong>
+                  <p>
+                    {currentPhase > 3
+                      ? "On its way — check the tracking link sent via SMS and email."
+                      : "You'll receive a tracking link via SMS and email once dispatched."}
+                  </p>
                 </div>
               </li>
             </ol>
@@ -1020,6 +1094,14 @@ export function OrderSuccessPage() {
           <StorefrontButton to="/products">Continue Shopping</StorefrontButton>
         )}
       </StorefrontStickyActionBar>
+
+      <OrderDetailModal
+        open={orderDetailModalOpen}
+        onClose={() => setOrderDetailModalOpen(false)}
+        items={items}
+        pricing={pricingForModal}
+        orderNo={effectiveOrderNo}
+      />
     </main>
   );
 }

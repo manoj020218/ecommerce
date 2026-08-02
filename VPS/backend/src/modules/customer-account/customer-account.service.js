@@ -560,6 +560,9 @@ async function updateCustomerProfile(customerId, patch) {
   if (patch.companyName !== undefined) {
     customer.companyName = patch.companyName || "";
   }
+  if (patch.newsletterSubscribed !== undefined) {
+    customer.newsletterSubscribed = Boolean(patch.newsletterSubscribed);
+  }
   customer.updatedAt = nowIso();
 
   await persistAuthStore(authStore);

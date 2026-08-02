@@ -163,9 +163,12 @@ function sanitizeAdminCustomer(customer, authStore) {
 
   return {
     id: customer.id,
+    customerCode: customer.customerCode || "",
     name: customer.name || "",
     email: customer.email || "",
     mobile: customer.mobile || "",
+    newsletterSubscribed: Boolean(customer.newsletterSubscribed),
+    accountStatus: customer.accountStatus || "active",
     companyName: customer.companyName || "",
     customerType: b2b.customerType || "retail",
     priceGroup: b2b.priceGroup || "",
@@ -297,6 +300,12 @@ async function updateCustomer(customerId, patch, actor) {
   }
   if (patch.name !== undefined) {
     customer.name = String(patch.name || "").trim();
+  }
+  if (patch.newsletterSubscribed !== undefined) {
+    customer.newsletterSubscribed = Boolean(patch.newsletterSubscribed);
+  }
+  if (patch.accountStatus !== undefined) {
+    customer.accountStatus = patch.accountStatus;
   }
 
   if (patch.customerType !== undefined) {

@@ -263,6 +263,7 @@ export function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState("online");
   const [shippingMethod, setShippingMethod] = useState("standard");
   const [sameAsBilling, setSameAsBilling] = useState(true);
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
   const [billingForm, setBillingForm] = useState(() => createAddressForm());
   const [shippingForm, setShippingForm] = useState(() => createAddressForm());
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -594,7 +595,8 @@ export function CheckoutPage() {
         // Ties this submission to the exact cart this tab last displayed, so a
         // cart mutated from another tab (same guest/customer session) can't silently
         // get ordered instead of what was reviewed and confirmed here.
-        expectedCartUpdatedAt: cart?.updatedAt || null
+        expectedCartUpdatedAt: cart?.updatedAt || null,
+        newsletterSubscribed
       });
 
       const nextCheckoutSession = response.checkoutSession || null;
@@ -1060,6 +1062,15 @@ export function CheckoutPage() {
                     onChange={(event) => setSameAsBilling(event.target.checked)}
                   />
                   <span>Shipping address is the same as billing</span>
+                </label>
+
+                <label className="proto-check-option">
+                  <input
+                    type="checkbox"
+                    checked={newsletterSubscribed}
+                    onChange={(event) => setNewsletterSubscribed(event.target.checked)}
+                  />
+                  <span>Keep me updated with offers and new products</span>
                 </label>
 
                 {!sameAsBilling ? (

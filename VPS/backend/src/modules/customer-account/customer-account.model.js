@@ -38,11 +38,40 @@ function createAddressSnapshot(address = {}) {
   };
 }
 
+// Short business-facing reference code (e.g. "F056E"), derived from the
+// customer's own id so it's unique for free — no collision bookkeeping
+// needed since it inherits uniqueness from the id it's built from.
+function generateCustomerCode(userId) {
+  const cleaned = String(userId || "").replace(/[^a-zA-Z0-9]/g, "");
+  const tail = cleaned.slice(-5).toUpperCase();
+  return tail || "00000";
+}
+
+const ACCOUNT_STATUSES = Object.freeze({
+  ACTIVE: "active",
+  BLOCKED: "blocked"
+});
+
 function ensureCustomerAccountShape(user) {
   let changed = false;
 
   if (typeof user.companyName !== "string") {
     user.companyName = "";
+    changed = true;
+  }
+
+  if (!user.customerCode) {
+    user.customerCode = generateCustomerCode(user.id);
+    changed = true;
+  }
+
+  if (typeof user.newsletterSubscribed !== "boolean") {
+    user.newsletterSubscribed = false;
+    changed = true;
+  }
+
+  if (!Object.values(ACCOUNT_STATUSES).includes(user.accountStatus)) {
+    user.accountStatus = ACCOUNT_STATUSES.ACTIVE;
     changed = true;
   }
 
@@ -92,10 +121,13 @@ function sanitizeCustomerAccountProfile(user) {
 
   return {
     id: safeUser.id,
+    customerCode: safeUser.customerCode || "",
     name: safeUser.name || "",
     companyName: safeUser.companyName || "",
     email: safeUser.email || "",
     mobile: safeUser.mobile || "",
+    newsletterSubscribed: Boolean(safeUser.newsletterSubscribed),
+    accountStatus: safeUser.accountStatus || "active",
     verifiedEmail: Boolean(safeUser.verifiedEmail),
     verifiedMobile: Boolean(safeUser.verifiedMobile),
     authProviders: ensureArray(safeUser.authProviders),
@@ -118,6 +150,7 @@ function sanitizeCustomerAccountProfile(user) {
 module.exports = {
   REORDER_MODES,
   DEFAULT_GST_DETAILS,
+  ACCOUNT_STATUSES,
   ensureArray,
   ensureCustomerAccountShape,
   sanitizeCustomerAddress,

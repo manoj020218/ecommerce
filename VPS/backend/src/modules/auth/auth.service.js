@@ -346,6 +346,16 @@ async function issueAdminTokens(store, staffUser) {
 
 async function issueCustomerTokens(store, customerUser, guestSessionId) {
   ensureCustomerAccountShape(customerUser);
+
+  // Single choke point for every customer login path (password, Google,
+  // mobile/email OTP) plus refresh-token reuse — blocking here instead of
+  // in each individual login function means a blocked account can't get in
+  // through any door, including one that's still holding a valid refresh
+  // token issued before it was blocked.
+  if (customerUser.accountStatus === "blocked") {
+    throw new HttpError(403, "This account has been blocked. Please contact support.");
+  }
+
   const mergedGuestCart = mergeGuestCartIntoUser(
     store,
     guestSessionId,

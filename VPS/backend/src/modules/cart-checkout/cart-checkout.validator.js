@@ -90,7 +90,8 @@ const checkoutStartSchema = z.object({
     .default(SHIPPING_METHODS.STANDARD),
   billingAddress: z.record(z.any()).optional().default({}),
   shippingAddress: z.record(z.any()).optional().default({}),
-  expectedCartUpdatedAt: z.string().trim().max(64).optional().nullable()
+  expectedCartUpdatedAt: z.string().trim().max(64).optional().nullable(),
+  newsletterSubscribed: z.boolean().optional().default(false)
 });
 
 const checkoutViewQuerySchema = z.object({

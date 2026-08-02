@@ -934,11 +934,21 @@ function createOrderFromSession(authStore, session, options = {}) {
   // userId here from unverified checkout-form input would silently bypass that
   // and could also collide with a genuine customer's own claim attempt).
   if (session.ownerType !== CART_OWNER_TYPES.CUSTOMER) {
-    findOrCreateCustomerByIdentity(authStore, {
+    const matchedCustomer = findOrCreateCustomerByIdentity(authStore, {
       name: billingAddress.name || shippingAddress.name || "",
       email: billingAddress.email || shippingAddress.email || "",
       mobile: billingAddress.mobile || shippingAddress.mobile || ""
     });
+    if (session.newsletterSubscribed && matchedCustomer) {
+      matchedCustomer.newsletterSubscribed = true;
+    }
+  } else if (session.newsletterSubscribed) {
+    // Only ever flips true — an absent/unchecked box on a later checkout
+    // should never silently unsubscribe someone who opted in earlier.
+    const loggedInCustomer = authStore.users.find((user) => user.id === session.ownerId);
+    if (loggedInCustomer) {
+      loggedInCustomer.newsletterSubscribed = true;
+    }
   }
 
   return {
@@ -2066,6 +2076,7 @@ async function startCheckout(context, payload) {
         payload.shippingAddress || {},
         customerPricingContext
       ),
+      newsletterSubscribed: Boolean(payload.newsletterSubscribed),
       createdAt: now,
       updatedAt: now
     };
@@ -2118,6 +2129,7 @@ async function startCheckout(context, payload) {
       payload.shippingAddress || {},
       customerPricingContext
     ),
+    newsletterSubscribed: Boolean(payload.newsletterSubscribed),
     createdAt: now,
     updatedAt: now
   };

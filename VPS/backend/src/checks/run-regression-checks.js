@@ -5051,6 +5051,96 @@ async function run() {
       true
     );
 
+    // ── Phase 22: customer code, newsletter opt-in, account blocking ────────
+    const phase22Customer = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase22Customer.response.status, 200);
+    assert.equal(typeof phase22Customer.json.data.customerCode, "string");
+    assert.equal(phase22Customer.json.data.customerCode.length > 0, true);
+    assert.equal(phase22Customer.json.data.accountStatus, "active");
+    assert.equal(phase22Customer.json.data.newsletterSubscribed, false);
+
+    const phase22ProfileNewsletterOptIn = await requestJson(
+      baseUrl,
+      "/api/customer/account/profile",
+      {
+        method: "PATCH",
+        headers: authHeaders(phase11AccountCustomerToken),
+        body: JSON.stringify({ newsletterSubscribed: true })
+      }
+    );
+    assert.equal(phase22ProfileNewsletterOptIn.response.status, 200);
+    assert.equal(phase22ProfileNewsletterOptIn.json.data.newsletterSubscribed, true);
+
+    const phase22AdminSeesNewsletter = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase22AdminSeesNewsletter.response.status, 200);
+    assert.equal(phase22AdminSeesNewsletter.json.data.newsletterSubscribed, true);
+
+    const phase22Block = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ accountStatus: "blocked" })
+      }
+    );
+    assert.equal(phase22Block.response.status, 200);
+    assert.equal(phase22Block.json.data.accountStatus, "blocked");
+
+    const phase22BlockedOtpRequest = await requestJson(baseUrl, "/api/auth/customer/otp/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mobile: "+91-9898989898" })
+    });
+    assert.equal(phase22BlockedOtpRequest.response.status, 200);
+
+    const phase22BlockedLoginAttempt = await requestJson(baseUrl, "/api/auth/customer/otp/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9898989898",
+        code: phase22BlockedOtpRequest.json.data.devCode
+      })
+    });
+    assert.equal(phase22BlockedLoginAttempt.response.status, 403);
+
+    const phase22Unblock = await requestJson(
+      baseUrl,
+      `/api/admin/customers/${phase21CustomerId}`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ accountStatus: "active" })
+      }
+    );
+    assert.equal(phase22Unblock.response.status, 200);
+    assert.equal(phase22Unblock.json.data.accountStatus, "active");
+
+    const phase22UnblockedOtpRequest = await requestJson(baseUrl, "/api/auth/customer/otp/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mobile: "+91-9898989898" })
+    });
+    assert.equal(phase22UnblockedOtpRequest.response.status, 200);
+
+    const phase22UnblockedLoginAttempt = await requestJson(baseUrl, "/api/auth/customer/otp/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9898989898",
+        code: phase22UnblockedOtpRequest.json.data.devCode
+      })
+    });
+    assert.equal(phase22UnblockedLoginAttempt.response.status, 200);
+
     // eslint-disable-next-line no-console
     console.log("Regression checks passed.");
   } finally {

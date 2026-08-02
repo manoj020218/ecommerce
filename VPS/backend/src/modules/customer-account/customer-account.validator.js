@@ -15,7 +15,8 @@ const listOrdersQuerySchema = z.object({
 
 const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
-  companyName: optionalString(180)
+  companyName: optionalString(180),
+  newsletterSubscribed: z.boolean().optional()
 });
 
 const linkGuestOrderSchema = z.object({

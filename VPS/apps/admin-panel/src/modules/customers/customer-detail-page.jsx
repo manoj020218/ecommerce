@@ -116,6 +116,8 @@ export function CustomerDetailPage() {
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressFormError, setAddressFormError] = useState("");
 
+  const [blockBusy, setBlockBusy] = useState(false);
+
   async function loadCore() {
     setLoading(true);
     setError("");
@@ -194,7 +196,8 @@ export function CustomerDetailPage() {
       creditAllowed: Boolean(customer.creditAllowed),
       bankTransferOnly: Boolean(customer.bankTransferOnly),
       pickupAllowed: Boolean(customer.pickupAllowed),
-      orderMode: customer.orderMode || "online"
+      orderMode: customer.orderMode || "online",
+      newsletterSubscribed: Boolean(customer.newsletterSubscribed)
     });
     setEditError("");
     setEditOpen(true);
@@ -217,6 +220,23 @@ export function CustomerDetailPage() {
       setEditError(err.message || "Failed to update customer.");
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  async function toggleBlockStatus() {
+    const nextStatus = customer.accountStatus === "blocked" ? "active" : "blocked";
+    const verb = nextStatus === "blocked" ? "block" : "unblock";
+    if (!window.confirm(`Are you sure you want to ${verb} this customer?`)) {
+      return;
+    }
+    setBlockBusy(true);
+    try {
+      const updated = await updateCustomer(customerId, { accountStatus: nextStatus });
+      setCustomer((current) => ({ ...current, ...updated }));
+    } catch (err) {
+      window.alert(err.message || `Failed to ${verb} customer.`);
+    } finally {
+      setBlockBusy(false);
     }
   }
 
@@ -300,10 +320,21 @@ export function CustomerDetailPage() {
     <>
       <PageHeader
         title={displayName}
-        description={customer.id}
+        description={`${customer.id}${customer.customerCode ? ` · Code: ${customer.customerCode}` : ""}`}
         actions={
           <>
             <button type="button" className="btn btn-secondary" onClick={() => navigate("/customers")}>← Back</button>
+            {canManage ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={toggleBlockStatus}
+                disabled={blockBusy}
+                style={customer.accountStatus === "blocked" ? { color: "#16a34a", borderColor: "rgba(22,163,74,0.4)" } : { color: "#dc2626", borderColor: "rgba(220,38,38,0.3)" }}
+              >
+                {blockBusy ? "Working..." : customer.accountStatus === "blocked" ? "Unblock Customer" : "Block Customer"}
+              </button>
+            ) : null}
             {canManage ? (
               <button type="button" className="btn btn-primary" onClick={openEditModal}>Edit Customer</button>
             ) : null}
@@ -347,6 +378,18 @@ export function CustomerDetailPage() {
           <div>
             <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", textTransform: "uppercase" }}>Customer Since</p>
             <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: "#111827" }}>{formatDateTime(customer.createdAt)}</p>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", textTransform: "uppercase" }}>Account Status</p>
+            <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: customer.accountStatus === "blocked" ? "#dc2626" : "#16a34a" }}>
+              {customer.accountStatus === "blocked" ? "Blocked" : "Active"}
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: 11, color: "#9ca3af", textTransform: "uppercase" }}>Newsletter</p>
+            <p style={{ margin: "2px 0 0", fontSize: 13, fontWeight: 600, color: customer.newsletterSubscribed ? "#16a34a" : "#6b7280" }}>
+              {customer.newsletterSubscribed ? "Subscribed" : "Not Subscribed"}
+            </p>
           </div>
         </div>
       </div>
@@ -570,6 +613,10 @@ export function CustomerDetailPage() {
               <label className="inline-check">
                 <input type="checkbox" name="pickupAllowed" checked={editForm.pickupAllowed} onChange={onEditFormChange} />
                 <span>Self Pickup Allowed</span>
+              </label>
+              <label className="inline-check">
+                <input type="checkbox" name="newsletterSubscribed" checked={editForm.newsletterSubscribed} onChange={onEditFormChange} />
+                <span>Newsletter Subscribed</span>
               </label>
             </div>
             <div className="form-actions">

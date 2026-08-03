@@ -899,8 +899,9 @@ export function CheckoutPage() {
       <div className="proto-checkout-steps">
         {[
           { n: 1, label: "Delivery Address" },
-          { n: 2, label: "Shipping & Payment" },
-          { n: 3, label: "Review & Place" }
+          { n: 2, label: "Shipping Method" },
+          { n: 3, label: "Payment Method" },
+          { n: 4, label: "Review & Place" }
         ].map((step, index) => (
           <div key={step.n} style={{ display: "contents" }}>
             {index > 0 ? <div className="proto-step-connector" /> : null}
@@ -1213,23 +1214,23 @@ export function CheckoutPage() {
 
                 <div className="proto-inline-actions">
                   <button type="button" className="proto-login-gate-btn proto-btn proto-btn-primary" style={{ width: "auto", padding: "0 24px" }} onClick={() => goToStep(2)}>
-                    Continue to Shipping &amp; Payment →
+                    Continue to Shipping →
                   </button>
                 </div>
               </article>
 
-              {activeStep !== 1 && activeStep !== 2 ? (
+              {activeStep > 2 ? (
                 <div className="proto-step-summary-card">
                   <div>
-                    <div className="proto-step-summary-title"><span className="check">✓</span>Shipping &amp; Payment</div>
-                    <p>{shippingPaymentStepSummary()}</p>
+                    <div className="proto-step-summary-title"><span className="check">✓</span>Shipping Method</div>
+                    <p>{SHIPPING_METHOD_OPTIONS.find((option) => option.value === shippingMethod)?.label || shippingMethod}</p>
                   </div>
                   <button type="button" className="proto-step-edit-btn" onClick={() => goToStep(2)}>Edit</button>
                 </div>
               ) : null}
               {activeStep === 1 ? (
                 <div className="proto-step-locked-row">
-                  <span>2</span> Shipping &amp; Payment — complete delivery address first
+                  <span>2</span> Shipping Method — complete delivery address first
                 </div>
               ) : null}
 
@@ -1256,9 +1257,29 @@ export function CheckoutPage() {
                     </label>
                   ))}
                 </div>
+                <div className="proto-inline-actions">
+                  <button type="button" className="proto-login-gate-btn proto-btn proto-btn-primary" style={{ width: "auto", padding: "0 24px" }} onClick={() => goToStep(3)}>
+                    Continue to Payment →
+                  </button>
+                </div>
               </article>
 
-              <article className="proto-checkout-card" hidden={activeStep !== 2}>
+              {activeStep > 3 ? (
+                <div className="proto-step-summary-card">
+                  <div>
+                    <div className="proto-step-summary-title"><span className="check">✓</span>Payment Method</div>
+                    <p>{PAYMENT_METHOD_OPTIONS.find((option) => option.value === paymentMethod)?.label || paymentMethod}</p>
+                  </div>
+                  <button type="button" className="proto-step-edit-btn" onClick={() => goToStep(3)}>Edit</button>
+                </div>
+              ) : null}
+              {activeStep < 2 ? (
+                <div className="proto-step-locked-row">
+                  <span>3</span> Payment Method — complete shipping method first
+                </div>
+              ) : null}
+
+              <article className="proto-checkout-card" hidden={activeStep !== 3}>
                 <div className="proto-checkout-card-head">
                   <h2>Payment Method</h2>
                 </div>
@@ -1330,31 +1351,45 @@ export function CheckoutPage() {
                   </div>
                 ) : null}
 
-                {activeStep === 2 ? (
-                  <div className="proto-inline-actions">
-                    <button type="button" className="proto-login-gate-btn proto-btn proto-btn-primary" style={{ width: "auto", padding: "0 24px" }} onClick={() => goToStep(3)}>
-                      Continue to Review →
-                    </button>
-                  </div>
-                ) : null}
+                <div className="proto-inline-actions">
+                  <button type="button" className="proto-login-gate-btn proto-btn proto-btn-primary" style={{ width: "auto", padding: "0 24px" }} onClick={() => goToStep(4)}>
+                    Continue to Review →
+                  </button>
+                </div>
               </article>
 
-              {activeStep < 3 ? (
+              {activeStep < 4 ? (
                 <div className="proto-step-locked-row">
-                  <span>3</span> Review &amp; Place — complete the steps above first
+                  <span>4</span> Review &amp; Place — complete the steps above first
                 </div>
               ) : (
                 <article className="proto-checkout-card proto-review-card">
                   <div className="proto-checkout-card-head">
                     <h2>Review &amp; Place Order</h2>
                   </div>
+
+                  <div className="proto-review-recap">
+                    <div>
+                      <span>Deliver to</span>
+                      <strong>{addressStepSummary()}</strong>
+                    </div>
+                    <div>
+                      <span>Shipping</span>
+                      <strong>{SHIPPING_METHOD_OPTIONS.find((option) => option.value === shippingMethod)?.label || shippingMethod}</strong>
+                    </div>
+                    <div>
+                      <span>Payment</span>
+                      <strong>{PAYMENT_METHOD_OPTIONS.find((option) => option.value === paymentMethod)?.label || paymentMethod}</strong>
+                    </div>
+                  </div>
+
                   <button type="button" className="proto-review-total-row" onClick={() => setOrderDetailModalOpen(true)}>
                     <span>Grand Total · {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}</span>
                     <strong>{formatCurrency(totals.grandTotal)} <span className="proto-review-total-caret">View details ›</span></strong>
                   </button>
                   <div className="proto-inline-actions">
                     <StorefrontButton type="submit" disabled={submitting}>
-                      {submitting ? "Submitting..." : paymentMethod === "online" ? "Place Order & Pay" : "Place Order"}
+                      {submitting ? "Submitting..." : paymentMethod === "online" ? "Pay Now" : "Place Order"}
                     </StorefrontButton>
                     {!isAuthenticated ? (
                       <StorefrontButton to="/account/login?redirect=%2Fcheckout" variant="light">
@@ -1431,7 +1466,7 @@ export function CheckoutPage() {
               className="storefront-button proto-btn proto-btn-primary storefront-button-full proto-btn-full"
               onClick={() => goToStep(2)}
             >
-              Continue to Shipping &amp; Payment →
+              Continue to Shipping →
             </button>
           ) : activeStep === 2 ? (
             <button
@@ -1439,11 +1474,23 @@ export function CheckoutPage() {
               className="storefront-button proto-btn proto-btn-primary storefront-button-full proto-btn-full"
               onClick={() => goToStep(3)}
             >
+              Continue to Payment →
+            </button>
+          ) : activeStep === 3 ? (
+            <button
+              type="button"
+              className="storefront-button proto-btn proto-btn-primary storefront-button-full proto-btn-full"
+              onClick={() => goToStep(4)}
+            >
               Continue to Review →
             </button>
           ) : (
             <StorefrontButton type="submit" form="checkout-form" fullWidth disabled={submitting}>
-              {submitting ? "Submitting..." : `Place Order · ${formatCurrency(totals.grandTotal)}`}
+              {submitting
+                ? "Submitting..."
+                : paymentMethod === "online"
+                  ? `Pay Now · ${formatCurrency(totals.grandTotal)}`
+                  : `Place Order · ${formatCurrency(totals.grandTotal)}`}
             </StorefrontButton>
           )}
         </StorefrontStickyActionBar>

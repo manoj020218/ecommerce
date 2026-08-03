@@ -4111,6 +4111,34 @@ textarea {
   border-color: var(--brand);
 }
 
+.proto-review-recap {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.proto-review-recap > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border: 1px solid #f3f4f6;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.proto-review-recap > div span {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.proto-review-recap > div strong {
+  color: #111827;
+  text-align: right;
+  font-weight: 600;
+}
+
 .proto-review-total-row {
   width: 100%;
   display: flex;

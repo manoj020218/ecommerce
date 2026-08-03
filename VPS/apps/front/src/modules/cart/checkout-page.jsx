@@ -1005,7 +1005,7 @@ export function CheckoutPage() {
                 </div>
               ) : null}
 
-              <article className="proto-checkout-card" hidden={activeStep !== 1}>
+              <article className="proto-checkout-card" hidden={activeStep !== 1} style={activeStep !== 1 ? { display: "none" } : undefined}>
                 <div className="proto-checkout-card-head">
                   <h2>Delivery Address</h2>
                   {!isAuthenticated ? <span>Guest checkout</span> : null}
@@ -1250,7 +1250,7 @@ export function CheckoutPage() {
                 </div>
               ) : null}
 
-              <article className="proto-checkout-card" hidden={activeStep !== 2}>
+              <article className="proto-checkout-card" hidden={activeStep !== 2} style={activeStep !== 2 ? { display: "none" } : undefined}>
                 <div className="proto-checkout-card-head">
                   <h2>Shipping Method</h2>
                 </div>
@@ -1295,7 +1295,7 @@ export function CheckoutPage() {
                 </div>
               ) : null}
 
-              <article className="proto-checkout-card" hidden={activeStep !== 3}>
+              <article className="proto-checkout-card" hidden={activeStep !== 3} style={activeStep !== 3 ? { display: "none" } : undefined}>
                 <div className="proto-checkout-card-head">
                   <h2>Payment Method</h2>
                 </div>

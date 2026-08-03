@@ -6867,3 +6867,15 @@ textarea {
   font-size: 10px;
   font-weight: 700;
 }
+
+/* The step-gated checkout cards rely on the plain HTML `hidden` attribute
+   to collapse completed steps. Placed last and !important so it can't lose
+   a cascade tie to any earlier same-specificity rule touching this class
+   (this exact silent-override shape already bit the admin panel's Settings
+   tabs once this session — [hidden] and a same-specificity class selector
+   tie, author stylesheet order decides, and it's easy to lose that tie by
+   accident without ever intending to fight [hidden] at all). */
+.proto-checkout-card[hidden],
+.proto-step-locked-row[hidden] {
+  display: none !important;
+}

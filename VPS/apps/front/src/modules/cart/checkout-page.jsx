@@ -32,26 +32,45 @@ import {
   updateCartItem
 } from "../products/products.api";
 
-function loadRazorpayScript() {
+// Plain <script> onload/onerror never fires on some flaky mobile connections
+// (the request just stalls) — without a timeout, `await`ing this hangs the
+// checkout indefinitely: no error shown, no reservation released, buyer just
+// stuck on a frozen "processing" screen until they give up and leave. A
+// real stuck Cashfree order (pay_attempt_a820a080...) traced back to exactly
+// this: server-side attempt succeeded, but the SDK script load never
+// resolved so the client-side flow never reached any completion/failure path.
+const GATEWAY_SCRIPT_LOAD_TIMEOUT_MS = 12000;
+
+function loadScriptWithTimeout(src, isLoadedAlready) {
   return new Promise((resolve) => {
-    if (window.Razorpay) { resolve(true); return; }
+    if (isLoadedAlready()) { resolve(true); return; }
+    let settled = false;
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
     const s = document.createElement("script");
-    s.src = "https://checkout.razorpay.com/v1/checkout.js";
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
+    s.src = src;
+    s.onload = () => settle(true);
+    s.onerror = () => settle(false);
     document.body.appendChild(s);
+    setTimeout(() => settle(false), GATEWAY_SCRIPT_LOAD_TIMEOUT_MS);
   });
 }
 
+function loadRazorpayScript() {
+  return loadScriptWithTimeout(
+    "https://checkout.razorpay.com/v1/checkout.js",
+    () => Boolean(window.Razorpay)
+  );
+}
+
 function loadCashfreeScript() {
-  return new Promise((resolve) => {
-    if (window.Cashfree) { resolve(true); return; }
-    const s = document.createElement("script");
-    s.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
-    s.onload = () => resolve(true);
-    s.onerror = () => resolve(false);
-    document.body.appendChild(s);
-  });
+  return loadScriptWithTimeout(
+    "https://sdk.cashfree.com/js/v3/cashfree.js",
+    () => Boolean(window.Cashfree)
+  );
 }
 import {
   PAYMENT_METHOD_OPTIONS,
@@ -776,6 +795,8 @@ export function CheckoutPage() {
         if (attempt.gateway === "razorpay" && attempt.gatewayOrderId && attempt.gatewayProviderKey) {
           const loaded = await loadRazorpayScript();
           if (!loaded) {
+            releaseAbandonedAttempt(attempt.attemptId);
+            watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, "gateway_script_load_timeout");
             setError("Failed to load payment gateway. Please check your internet connection and try again.");
             setSubmitting(false);
             return;
@@ -811,6 +832,7 @@ export function CheckoutPage() {
             modal: {
               ondismiss: function () {
                 releaseAbandonedAttempt(attempt.attemptId);
+                watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, "modal_dismissed");
                 setError("Payment was not completed. You can try again.");
                 setSubmitting(false);
               }
@@ -820,6 +842,7 @@ export function CheckoutPage() {
           const rzp = new window.Razorpay(rzpOptions);
           rzp.on("payment.failed", function (resp) {
             releaseAbandonedAttempt(attempt.attemptId);
+            watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, resp.error?.description || "payment_failed");
             setError(`Payment failed: ${resp.error?.description || "Please try again."}`);
             setSubmitting(false);
           });
@@ -830,6 +853,8 @@ export function CheckoutPage() {
         if (attempt.gateway === "cashfree" && attempt.gatewayPaymentSessionId) {
           const loaded = await loadCashfreeScript();
           if (!loaded || !window.Cashfree) {
+            releaseAbandonedAttempt(attempt.attemptId);
+            watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, "gateway_script_load_timeout");
             setError("Failed to load payment gateway. Please check your internet connection and try again.");
             setSubmitting(false);
             return;
@@ -846,6 +871,11 @@ export function CheckoutPage() {
 
             if (!result?.paymentDetails) {
               releaseAbandonedAttempt(attempt.attemptId);
+              watchdog.trackPaymentFailed(
+                cart?.id,
+                attempt.attemptId,
+                result?.error?.message || "checkout_not_completed"
+              );
               setError(
                 result?.error?.message || "Payment was not completed. You can try again."
               );
@@ -861,6 +891,7 @@ export function CheckoutPage() {
             openOrderSuccess(attempt);
           } catch (cashfreeError) {
             releaseAbandonedAttempt(attempt.attemptId);
+            watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, cashfreeError.message || "checkout_error");
             setError(cashfreeError.message || "Payment failed. Please try again.");
             setSubmitting(false);
           }

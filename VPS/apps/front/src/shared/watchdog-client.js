@@ -66,7 +66,7 @@ function track(stage, extra = {}) {
     ...extra,
   });
   // Flush immediately for critical payment stages
-  if (["PAYMENT_INITIATED", "PAYMENT_SUCCESS", "ORDER_CREATED"].includes(stage)) {
+  if (["PAYMENT_INITIATED", "PAYMENT_SUCCESS", "PAYMENT_FAILED", "ORDER_CREATED"].includes(stage)) {
     flush();
   }
 }
@@ -103,6 +103,13 @@ export const watchdog = {
 
   trackPaymentSuccess: (cartId, orderId, paymentAttemptId) =>
     track("PAYMENT_SUCCESS", { cartId, orderId, paymentAttemptId }),
+
+  // No prior stage covered a payment attempt dying client-side (gateway
+  // script hang, modal dismissed, payment declined) — the funnel only ever
+  // saw PAYMENT_INITIATED and then silence, which is why a real stuck order
+  // never surfaced on the dashboard. This closes that gap going forward.
+  trackPaymentFailed: (cartId, paymentAttemptId, reason) =>
+    track("PAYMENT_FAILED", { cartId, paymentAttemptId, metadata: { reason: String(reason || "") } }),
 
   trackOrderCreated: (orderId, cartId) =>
     track("ORDER_CREATED", { orderId, cartId }),

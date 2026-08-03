@@ -3064,6 +3064,15 @@ textarea {
 .proto-checkout-sidebar {
   display: grid;
   gap: 14px;
+  /* Grid items default to min-width:auto (their content's intrinsic width),
+     not 0 — so even though the parent .proto-checkout-layout already sets
+     min-width:0, that doesn't inherit to these items. Any unbreakable
+     content added inside (a long product title, an address string) grows
+     this column past its track width and drags the whole page into
+     horizontal overflow, which is clipped (not scrollable) by body's own
+     overflow-x:hidden — the exact "content cut off flush at the screen
+     edge" symptom, not a normal ellipsis truncation. */
+  min-width: 0;
 }
 
 .proto-filter-card,
@@ -4126,6 +4135,7 @@ textarea {
   border: 1px solid #f3f4f6;
   border-radius: 8px;
   background: #fafafa;
+  min-width: 0;
 }
 
 .proto-review-recap > div span {
@@ -4137,6 +4147,10 @@ textarea {
   color: #111827;
   text-align: right;
   font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .proto-review-items-heading {
@@ -4176,6 +4190,7 @@ textarea {
   border: 1px solid #f3f4f6;
   border-radius: 10px;
   background: #fafafa;
+  min-width: 0;
 }
 
 .proto-review-item-media {
@@ -4330,10 +4345,12 @@ textarea {
 
 .proto-review-total-row {
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   background: #fafafa;
   border: 1px solid #e5e7eb;
   border-radius: 12px;

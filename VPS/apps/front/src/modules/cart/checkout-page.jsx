@@ -270,6 +270,20 @@ export function CheckoutPage() {
   const [activeStep, setActiveStep] = useState(1);
   const [maxStepReached, setMaxStepReached] = useState(1);
   const formRef = useRef(null);
+  const skipFirstScrollRef = useRef(true);
+
+  // Advancing (or jumping back to Edit) a step changes what's expanded, which
+  // changes the page's total height — without this, a buyer scrolled down
+  // into a long step just sees blank space (or an unrelated part of the
+  // page) after the content above them collapses, and it looks like nothing
+  // happened when the step actually did change.
+  useEffect(() => {
+    if (skipFirstScrollRef.current) {
+      skipFirstScrollRef.current = false;
+      return;
+    }
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [activeStep]);
   const [orderDetailModalOpen, setOrderDetailModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -533,8 +547,10 @@ export function CheckoutPage() {
   // or block on them) before collapsing step 1 and unlocking step 2.
   function goToStep(stepNumber) {
     if (formRef.current && stepNumber > activeStep && !formRef.current.reportValidity()) {
+      setError("Please complete the required fields above before continuing.");
       return;
     }
+    setError("");
     setActiveStep(stepNumber);
     setMaxStepReached((current) => Math.max(current, stepNumber));
   }

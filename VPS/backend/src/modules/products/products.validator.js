@@ -78,8 +78,10 @@ const publicProductRecommendationsQuerySchema = z.object({
 });
 
 const createProductSchema = z.object({
-  title: z.string().trim().min(2).max(200),
-  slug: z.string().trim().min(2).max(200).optional(),
+  // Real migrated titles/slugs run past the original 200-char cap (up to
+  // 248/238 observed) — 300 gives headroom without being unbounded.
+  title: z.string().trim().min(2).max(300),
+  slug: z.string().trim().min(2).max(300).optional(),
   oldUrl: z.string().trim().max(1000).optional().default(""),
   categoryId: z.string().trim().max(150).optional().nullable(),
   subcategoryId: z.string().trim().max(150).optional().nullable(),
@@ -123,8 +125,13 @@ const createProductSchema = z.object({
   googleProductCategory: z.string().trim().max(250).optional().default(""),
   productType: z.string().trim().max(250).optional().default(""),
   youtubeUrl: z.string().trim().max(500).optional().default(""),
-  metaTitle: z.string().trim().max(120).optional().default(""),
-  metaDescription: z.string().trim().max(320).optional().default(""),
+  // A scan of the live catalog (2026-08-03) found metaTitle up to 218 chars
+  // and metaDescription up to 1024 across ~280 migrated products — the
+  // original 120/320 caps were tighter than real data, making those
+  // products un-editable (any save, even of unrelated fields, tripped
+  // this). These caps now have real headroom over the observed max.
+  metaTitle: z.string().trim().max(250).optional().default(""),
+  metaDescription: z.string().trim().max(1200).optional().default(""),
   metaKeywords: z.string().trim().max(500).optional().default(""),
   tags: z.array(z.string().trim().max(80)).max(30).optional().default([]),
   productLabel: z.string().trim().max(80).optional().default(""),
@@ -143,8 +150,8 @@ const createProductSchema = z.object({
 });
 
 const updateProductSchema = z.object({
-  title: z.string().trim().min(2).max(200).optional(),
-  slug: z.string().trim().min(2).max(200).optional(),
+  title: z.string().trim().min(2).max(300).optional(),
+  slug: z.string().trim().min(2).max(300).optional(),
   oldUrl: z.string().trim().max(1000).optional(),
   categoryId: z.string().trim().max(150).optional().nullable(),
   subcategoryId: z.string().trim().max(150).optional().nullable(),
@@ -182,8 +189,8 @@ const updateProductSchema = z.object({
   googleProductCategory: z.string().trim().max(250).optional(),
   productType: z.string().trim().max(250).optional(),
   youtubeUrl: z.string().trim().max(500).optional(),
-  metaTitle: z.string().trim().max(120).optional(),
-  metaDescription: z.string().trim().max(320).optional(),
+  metaTitle: z.string().trim().max(250).optional(),
+  metaDescription: z.string().trim().max(1200).optional(),
   metaKeywords: z.string().trim().max(500).optional(),
   tags: z.array(z.string().trim().max(80)).max(30).optional(),
   productLabel: z.string().trim().max(80).optional(),

@@ -16,16 +16,20 @@ import {
 } from "../../shared/storefront/storefront-ui";
 import { INDIA_GST_STATES } from "../../shared/india-gst-states";
 import {
+  addCartItem,
   cancelPaymentAttempt,
   confirmCashfreePayment,
   confirmRazorpayPayment,
   createPaymentAttempt,
+  deleteCartItem,
   getCart,
   getCheckoutSession,
   getManualGatewayInfo,
   listOnlineGateways,
   mergeGuestCart,
-  startCheckout
+  searchStorefront,
+  startCheckout,
+  updateCartItem
 } from "../products/products.api";
 
 function loadRazorpayScript() {
@@ -62,6 +66,7 @@ import {
 } from "./cart.utils";
 import { watchdog } from "../../shared/watchdog-client";
 import { OrderDetailModal } from "./order-detail-modal";
+import { CheckoutItemEditor } from "./checkout-item-editor";
 
 const PAYMENT_DESCRIPTIONS = {
   online: "Credit/Debit card, UPI, and net banking through the online gateway.",
@@ -285,6 +290,7 @@ export function CheckoutPage() {
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [activeStep]);
   const [orderDetailModalOpen, setOrderDetailModalOpen] = useState(false);
+  const [reviewItemsBusy, setReviewItemsBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -576,6 +582,60 @@ export function CheckoutPage() {
       setError(requestError.message || "Failed to refresh cart totals.");
     } finally {
       setPreviewLoading(false);
+    }
+  }
+
+  // All three below write straight to the server cart, then re-fetch it —
+  // never just patch local state optimistically. That re-fetch is what
+  // keeps `cart.updatedAt` (sent as expectedCartUpdatedAt on submit) honest:
+  // whatever this tab did last is what's reflected, and if a second tab
+  // changed the same cart in between, the existing "cart changed since this
+  // tab last loaded it" 409 guard on submit already catches that — nothing
+  // new needed there, this just makes sure THIS tab's edits are the ones
+  // actually recorded rather than a stale in-memory copy.
+  async function handleReviewQtyChange(productId, nextQty) {
+    if (nextQty < 1) {
+      return;
+    }
+    setReviewItemsBusy(true);
+    setError("");
+    try {
+      await updateCartItem(productId, { qty: nextQty });
+      await refreshCartPreview();
+      notifyStorefrontCartUpdated();
+    } catch (requestError) {
+      setError(requestError.message || "Failed to update quantity.");
+    } finally {
+      setReviewItemsBusy(false);
+    }
+  }
+
+  async function handleReviewRemoveItem(productId) {
+    setReviewItemsBusy(true);
+    setError("");
+    try {
+      await deleteCartItem(productId);
+      await refreshCartPreview();
+      notifyStorefrontCartUpdated();
+    } catch (requestError) {
+      setError(requestError.message || "Failed to remove item.");
+    } finally {
+      setReviewItemsBusy(false);
+    }
+  }
+
+  async function handleReviewAddProduct(product) {
+    setReviewItemsBusy(true);
+    setError("");
+    try {
+      await addCartItem({ ...buildCartContext(isAuthenticated), productId: product.id, qty: 1 });
+      await refreshCartPreview();
+      notifyStorefrontCartUpdated();
+      setNotice(`${product.title} added to cart.`);
+    } catch (requestError) {
+      setError(requestError.message || "Failed to add product.");
+    } finally {
+      setReviewItemsBusy(false);
     }
   }
 
@@ -1398,6 +1458,19 @@ export function CheckoutPage() {
                       <strong>{PAYMENT_METHOD_OPTIONS.find((option) => option.value === paymentMethod)?.label || paymentMethod}</strong>
                     </div>
                   </div>
+
+                  <div className="proto-review-items-heading">
+                    <h3>Order Items</h3>
+                    <span>Change quantity, remove, or add a product before you pay</span>
+                  </div>
+                  <CheckoutItemEditor
+                    items={items}
+                    existingProductIds={items.map((item) => item.productId)}
+                    busy={reviewItemsBusy}
+                    onQtyChange={handleReviewQtyChange}
+                    onRemove={handleReviewRemoveItem}
+                    onAddProduct={handleReviewAddProduct}
+                  />
 
                   <button type="button" className="proto-review-total-row" onClick={() => setOrderDetailModalOpen(true)}>
                     <span>Grand Total · {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}</span>

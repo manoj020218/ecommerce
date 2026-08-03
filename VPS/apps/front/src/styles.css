@@ -4556,6 +4556,84 @@ textarea {
   text-align: center;
 }
 
+.proto-snapshot-card {
+  padding-bottom: 16px;
+}
+
+.proto-snapshot-bar {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  background: none;
+  border: none;
+  padding: 0 0 10px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.proto-snapshot-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.proto-snapshot-order-no {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proto-snapshot-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.proto-snapshot-bar-right strong {
+  font-size: 16px;
+  color: #111827;
+}
+
+.proto-snapshot-toggle {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+.proto-snapshot-details {
+  border-top: 1px solid #f3f4f6;
+  padding-top: 12px;
+  margin-bottom: 10px;
+}
+
+.proto-invoice-pending-note {
+  margin: 0;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.proto-support-btn-row {
+  display: flex;
+  gap: 8px;
+}
+
+.proto-support-btn-row .storefront-button {
+  flex: 1;
+}
+
 .proto-step-locked-row {
   display: flex;
   align-items: center;

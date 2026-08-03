@@ -377,6 +377,7 @@ export function OrderSuccessPage() {
   });
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
   const [orderDetailModalOpen, setOrderDetailModalOpen] = useState(false);
+  const [snapshotExpanded, setSnapshotExpanded] = useState(false);
 
   useEffect(() => {
     if (!manualPaymentForm.file || !manualPaymentForm.file.type?.startsWith("image/")) {
@@ -830,48 +831,74 @@ export function OrderSuccessPage() {
             </StorefrontCard>
           ) : null}
 
-          <StorefrontCard className="proto-checkout-card">
-            <StorefrontSectionHeader
-              title="Order Snapshot"
-              description="Core order, payment, and dispatch details captured from the checkout session."
-            />
-            <div className="proto-feature-chip-row">
-              <StorefrontBadge tone={statusTone(paymentStatus)}>
-                Payment: {humanizeStatus(paymentStatus)}
-              </StorefrontBadge>
-              <StorefrontBadge tone={statusTone(orderStatus)}>
-                Order: {humanizeStatus(orderStatus)}
-              </StorefrontBadge>
-              <StorefrontBadge tone={statusTone(shipmentStatus)}>
-                Shipment: {humanizeStatus(shipmentStatus)}
-              </StorefrontBadge>
-            </div>
-            <div className="proto-summary-rows">
-              <div>
-                <span>Order Number</span>
-                <strong>{effectiveOrderNo || "--"}</strong>
+          <StorefrontCard className="proto-checkout-card proto-snapshot-card">
+            <button
+              type="button"
+              className="proto-snapshot-bar"
+              onClick={() => setSnapshotExpanded((current) => !current)}
+              aria-expanded={snapshotExpanded}
+            >
+              <div className="proto-snapshot-bar-left">
+                <StorefrontBadge tone={statusTone(paymentStatus)}>
+                  {paymentStatus === "paid" ? "Payment confirmed" : humanizeStatus(paymentStatus)}
+                </StorefrontBadge>
+                <span className="proto-snapshot-order-no">{effectiveOrderNo || "--"}</span>
               </div>
-              <div>
-                <span>Checkout Session</span>
-                <strong>{checkoutSession?.id || "--"}</strong>
+              <div className="proto-snapshot-bar-right">
+                <strong>{formatCurrency(total)}</strong>
+                <span className="proto-snapshot-toggle">{snapshotExpanded ? "Hide details ▴" : "Details ▾"}</span>
               </div>
-              <div>
-                <span>Created On</span>
-                <strong>{formatDate(order?.orderDate || checkoutSession?.createdAt)}</strong>
+            </button>
+
+            {snapshotExpanded ? (
+              <div className="proto-snapshot-details">
+                <div className="proto-summary-rows proto-summary-rows-compact">
+                  <div>
+                    <span>Checkout Session</span>
+                    <strong>{checkoutSession?.id || "--"}</strong>
+                  </div>
+                  <div>
+                    <span>Created On</span>
+                    <strong>{formatDate(order?.orderDate || checkoutSession?.createdAt)}</strong>
+                  </div>
+                  <div>
+                    <span>Payment Method</span>
+                    <strong>{humanizeStatus(paymentMethod)}</strong>
+                  </div>
+                  <div>
+                    <span>Shipping Method</span>
+                    <strong>{humanizeStatus(shippingMethod)}</strong>
+                  </div>
+                  <div>
+                    <span>Order Status</span>
+                    <strong>{humanizeStatus(orderStatus)}</strong>
+                  </div>
+                  <div>
+                    <span>Shipment Status</span>
+                    <strong>{humanizeStatus(shipmentStatus)}</strong>
+                  </div>
+                </div>
+                <button type="button" className="proto-grand-total-row-btn" onClick={() => setOrderDetailModalOpen(true)}>
+                  <span>Items &amp; Pricing · {items.length} item{items.length === 1 ? "" : "s"}</span>
+                  <strong>View breakdown <span className="proto-review-total-caret">›</span></strong>
+                </button>
+                <div className="proto-summary-rows proto-summary-rows-compact" style={{ marginTop: 10 }}>
+                  <div>
+                    <span>Billing Address</span>
+                    <strong>
+                      {formatAddress(order?.billingAddress || checkoutSession?.billingAddress || {}) || "--"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Shipping Address</span>
+                    <strong>
+                      {formatAddress(order?.shippingAddress || checkoutSession?.shippingAddress || {}) || "--"}
+                    </strong>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span>Payment Method</span>
-                <strong>{humanizeStatus(paymentMethod)}</strong>
-              </div>
-              <div>
-                <span>Shipping Method</span>
-                <strong>{humanizeStatus(shippingMethod)}</strong>
-              </div>
-              <button type="button" className="proto-grand-total-row-btn" onClick={() => setOrderDetailModalOpen(true)}>
-                <span>Grand Total</span>
-                <strong>{formatCurrency(total)} <span className="proto-review-total-caret">View details ›</span></strong>
-              </button>
-            </div>
+            ) : null}
+
             <StorefrontAlert tone="warning">{nextStepCopy}</StorefrontAlert>
             {!isAuthenticated && guestOrderLink ? (
               <StorefrontAlert>
@@ -880,36 +907,6 @@ export function OrderSuccessPage() {
                 order from your account using the same contact details.
               </StorefrontAlert>
             ) : null}
-          </StorefrontCard>
-
-          <StorefrontCard className="proto-checkout-card">
-            <StorefrontSectionHeader
-              title="Items"
-              description={`${items.length} line item${items.length === 1 ? "" : "s"} in this checkout.`}
-            />
-            <div className="proto-checkout-items">
-              {items.map((item) => (
-                <div
-                  key={`${item.productId || item.sku}-${item.title}`}
-                  className="proto-checkout-item"
-                >
-                  <div className="proto-checkout-item-media">
-                    <span>{item.sku || "Jenix"}</span>
-                  </div>
-                  <div className="proto-checkout-item-copy">
-                    <p>{item.title}</p>
-                    <span>
-                      Qty {Number(item.qty || 0)} | {humanizeStatus(item.availabilityStatus)}
-                    </span>
-                    <strong>
-                      {formatCurrency(
-                        item.lineTotal || item.finalUnitPriceAfterDiscount || 0
-                      )}
-                    </strong>
-                  </div>
-                </div>
-              ))}
-            </div>
           </StorefrontCard>
 
           <StorefrontCard className="proto-checkout-card proto-next-steps-card">
@@ -952,29 +949,6 @@ export function OrderSuccessPage() {
                 </div>
               </li>
             </ol>
-          </StorefrontCard>
-
-          <StorefrontCard className="proto-checkout-card">
-            <StorefrontSectionHeader
-              title="Addresses"
-              description="Billing and shipping snapshots captured during checkout."
-            />
-            <div className="proto-summary-rows">
-              <div>
-                <span>Billing Address</span>
-                <strong>
-                  {formatAddress(order?.billingAddress || checkoutSession?.billingAddress || {}) ||
-                    "--"}
-                </strong>
-              </div>
-              <div>
-                <span>Shipping Address</span>
-                <strong>
-                  {formatAddress(order?.shippingAddress || checkoutSession?.shippingAddress || {}) ||
-                    "--"}
-                </strong>
-              </div>
-            </div>
           </StorefrontCard>
         </section>
 
@@ -1022,31 +996,33 @@ export function OrderSuccessPage() {
                   Download Invoice
                 </StorefrontButton>
               ) : (
-                <StorefrontAlert>
-                  Invoice is generated after payment confirmation and order processing.
-                  Revisit this order link or contact support if you need it urgently.
-                </StorefrontAlert>
+                <p className="proto-invoice-pending-note">
+                  Invoice will be ready here once payment is confirmed.
+                </p>
               )}
 
               <StorefrontButton to="/products" variant="dark">
                 Continue Shopping
               </StorefrontButton>
 
-              {supportPhone ? (
-                <StorefrontButton href={`tel:${supportPhone}`} variant="light">
-                  Call Support
-                </StorefrontButton>
-              ) : null}
-
-              {whatsappLink ? (
-                <StorefrontButton
-                  href={whatsappLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="whatsapp"
-                >
-                  WhatsApp Support
-                </StorefrontButton>
+              {supportPhone || whatsappLink ? (
+                <div className="proto-support-btn-row">
+                  {supportPhone ? (
+                    <StorefrontButton href={`tel:${supportPhone}`} variant="light">
+                      Call Support
+                    </StorefrontButton>
+                  ) : null}
+                  {whatsappLink ? (
+                    <StorefrontButton
+                      href={whatsappLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      variant="whatsapp"
+                    >
+                      WhatsApp Support
+                    </StorefrontButton>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           </StorefrontCard>

@@ -80,6 +80,80 @@ function buildWhatsAppLink(number, message) {
   return `https://wa.me/${digits}${query}`;
 }
 
+// Names the current page in plain language so the support team sees exactly
+// what the visitor was looking at without asking — a product page uses the
+// actual product name (already set as document.title by product-page.jsx),
+// everything else gets a friendly label from the route. Falls back to
+// whatever the browser tab title is for any page not explicitly listed.
+function resolvePageContextLabel(pathname) {
+  if (pathname === "/" || pathname === "") {
+    return "the Home Page";
+  }
+  if (pathname.startsWith("/products/")) {
+    return document.title ? `the product "${document.title}"` : "a product page";
+  }
+  if (pathname === "/products") {
+    return "the Products listing page";
+  }
+  if (pathname.startsWith("/checkout")) {
+    return "the Checkout page";
+  }
+  if (pathname.startsWith("/cart")) {
+    return "the Cart page";
+  }
+  if (pathname.startsWith("/account")) {
+    return "my Account page";
+  }
+  if (pathname.startsWith("/orders/")) {
+    return "an Order page";
+  }
+  return document.title || "this page";
+}
+
+function buildContextualWhatsAppMessage() {
+  const label = resolvePageContextLabel(window.location.pathname);
+  return `Hi, I need help regarding ${label}.\n${window.location.href}\n\n(I've also saved a screenshot of this page on my device — attaching it here.)`;
+}
+
+// WhatsApp's click-to-chat link has no way to pre-attach a file — that's a
+// platform limit, not something a website can work around. The closest
+// honest equivalent: auto-capture what the visitor is currently looking at
+// and auto-download it, so it's sitting ready in their gallery/downloads to
+// manually attach in the chat that just opened. Best-effort only — capture
+// failing (e.g. a cross-origin image tainting the canvas) never blocks or
+// delays WhatsApp itself opening, since that call happens first and
+// synchronously, before this even starts.
+async function captureAndDownloadPageScreenshot() {
+  try {
+    const { default: html2canvas } = await import("html2canvas");
+    const canvas = await html2canvas(document.documentElement, {
+      x: window.scrollX,
+      y: window.scrollY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollX: 0,
+      scrollY: 0,
+      useCORS: true,
+      logging: false
+    });
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        return;
+      }
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = `jenix-support-screenshot-${Date.now()}.png`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 8000);
+    }, "image/png");
+  } catch (_error) {
+    // Silently skip — the WhatsApp chat already opened either way.
+  }
+}
+
 function SearchIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -304,6 +378,19 @@ export function StorefrontLayout() {
     };
   }, [isAuthenticated]);
 
+  // Opens WhatsApp first — synchronously, so it can never be popup-blocked —
+  // then kicks off the screenshot capture/download as a non-blocking side
+  // effect. The two don't need to be coordinated: the message text already
+  // tells the visitor a screenshot was saved for them to attach themselves.
+  function handleWhatsAppClick(event) {
+    event.preventDefault();
+    const link = buildWhatsAppLink(supportWhatsApp, buildContextualWhatsAppMessage());
+    if (link) {
+      window.open(link, "_blank", "noopener,noreferrer");
+    }
+    captureAndDownloadPageScreenshot();
+  }
+
   if (usesMinimalShell) {
     return (
       <>
@@ -328,6 +415,7 @@ export function StorefrontLayout() {
         <a
           className="proto-whatsapp-fab"
           href={buildWhatsAppLink(supportWhatsApp, `Need help from ${storeName}.`)}
+          onClick={handleWhatsAppClick}
           target="_blank"
           rel="noreferrer"
           aria-label="Chat on WhatsApp"
@@ -475,6 +563,7 @@ export function StorefrontLayout() {
             supportWhatsApp,
             `Need help from ${storeName}.`
           )}
+          onClick={handleWhatsAppClick}
           target="_blank"
           rel="noreferrer"
           aria-label="Chat on WhatsApp"
@@ -500,6 +589,7 @@ export function StorefrontLayout() {
                     supportWhatsApp,
                     `Need support from ${storeName}.`
                   )}
+                  onClick={handleWhatsAppClick}
                   target="_blank"
                   rel="noreferrer"
                 >

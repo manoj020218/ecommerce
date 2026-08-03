@@ -157,20 +157,28 @@ Setup scripts in `VPS/scripts/`. Config: `VPS/ecosystem.config.cjs` for PM2.
 
 ## Production Environment
 
-**VPS IP**: 154.61.69.200
-**Project path on VPS**: `/root/projects/jenixindia`
-**SSH access**: `plink root@154.61.69.200` (password: `***REMOVED***`) via `"D:\plink_git.bat"`
+**VPS IP**: 103.118.183.243 (moved here as of ~2026-07-27; the old VPS `154.61.69.200` is no longer where jenixindia.com is hosted — that box is still used for developing other products before they're migrated over, but jenixindia.com itself now lives on this new VPS)
+**OS**: AlmaLinux 8.10 (RHEL-family, SELinux-enforcing) — use `dnf`/`yum`, not `apt`; no `sites-available`/`sites-enabled`, nginx configs live directly in `/etc/nginx/conf.d/`
+**Project path on VPS**: `/root/projects/jenixindia` (repo root, with `VPS/` subfolder as usual)
+**SSH access**: `plink -pw <password> root@103.118.183.243` (password rotates — ask user for current one, or check memory; last rotated 2026-08-02). A break-glass backup admin account (`jenix-backup`, SSH-key-only, sudo requires its own password) also exists on both this VPS and the old one — see memory for details. Never commit real passwords to this file; it's tracked in git.
+**Node**: v20.20.2, pnpm 10.34.3
+**Other apps on this same VPS** (do not touch): `fireguard`, `floodguard`, `sitemitra` — each has its own pm2 process and nginx conf.d file.
 
 **Live URLs**:
 - Admin panel: `https://admin.jenixindia.com`
 - API: `https://api.jenixindia.com`
-- Storefront: `https://jenixindia.com`
+- Storefront: `https://jenixindia.com` (+ `test.jenixindia.com`)
 
-**PM2 process**: `jenix-backend` (id 28), port 4100
+**PM2 process**: `jenix-backend` (id 4 as of 2026-08-01), port 4100
+
+**Nginx config**: `/etc/nginx/conf.d/jenixindia.conf` (not a symlinked sites-available/enabled setup on this VPS)
+
+**⚠️ SSL renewal gap**: `jenixindia.com` and `test.jenixindia.com` certs exist at `/etc/letsencrypt/live/` (valid until 2026-10-05) but have **no corresponding file in `/etc/letsencrypt/renewal/`** — they were copied over during the VPS migration without their certbot renewal config, so `certbot renew` will silently skip them. Needs re-issuing/re-registering with certbot before Oct 2026 or the site will go down on expiry. Confirm with user before touching — shared SSL infra.
 
 **After .env changes**: always restart with `pm2 restart jenix-backend --update-env` — plain `pm2 restart` does NOT pick up new env vars.
 
 **After admin panel code changes**: rebuild with `pnpm run build:admin` then copy `apps/admin-panel/dist` to VPS.
+**⚠️ SELinux gotcha (new VPS only, AlmaLinux)**: any freshly uploaded/created directory under `/root/...` inherits the `admin_home_t` SELinux context, not `httpd_sys_content_t` — nginx (running confined) gets a silent 403 ("Permission denied", visible in `/var/log/nginx/error.log`, NOT a normal file-permission issue — `ls -la` looks totally fine) even though Unix rwx bits are correct. After copying a new `dist/` into place, always run `restorecon -Rv /root/projects/jenixindia/VPS/apps/admin-panel/dist` (or whichever path was replaced) before assuming the deploy worked. Hit this for real on 2026-08-01 deploying the admin panel — the old Ubuntu VPS never had this issue since it has no SELinux.
 
 ### VPS .env (production values)
 ```

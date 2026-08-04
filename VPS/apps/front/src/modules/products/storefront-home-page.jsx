@@ -470,7 +470,7 @@ export function StorefrontHomePage() {
       : `${storeName} — CCTV, Smart Security & IoT Solutions`;
     const metaDescription = seoDefaults.homeMetaDescription ||
       "Jenix India supplies CCTV cameras, smart locks, gate automation, IP networking, fire alarms and access control. GST invoice, same-day dispatch, pan-India delivery.";
-    const canonicalRoot = String(seoDefaults.canonicalDomain || "https://www.jenixindia.com").replace(/\/+$/, "");
+    const canonicalRoot = String(seoDefaults.canonicalDomain || "https://jenixindia.com").replace(/\/+$/, "");
     const canonicalUrl = `${canonicalRoot}/`;
     const ogImage = seoDefaults.defaultOgImageUrl || `${canonicalRoot}/og-cover.jpg`;
     const supportPhone = storeProfile.supportMobile || storeProfile.phone || "";

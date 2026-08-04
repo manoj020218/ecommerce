@@ -299,15 +299,23 @@ async function generateProductFeedXml() {
 async function generateRobotsTxt() {
   const settings = await getAllSettings();
   const baseUrl = buildCanonicalBaseUrl(settings);
-  return [
+  const sitemapLine = `Sitemap: ${baseUrl}/sitemap.xml`;
+
+  // The admin SEO page exposes an editable robots.txt textarea
+  // (settings.seoDefaults.robotsTxt) — this used to be ignored entirely,
+  // always serving a hardcoded default, so admin edits had no effect.
+  // The Sitemap line is always appended fresh (never stored) so it can't
+  // go stale if the canonical domain changes.
+  const configured = String(settings.seoDefaults.robotsTxt || "").trim();
+  const directives = configured || [
     "User-agent: *",
     "Allow: /",
     "Disallow: /account",
     "Disallow: /cart",
-    "Disallow: /checkout",
-    "",
-    `Sitemap: ${baseUrl}/sitemap.xml`
+    "Disallow: /checkout"
   ].join("\n");
+
+  return `${directives}\n\n${sitemapLine}`;
 }
 
 module.exports = {

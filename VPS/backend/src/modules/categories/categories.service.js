@@ -4,6 +4,7 @@ const { generateId } = require("../../common/identity");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { sanitizeCategory, toPublicCategory } = require("./categories.model");
+const { toPublicProductCard } = require("../products/products.model");
 const { convertToWebp } = require("../../common/image-utils");
 const { env } = require("../../config/env");
 
@@ -211,6 +212,40 @@ async function archiveCategory(categoryId, actor) {
   return sanitizeCategory(store.categories[index]);
 }
 
+function buildCategoryBreadcrumb(store, category) {
+  const byId = new Map(store.categories.map((row) => [row.id, row]));
+  const crumbs = [{ label: "Home", href: "/" }];
+
+  const parent = category.parentCategoryId ? byId.get(category.parentCategoryId) : null;
+  if (parent) {
+    crumbs.push({ label: parent.name, href: `/categories/${parent.slug}` });
+  }
+  crumbs.push({ label: category.name, href: `/categories/${category.slug}` });
+
+  return crumbs;
+}
+
+async function getPublicCategoryPage(slug) {
+  const store = await readCatalogStore();
+  const category = store.categories.find((row) => row.slug === slug && row.isActive);
+  if (!category) {
+    throw new HttpError(404, "Category not found.");
+  }
+
+  // Same match rule the storefront's own category listing uses
+  // (products-list-page.jsx sends categoryId as the sole filter) — keeps
+  // this page's product list consistent with what a real visitor sees.
+  const products = store.products
+    .filter((product) => product.isActive && (product.categoryId || null) === category.id)
+    .map((product) => toPublicProductCard(product));
+
+  return {
+    category: toPublicCategory(category),
+    breadcrumb: buildCategoryBreadcrumb(store, category),
+    products
+  };
+}
+
 function publicBaseUploadUrl(filePath) {
   const uploadsRoot = path.resolve(process.cwd(), env.uploadDir);
   const relativePath = path.relative(uploadsRoot, filePath).replace(/\\/g, "/");
@@ -256,6 +291,7 @@ module.exports = {
   listAdminCategories,
   listPublicCategories,
   getCategoryById,
+  getPublicCategoryPage,
   createCategory,
   updateCategory,
   archiveCategory,

@@ -3,8 +3,10 @@ const path = require("path");
 const { env } = require("../../config/env");
 const { HttpError } = require("../../common/http-error");
 const { escapeXml } = require("../seo/seo.model");
+const { buildCategoryPageSeoPayload } = require("../seo/seo.service");
 const { sanitizeRichText } = require("../../common/html-sanitizer");
 const { getPublicProductPage } = require("../products/products.service");
+const { getPublicCategoryPage } = require("../categories/categories.service");
 
 // Only known crawler/link-preview user agents ever reach this route (nginx
 // routes them here, everyone else keeps getting the plain SPA build) — see
@@ -77,7 +79,10 @@ function injectHeadTags(html, seo) {
 }
 
 function injectJsonLd(html, structuredData) {
-  const blocks = [structuredData.product, structuredData.offer, structuredData.breadcrumb]
+  // Generic over whatever keys the caller's structuredData object has
+  // (product/offer/breadcrumb for products, collection/breadcrumb for
+  // categories) — no per-resource-type branching needed here.
+  const blocks = Object.values(structuredData)
     .filter(Boolean)
     // A stray "</script>" inside a string field (e.g. a product description)
     // would otherwise break out of the script tag — escape "<" so JSON.parse
@@ -117,17 +122,39 @@ function buildVisibleSkeleton(product, breadcrumb, seo) {
     .join("\n    ");
 }
 
-function injectBody(html, product, breadcrumb, seo) {
-  const skeleton = buildVisibleSkeleton(product, breadcrumb, seo);
+function injectBody(html, skeletonHtml) {
   return html.replace(
     '<div id="root"></div>',
-    `<div id="root">\n    ${skeleton}\n  </div>`
+    `<div id="root">\n    ${skeletonHtml}\n  </div>`
   );
 }
 
-function build404Html(baseHtml) {
+// Same "real users never see this" reasoning as buildVisibleSkeleton above.
+function buildCategorySkeleton(category, breadcrumb, products) {
+  const crumbLinks = breadcrumb
+    .map((item) => `<a href="${escapeXml(item.href)}">${escapeXml(item.label)}</a>`)
+    .join(" &raquo; ");
+  const safeDescription = sanitizeRichText(category.description || "");
+  const productLinks = products
+    .map(
+      (product) =>
+        `<li><a href="/products/${escapeXml(product.slug)}">${escapeXml(product.title)}</a></li>`
+    )
+    .join("\n      ");
+
+  return [
+    `<nav>${crumbLinks}</nav>`,
+    `<h1>${escapeXml(category.name)}</h1>`,
+    safeDescription ? `<div>${safeDescription}</div>` : "",
+    productLinks ? `<ul>\n      ${productLinks}\n    </ul>` : ""
+  ]
+    .filter(Boolean)
+    .join("\n    ");
+}
+
+function build404Html(baseHtml, label) {
   return baseHtml
-    .replace(/<title>[^<]*<\/title>/, "<title>Product not found — Jenix India</title>")
+    .replace(/<title>[^<]*<\/title>/, `<title>${escapeXml(label)} not found — Jenix India</title>`)
     .replace(
       /<meta name="robots" content="[^"]*"\s*\/?>/,
       '<meta name="robots" content="noindex, follow" />'
@@ -146,7 +173,7 @@ async function renderProductPageHtml(slug) {
     // shows up in logs/error handling like everywhere else, instead of
     // silently masquerading as a 404.
     if (error instanceof HttpError && error.statusCode === 404) {
-      return { status: 404, html: build404Html(baseHtml) };
+      return { status: 404, html: build404Html(baseHtml, "Product") };
     }
     throw error;
   }
@@ -155,9 +182,32 @@ async function renderProductPageHtml(slug) {
 
   let html = injectHeadTags(baseHtml, seo);
   html = injectJsonLd(html, structuredData);
-  html = injectBody(html, product, breadcrumb, seo);
+  html = injectBody(html, buildVisibleSkeleton(product, breadcrumb, seo));
 
   return { status: 200, html };
 }
 
-module.exports = { renderProductPageHtml };
+async function renderCategoryPageHtml(slug) {
+  const baseHtml = await fs.readFile(resolveDistIndexPath(), "utf-8");
+
+  let page;
+  try {
+    page = await getPublicCategoryPage(slug);
+  } catch (error) {
+    if (error instanceof HttpError && error.statusCode === 404) {
+      return { status: 404, html: build404Html(baseHtml, "Category") };
+    }
+    throw error;
+  }
+
+  const { category, breadcrumb, products } = page;
+  const { seo, structuredData } = await buildCategoryPageSeoPayload(category, products, breadcrumb);
+
+  let html = injectHeadTags(baseHtml, seo);
+  html = injectJsonLd(html, structuredData);
+  html = injectBody(html, buildCategorySkeleton(category, breadcrumb, products));
+
+  return { status: 200, html };
+}
+
+module.exports = { renderProductPageHtml, renderCategoryPageHtml };

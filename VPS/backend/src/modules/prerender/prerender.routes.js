@@ -8,6 +8,7 @@ function createPublicPrerenderRouter() {
   const router = express.Router();
 
   router.get("/prerender/products/:slug", controller.prerenderProductPage);
+  router.get("/prerender/categories/:slug", controller.prerenderCategoryPage);
 
   return router;
 }

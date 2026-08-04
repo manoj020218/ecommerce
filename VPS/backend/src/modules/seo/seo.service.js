@@ -157,6 +157,54 @@ async function buildProductPageSeoPayload(product, breadcrumb) {
   };
 }
 
+function buildCategoryPageMeta(category, settings) {
+  const baseUrl = buildCanonicalBaseUrl(settings);
+  const storeName = settings.storeProfile?.storeName || "Jenix India";
+  return {
+    metaTitle: `${category.name} — ${storeName}`,
+    metaDescription:
+      collapseText(category.description) ||
+      `Shop ${category.name} at ${storeName}. GST invoice, same-day dispatch, pan-India delivery.`,
+    canonicalUrl: `${baseUrl}/categories/${category.slug}`,
+    ogImageUrl: category.imageUrl || settings.seoDefaults.defaultOgImageUrl || ""
+  };
+}
+
+function buildCategoryItemListJsonLd(category, products, meta, baseUrl) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": `${meta.canonicalUrl}#collection`,
+    name: category.name,
+    description: meta.metaDescription,
+    url: meta.canonicalUrl,
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: products.length,
+      itemListElement: products.map((product, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${baseUrl}/products/${product.slug}`,
+        name: product.title
+      }))
+    }
+  };
+}
+
+async function buildCategoryPageSeoPayload(category, products, breadcrumb) {
+  const settings = await getAllSettings();
+  const meta = buildCategoryPageMeta(category, settings);
+  const baseUrl = buildCanonicalBaseUrl(settings);
+
+  return {
+    seo: meta,
+    structuredData: {
+      collection: buildCategoryItemListJsonLd(category, products, meta, baseUrl),
+      breadcrumb: buildBreadcrumbJsonLd(breadcrumb, baseUrl)
+    }
+  };
+}
+
 async function collectSitemapEntries() {
   const [settings, catalogStore, rawContentStore] = await Promise.all([
     getAllSettings(),
@@ -320,6 +368,7 @@ async function generateRobotsTxt() {
 
 module.exports = {
   buildProductPageSeoPayload,
+  buildCategoryPageSeoPayload,
   generateSitemapIndexXml,
   generateTypedSitemapXml,
   generateRobotsTxt,

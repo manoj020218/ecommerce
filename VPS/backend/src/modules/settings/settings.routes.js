@@ -9,6 +9,8 @@ const {
   ensurePermission,
   ensureSuperAdminForCustomCode
 } = require("./settings.permissions");
+const { requireAdminPermission } = require("../../middlewares/require-admin-permission");
+const { REVIEWS_PERMISSIONS } = require("../reviews/reviews.permissions");
 const controller = require("./settings.controller");
 
 const uploadsRoot = path.resolve(process.cwd(), env.uploadDir, "settings");
@@ -65,6 +67,14 @@ function createAdminSettingsRouter() {
     "/seo-defaults",
     ensurePermission(SETTINGS_PERMISSIONS.EDIT),
     controller.adminUpdateSeoDefaults
+  );
+  // Gated by reviews.moderate (not settings.edit) since this control lives
+  // on the dedicated Reviews admin page, not the global Settings tabs —
+  // whoever can moderate reviews configures how they work.
+  router.put(
+    "/review-settings",
+    requireAdminPermission(REVIEWS_PERMISSIONS.MODERATE),
+    controller.adminUpdateReviewSettings
   );
   router.put(
     "/contact-information",

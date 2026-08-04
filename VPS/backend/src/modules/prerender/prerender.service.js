@@ -112,12 +112,17 @@ function buildVisibleSkeleton(product, breadcrumb, seo) {
   // shortDescription is safe to embed as raw HTML.
   const safeShortDescription = sanitizeRichText(product.shortDescription || "");
 
+  const reviewCount = Number(product.reviewCount || 0);
+
   return [
     `<nav>${crumbLinks}</nav>`,
     `<h1>${escapeXml(product.title)}</h1>`,
     safeShortDescription ? `<div>${safeShortDescription}</div>` : "",
     `<p>Price: &#8377;${escapeXml(price)}</p>`,
-    `<p>SKU: ${escapeXml(product.sku || "")}</p>`
+    `<p>SKU: ${escapeXml(product.sku || "")}</p>`,
+    reviewCount > 0
+      ? `<p>Rating: ${escapeXml(Number(product.avgRating || 0).toFixed(1))}/5 (${reviewCount} review${reviewCount === 1 ? "" : "s"})</p>`
+      : ""
   ]
     .filter(Boolean)
     .join("\n    ");

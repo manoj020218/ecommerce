@@ -34,6 +34,7 @@ import {
   notifyStorefrontCartUpdated
 } from "../cart/cart.utils";
 import { watchdog } from "../../shared/watchdog-client";
+import { ProductReviewsSection } from "./product-reviews-section";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -1403,6 +1404,8 @@ export function ProductPage() {
           </StorefrontAlert>
         )}
       </section>
+
+      <ProductReviewsSection productId={product.id} />
 
       <StorefrontStickyActionBar className="proto-mobile-product-bar">
         <div>

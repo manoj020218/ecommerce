@@ -9,7 +9,8 @@ const SETTINGS_SECTION_MAP = Object.freeze({
   "contact-information": "contactInformation",
   "custom-code": "customCodeTags",
   "invoice-settings": "invoiceSettings",
-  "hero-banners": "heroBanners"
+  "hero-banners": "heroBanners",
+  "review-settings": "reviewSettings"
 });
 
 const INVOICE_SETTINGS_UPLOAD_ASSET_MAP = Object.freeze({
@@ -56,6 +57,14 @@ const DEFAULT_SETTINGS_DOCUMENT = Object.freeze({
     sitemapEnabled: true,
     searchConsoleVerification: "",
     bingVerification: ""
+  },
+  reviewSettings: {
+    // "logged_in" = any signed-in customer can review; "verified_purchase"
+    // = only customers with a paid order containing that product.
+    eligibility: "logged_in",
+    // "auto" = review goes live immediately; "gated" = stays pending until
+    // an admin approves it on the Reviews page.
+    moderationMode: "gated"
   },
   contactInformation: {
     publicPhone: "",

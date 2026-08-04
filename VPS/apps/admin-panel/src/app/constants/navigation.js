@@ -41,7 +41,8 @@ export const ADMIN_NAV_ITEMS = [
           { key: "search",     label: "Search",     path: "/search",     permission: "search.view" }
         ]
       },
-      { key: "products", label: "Products", path: "/products", permission: "products.view" }
+      { key: "products", label: "Products", path: "/products", permission: "products.view" },
+      { key: "reviews", label: "Reviews & Ratings", path: "/reviews", permission: "reviews.view" }
     ]
   },
   {

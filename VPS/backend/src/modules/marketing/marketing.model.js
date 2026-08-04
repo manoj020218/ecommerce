@@ -42,7 +42,11 @@ const TEMPLATE_KEYS = Object.freeze([
   "order_processing_whatsapp",
   "payment_pending_whatsapp",
   "manual_payment_verified_whatsapp",
-  "tracking_detail_update_whatsapp"
+  "tracking_detail_update_whatsapp",
+  "review_approved",
+  "review_approved_whatsapp",
+  "review_rejected",
+  "review_rejected_whatsapp"
 ]);
 
 // The 7 customer lifecycle events the storefront actually fires today, each with
@@ -57,7 +61,9 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
   { key: "payment_pending", whatsappKey: "payment_pending_whatsapp", group: "Payment", label: "Payment Pending" },
   { key: "manual_payment_verified", whatsappKey: "manual_payment_verified_whatsapp", group: "Payment", label: "Payment Confirmed" },
   { key: "tracking_detail_update", whatsappKey: "tracking_detail_update_whatsapp", group: "Shipping", label: "Order Shipped" },
-  { key: "order_left_in_cart", whatsappKey: "order_left_in_cart_whatsapp", group: "Recovery", label: "Cart Left Behind" }
+  { key: "order_left_in_cart", whatsappKey: "order_left_in_cart_whatsapp", group: "Recovery", label: "Cart Left Behind" },
+  { key: "review_approved", whatsappKey: "review_approved_whatsapp", group: "Reviews", label: "Review Approved" },
+  { key: "review_rejected", whatsappKey: "review_rejected_whatsapp", group: "Reviews", label: "Review Rejected" }
 ]);
 
 const BRAND_COLOR = "#E8231A";
@@ -193,6 +199,35 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     subject: "",
     body: "✅ Payment received! Hi {{customerName}}, we've confirmed your payment of {{orderTotal}} for order *{{orderNo}}*. It's now being processed. Thank you!"
   },
+  review_approved: {
+    label: "Review Approved (Email)",
+    subject: "Your review for {{productName}} is now live ⭐",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Thanks for taking the time to review <strong>{{productName}}</strong> — it's now live on the product page.</p>` +
+      `<p style="font-size:14px;">We appreciate you helping other buyers make better decisions!</p>`
+    )
+  },
+  review_approved_whatsapp: {
+    label: "Review Approved (WhatsApp)",
+    subject: "",
+    body: "⭐ Hi {{customerName}}, your review for *{{productName}}* is now live. Thanks for sharing your feedback!"
+  },
+  review_rejected: {
+    label: "Review Not Approved (Email)",
+    subject: "About your review for {{productName}}",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Your review for <strong>{{productName}}</strong> couldn't be published.</p>` +
+      `<p style="font-size:13px;color:#6b7280;">Reason: {{rejectionReason}}</p>` +
+      `<p style="font-size:14px;">Feel free to submit an updated review any time.</p>`
+    )
+  },
+  review_rejected_whatsapp: {
+    label: "Review Not Approved (WhatsApp)",
+    subject: "",
+    body: "Hi {{customerName}}, your review for *{{productName}}* couldn't be published ({{rejectionReason}}). Feel free to submit an updated one."
+  },
   tracking_detail_update: {
     label: "Order Shipped (Email)",
     subject: "Your order {{orderNo}} has shipped 🚚",
@@ -268,7 +303,8 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "expectedDeliveryDate",
   "recoveryUrl",
   "whatsappNumber",
-  "whatsappLink"
+  "whatsappLink",
+  "rejectionReason"
 ]);
 
 const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([

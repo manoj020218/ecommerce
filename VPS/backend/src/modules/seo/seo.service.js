@@ -66,6 +66,18 @@ function buildBreadcrumbJsonLd(breadcrumb, baseUrl) {
   };
 }
 
+function buildAggregateRatingJsonLd(product) {
+  const reviewCount = Number(product.reviewCount || 0);
+  if (reviewCount <= 0) {
+    return undefined;
+  }
+  return {
+    "@type": "AggregateRating",
+    ratingValue: Number(product.avgRating || 0),
+    reviewCount
+  };
+}
+
 function buildProductJsonLd(product, meta, settings, categoryPathNames) {
   const imageList = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
 
@@ -81,6 +93,7 @@ function buildProductJsonLd(product, meta, settings, categoryPathNames) {
     image: imageList,
     category: categoryPathNames.join(" > "),
     url: meta.canonicalUrl,
+    aggregateRating: buildAggregateRatingJsonLd(product),
     offers: {
       "@id": `${meta.canonicalUrl}#offer`
     },

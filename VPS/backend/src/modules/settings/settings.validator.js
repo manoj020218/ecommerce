@@ -47,6 +47,11 @@ const seoDefaultsSchema = z.object({
   bingVerification: optionalString(300)
 });
 
+const reviewSettingsSchema = z.object({
+  eligibility: z.enum(["logged_in", "verified_purchase"]).optional(),
+  moderationMode: z.enum(["auto", "gated"]).optional()
+});
+
 const contactInformationSchema = z.object({
   publicPhone: optionalString(20),
   publicEmail: optionalString(150),
@@ -123,6 +128,11 @@ function parseSeoDefaultsPatch(payload) {
   return seoDefaultsSchema.parse(payload);
 }
 
+function parseReviewSettingsPatch(payload) {
+  ensureNonEmptyPayload(payload, "Review settings");
+  return reviewSettingsSchema.parse(payload);
+}
+
 function parseContactInformationPatch(payload) {
   ensureNonEmptyPayload(payload, "Contact information");
   return contactInformationSchema.parse(payload);
@@ -150,6 +160,7 @@ module.exports = {
   parseStoreProfilePatch,
   parseBrandingPatch,
   parseSeoDefaultsPatch,
+  parseReviewSettingsPatch,
   parseContactInformationPatch,
   parseCustomCodePatch,
   parseInvoiceSettingsPatch,

@@ -13,6 +13,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/website-leads"))   return "Website Buyer Leads";
   if (pathname.startsWith("/categories"))      return "Categories";
   if (pathname.startsWith("/products"))        return "Products";
+  if (pathname.startsWith("/reviews"))         return "Reviews & Ratings";
   if (pathname.startsWith("/inventory"))       return "Inventory";
   if (pathname.startsWith("/hsn-tax"))         return "HSN / Tax Master";
   if (pathname.startsWith("/search"))          return "Search";

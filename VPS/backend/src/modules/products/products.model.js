@@ -395,6 +395,8 @@ function toPublicProduct(product, options = {}) {
     isActive: Boolean(product.isActive),
     productLabel: product.productLabel || "",
     tags: Array.isArray(product.tags) ? [...product.tags] : [],
+    avgRating: Number(product.avgRating || 0),
+    reviewCount: Number(product.reviewCount || 0),
     createdAt: product.createdAt,
     updatedAt: product.updatedAt
   };
@@ -419,7 +421,9 @@ function toPublicProductCard(product, options = {}) {
     images,
     stockStatus: product.stockStatus || "in_stock",
     isPurchasable:
-      calculateAvailableQty(product) > 0 || Boolean(product.allowBackorder)
+      calculateAvailableQty(product) > 0 || Boolean(product.allowBackorder),
+    avgRating: Number(product.avgRating || 0),
+    reviewCount: Number(product.reviewCount || 0)
   };
 }
 

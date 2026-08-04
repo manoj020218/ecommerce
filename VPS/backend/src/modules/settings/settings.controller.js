@@ -6,6 +6,7 @@ const {
   parseStoreProfilePatch,
   parseBrandingPatch,
   parseSeoDefaultsPatch,
+  parseReviewSettingsPatch,
   parseContactInformationPatch,
   parseCustomCodePatch,
   parseInvoiceSettingsPatch,
@@ -58,6 +59,12 @@ const adminUpdateSeoDefaults = asyncHandler(async (req, res) => {
   const patch = parseSeoDefaultsPatch(req.body);
   const data = await settingsService.updateSection("seoDefaults", patch, req.actor);
   return ok(res, data, "SEO defaults updated.");
+});
+
+const adminUpdateReviewSettings = asyncHandler(async (req, res) => {
+  const patch = parseReviewSettingsPatch(req.body);
+  const data = await settingsService.updateSection("reviewSettings", patch, req.actor);
+  return ok(res, data, "Review settings updated.");
 });
 
 const adminUpdateContactInformation = asyncHandler(async (req, res) => {
@@ -162,6 +169,7 @@ module.exports = {
   adminUpdateStoreProfile,
   adminUpdateBranding,
   adminUpdateSeoDefaults,
+  adminUpdateReviewSettings,
   adminUpdateContactInformation,
   adminUpdateCustomCode,
   adminUpdateInvoiceSettings,

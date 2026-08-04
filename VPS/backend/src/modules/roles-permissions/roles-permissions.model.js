@@ -47,6 +47,9 @@ const AVAILABLE_PERMISSIONS = Object.freeze([
   "customers.view",
   "customers.edit",
   "customers.mark_dealer",
+  "reviews.view",
+  "reviews.moderate",
+  "reviews.delete",
   "reports.view",
   "reports.export",
   "blogs.view",
@@ -91,7 +94,8 @@ const DEFAULT_PERMISSION_GROUPS = Object.freeze([
       "search.view",
       "orders.view",
       "customers.view",
-      "reports.view"
+      "reports.view",
+      "reviews.view"
     ]
   }
 ]);

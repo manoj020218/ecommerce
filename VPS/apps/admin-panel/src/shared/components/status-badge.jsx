@@ -58,7 +58,9 @@ const STATUS_CLASS = {
   returned: "red",
   picked_up: "green",
   tax_invoice: "green",
-  proforma_invoice: "amber"
+  proforma_invoice: "amber",
+  approved: "green",
+  rejected: "red"
 };
 
 export function StatusBadge({ value, label }) {

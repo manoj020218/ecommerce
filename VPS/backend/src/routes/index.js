@@ -12,6 +12,10 @@ const {
   createPublicProductsRouter
 } = require("../modules/products/products.routes");
 const {
+  createAdminReviewsRouter,
+  createPublicReviewsRouter
+} = require("../modules/reviews/reviews.routes");
+const {
   createRolesPermissionsRouter
 } = require("../modules/roles-permissions/roles-permissions.routes");
 const { createStaffRouter } = require("../modules/staff/staff.routes");
@@ -99,6 +103,8 @@ function createApiRouter() {
   router.use("/admin/search", createAdminSearchRouter());
   router.use("/categories", createPublicCategoriesRouter());
   router.use("/products", createPublicProductsRouter());
+  router.use("/admin/reviews", createAdminReviewsRouter());
+  router.use("/reviews", createPublicReviewsRouter());
   router.use("/settings", createPublicSettingsRouter());
   router.use("/search", createSearchRouter());
   router.use("/cart", createCartRouter());

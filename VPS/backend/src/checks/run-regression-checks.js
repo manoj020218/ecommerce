@@ -21,6 +21,7 @@ const {
 } = require("../database/website-leads-store");
 const { jsonFileStore } = require("../database/json-file-store");
 const { resetAuthStoreForRegression } = require("../database/auth-store");
+const { resetReviewStoreForRegression } = require("../database/review-store");
 const { ensureAuthBootstrap } = require("../modules/auth/auth.service");
 
 const execFileAsync = promisify(execFile);
@@ -105,6 +106,7 @@ async function run() {
   await resetMarketingStoreForRegression();
   await resetWebsiteLeadsStoreForRegression();
   await resetAuthStoreForRegression();
+  await resetReviewStoreForRegression();
   await ensureAuthBootstrap();
 
   const app = createApp();
@@ -5149,6 +5151,250 @@ async function run() {
       })
     });
     assert.equal(phase22UnblockedLoginAttempt.response.status, 200);
+
+    // ── Phase 23: reviews & ratings ──────────────────────────────────────────
+    // Builds its own product + paid order rather than reusing createdProductId,
+    // since that product gets hard-deleted by an earlier phase (Phase 19) and
+    // would no longer exist by the time this phase runs.
+    const phase23Product = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 23 Review Test Speaker",
+        categoryId,
+        brand: "Jenix",
+        mpn: "JNX-P23-REVIEW",
+        hsnCode: "8525",
+        basePrice: 1500,
+        salePrice: 1400,
+        deadWeightKg: 1,
+        shortDescription: "Phase 23 test product for reviews.",
+        fullDescription: "Phase 23 test product for reviews.",
+        stockQty: 10,
+        lowStockThreshold: 2
+      })
+    });
+    assert.equal(phase23Product.response.status, 201);
+    const phase23ProductId = phase23Product.json.data.id;
+
+    const phase23CartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ productId: phase23ProductId, qty: 1 })
+    });
+    assert.equal(phase23CartAdd.response.status, 201);
+
+    const phase23Checkout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          addressLine1: "B-12 Market Road",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase23Checkout.response.status, 200);
+    const phase23CheckoutId = phase23Checkout.json.data.checkoutSession.id;
+
+    const phase23Attempt = await requestJson(baseUrl, "/api/payments/create-attempt", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ checkoutSessionId: phase23CheckoutId, gateway: "mock_online" })
+    });
+    assert.equal(phase23Attempt.response.status, 201);
+
+    const phase23Webhook = await requestJson(baseUrl, "/api/payments/webhook/mock", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        attemptId: phase23Attempt.json.data.attemptId,
+        status: "success",
+        gatewayTxnId: "txn_phase23_review_01"
+      })
+    });
+    assert.equal(phase23Webhook.response.status, 200);
+
+    const phase23Submit = await requestJson(baseUrl, "/api/reviews", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        productId: phase23ProductId,
+        rating: 5,
+        title: "Phase 23 great product",
+        comment: "Works exactly as described, easy to install."
+      })
+    });
+    assert.equal(phase23Submit.response.status, 201);
+    assert.equal(phase23Submit.json.data.status, "pending");
+    const phase23ReviewId = phase23Submit.json.data.id;
+
+    const phase23Duplicate = await requestJson(baseUrl, "/api/reviews", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        productId: phase23ProductId,
+        rating: 4,
+        title: "Second attempt",
+        comment: "Trying to review the same product twice."
+      })
+    });
+    assert.equal(phase23Duplicate.response.status, 409);
+
+    const phase23AdminPendingList = await requestJson(
+      baseUrl,
+      "/api/admin/reviews?status=pending",
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase23AdminPendingList.response.status, 200);
+    assert.equal(
+      phase23AdminPendingList.json.data.some((row) => row.id === phase23ReviewId),
+      true
+    );
+
+    const phase23Approve = await requestJson(
+      baseUrl,
+      `/api/admin/reviews/${phase23ReviewId}/moderate`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ action: "approve" })
+      }
+    );
+    assert.equal(phase23Approve.response.status, 200);
+    assert.equal(phase23Approve.json.data.status, "approved");
+
+    const phase23ProductAfterApprove = await requestJson(
+      baseUrl,
+      `/api/admin/products/${phase23ProductId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase23ProductAfterApprove.response.status, 200);
+    assert.equal(phase23ProductAfterApprove.json.data.reviewCount, 1);
+    assert.equal(phase23ProductAfterApprove.json.data.avgRating, 5);
+
+    const phase23PublicReviews = await requestJson(
+      baseUrl,
+      `/api/reviews?productId=${phase23ProductId}`
+    );
+    assert.equal(phase23PublicReviews.response.status, 200);
+    assert.equal(phase23PublicReviews.json.data.summary.reviewCount, 1);
+    assert.equal(
+      phase23PublicReviews.json.data.reviews.some((row) => row.id === phase23ReviewId),
+      true
+    );
+
+    // Switch to verified-purchase mode and confirm a customer with no order
+    // for this product is blocked, before restoring/cleaning up.
+    const phase23SettingsUpdate = await requestJson(
+      baseUrl,
+      "/api/admin/settings/review-settings",
+      {
+        method: "PUT",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ eligibility: "verified_purchase" })
+      }
+    );
+    assert.equal(phase23SettingsUpdate.response.status, 200);
+    assert.equal(phase23SettingsUpdate.json.data.eligibility, "verified_purchase");
+
+    const phase23NoPurchaseOtpRequest = await requestJson(baseUrl, "/api/auth/customer/otp/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mobile: "+91-9797979797" })
+    });
+    assert.equal(phase23NoPurchaseOtpRequest.response.status, 200);
+
+    const phase23NoPurchaseLogin = await requestJson(baseUrl, "/api/auth/customer/otp/verify", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mobile: "+91-9797979797",
+        code: phase23NoPurchaseOtpRequest.json.data.devCode,
+        name: "Phase 23 No Purchase Customer"
+      })
+    });
+    assert.equal(phase23NoPurchaseLogin.response.status, 200);
+    const phase23NoPurchaseToken = phase23NoPurchaseLogin.json.data.accessToken;
+
+    const phase23BlockedSubmit = await requestJson(baseUrl, "/api/reviews", {
+      method: "POST",
+      headers: authHeaders(phase23NoPurchaseToken),
+      body: JSON.stringify({
+        productId: phase23ProductId,
+        rating: 3,
+        title: "Never bought this",
+        comment: "Trying to review without a purchase."
+      })
+    });
+    assert.equal(phase23BlockedSubmit.response.status, 403);
+
+    // Delete the approved review, confirm the rollup resets, then submit a
+    // fresh one (from the customer who DOES have a paid order — still
+    // allowed under verified-purchase mode) and reject it this time.
+    const phase23Delete = await requestJson(
+      baseUrl,
+      `/api/admin/reviews/${phase23ReviewId}`,
+      { method: "DELETE", headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase23Delete.response.status, 200);
+
+    const phase23ProductAfterDelete = await requestJson(
+      baseUrl,
+      `/api/admin/products/${phase23ProductId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase23ProductAfterDelete.response.status, 200);
+    assert.equal(phase23ProductAfterDelete.json.data.reviewCount, 0);
+
+    const phase23ResubmitAsVerifiedBuyer = await requestJson(baseUrl, "/api/reviews", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        productId: phase23ProductId,
+        rating: 2,
+        title: "Changed my mind",
+        comment: "Resubmitting after the first review was deleted."
+      })
+    });
+    assert.equal(phase23ResubmitAsVerifiedBuyer.response.status, 201);
+    const phase23SecondReviewId = phase23ResubmitAsVerifiedBuyer.json.data.id;
+
+    const phase23Reject = await requestJson(
+      baseUrl,
+      `/api/admin/reviews/${phase23SecondReviewId}/moderate`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ action: "reject", rejectionReason: "Does not follow review guidelines." })
+      }
+    );
+    assert.equal(phase23Reject.response.status, 200);
+    assert.equal(phase23Reject.json.data.status, "rejected");
+
+    const phase23ProductAfterReject = await requestJson(
+      baseUrl,
+      `/api/admin/products/${phase23ProductId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase23ProductAfterReject.response.status, 200);
+    assert.equal(phase23ProductAfterReject.json.data.reviewCount, 0);
 
     // eslint-disable-next-line no-console
     console.log("Regression checks passed.");

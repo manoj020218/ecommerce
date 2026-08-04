@@ -9,6 +9,7 @@ function createPublicPrerenderRouter() {
 
   router.get("/prerender/products/:slug", controller.prerenderProductPage);
   router.get("/prerender/categories/:slug", controller.prerenderCategoryPage);
+  router.get("/prerender/guides/:slug", controller.prerenderBlogPage);
 
   return router;
 }

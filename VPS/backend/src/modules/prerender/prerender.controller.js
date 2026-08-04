@@ -1,4 +1,8 @@
-const { renderProductPageHtml, renderCategoryPageHtml } = require("./prerender.service");
+const {
+  renderProductPageHtml,
+  renderCategoryPageHtml,
+  renderBlogPageHtml
+} = require("./prerender.service");
 
 async function prerenderProductPage(req, res, next) {
   try {
@@ -18,4 +22,13 @@ async function prerenderCategoryPage(req, res, next) {
   }
 }
 
-module.exports = { prerenderProductPage, prerenderCategoryPage };
+async function prerenderBlogPage(req, res, next) {
+  try {
+    const { status, html } = await renderBlogPageHtml(req.params.slug);
+    res.status(status).type("html").send(html);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { prerenderProductPage, prerenderCategoryPage, prerenderBlogPage };

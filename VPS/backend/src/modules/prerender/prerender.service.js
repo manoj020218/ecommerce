@@ -7,6 +7,7 @@ const { buildCategoryPageSeoPayload } = require("../seo/seo.service");
 const { sanitizeRichText } = require("../../common/html-sanitizer");
 const { getPublicProductPage } = require("../products/products.service");
 const { getPublicCategoryPage } = require("../categories/categories.service");
+const { getPublicBlogBySlug } = require("../blogs/blogs.service");
 
 // Only known crawler/link-preview user agents ever reach this route (nginx
 // routes them here, everyone else keeps getting the plain SPA build) — see
@@ -152,6 +153,20 @@ function buildCategorySkeleton(category, breadcrumb, products) {
     .join("\n    ");
 }
 
+// Same "real users never see this" reasoning as the other skeleton builders.
+function buildBlogSkeleton(article) {
+  const safeContent = sanitizeRichText(article.content || "");
+
+  return [
+    `<nav><a href="/">Home</a> &raquo; <a href="/guides">Guides</a> &raquo; ${escapeXml(article.title)}</nav>`,
+    `<h1>${escapeXml(article.title)}</h1>`,
+    article.excerpt ? `<p>${escapeXml(article.excerpt)}</p>` : "",
+    safeContent ? `<div>${safeContent}</div>` : ""
+  ]
+    .filter(Boolean)
+    .join("\n    ");
+}
+
 function build404Html(baseHtml, label) {
   return baseHtml
     .replace(/<title>[^<]*<\/title>/, `<title>${escapeXml(label)} not found — Jenix India</title>`)
@@ -210,4 +225,32 @@ async function renderCategoryPageHtml(slug) {
   return { status: 200, html };
 }
 
-module.exports = { renderProductPageHtml, renderCategoryPageHtml };
+async function renderBlogPageHtml(slug) {
+  const baseHtml = await fs.readFile(resolveDistIndexPath(), "utf-8");
+
+  let page;
+  try {
+    page = await getPublicBlogBySlug(slug);
+  } catch (error) {
+    if (error instanceof HttpError && error.statusCode === 404) {
+      return { status: 404, html: build404Html(baseHtml, "Guide") };
+    }
+    throw error;
+  }
+
+  const { article, structuredData } = page;
+  const seo = {
+    metaTitle: article.seoTitle,
+    metaDescription: article.seoDescription,
+    canonicalUrl: article.canonicalUrl,
+    ogImageUrl: article.ogImageUrl
+  };
+
+  let html = injectHeadTags(baseHtml, seo);
+  html = injectJsonLd(html, structuredData);
+  html = injectBody(html, buildBlogSkeleton(article));
+
+  return { status: 200, html };
+}
+
+module.exports = { renderProductPageHtml, renderCategoryPageHtml, renderBlogPageHtml };

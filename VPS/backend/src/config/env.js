@@ -63,6 +63,8 @@ const env = {
   staticPagesStorePath:
     process.env.STATIC_PAGES_STORE_PATH ||
     "backend/src/database/json/static-pages-store.json",
+  frontDistIndexPath:
+    process.env.FRONT_DIST_INDEX_PATH || "apps/front/dist/index.html",
   otpDevDefaultCode: process.env.OTP_DEV_DEFAULT_CODE || "123456",
   cartStockReservationMinutes: Number.parseInt(
     process.env.CART_STOCK_RESERVATION_MINUTES || "15",

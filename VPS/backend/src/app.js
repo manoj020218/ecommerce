@@ -15,6 +15,9 @@ const {
 const {
   createPublicFacebookFeedRouter
 } = require("./modules/facebook-feed/facebook-feed.routes");
+const {
+  createPublicPrerenderRouter
+} = require("./modules/prerender/prerender.routes");
 
 function createApp() {
   const app = express();
@@ -111,6 +114,7 @@ function createApp() {
   app.use(createPublicSeoRouter());
   app.use(createPublicGoogleMerchantRouter());
   app.use(createPublicFacebookFeedRouter());
+  app.use(createPublicPrerenderRouter());
   app.use("/api/auth/admin/login", loginLimiter);
   app.use("/api/auth/customer/login", loginLimiter);
   app.use("/api/auth/customer/register", loginLimiter);

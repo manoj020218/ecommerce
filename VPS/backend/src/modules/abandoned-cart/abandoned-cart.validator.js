@@ -11,12 +11,26 @@ const optionalString = (max = 300) =>
 
 const sessionIdSchema = z.string().trim().min(3).max(120);
 
+// z.coerce.boolean() runs JS `Boolean(value)` under the hood, so the string
+// "false" (sent by query params for an unchecked checkbox) coerces to
+// `true` — any non-empty string is truthy. This parses "true"/"false"
+// strings by their actual text instead.
+const booleanQueryParam = (defaultValue) =>
+  z
+    .preprocess((value) => {
+      if (typeof value === "boolean") return value;
+      if (typeof value === "string") return value.toLowerCase() === "true";
+      return value;
+    }, z.boolean())
+    .optional()
+    .default(defaultValue);
+
 const listRecoveriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),
   stage: z
     .enum(Object.values(RECOVERY_STAGES))
     .optional(),
-  dueOnly: z.coerce.boolean().optional().default(false),
+  dueOnly: booleanQueryParam(false),
   customerId: optionalString(80)
 });
 

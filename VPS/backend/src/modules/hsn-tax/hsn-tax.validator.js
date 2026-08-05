@@ -1,8 +1,9 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 
 const listHsnQuerySchema = z.object({
-  includeInactive: z.coerce.boolean().optional().default(true),
+  includeInactive: booleanQueryParam(true),
   q: z.string().trim().max(120).optional().default("")
 });
 

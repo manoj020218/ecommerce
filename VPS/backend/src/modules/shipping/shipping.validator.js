@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 const {
   SHIPPING_METHODS,
   SHIPPING_ZONES,
@@ -61,7 +62,7 @@ const shippingSettingsPatchSchema = z.object({
 const listRateCardsQuerySchema = z.object({
   shippingMethod: shippingMethodSchema.optional(),
   zone: shippingZoneSchema.optional(),
-  includeInactive: z.coerce.boolean().optional().default(true)
+  includeInactive: booleanQueryParam(true)
 });
 
 const createRateCardSchema = z.object({
@@ -79,7 +80,7 @@ const updateRateCardSchema = z.object({
 });
 
 const listCouriersQuerySchema = z.object({
-  includeInactive: z.coerce.boolean().optional().default(true)
+  includeInactive: booleanQueryParam(true)
 });
 
 const createCourierProfileSchema = z.object({

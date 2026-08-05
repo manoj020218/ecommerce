@@ -2,6 +2,7 @@ const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
 const { PRODUCT_RELATION_TYPES } = require("./products.model");
 const { sanitizeRichText } = require("../../common/html-sanitizer");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 
 // Strips <script>/event-handlers/etc. before the description ever reaches storage —
 // these fields are rendered as raw innerHTML in the admin RichTextEditor on every
@@ -59,7 +60,7 @@ const relationMapShape = PRODUCT_RELATION_TYPES.reduce((shape, key) => {
 const relationMapSchema = z.object(relationMapShape);
 
 const listAdminProductsQuerySchema = z.object({
-  includeInactive: z.coerce.boolean().optional().default(true),
+  includeInactive: booleanQueryParam(true),
   categoryId: z.string().trim().optional(),
   q: z.string().trim().max(120).optional().default("")
 });

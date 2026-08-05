@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 const {
   GATEWAY_MODES,
   GATEWAY_TYPES
@@ -9,7 +10,7 @@ const listGatewaysQuerySchema = z.object({
   gatewayType: z
     .enum([GATEWAY_TYPES.ONLINE, GATEWAY_TYPES.MANUAL])
     .optional(),
-  includeDisabled: z.coerce.boolean().optional().default(true)
+  includeDisabled: booleanQueryParam(true)
 });
 
 const updateGatewayPayloadSchema = z

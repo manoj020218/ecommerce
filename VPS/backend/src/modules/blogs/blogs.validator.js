@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 const { BLOG_STATUS } = require("./blogs.model");
 
 const faqItemSchema = z.object({
@@ -24,7 +25,7 @@ const listAdminBlogsQuerySchema = z.object({
   q: z.string().trim().max(200).optional().default(""),
   categoryId: z.string().trim().max(160).optional().default(""),
   status: z.string().trim().max(40).optional().default(""),
-  includeArchived: z.coerce.boolean().optional().default(true),
+  includeArchived: booleanQueryParam(true),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100)
 });
 

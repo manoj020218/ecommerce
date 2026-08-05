@@ -1,7 +1,8 @@
 const { z } = require("zod");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 
 const exportProductsQuerySchema = z.object({
-  includeInactive: z.coerce.boolean().optional().default(false)
+  includeInactive: booleanQueryParam(false)
 });
 
 function parseExportProductsQuery(query) {

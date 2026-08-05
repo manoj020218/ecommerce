@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 
 const searchTextSchema = z.string().trim().min(1).max(200);
 const optionalSearchTextSchema = z.string().trim().max(200).optional().default("");
@@ -29,7 +30,7 @@ const viewPayloadSchema = z.object({
 
 const listAdminQuerySchema = z.object({
   q: optionalSearchTextSchema,
-  includeInactive: z.coerce.boolean().optional().default(true),
+  includeInactive: booleanQueryParam(true),
   limit: z.coerce.number().int().min(1).max(500).optional().default(100)
 });
 

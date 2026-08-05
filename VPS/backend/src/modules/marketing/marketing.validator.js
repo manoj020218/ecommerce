@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 const {
   OFFER_TYPES,
   TEMPLATE_KEYS,
@@ -51,7 +52,7 @@ const notificationLogsQuerySchema = z.object({
 });
 
 const offersQuerySchema = z.object({
-  includeInactive: z.coerce.boolean().optional().default(true)
+  includeInactive: booleanQueryParam(true)
 });
 
 const notifySubscriptionPayloadSchema = z.object({

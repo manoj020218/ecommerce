@@ -650,6 +650,101 @@ function ShipmentsTab({ canUpdateTracking, canMarkDelivered, couriers }) {
 
 // ─── Rate Cards Tab ───────────────────────────────────────────────────────────
 
+// Mirrors the exact math in backend/src/modules/shipping/shipping-calculator.js
+// — keep this in sync if that formula ever changes.
+function RateCardHelp() {
+  return (
+    <details
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "var(--surface-soft)",
+        padding: "12px 14px"
+      }}
+    >
+      <summary
+        style={{ cursor: "pointer", fontWeight: 600, fontSize: 13, color: "var(--text)" }}
+      >
+        How is the buyer's final shipping charge calculated?
+      </summary>
+
+      <div style={{ marginTop: 12, display: "grid", gap: 12, fontSize: 13, color: "var(--text)" }}>
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: 10,
+            background: "#fff",
+            padding: "10px 12px",
+            fontFamily: "monospace",
+            fontSize: 12.5
+          }}
+        >
+          Shipping Charge = Base Charge + (Billable Weight × Per Kg Charge) + Remote Area Surcharge + Shipping Class Override
+        </div>
+
+        <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
+          <li>
+            <strong>Zone</strong> is auto-detected from the buyer's pincode/state (Local
+            pincode prefix → same state as your store → Remote pincode prefix or North-East
+            state → your configured regional zone map → All India as the fallback). The Base
+            Charge and Per Kg Charge above come from whichever rate card matches the chosen
+            delivery method + that zone (falling back to the method's "All India" card if no
+            zone-specific one is set).
+          </li>
+          <li>
+            <strong>Billable Weight</strong> per cart line is the greater of: 0.2kg minimum,
+            the product's actual weight, or its volumetric weight —{" "}
+            <code>(Length × Width × Height in cm) ÷ 5000</code> — then multiplied by quantity
+            and summed across the whole cart. Bulky-but-light items are billed on volume, not
+            scale weight.
+          </li>
+          <li>
+            Products marked <strong>"shipping included in price"</strong> contribute ₹0 —
+            their delivery cost is already inside the item price, so it's never charged twice.
+          </li>
+          <li>
+            A <strong>Remote Area Surcharge</strong> (set per delivery method under Settings)
+            is added only when the destination resolves to the North-East/Remote zone.
+          </li>
+          <li>
+            If a product has an active <strong>Shipping Class</strong> with its own rate, that
+            line skips this rate card entirely and uses the class's own Base + Per Kg (or a
+            flat amount) instead — see the Classes tab.
+          </li>
+          <li>
+            <strong>Local Pickup</strong> and <strong>Self Pickup</strong> are always ₹0,
+            regardless of rate cards.
+          </li>
+        </ul>
+
+        <div
+          style={{
+            border: "1px dashed var(--border)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            background: "#fff"
+          }}
+        >
+          <strong>Worked example</strong>
+          <p style={{ margin: "6px 0 0" }}>
+            Buyer orders <strong>2 units</strong> of a product: actual weight 1.2kg each,
+            dimensions 30×20×15cm, no shipping class override. Delivery zone resolves to
+            "State", where the rate card is <strong>Base ₹50 + Per Kg ₹40</strong>.
+          </p>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 18, display: "grid", gap: 3 }}>
+            <li>Volumetric weight per unit = (30 × 20 × 15) ÷ 5000 = <strong>1.8kg</strong></li>
+            <li>Billable weight per unit = max(0.2, 1.2 actual, 1.8 volumetric) = <strong>1.8kg</strong></li>
+            <li>Total billable weight = 1.8kg × 2 units = <strong>3.6kg</strong></li>
+            <li>
+              Shipping charge = ₹50 + (3.6 × ₹40) = ₹50 + ₹144 = <strong>₹194</strong>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function RateCardsTab({ canCreate }) {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState([]);
@@ -764,6 +859,8 @@ function RateCardsTab({ canCreate }) {
           </button>
         ) : null}
       </div>
+
+      <RateCardHelp />
 
       {notice ? <p className="alert-info">{notice}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}

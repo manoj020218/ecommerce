@@ -1332,6 +1332,8 @@ export function ProductPage() {
         ) : null}
       </section>
 
+      <ProductReviewsSection productId={product.id} />
+
       {recommendationError ? <StorefrontAlert tone="warning">{recommendationError}</StorefrontAlert> : null}
 
       <ProductCarousel
@@ -1404,8 +1406,6 @@ export function ProductPage() {
           </StorefrontAlert>
         )}
       </section>
-
-      <ProductReviewsSection productId={product.id} />
 
       <StorefrontStickyActionBar className="proto-mobile-product-bar">
         <div>

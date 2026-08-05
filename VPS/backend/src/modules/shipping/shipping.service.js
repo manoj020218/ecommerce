@@ -1224,6 +1224,21 @@ async function trackShipmentByTrackingId(trackingId) {
   };
 }
 
+function sanitizeWeightSlabs(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row) => ({
+      uptoKg: Number(row?.uptoKg || 0),
+      charge: Number(row?.charge || 0)
+    }))
+    .filter((row) => row.uptoKg > 0)
+    .sort((a, b) => a.uptoKg - b.uptoKg);
+}
+
+function normalizeClassRateType(value) {
+  return ["fixed", "weight_slab"].includes(value) ? value : "weight_based";
+}
+
 async function listShippingClasses() {
   const store = await readShippingStore();
   return Array.isArray(store.shippingClasses) ? store.shippingClasses : [];
@@ -1244,10 +1259,12 @@ async function createShippingClass(payload, actor) {
     name: String(payload.name || "").trim(),
     code,
     description: String(payload.description || "").trim(),
-    rateType: payload.rateType === "fixed" ? "fixed" : "weight_based",
+    rateType: normalizeClassRateType(payload.rateType),
     fixedAmount: Number(payload.fixedAmount || 0),
     baseCharge: Number(payload.baseCharge || 0),
     perKgRate: Number(payload.perKgRate || 0),
+    weightSlabs: sanitizeWeightSlabs(payload.weightSlabs),
+    extraPerKgAfterLastSlab: Number(payload.extraPerKgAfterLastSlab || 0),
     isActive: payload.isActive !== false,
     createdAt: new Date().toISOString()
   };
@@ -1275,10 +1292,15 @@ async function updateShippingClass(classId, patch, actor) {
     ...existing,
     name: patch.name !== undefined ? String(patch.name).trim() : existing.name,
     description: patch.description !== undefined ? String(patch.description).trim() : existing.description,
-    rateType: patch.rateType !== undefined ? (patch.rateType === "fixed" ? "fixed" : "weight_based") : existing.rateType,
+    rateType: patch.rateType !== undefined ? normalizeClassRateType(patch.rateType) : existing.rateType,
     fixedAmount: patch.fixedAmount !== undefined ? Number(patch.fixedAmount) : existing.fixedAmount,
     baseCharge: patch.baseCharge !== undefined ? Number(patch.baseCharge) : existing.baseCharge,
     perKgRate: patch.perKgRate !== undefined ? Number(patch.perKgRate) : existing.perKgRate,
+    weightSlabs: patch.weightSlabs !== undefined ? sanitizeWeightSlabs(patch.weightSlabs) : (existing.weightSlabs || []),
+    extraPerKgAfterLastSlab:
+      patch.extraPerKgAfterLastSlab !== undefined
+        ? Number(patch.extraPerKgAfterLastSlab)
+        : (existing.extraPerKgAfterLastSlab || 0),
     isActive: patch.isActive !== undefined ? Boolean(patch.isActive) : existing.isActive
   };
 

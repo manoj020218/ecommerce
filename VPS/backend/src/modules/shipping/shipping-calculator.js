@@ -116,6 +116,39 @@ function resolveBillableWeightKg(lines) {
   return roundMoney(totalWeightKg);
 }
 
+// Indian courier companies don't bill continuous fractional weight — a
+// parcel at 1.1kg is billed the same as one at 2.0kg, because the actual
+// (or volumetric) weight is rounded UP to the next whole kg before the
+// slab rate applies. Math.ceil alone would treat 1.9999999997 (float
+// rounding noise from the volumetric-weight division) as 2kg when it's
+// really 2kg exactly, so the tiny epsilon subtraction guards against that.
+function roundUpToWholeKg(weightKg) {
+  return Math.max(1, Math.ceil(Number(weightKg || 0) - 1e-9));
+}
+
+function calculateWeightSlabCharge(unitWeightKg, shippingClass) {
+  const roundedKg = roundUpToWholeKg(unitWeightKg);
+  const slabs = safeArray(shippingClass.weightSlabs)
+    .map((slab) => ({ uptoKg: Number(slab.uptoKg || 0), charge: Number(slab.charge || 0) }))
+    .filter((slab) => slab.uptoKg > 0)
+    .sort((a, b) => a.uptoKg - b.uptoKg);
+
+  const matchedSlab = slabs.find((slab) => slab.uptoKg >= roundedKg);
+  if (matchedSlab) {
+    return matchedSlab.charge;
+  }
+
+  const lastSlab = slabs[slabs.length - 1];
+  if (!lastSlab) {
+    return 0;
+  }
+
+  // Weight beyond the last defined slab (e.g. slabs only go up to 5kg but
+  // the parcel is 7kg) is billed per additional whole kg past that slab.
+  const extraKg = roundUpToWholeKg(roundedKg - lastSlab.uptoKg);
+  return lastSlab.charge + extraKg * Number(shippingClass.extraPerKgAfterLastSlab || 0);
+}
+
 // A shipping class only overrides the default zone-based rate cards when it
 // actually specifies a rate. A weight_based class left at 0/0 (the "Normal"
 // default every product starts on) explicitly means "use the zone-based rate
@@ -128,6 +161,9 @@ function classOverridesDefault(shippingClass) {
   if (shippingClass.rateType === "fixed") {
     return Number(shippingClass.fixedAmount || 0) > 0;
   }
+  if (shippingClass.rateType === "weight_slab") {
+    return safeArray(shippingClass.weightSlabs).length > 0;
+  }
   return Number(shippingClass.baseCharge || 0) > 0 || Number(shippingClass.perKgRate || 0) > 0;
 }
 
@@ -137,6 +173,11 @@ function calculateLineOverrideCharge(line, shippingClass) {
 
   if (shippingClass.rateType === "fixed") {
     return roundMoney(Number(shippingClass.fixedAmount || 0) * qty);
+  }
+
+  if (shippingClass.rateType === "weight_slab") {
+    const perUnitCharge = calculateWeightSlabCharge(billableUnitWeightKg(line), shippingClass);
+    return roundMoney(perUnitCharge * qty);
   }
 
   const perUnitCharge =

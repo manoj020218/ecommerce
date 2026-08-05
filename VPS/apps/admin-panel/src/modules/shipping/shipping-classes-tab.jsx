@@ -12,6 +12,8 @@ const EMPTY_FORM = {
   fixedAmount: "",
   baseCharge: "",
   perKgRate: "",
+  weightSlabs: [],
+  extraPerKgAfterLastSlab: "",
   isActive: true
 };
 
@@ -68,9 +70,28 @@ export function ShippingClassesTab({ canCreate }) {
       fixedAmount: row.fixedAmount ?? "",
       baseCharge: row.baseCharge ?? "",
       perKgRate: row.perKgRate ?? "",
+      weightSlabs: Array.isArray(row.weightSlabs)
+        ? row.weightSlabs.map((slab) => ({ uptoKg: slab.uptoKg ?? "", charge: slab.charge ?? "" }))
+        : [],
+      extraPerKgAfterLastSlab: row.extraPerKgAfterLastSlab ?? "",
       isActive: row.isActive !== false
     });
     setModal(true);
+  }
+
+  function addSlabRow() {
+    setForm((f) => ({ ...f, weightSlabs: [...f.weightSlabs, { uptoKg: "", charge: "" }] }));
+  }
+
+  function removeSlabRow(index) {
+    setForm((f) => ({ ...f, weightSlabs: f.weightSlabs.filter((_, i) => i !== index) }));
+  }
+
+  function updateSlabRow(index, field, value) {
+    setForm((f) => ({
+      ...f,
+      weightSlabs: f.weightSlabs.map((slab, i) => (i === index ? { ...slab, [field]: value } : slab))
+    }));
   }
 
   function onNameChange(e) {
@@ -95,6 +116,10 @@ export function ShippingClassesTab({ canCreate }) {
         fixedAmount: Number(form.fixedAmount || 0),
         baseCharge: Number(form.baseCharge || 0),
         perKgRate: Number(form.perKgRate || 0),
+        weightSlabs: form.weightSlabs
+          .map((slab) => ({ uptoKg: Number(slab.uptoKg || 0), charge: Number(slab.charge || 0) }))
+          .filter((slab) => slab.uptoKg > 0),
+        extraPerKgAfterLastSlab: Number(form.extraPerKgAfterLastSlab || 0),
         isActive: form.isActive
       };
       if (editing) {
@@ -122,7 +147,7 @@ export function ShippingClassesTab({ canCreate }) {
         <div>
           <h3>Shipping Classes</h3>
           <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>
-            Define how shipping cost is calculated per product — fixed flat rate or weight-based.
+            Define how shipping cost is calculated per product — fixed flat rate, continuous weight-based, or Indian-courier-style per-kg slabs.
           </p>
         </div>
         {canCreate && (
@@ -167,6 +192,8 @@ export function ShippingClassesTab({ canCreate }) {
                 <td style={{ padding: "10px 12px", border: "1px solid #e5e7eb" }}>
                   {row.rateType === "fixed" ? (
                     <span style={{ background: "#eff6ff", color: "#1d4ed8", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>Fixed</span>
+                  ) : row.rateType === "weight_slab" ? (
+                    <span style={{ background: "#fff7ed", color: "#c2410c", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>Per-Kg Slab</span>
                   ) : (
                     <span style={{ background: "#f0fdf4", color: "#15803d", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 600 }}>Weight-Based</span>
                   )}
@@ -174,9 +201,17 @@ export function ShippingClassesTab({ canCreate }) {
                 <td style={{ padding: "10px 12px", border: "1px solid #e5e7eb", fontSize: 12, color: "#374151" }}>
                   {row.rateType === "fixed"
                     ? `Flat ₹${row.fixedAmount}`
-                    : (row.baseCharge || row.perKgRate)
-                      ? `Base ₹${row.baseCharge} + ₹${row.perKgRate}/kg`
-                      : "Uses rate card defaults"}
+                    : row.rateType === "weight_slab"
+                      ? (Array.isArray(row.weightSlabs) && row.weightSlabs.length > 0
+                          ? row.weightSlabs
+                              .slice()
+                              .sort((a, b) => a.uptoKg - b.uptoKg)
+                              .map((slab) => `≤${slab.uptoKg}kg ₹${slab.charge}`)
+                              .join(", ") + (row.extraPerKgAfterLastSlab ? ` (+₹${row.extraPerKgAfterLastSlab}/kg after)` : "")
+                          : "No slabs configured")
+                      : (row.baseCharge || row.perKgRate)
+                        ? `Base ₹${row.baseCharge} + ₹${row.perKgRate}/kg`
+                        : "Uses rate card defaults"}
                 </td>
                 <td style={{ padding: "10px 12px", border: "1px solid #e5e7eb", textAlign: "center" }}>
                   <span style={{ color: row.isActive ? "#16a34a" : "#9ca3af", fontWeight: 600, fontSize: 12 }}>
@@ -218,7 +253,8 @@ export function ShippingClassesTab({ canCreate }) {
             <div>
               <label style={labelStyle}>Rate Type *</label>
               <select style={inp()} value={form.rateType} onChange={(e) => setForm((f) => ({ ...f, rateType: e.target.value }))}>
-                <option value="weight_based">Weight-Based (base charge + per kg rate)</option>
+                <option value="weight_based">Weight-Based (base charge + continuous per kg rate)</option>
+                <option value="weight_slab">Per-Kg Slab (Indian courier style — rounds up to next kg)</option>
                 <option value="fixed">Fixed (flat amount regardless of weight)</option>
               </select>
             </div>
@@ -228,6 +264,66 @@ export function ShippingClassesTab({ canCreate }) {
                 <label style={labelStyle}>Fixed Shipping Amount (₹) *</label>
                 <input type="number" min="0" step="0.01" style={inp()} value={form.fixedAmount} onChange={(e) => setForm((f) => ({ ...f, fixedAmount: e.target.value }))} placeholder="e.g. 500" required />
                 <div style={hintStyle}>Charged as a flat fee regardless of weight or destination zone.</div>
+              </div>
+            ) : form.rateType === "weight_slab" ? (
+              <div>
+                <label style={labelStyle}>Weight Slabs *</label>
+                <div style={hintStyle}>
+                  Courier convention: the parcel's weight is rounded UP to the next whole kg, then
+                  billed at that slab's flat rate — e.g. 1.1kg is billed the same as 2.0kg. Set
+                  "Up to" as the ceiling of each slab.
+                </div>
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  {form.weightSlabs.map((slab, index) => (
+                    <div key={index} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "center" }}>
+                      <div>
+                        <input
+                          type="number" min="0" step="1" style={inp()}
+                          value={slab.uptoKg}
+                          onChange={(e) => updateSlabRow(index, "uptoKg", e.target.value)}
+                          placeholder="Up to (kg), e.g. 1"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="number" min="0" step="0.01" style={inp()}
+                          value={slab.charge}
+                          onChange={(e) => updateSlabRow(index, "charge", e.target.value)}
+                          placeholder="Charge (₹), e.g. 60"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeSlabRow(index)}
+                        style={{ background: "none", border: "1px solid #fca5a5", color: BRAND, borderRadius: 6, padding: "8px 10px", fontSize: 12, cursor: "pointer" }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addSlabRow}
+                  style={{ marginTop: 8, background: "none", border: "1px dashed #d1d5db", color: "#374151", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                >
+                  + Add Slab
+                </button>
+
+                <div style={{ marginTop: 14 }}>
+                  <label style={labelStyle}>Extra ₹ per Kg Beyond Last Slab</label>
+                  <input
+                    type="number" min="0" step="0.01" style={inp()}
+                    value={form.extraPerKgAfterLastSlab}
+                    onChange={(e) => setForm((f) => ({ ...f, extraPerKgAfterLastSlab: e.target.value }))}
+                    placeholder="0"
+                  />
+                  <div style={hintStyle}>
+                    If a parcel's rounded weight exceeds your largest slab (e.g. slabs stop at
+                    5kg but the parcel is 7kg), this is charged per additional whole kg on top of
+                    the last slab's rate.
+                  </div>
+                </div>
               </div>
             ) : (
               <>

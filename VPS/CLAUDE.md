@@ -214,10 +214,11 @@ Dev `.env` overrides to: `UPLOAD_DIR=backend/uploads`, `MIGRATION_IMAGES_DIR=scr
 **Root cause**: `useEffect` in `auth-guard.jsx` had `session` in its dependency array. Calling `setSession({...session, admin})` inside the effect changed `session`, which re-triggered the effect, creating an infinite loop of `adminMe()` calls until the 300/min rate limit hit and caused logout.
 **Fix**: Use `sessionRef.current` inside the effect instead of `session` directly. Changed deps to `[isAuthenticated]` only — effect only re-runs on login/logout, not on session object updates. Also added guard: only call `setSession` if `!currentSession.admin` (prevents double-update).
 
-### sharp module crashes backend
+### sharp module crashes backend (historical — old VPS only, not applicable since the Jul 2026 migration)
 **Symptom**: Backend crashes at startup: "Unsupported CPU: requires v2 microarchitecture"
-**Root cause**: VPS CPU doesn't support AVX2; sharp prebuilt binaries require x86-64-v2.
-**Fix**: Made sharp a graceful optional dependency in `common/image-utils.js`. Image uploads work, but skip WebP conversion (original file served instead).
+**Root cause**: the *old* VPS's CPU didn't support AVX2; sharp prebuilt binaries require x86-64-v2.
+**Fix at the time**: made sharp a graceful optional dependency in `common/image-utils.js`, falling back to serving the original file if sharp fails to load.
+**Current status (verified 2026-08-05 on the new VPS, 103.118.183.243)**: not an issue here — this VPS's CPU (AMD EPYC 7543) supports AVX2, `require("sharp")` loads and works, and an audit of the live catalog found all 1,605 image references across all 387 products already in `.webp` format. The optional-dependency guard in `image-utils.js` is still there (harmless, correct defensive code) but isn't actually being triggered on this box. Don't re-flag this as a live bug without testing `require("sharp")` on the current VPS first — this note describes what was true on the old box, not the current one.
 
 ### certbot UnicodeDecodeError
 **Root cause**: Old apt-installed certbot (Python 3.8) choked on non-UTF-8 bytes in another nginx config (`floodguard-api`).

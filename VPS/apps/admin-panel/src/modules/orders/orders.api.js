@@ -78,6 +78,10 @@ export function verifyManualPayment(submissionId, payload) {
   return apiFetch(`/admin/manual-payments/${submissionId}/verify`, { method: "POST", body: payload });
 }
 
+export function demandManualPayment(orderId) {
+  return apiFetch(`/admin/manual-payments/orders/${orderId}/demand`, { method: "POST", body: {} });
+}
+
 export function sendTrackingEmail(shipmentId, payload) {
   return apiFetch(`/admin/shipping/shipments/${shipmentId}/tracking-email`, { method: "POST", body: payload });
 }

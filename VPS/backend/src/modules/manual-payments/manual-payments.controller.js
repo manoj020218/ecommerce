@@ -78,10 +78,16 @@ const publicRequestWhatsAppReminder = asyncHandler(async (req, res) => {
   return ok(res, data, data.sent ? "Reminder sent." : "Reminder not sent.");
 });
 
+const adminDemandPayment = asyncHandler(async (req, res) => {
+  const data = await service.demandManualPayment(req.params.orderId, req.actor);
+  return ok(res, data, "Payment demand sent.");
+});
+
 module.exports = {
   publicGetManualGatewayInfo,
   publicSubmitManualPayment,
   adminListManualPayments,
   adminVerifyManualPayment,
-  publicRequestWhatsAppReminder
+  publicRequestWhatsAppReminder,
+  adminDemandPayment
 };

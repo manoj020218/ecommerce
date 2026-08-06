@@ -61,6 +61,11 @@ function createAdminManualPaymentsRouter() {
     requireAdminPermission(MANUAL_PAYMENTS_PERMISSIONS.VERIFY),
     controller.adminVerifyManualPayment
   );
+  router.post(
+    "/orders/:orderId/demand",
+    requireAdminPermission(MANUAL_PAYMENTS_PERMISSIONS.VERIFY),
+    controller.adminDemandPayment
+  );
 
   return router;
 }

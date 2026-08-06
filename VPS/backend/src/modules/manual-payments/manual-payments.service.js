@@ -560,10 +560,116 @@ async function requestPaymentScreenshotReminder(orderId) {
   return result;
 }
 
+const DEMAND_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
+
+// Same UPI-intent shape as the front's upi-payment-kit (buildUpiPaymentLink)
+// — kept as its own small inline copy here rather than importing across the
+// frontend/backend boundary, matching how this codebase already duplicates
+// small helpers per-side rather than sharing them.
+function buildUpiPaymentLink({ payeeVpa, payeeName, amount, note }) {
+  if (!payeeVpa) return "";
+  const params = new URLSearchParams({
+    pa: payeeVpa,
+    pn: payeeName || "",
+    am: (Math.round(Number(amount || 0) * 100) / 100).toFixed(2),
+    cu: "INR"
+  });
+  if (note) {
+    params.set("tn", note);
+  }
+  return `upi://pay?${params.toString()}`;
+}
+
+// Admin-triggered "please pay now" push: a WhatsApp message with the exact
+// amount due, a UPI deep link prefilled with that amount (manual_upi orders
+// only — direct_bank_transfer has no VPA to link), and a link back to the
+// buyer's own order page. Deliberately reuses the SAME public checkout
+// follow-up page (/orders/guest/:checkoutSessionId, or the logged-in
+// account order page as a fallback) that already renders UpiPaymentPanel
+// and the "upload payment screenshot" proof form — no new customer-facing
+// page needed for this feature.
+async function demandManualPayment(orderId, actor) {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+
+  const order = findOrderByIdOrNo(authStore, orderId);
+  if (!order) {
+    throw new HttpError(404, "Order not found.");
+  }
+  const method = String(order.paymentMethod || "").toLowerCase();
+  if (!DEMAND_PAYMENT_METHODS.has(method)) {
+    throw new HttpError(409, "This order is not on a manual payment method.");
+  }
+  if (order.manualPaymentStatus === "verified" || order.paymentStatus === "paid") {
+    throw new HttpError(409, "This order is already marked as paid.");
+  }
+
+  const contact = order.billingAddress || order.shippingAddress || {};
+  const mobile = contact.mobile || "";
+  if (!mobile) {
+    throw new HttpError(400, "No mobile number on file for this order's customer.");
+  }
+
+  const paymentStore = await readPaymentStore();
+  ensurePaymentStoreShape(paymentStore); // mutates paymentStore in place; returns a boolean, not the store
+  const gateway = (paymentStore.gateways || []).find(
+    (row) => String(row.code || "").toLowerCase() === method
+  );
+  const instructions = gateway?.instructions || {};
+
+  const actionUrl = order.checkoutSessionId
+    ? `${env.storefrontBaseUrl}/orders/guest/${order.checkoutSessionId}`
+    : `${env.storefrontBaseUrl}/account/orders/${order.id}`;
+
+  const upiLink =
+    method === "manual_upi" && instructions.upiId
+      ? buildUpiPaymentLink({
+          payeeVpa: instructions.upiId,
+          payeeName: instructions.beneficiaryName,
+          amount: order.grandTotal,
+          note: `Order ${order.orderNo || ""}`
+        })
+      : "";
+
+  const customerName = contact.name || contact.companyName || order.companyName || "there";
+  const amountText = `Rs. ${Number(order.grandTotal || 0).toLocaleString("en-IN")}`;
+
+  const messageLines = [
+    `Hi ${customerName},`,
+    `Your order ${order.orderNo || ""} for ${amountText} is pending payment.`
+  ];
+  if (upiLink) {
+    messageLines.push(`Pay now via UPI (opens your UPI app with the amount already filled in): ${upiLink}`);
+  }
+  messageLines.push(`View your order & pay: ${actionUrl}`);
+  messageLines.push(
+    "Once paid, please share a screenshot of the payment on that page (or reply here) so we can confirm and process your order right away."
+  );
+
+  try {
+    await whatsappService.sendMessage(mobile, messageLines.join("\n\n"));
+  } catch (error) {
+    throw new HttpError(502, `Could not send WhatsApp message: ${error.message}`);
+  }
+
+  order.lastPaymentDemandAt = nowIso();
+  await writeAuthStore(authStore);
+  await addActivityLog({
+    action: "manual_payment.demand_sent",
+    resourceType: "order",
+    resourceId: order.id,
+    actorId: actor?.id,
+    actorRole: actor?.role
+  });
+
+  return { sent: true, sentTo: mobile };
+}
+
 module.exports = {
   submitManualPayment,
   listManualPaymentSubmissions,
   verifyManualPaymentSubmission,
   getPublicGatewayInfo,
-  requestPaymentScreenshotReminder
+  requestPaymentScreenshotReminder,
+  demandManualPayment
 };

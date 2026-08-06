@@ -18,6 +18,13 @@ const env = {
   nodeEnv,
   port,
   publicBaseUrl: process.env.PUBLIC_BASE_URL || `http://localhost:${port}`,
+  // publicBaseUrl is api.jenixindia.com in production (correct for backend
+  // asset URLs like /static/uploads/...), but customer-facing SPA routes
+  // (/recover/:token, /orders/guest/:id, etc.) live on the storefront
+  // domain, not the API subdomain — api.jenixindia.com/orders/guest/... is
+  // a 404, confirmed live. Links built for a customer to click must use
+  // this instead.
+  storefrontBaseUrl: process.env.STOREFRONT_BASE_URL || `http://localhost:${port}`,
   jwtAccessSecret: process.env.JWT_ACCESS_SECRET || DEV_JWT_ACCESS_SECRET,
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || DEV_JWT_REFRESH_SECRET,
   jwtAccessTtl: process.env.JWT_ACCESS_TTL || "15m",

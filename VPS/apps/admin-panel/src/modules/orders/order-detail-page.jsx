@@ -21,7 +21,8 @@ import {
   uploadShipmentPod,
   sendTrackingEmail,
   fetchManualPaymentsForOrder,
-  verifyManualPayment
+  verifyManualPayment,
+  demandManualPayment
 } from "./orders.api";
 import { searchWalkInProducts } from "../walkin-orders/walkin-orders.api";
 import { fetchSettings } from "../settings/settings.api";
@@ -309,7 +310,10 @@ function StatusChip({ label, value }) {
 
 const MANUAL_PAYMENT_METHODS_UI = new Set(["direct_bank_transfer", "manual_upi"]);
 
-function PaymentActionBanner({ order, onConfirmPayment, paymentSaving }) {
+function PaymentActionBanner({
+  order, onConfirmPayment, paymentSaving,
+  onDemandPayment, demandSaving, demandNotice
+}) {
   const isManual = MANUAL_PAYMENT_METHODS_UI.has(order.paymentMethod);
   const paymentVerified = order.manualPaymentStatus === "verified";
 
@@ -334,17 +338,31 @@ function PaymentActionBanner({ order, onConfirmPayment, paymentSaving }) {
       <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>
         Verify that the bank transfer / UPI payment has been received in your account before processing this order.
       </p>
-      <button
-        type="button" className="btn btn-primary btn-small"
-        disabled={paymentSaving}
-        onClick={onConfirmPayment}
-        style={{ background: "#d97706" }}
-      >
-        {paymentSaving ? "Confirming…" : "Confirm Payment Received"}
-      </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button" className="btn btn-primary btn-small"
+          disabled={paymentSaving}
+          onClick={onConfirmPayment}
+          style={{ background: "#d97706" }}
+        >
+          {paymentSaving ? "Confirming…" : "Confirm Payment Received"}
+        </button>
+        <button
+          type="button" className="btn btn-secondary btn-small"
+          disabled={demandSaving}
+          onClick={onDemandPayment}
+        >
+          {demandSaving ? "Sending…" : "Demand for Payment"}
+        </button>
+      </div>
+      {demandNotice ? (
+        <p style={{ margin: "8px 0 0", fontSize: 12, color: "#16a34a", fontWeight: 600 }}>{demandNotice}</p>
+      ) : null}
       <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--muted)" }}>
-        No payment proof was submitted in-app for this order — use this only if you've verified
-        the transfer another way (e.g. bank statement, WhatsApp screenshot).
+        "Demand for Payment" sends the customer a WhatsApp message with the amount due, a
+        prefilled UPI pay link, and their order page to upload a payment screenshot. "Confirm
+        Payment Received" is a manual override — use it only if you've verified the transfer
+        another way (e.g. bank statement) without an in-app screenshot.
       </p>
     </div>
   );
@@ -1178,6 +1196,8 @@ export function OrderDetailPage() {
   const [noteSaving, setNoteSaving] = useState(false);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [paymentConfirmSaving, setPaymentConfirmSaving] = useState(false);
+  const [paymentDemandSaving, setPaymentDemandSaving] = useState(false);
+  const [paymentDemandNotice, setPaymentDemandNotice] = useState("");
 
   const [manualPayments, setManualPayments] = useState([]);
   const [manualPaymentBusyKey, setManualPaymentBusyKey] = useState("");
@@ -1297,6 +1317,20 @@ export function OrderDetailPage() {
       setError(e.message || "Failed to confirm payment.");
     } finally {
       setPaymentConfirmSaving(false);
+    }
+  };
+
+  const handleDemandPayment = async () => {
+    setPaymentDemandSaving(true);
+    setPaymentDemandNotice("");
+    setError("");
+    try {
+      const result = await demandManualPayment(orderId);
+      setPaymentDemandNotice(`Payment demand sent via WhatsApp to ${result.sentTo || "the customer"}.`);
+    } catch (e) {
+      setError(e.message || "Failed to send payment demand.");
+    } finally {
+      setPaymentDemandSaving(false);
     }
   };
 
@@ -1581,6 +1615,9 @@ export function OrderDetailPage() {
           order={order}
           onConfirmPayment={handleConfirmPayment}
           paymentSaving={paymentConfirmSaving}
+          onDemandPayment={handleDemandPayment}
+          demandSaving={paymentDemandSaving}
+          demandNotice={paymentDemandNotice}
         />
       )}
 

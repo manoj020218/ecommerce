@@ -67,8 +67,12 @@ function addMinutes(isoString, minutes) {
   return new Date(baseTimestamp + Number(minutes || 0) * 60 * 1000).toISOString();
 }
 
+// /recover/:token is a storefront SPA route, not a backend API route —
+// env.publicBaseUrl is api.jenixindia.com in production (correct for
+// backend asset URLs), which 404s for this. Confirmed live while building
+// the "Demand for Payment" feature, which hit the identical bug.
 function buildRecoveryUrl(token) {
-  return `${env.publicBaseUrl}/recover/${token}`;
+  return `${env.storefrontBaseUrl}/recover/${token}`;
 }
 
 function resolveCustomerProfile(authStore, owner) {

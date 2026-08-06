@@ -75,7 +75,7 @@ function safeAddrStr(v) {
   return String(v);
 }
 
-function generateShippingLabelHtml(order, storeProfile, trackingInfo) {
+function resolveLabelAddressData(order, storeProfile) {
   const storeName = storeProfile?.storeName || "Jenix India";
   const fromAddress = safeAddrStr(storeProfile?.pickupAddress || storeProfile?.address);
   const fromPhone = storeProfile?.supportMobile || storeProfile?.whatsappNumber || "";
@@ -88,6 +88,14 @@ function generateShippingLabelHtml(order, storeProfile, trackingInfo) {
   const toLine2 = toAddr.addressLine2 || "";
   const toCityState = [toAddr.city, toAddr.state].filter(Boolean).join(", ");
   const toPincode = toAddr.pincode || "";
+
+  return { storeName, fromAddress, fromPhone, toName, toCompany, toPhone, toLine1, toLine2, toCityState, toPincode };
+}
+
+function generateShippingLabelHtml(order, storeProfile, trackingInfo) {
+  const {
+    storeName, fromAddress, fromPhone, toName, toCompany, toPhone, toLine1, toLine2, toCityState, toPincode
+  } = resolveLabelAddressData(order, storeProfile);
 
   const trackingRows = trackingInfo?.trackingId ? `
     <div class="meta-row"><span>AWB</span><strong>${trackingInfo.trackingId}</strong></div>
@@ -156,6 +164,81 @@ function printShippingLabel(order, storeProfile, trackingInfo) {
   const win = window.open("", "_blank", "width=580,height=760");
   if (!win) {
     alert("Pop-up blocked. Please allow pop-ups for this site to print the shipping label.");
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ── Invoice + shipping label combined print (packing-stage flow) ─────────────
+// Packing flow: invoice is generated while the order is still "processing"
+// (before any courier is chosen), so trackingInfo is normally {} here — the
+// label prints with just the delivery address, no AWB/courier yet. Staff
+// pack the box with this printout, THEN pick a courier and enter tracking
+// details when they press "Mark as Packed". Classes are "sl-" prefixed and
+// scoped to a CSS named page (`page: sl-label-page`) instead of reusing the
+// standalone label's class names, so this never collides with the invoice
+// template's own <style> block, whatever it happens to use.
+function buildShippingLabelBlockHtml(order, storeProfile, trackingInfo) {
+  const {
+    storeName, fromAddress, fromPhone, toName, toCompany, toPhone, toLine1, toLine2, toCityState, toPincode
+  } = resolveLabelAddressData(order, storeProfile);
+
+  const trackingRows = trackingInfo?.trackingId ? `
+    <div class="sl-meta-row"><span>AWB</span><strong>${trackingInfo.trackingId}</strong></div>
+    <div class="sl-meta-row"><span>Courier</span><strong>${trackingInfo.courierName || "—"}</strong></div>` : "";
+
+  const style = `<style>
+    @page sl-label-page { size: A6; margin: 5mm; }
+    .sl-page { page: sl-label-page; page-break-before: always; font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; padding: 5mm; }
+    .sl-to-tag { font-size: 10pt; font-weight: 700; letter-spacing: 1pt; text-transform: uppercase; margin-bottom: 3mm; }
+    .sl-to-name { font-size: 20pt; font-weight: 800; line-height: 1.25; margin-bottom: 2mm; }
+    .sl-to-company { font-size: 11pt; font-weight: 600; color: #333; margin-bottom: 2mm; }
+    .sl-to-addr-line { font-size: 15pt; font-weight: 600; line-height: 1.45; }
+    .sl-to-pincode-row { font-size: 22pt; font-weight: 800; letter-spacing: 0.5pt; margin-top: 2.5mm; }
+    .sl-to-phone { font-size: 14pt; font-weight: 700; margin-top: 3.5mm; }
+    .sl-meta { border-top: 1.5px solid #000; padding-top: 3mm; margin-top: 5mm; }
+    .sl-order-id-row { font-size: 11pt; font-weight: 700; margin-bottom: 2mm; }
+    .sl-meta-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 9pt; color: #555; margin-bottom: 1.5mm; }
+    .sl-meta-row strong { font-size: 9.5pt; color: #000; }
+    .sl-from-row { font-size: 7pt; color: #444; line-height: 1.4; padding-top: 2.5mm; border-top: 1px solid #000; margin-top: 5mm; }
+    .sl-from-row .sl-from-tag { font-weight: 700; color: #000; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; margin-right: 2mm; }
+    @media print { .sl-page { -webkit-print-color-adjust: exact; } }
+  </style>`;
+
+  const body = `<div class="sl-page">
+    <div class="sl-to-tag">Deliver To</div>
+    <div class="sl-to-name">${toName}</div>
+    ${toCompany ? `<div class="sl-to-company">${toCompany}</div>` : ""}
+    ${toLine1 ? `<div class="sl-to-addr-line">${toLine1}</div>` : ""}
+    ${toLine2 ? `<div class="sl-to-addr-line">${toLine2}</div>` : ""}
+    ${toCityState ? `<div class="sl-to-addr-line">${toCityState}</div>` : ""}
+    ${toPincode ? `<div class="sl-to-pincode-row">PIN ${toPincode}</div>` : ""}
+    ${toPhone ? `<div class="sl-to-phone">Ph: ${toPhone}</div>` : ""}
+    <div class="sl-meta">
+      <div class="sl-order-id-row">Order: ${order.orderNo || order.id}</div>
+      ${trackingRows}
+    </div>
+    <div class="sl-from-row"><span class="sl-from-tag">From</span>${storeName} — ${fromAddress}${fromPhone ? ` — ${fromPhone}` : ""}</div>
+  </div>`;
+
+  return { style, body };
+}
+
+function printInvoiceWithShippingLabel(invoiceHtml, order, storeProfile, trackingInfo) {
+  const { style, body } = buildShippingLabelBlockHtml(order, storeProfile, trackingInfo || {});
+  const printScript = `<script>window.onload = function() { window.print(); };</script>`;
+
+  let html = invoiceHtml.includes("</head>")
+    ? invoiceHtml.replace("</head>", `${style}</head>`)
+    : `${style}${invoiceHtml}`;
+  html = html.includes("</body>")
+    ? html.replace("</body>", `${body}${printScript}</body>`)
+    : `${html}${body}${printScript}`;
+
+  const win = window.open("", "_blank", "width=900,height=1000");
+  if (!win) {
+    alert("Pop-up blocked. Please allow pop-ups for this site to print the invoice and shipping label.");
     return;
   }
   win.document.write(html);
@@ -920,9 +1003,10 @@ function EditBuyerDetailsModal({ invoice, onClose, onSave, saving, error }) {
   );
 }
 
-function InvoiceSection({ invoice, onInvoiceUpdated }) {
+function InvoiceSection({ invoice, onInvoiceUpdated, order, storeProfile }) {
   const [err, setErr] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [printingLabelSet, setPrintingLabelSet] = useState(false);
   const [editModal, setEditModal] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
@@ -963,6 +1047,21 @@ function InvoiceSection({ invoice, onInvoiceUpdated }) {
     }
   };
 
+  const printWithLabel = async () => {
+    if (!invoice?.id) return;
+    setPrintingLabelSet(true);
+    setErr("");
+    try {
+      const data = await fetchInvoiceDownloadData(invoice.id);
+      const content = data?.content || "";
+      printInvoiceWithShippingLabel(content, order, storeProfile, order?.trackingDetails || {});
+    } catch (e) {
+      setErr(e.message || "Failed to prepare invoice + label.");
+    } finally {
+      setPrintingLabelSet(false);
+    }
+  };
+
   if (invoice) {
     return (
       <div style={{ background: "rgba(22,163,74,0.04)", border: "1px solid rgba(22,163,74,0.25)", borderRadius: 8, padding: "12px 14px" }}>
@@ -978,8 +1077,16 @@ function InvoiceSection({ invoice, onInvoiceUpdated }) {
             <button type="button" className="btn btn-secondary btn-small" disabled={downloading} onClick={download}>
               {downloading ? "Preparing…" : "Download PDF"}
             </button>
+            <button type="button" className="btn btn-secondary btn-small" disabled={printingLabelSet} onClick={printWithLabel}>
+              {printingLabelSet ? "Preparing…" : "Print Invoice + Shipping Label"}
+            </button>
           </div>
         </div>
+        <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--muted)" }}>
+          Prints as a 2-page job — invoice, then the shipping label (address only, no courier
+          yet) — so the order can be packed and labelled before you enter courier details on
+          "Mark as Packed".
+        </p>
         {err && <p style={{ color: "var(--danger)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
         {editModal && (
           <EditBuyerDetailsModal
@@ -1615,7 +1722,7 @@ export function OrderDetailPage() {
       {/* Invoice section */}
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
         <h4 style={{ margin: "0 0 12px", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Invoice</h4>
-        <InvoiceSection invoice={invoice} onInvoiceUpdated={setInvoice} />
+        <InvoiceSection invoice={invoice} onInvoiceUpdated={setInvoice} order={order} storeProfile={storeProfile} />
       </div>
 
       {/* Tracking info */}

@@ -126,8 +126,8 @@ function roundUpToWholeKg(weightKg) {
   return Math.max(1, Math.ceil(Number(weightKg || 0) - 1e-9));
 }
 
-function calculateWeightSlabCharge(unitWeightKg, shippingClass) {
-  const roundedKg = roundUpToWholeKg(unitWeightKg);
+function calculateWeightSlabCharge(weightKg, shippingClass) {
+  const roundedKg = roundUpToWholeKg(weightKg);
   const slabs = safeArray(shippingClass.weightSlabs)
     .map((slab) => ({ uptoKg: Number(slab.uptoKg || 0), charge: Number(slab.charge || 0) }))
     .filter((slab) => slab.uptoKg > 0)
@@ -167,17 +167,16 @@ function classOverridesDefault(shippingClass) {
   return Number(shippingClass.baseCharge || 0) > 0 || Number(shippingClass.perKgRate || 0) > 0;
 }
 
+// fixed/weight_based only — weight_slab is deliberately excluded and
+// handled per shipping-class GROUP instead (see calculateOverrideCharges),
+// since slab weight must be combined across every line on that class
+// before rounding, not rounded per line and then multiplied by qty.
 function calculateLineOverrideCharge(line, shippingClass) {
   const qty = Number(line.qty || 0);
   if (qty <= 0) return 0;
 
   if (shippingClass.rateType === "fixed") {
     return roundMoney(Number(shippingClass.fixedAmount || 0) * qty);
-  }
-
-  if (shippingClass.rateType === "weight_slab") {
-    const perUnitCharge = calculateWeightSlabCharge(billableUnitWeightKg(line), shippingClass);
-    return roundMoney(perUnitCharge * qty);
   }
 
   const perUnitCharge =
@@ -200,6 +199,40 @@ function partitionLinesByShippingClass(lines, shippingClasses) {
   }
 
   return { defaultLines, overrideLines };
+}
+
+// Slab-rate lines are grouped by shipping class code — e.g. two different
+// products both on the "Small Parts" class in the same cart get their
+// weights combined into one parcel before the slab lookup, matching how a
+// courier would actually box and weigh them together, rather than billing
+// each product (or each unit) as its own separately-rounded parcel. A cart
+// with two different overriding classes gets each class's total computed
+// separately and then summed — a genuinely mixed shipment.
+function calculateOverrideCharges(overrideLines) {
+  const groups = new Map();
+
+  for (const { line, shippingClass } of overrideLines) {
+    const code = shippingClass.code;
+    if (!groups.has(code)) {
+      groups.set(code, { shippingClass, lines: [] });
+    }
+    groups.get(code).lines.push(line);
+  }
+
+  let total = 0;
+  for (const { shippingClass, lines } of groups.values()) {
+    if (shippingClass.rateType === "weight_slab") {
+      const totalWeightKg = lines.reduce((sum, line) => {
+        const qty = Number(line.qty || 0);
+        return qty > 0 ? sum + billableUnitWeightKg(line) * qty : sum;
+      }, 0);
+      total += calculateWeightSlabCharge(totalWeightKg, shippingClass);
+    } else {
+      total += lines.reduce((sum, line) => sum + calculateLineOverrideCharge(line, shippingClass), 0);
+    }
+  }
+
+  return roundMoney(total);
 }
 
 function findRateCard(rateCards, shippingMethod, zone) {
@@ -270,9 +303,7 @@ function calculateShippingQuote({ lines, shippingMethod, destination, shippingSt
     shippingStore?.shippingClasses
   );
 
-  const shippingClassCharge = roundMoney(
-    overrideLines.reduce((sum, { line, shippingClass }) => sum + calculateLineOverrideCharge(line, shippingClass), 0)
-  );
+  const shippingClassCharge = calculateOverrideCharges(overrideLines);
 
   const zone = resolveDestinationZone(destination || {}, settings);
   const remoteExtraMap = settings.remoteExtraChargeByMethod || {};

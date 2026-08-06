@@ -22,6 +22,17 @@ const {
 function createApp() {
   const app = express();
 
+  // Express auto-generates an ETag for every res.json() response by
+  // default. Confirmed live: this made GET /api/admin/dashboard return 304
+  // on repeat requests once the browser cached an ETag — and since
+  // apiFetch's success check is `response.ok` (true only for HTTP
+  // 200-299), a 304 is treated as a failed request and silently swallowed
+  // by the admin panel's `.catch(() => {})` handlers, showing stale/zeroed
+  // data even though the underlying (dynamic, constantly-changing) data
+  // was actually fine. None of this API is cacheable content — disable
+  // ETag generation entirely rather than special-case every caller.
+  app.set("etag", false);
+
   const allowedOrigins = env.corsOrigin
     .split(",")
     .map((o) => o.trim())
@@ -122,6 +133,13 @@ function createApp() {
   app.use("/api/auth/customer/otp", otpLimiter);
   app.use("/api/checkout", loginLimiter);
   app.use("/api", apiLimiter);
+  // Belt-and-suspenders alongside app.set("etag", false) above: explicit
+  // no-store means a browser/proxy has no basis for heuristic caching
+  // either, even without an ETag or Last-Modified header to key off.
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
   app.use("/api", apiRouter);
   app.use(notFoundHandler);
   app.use(errorHandler);

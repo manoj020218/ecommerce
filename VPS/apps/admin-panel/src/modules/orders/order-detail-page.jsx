@@ -312,7 +312,7 @@ const MANUAL_PAYMENT_METHODS_UI = new Set(["direct_bank_transfer", "manual_upi"]
 
 function PaymentActionBanner({
   order, onConfirmPayment, paymentSaving,
-  onDemandPayment, demandSaving, demandNotice
+  onDemandPayment, demandSaving, demandNotice, demandError
 }) {
   const isManual = MANUAL_PAYMENT_METHODS_UI.has(order.paymentMethod);
   const paymentVerified = order.manualPaymentStatus === "verified";
@@ -357,6 +357,9 @@ function PaymentActionBanner({
       </div>
       {demandNotice ? (
         <p style={{ margin: "8px 0 0", fontSize: 12, color: "#16a34a", fontWeight: 600 }}>{demandNotice}</p>
+      ) : null}
+      {demandError ? (
+        <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>{demandError}</p>
       ) : null}
       <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--muted)" }}>
         "Demand for Payment" sends the customer a WhatsApp message with the amount due, a
@@ -1198,6 +1201,7 @@ export function OrderDetailPage() {
   const [paymentConfirmSaving, setPaymentConfirmSaving] = useState(false);
   const [paymentDemandSaving, setPaymentDemandSaving] = useState(false);
   const [paymentDemandNotice, setPaymentDemandNotice] = useState("");
+  const [paymentDemandError, setPaymentDemandError] = useState("");
 
   const [manualPayments, setManualPayments] = useState([]);
   const [manualPaymentBusyKey, setManualPaymentBusyKey] = useState("");
@@ -1323,12 +1327,12 @@ export function OrderDetailPage() {
   const handleDemandPayment = async () => {
     setPaymentDemandSaving(true);
     setPaymentDemandNotice("");
-    setError("");
+    setPaymentDemandError("");
     try {
       const result = await demandManualPayment(orderId);
       setPaymentDemandNotice(`Payment demand sent via WhatsApp to ${result.sentTo || "the customer"}.`);
     } catch (e) {
-      setError(e.message || "Failed to send payment demand.");
+      setPaymentDemandError(e.message || "Failed to send payment demand.");
     } finally {
       setPaymentDemandSaving(false);
     }
@@ -1618,6 +1622,7 @@ export function OrderDetailPage() {
           onDemandPayment={handleDemandPayment}
           demandSaving={paymentDemandSaving}
           demandNotice={paymentDemandNotice}
+          demandError={paymentDemandError}
         />
       )}
 

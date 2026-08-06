@@ -225,13 +225,24 @@ function buildShippingLabelBlockHtml(order, storeProfile, trackingInfo) {
   return { style, body };
 }
 
+// The invoice template itself never set an explicit @page size/margin, so
+// it fell back to the browser's default print margin (~0.5in per side on
+// A4). That leaves under 720px of content width — which trips the
+// invoice's OWN `@media (max-width:720px)` mobile fallback (it collapses
+// the 2-column Bill-To/Ship-To grid to 1 column and stacks the masthead),
+// making the invoice taller and spilling onto a wasted extra page. A tight
+// explicit A4 margin keeps content width safely above that 720px
+// breakpoint so the invoice renders exactly as designed, on one page.
+const INVOICE_PAGE_STYLE = `<style>@page { size: A4; margin: 10mm 6mm; }</style>`;
+
 function printInvoiceWithShippingLabel(invoiceHtml, order, storeProfile, trackingInfo) {
   const { style, body } = buildShippingLabelBlockHtml(order, storeProfile, trackingInfo || {});
   const printScript = `<script>window.onload = function() { window.print(); };</script>`;
+  const headStyles = `${INVOICE_PAGE_STYLE}${style}`;
 
   let html = invoiceHtml.includes("</head>")
-    ? invoiceHtml.replace("</head>", `${style}</head>`)
-    : `${style}${invoiceHtml}`;
+    ? invoiceHtml.replace("</head>", `${headStyles}</head>`)
+    : `${headStyles}${invoiceHtml}`;
   html = html.includes("</body>")
     ? html.replace("</body>", `${body}${printScript}</body>`)
     : `${html}${body}${printScript}`;

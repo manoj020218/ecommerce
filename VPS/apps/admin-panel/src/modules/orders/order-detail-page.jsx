@@ -25,6 +25,21 @@ import {
 } from "./orders.api";
 import { searchWalkInProducts } from "../walkin-orders/walkin-orders.api";
 import { fetchSettings } from "../settings/settings.api";
+import { fetchProduct } from "../products/products.api";
+import { API_BASE_URL } from "../../shared/api/http-client";
+
+// Same image-path resolution as products-page.jsx / edit-product-page.jsx —
+// order items only snapshot title/sku/price at purchase time, not the image,
+// so the current product image is looked up separately by productId.
+const BACKEND_BASE = API_BASE_URL.replace(/\/api$/, "");
+function resolveOrderItemImageUrl(image) {
+  if (!image) return null;
+  const src = typeof image === "string" ? image : (image.thumbnail || image.url || "");
+  if (!src) return null;
+  if (src.startsWith("http")) return src;
+  if (src.startsWith("/static")) return `${BACKEND_BASE}${src}`;
+  return `${BACKEND_BASE}/static/migration/${src}`;
+}
 
 // Mirrors MANUAL_PAYMENT_METHODS in backend/src/modules/orders/orders.service.js —
 // only these payment methods are safe to edit items on pre-payment (no risk of
@@ -995,10 +1010,12 @@ export function OrderDetailPage() {
   const navigate = useNavigate();
   const { session } = useAuthSession();
   const canView = hasPermission(session, "orders.view");
+  const canViewProducts = hasPermission(session, "products.view");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [order, setOrder] = useState(null);
+  const [productLookup, setProductLookup] = useState({});
   const [invoice, setInvoice] = useState(null);
   const [couriers, setCouriers] = useState([]);
   const [storeProfile, setStoreProfile] = useState({});
@@ -1074,6 +1091,29 @@ export function OrderDetailPage() {
     };
     init();
   }, [orderId]);
+
+  // Order items only snapshot title/sku/price at purchase time, so the
+  // current product (for its image + a live View/Edit link) is fetched
+  // separately, once per unique productId on the order.
+  useEffect(() => {
+    if (!canViewProducts) return;
+    const productIds = [...new Set((order?.items || []).map((item) => item.productId).filter(Boolean))];
+    const missingIds = productIds.filter((id) => !(id in productLookup));
+    if (missingIds.length === 0) return;
+
+    let cancelled = false;
+    Promise.allSettled(missingIds.map((id) => fetchProduct(id))).then((results) => {
+      if (cancelled) return;
+      setProductLookup((prev) => {
+        const next = { ...prev };
+        results.forEach((result, i) => {
+          next[missingIds[i]] = result.status === "fulfilled" ? result.value : null;
+        });
+        return next;
+      });
+    });
+    return () => { cancelled = true; };
+  }, [order, canViewProducts]);
 
   const handleUpdateOrder = async (patch) => {
     const updated = await updateOrder(orderId, patch);
@@ -1481,12 +1521,45 @@ export function OrderDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {(order.items || []).map((item, i) => (
+              {(order.items || []).map((item, i) => {
+                const lookedUpProduct = productLookup[item.productId];
+                const imageUrl = resolveOrderItemImageUrl(lookedUpProduct?.images?.[0]);
+                return (
                 <tr key={i} style={{ borderBottom: i < order.items.length - 1 ? "1px solid var(--border)" : "none" }}>
                   <td style={{ padding: "12px 14px" }}>
-                    <div style={{ fontWeight: 600 }}>{item.title}</div>
-                    {item.sku && <div style={{ fontSize: 11, color: "var(--muted)" }}>SKU: {item.sku}</div>}
-                    {item.hsnCode && <div style={{ fontSize: 11, color: "var(--muted)" }}>HSN: {item.hsnCode}</div>}
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl} alt=""
+                          style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 6, border: "1px solid var(--border)", flexShrink: 0 }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: 44, height: 44, borderRadius: 6, background: "#f3f4f6",
+                          border: "1px solid var(--border)", display: "flex", alignItems: "center",
+                          justifyContent: "center", flexShrink: 0, color: "#d1d5db", fontSize: 16
+                        }}>&#128247;</div>
+                      )}
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{item.title}</div>
+                        {item.sku && <div style={{ fontSize: 11, color: "var(--muted)" }}>SKU: {item.sku}</div>}
+                        {item.hsnCode && <div style={{ fontSize: 11, color: "var(--muted)" }}>HSN: {item.hsnCode}</div>}
+                        {canViewProducts && item.productId && (
+                          lookedUpProduct === null ? (
+                            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>Product no longer available</div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-link"
+                              style={{ fontSize: 11, marginTop: 3, padding: 0 }}
+                              onClick={() => navigate(`/products/${item.productId}/edit`)}
+                            >
+                              View / Edit Product
+                            </button>
+                          )
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td style={{ padding: "12px 14px", textAlign: "right", whiteSpace: "nowrap" }}>
                     {formatCurrencyInr(item.unitPriceUsed)}
@@ -1499,7 +1572,8 @@ export function OrderDetailPage() {
                     {formatCurrencyInr(item.lineTotal)}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

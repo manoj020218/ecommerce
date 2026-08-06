@@ -9,9 +9,20 @@ import { formatCurrencyInr, formatDateTime } from "../../shared/utils/formatters
 import { hasPermission } from "../../shared/utils/permissions";
 import { useAuthSession } from "../auth/use-auth-session";
 
+// Customer mobile numbers are stored as plain 10-digit Indian numbers (no
+// country code — checkout never asks for one), so a bare wa.me/<10 digits>
+// link fails with WhatsApp's "country code is not fixed" error. Prepends 91
+// for a bare 10-digit number and strips a leading trunk "0" if present;
+// leaves anything that already carries a country code untouched.
 function WaBtn({ phone, message, label = "WhatsApp" }) {
-  const digits = String(phone || "").replace(/[^\d]/g, "");
+  let digits = String(phone || "").replace(/[^\d]/g, "");
   if (!digits) return null;
+  if (digits.length === 11 && digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+  if (digits.length === 10) {
+    digits = `91${digits}`;
+  }
   const href = `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
   return (
     <a href={href} target="_blank" rel="noreferrer"

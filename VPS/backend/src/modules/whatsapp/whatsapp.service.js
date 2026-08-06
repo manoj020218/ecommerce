@@ -20,10 +20,22 @@ const state = {
   starting: false
 };
 
+// Customer mobile numbers are stored as plain 10-digit Indian numbers with
+// no country code (checkout never asks for one) — the previous version only
+// stripped a leading trunk "0" and left a bare 10-digit number as-is, which
+// WhatsApp rejects (missing country code), silently failing every send to a
+// number entered in the normal 10-digit form. This handles both that common
+// case and the leading-0 edge case; a number that already carries a country
+// code (12+ digits) passes through unchanged.
 function toJid(phone) {
-  const clean = String(phone || "").replace(/[^0-9]/g, "");
-  const normalized = clean.startsWith("0") ? "91" + clean.slice(1) : clean;
-  return `${normalized}@s.whatsapp.net`;
+  let clean = String(phone || "").replace(/[^0-9]/g, "");
+  if (clean.length === 11 && clean.startsWith("0")) {
+    clean = clean.slice(1);
+  }
+  if (clean.length === 10) {
+    clean = `91${clean}`;
+  }
+  return `${clean}@s.whatsapp.net`;
 }
 
 function publicStatus() {

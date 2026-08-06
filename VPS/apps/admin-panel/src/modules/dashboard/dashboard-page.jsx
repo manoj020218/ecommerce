@@ -313,8 +313,14 @@ export function DashboardPage() {
   const isMobile = width < 768;
 
   useEffect(() => {
+    // fetchDashboardStats() already goes through apiFetch, which unwraps
+    // the {ok, data} envelope itself and resolves directly to the stats
+    // object — `.then((res) => setStats(res.data))` was reading .data a
+    // second time off an object that no longer had one, so setStats(undefined)
+    // fired on every load and every card silently fell back to its zero/empty
+    // state, no matter what the backend actually returned.
     fetchDashboardStats()
-      .then((res) => setStats(res.data))
+      .then((res) => setStats(res))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

@@ -272,10 +272,10 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancel
             <div style={{ background:"#f9fafb", borderRadius:12, padding:"14px 16px" }}>
               <p style={{ margin:"0 0 10px", fontSize:11, fontWeight:700, color:"#9ca3af", textTransform:"uppercase", letterSpacing:"0.06em" }}>Summary</p>
               {[
-                ["Product Total",  formatCurrencyInr(o.subtotal || o.productTotal)],
-                ["GST",            formatCurrencyInr(o.taxAmount || o.gstAmount)],
-                o.discountAmount > 0 && ["Discount", `− ${formatCurrencyInr(o.discountAmount)}`],
-                ["Shipping",       o.shippingAmount > 0 ? formatCurrencyInr(o.shippingAmount) : "FREE"],
+                ["Product Total",  formatCurrencyInr(o.pricing?.productSubtotal)],
+                ["GST",            formatCurrencyInr(o.pricing?.gstTotal)],
+                o.pricing?.discountAmount > 0 && ["Discount", `− ${formatCurrencyInr(o.pricing.discountAmount)}`],
+                ["Shipping",       o.pricing?.shippingCharge > 0 ? formatCurrencyInr(o.pricing.shippingCharge) : "FREE"],
               ].filter(Boolean).map(([label, value]) => (
                 <div key={label} style={{ display:"flex", justifyContent:"space-between", marginBottom:6, fontSize:13 }}>
                   <span style={{ color:"#6b7280" }}>{label}</span>

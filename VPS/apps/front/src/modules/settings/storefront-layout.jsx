@@ -13,6 +13,7 @@ import {
   buildCartContext
 } from "../cart/cart.utils";
 import { usePublicSettings } from "./public-settings-context";
+import { useInstallPrompt } from "../../shared/hooks/use-install-prompt";
 
 const SOCIAL_LABELS = {
   facebook: "Facebook",
@@ -259,6 +260,21 @@ function BookIcon() {
   );
 }
 
+function InstallIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -290,6 +306,7 @@ export function StorefrontLayout() {
   const location = useLocation();
   const { customer, isAuthenticated } = useCustomerSession();
   const { settings } = usePublicSettings();
+  const { canInstall, promptInstall } = useInstallPrompt();
   const [categories, setCategories] = useState([]);
   const [cartCount, setCartCount] = useState(0);
   const [searchText, setSearchText] = useState("");
@@ -502,6 +519,17 @@ export function StorefrontLayout() {
           </form>
 
           <div className="proto-header-actions">
+            {canInstall ? (
+              <button
+                type="button"
+                className="proto-icon-action proto-install-action"
+                onClick={promptInstall}
+                aria-label="Install app"
+              >
+                <InstallIcon />
+                <span className="proto-install-action-label">Install</span>
+              </button>
+            ) : null}
             <Link
               to={accountHref}
               className={`proto-icon-action${isAccountRoute ? " active" : ""}`}

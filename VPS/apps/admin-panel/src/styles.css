@@ -226,6 +226,12 @@ a {
   font-size: 12px;
 }
 
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .topbar-user span {
   border: 1px solid #fecaca;
   background: #fff1f2;

@@ -4,6 +4,7 @@ import { ADMIN_NAV_ITEMS } from "../constants/navigation";
 import { adminLogout } from "../../modules/auth/auth.api";
 import { useAuthSession } from "../../modules/auth/use-auth-session";
 import { hasPermission } from "../../shared/utils/permissions";
+import { useInstallPrompt } from "../../shared/hooks/use-install-prompt";
 
 function titleFromPath(pathname) {
   if (pathname.startsWith("/dashboard"))       return "Dashboard";
@@ -43,6 +44,7 @@ export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { session, clearSession } = useAuthSession();
+  const { canInstall, promptInstall } = useInstallPrompt();
 
   const visibleGroups = useMemo(() => {
     return ADMIN_NAV_ITEMS.map((group) => ({
@@ -151,6 +153,11 @@ export function AdminLayout() {
             <p>Admin workspace — Jenix India</p>
           </div>
           <div className="topbar-user">
+            {canInstall && (
+              <button type="button" className="btn btn-secondary btn-small" onClick={promptInstall}>
+                Install App
+              </button>
+            )}
             <span>{session?.admin?.role || "staff"}</span>
           </div>
         </header>

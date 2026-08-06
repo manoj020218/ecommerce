@@ -1942,6 +1942,27 @@ textarea {
   white-space: nowrap;
 }
 
+/* Unlike the account/cart icon actions, "Install" only ever appears when
+   the browser has actually offered it (canInstall) — rare enough that it
+   should stay legible on mobile too, not hidden behind the >=900px-only
+   .proto-header-action-label rule. */
+.proto-install-action {
+  width: auto;
+  height: auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  cursor: pointer;
+  background: transparent;
+  font-family: inherit;
+}
+
+.proto-install-action-label {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .proto-header-action:hover,
 .proto-icon-action:hover,
 .proto-header-action.active,

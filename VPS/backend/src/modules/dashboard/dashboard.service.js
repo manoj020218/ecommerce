@@ -1,20 +1,30 @@
 const { readAuthStore } = require("../../database/auth-store");
 const { readCatalogStore } = require("../../database/catalog-store");
+const { readShippingStore } = require("../../database/shipping-store");
 const { calculateAvailableQty } = require("../products/products.model");
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MANUAL_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
 
-function todayBounds() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return { start, end: now };
+// "Today" and the 7-day trend need to mean the store's business day (India),
+// not the server's — this VPS runs on UTC+1, so computing day boundaries
+// with plain `new Date().getFullYear()/getMonth()/getDate()` (server-local)
+// misattributes any order placed between ~7:30pm-11:59pm server time
+// (which is already the next calendar day in IST) to the wrong day. India
+// has no DST, so a fixed +5:30 offset is always correct.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const DAY_MS = 86400000;
+
+function istDayStartMs(utcMs) {
+  const shifted = utcMs + IST_OFFSET_MS;
+  return Math.floor(shifted / DAY_MS) * DAY_MS - IST_OFFSET_MS;
 }
 
 function isToday(dateStr) {
   if (!dateStr) return false;
-  const { start } = todayBounds();
-  return new Date(dateStr) >= start;
+  const t = new Date(dateStr).getTime();
+  if (Number.isNaN(t)) return false;
+  return t >= istDayStartMs(Date.now());
 }
 
 function isPendingPayment(order) {
@@ -31,13 +41,28 @@ function isPendingPayment(order) {
 }
 
 async function getDashboardStats() {
-  const [authStore, catalogStore] = await Promise.all([
+  const [authStore, catalogStore, shippingStore] = await Promise.all([
     readAuthStore(),
-    readCatalogStore()
+    readCatalogStore(),
+    readShippingStore()
   ]);
 
   const orders = Array.isArray(authStore.orders) ? authStore.orders : [];
   const products = Array.isArray(catalogStore.products) ? catalogStore.products : [];
+
+  // Shipment status lives in a separate shipments store keyed by orderId —
+  // it was never on the order record itself, so recentOrderList's
+  // shipmentStatus always read as blank ("pending" pill for every order)
+  // until this was joined in, same as orders.service.js's buildOrderSummary.
+  const latestShipmentByOrderId = new Map();
+  for (const shipment of Array.isArray(shippingStore.shipments) ? shippingStore.shipments : []) {
+    const current = latestShipmentByOrderId.get(shipment.orderId);
+    const currentTs = current ? Date.parse(current.updatedAt || current.createdAt || "") : -Infinity;
+    const nextTs = Date.parse(shipment.updatedAt || shipment.createdAt || "");
+    if (!current || nextTs >= currentTs) {
+      latestShipmentByOrderId.set(shipment.orderId, shipment);
+    }
+  }
 
   // Today stats
   const todayOrders = orders.filter((o) => isToday(o.createdAt));
@@ -55,33 +80,36 @@ async function getDashboardStats() {
     return threshold > 0 && avail <= threshold;
   }).length;
 
-  // Last 7 days order trend
-  const now = new Date();
+  // Last 7 days order trend (IST calendar days — see istDayStartMs above)
+  const nowMs = Date.now();
+  const todayStartMs = istDayStartMs(nowMs);
   const last7 = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const dayEnd = new Date(dayStart.getTime() + 86400000);
+    const dayStartMs = todayStartMs - i * DAY_MS;
+    const dayEndMs = dayStartMs + DAY_MS;
     const count = orders.filter((o) => {
-      const t = new Date(o.createdAt);
-      return t >= dayStart && t < dayEnd;
+      const t = new Date(o.createdAt).getTime();
+      return t >= dayStartMs && t < dayEndMs;
     }).length;
     const revenue = orders
       .filter((o) => {
-        const t = new Date(o.createdAt);
+        const t = new Date(o.createdAt).getTime();
         return (
-          t >= dayStart &&
-          t < dayEnd &&
+          t >= dayStartMs &&
+          t < dayEndMs &&
           String(o.paymentStatus || "").toLowerCase() === "paid"
         );
       })
       .reduce((s, o) => s + Number(o.grandTotal || 0), 0);
-    last7.push({ day: DAY_LABELS[d.getDay()], date: dayStart.toISOString(), count, revenue });
+    // Adding the offset back gives the IST wall-clock instant for this day
+    // boundary, so getUTCDay() reads the correct IST weekday label.
+    const istWeekday = new Date(dayStartMs + IST_OFFSET_MS).getUTCDay();
+    last7.push({ day: DAY_LABELS[istWeekday], date: new Date(dayStartMs).toISOString(), count, revenue });
   }
 
-  // Payment method breakdown (last 30 days)
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+  // Payment method breakdown (last 30 days — a rolling window, not
+  // calendar-aligned, so the server/IST distinction doesn't matter here)
+  const thirtyDaysAgo = new Date(nowMs - 30 * DAY_MS);
   const recentOrders = orders.filter((o) => new Date(o.createdAt) >= thirtyDaysAgo);
   const methodCounts = {};
   recentOrders.forEach((o) => {
@@ -127,7 +155,7 @@ async function getDashboardStats() {
         billing.name || billing.companyName || o.companyName || "—";
       const city = billing.city || billing.district || "";
       return {
-        orderId: o.orderId,
+        orderId: o.id,
         orderNo: o.orderNo,
         customerName: name,
         customerCity: city,
@@ -135,7 +163,7 @@ async function getDashboardStats() {
         paymentStatus: o.paymentStatus,
         paymentMethod: o.paymentMethod,
         manualPaymentStatus: o.manualPaymentStatus,
-        shipmentStatus: o.shipmentStatus || o.fulfillmentStatus || "",
+        shipmentStatus: latestShipmentByOrderId.get(o.id)?.shipmentStatus || "pending_packing",
         orderStatus: o.orderStatus,
         createdAt: o.createdAt
       };

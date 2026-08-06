@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuthSession } from "../auth/use-auth-session";
 import { ErrorBlock } from "../../shared/components/error-block";
@@ -687,8 +687,62 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
     customerNote: order.customerNote || "",
     podFile: null
   });
+  const [podPreviewUrl, setPodPreviewUrl] = useState(null);
+  const [scannedBarcode, setScannedBarcode] = useState("");
+  const [scanningBarcode, setScanningBarcode] = useState(false);
+  const trackingIdWasEmptyAtScan = useRef(true);
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
+
+  // Revoke the previous object URL whenever the file changes or the modal
+  // unmounts — otherwise each re-selected image leaks its blob URL.
+  useEffect(() => {
+    return () => {
+      if (podPreviewUrl) URL.revokeObjectURL(podPreviewUrl);
+    };
+  }, [podPreviewUrl]);
+
+  const onPodFileChange = async (event) => {
+    const file = event.target.files?.[0] || null;
+    set("podFile", file);
+    setScannedBarcode("");
+
+    if (podPreviewUrl) {
+      URL.revokeObjectURL(podPreviewUrl);
+      setPodPreviewUrl(null);
+    }
+
+    if (!file || !file.type.startsWith("image/")) {
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPodPreviewUrl(objectUrl);
+
+    // Package labels usually have the courier's own AWB barcode printed on
+    // them — try reading it straight off the uploaded photo so staff don't
+    // have to retype a long tracking number by hand. Failure here (no
+    // barcode in frame, blurry photo, etc.) is the common case for a plain
+    // packed-parcel photo, not an error — silently no-op.
+    trackingIdWasEmptyAtScan.current = !form.trackingId;
+    setScanningBarcode(true);
+    try {
+      const { BrowserMultiFormatReader } = await import("@zxing/browser");
+      const reader = new BrowserMultiFormatReader();
+      const result = await reader.decodeFromImageUrl(objectUrl);
+      const text = result?.getText?.() || "";
+      if (text) {
+        setScannedBarcode(text);
+        if (trackingIdWasEmptyAtScan.current) {
+          set("trackingId", text);
+        }
+      }
+    } catch (_error) {
+      // No barcode found / unreadable — expected for most parcel photos.
+    } finally {
+      setScanningBarcode(false);
+    }
+  };
 
   const customerMobile = order.billingAddress?.mobile || order.shippingAddress?.mobile || order.customerMobile || "";
 
@@ -746,9 +800,42 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
             Package Image <span style={{ fontWeight: 400, color: "var(--muted)" }}>(optional)</span>
           </span>
           <input type="file" accept="image/*,application/pdf"
-            onChange={(e) => set("podFile", e.target.files?.[0] || null)}
+            onChange={onPodFileChange}
             style={{ fontSize: 13 }} />
         </label>
+
+        {podPreviewUrl && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+            <img
+              src={podPreviewUrl} alt="Package preview"
+              style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", flexShrink: 0 }}
+            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>
+                Preview — check this is the right parcel before saving.
+              </p>
+              {scanningBarcode && (
+                <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>Scanning for a barcode…</p>
+              )}
+              {!scanningBarcode && scannedBarcode && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, color: "#166534", fontWeight: 600 }}>
+                    Barcode found: {scannedBarcode}
+                  </span>
+                  {form.trackingId !== scannedBarcode && (
+                    <button
+                      type="button" className="btn-link"
+                      style={{ fontSize: 11, padding: 0 }}
+                      onClick={() => set("trackingId", scannedBarcode)}
+                    >
+                      Use as Tracking ID
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {customerMobile && form.trackingId && (
           <div style={{ background: "rgba(37,211,102,0.06)", border: "1px solid rgba(37,211,102,0.3)", borderRadius: 8, padding: "10px 14px" }}>

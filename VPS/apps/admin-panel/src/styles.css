@@ -97,13 +97,17 @@ a {
   padding: 14px 10px;
 }
 
-/* Group label, top-level link, and sub-link text all share the same left
-   edge (nav padding 10px + margin 6px + padding-left 12px = 28px) —
-   previously the group label had no left padding and sub-links had an
-   extra 18px indent, so the three text baselines didn't line up. */
+/* Group label sits at the base indent. Every item under it — whether a
+   top-level link ("All Orders") or one of its children ("Walk-in
+   Orders") — now shares identical font-size, font-weight, and bullet
+   style, indented exactly one tab-stop past the group label. Previously
+   the group label had no bullet/indent, links had no bullet at all, and
+   sub-links were both smaller AND indented an extra 18px past their own
+   parent — three different treatments for what should read as one
+   consistent list. */
 .sidebar-group {
-  margin: 10px 6px 6px;
-  padding: 0 12px;
+  margin: 14px 6px 4px;
+  padding: 0 10px;
   font-size: 11px;
   color: #9ca3af;
   letter-spacing: 0.08em;
@@ -111,69 +115,54 @@ a {
   font-weight: 700;
 }
 
-.sidebar-link {
+.sidebar-link,
+.sidebar-sublink {
   display: block;
-  margin: 3px 6px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  position: relative;
+  margin: 2px 6px;
+  padding: 9px 10px 9px 30px;
+  border-radius: 8px;
   font-size: 13px;
+  font-weight: 400;
   text-decoration: none;
   color: #d1d5db;
-  transition: 0.2s ease;
+  transition: 0.15s ease;
 }
 
-.sidebar-link:hover {
+.sidebar-link::before,
+.sidebar-sublink::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #4b5563;
+}
+
+.sidebar-link:hover,
+.sidebar-sublink:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
-.sidebar-link.active {
+.sidebar-link:hover::before,
+.sidebar-sublink:hover::before {
+  background: #9ca3af;
+}
+
+.sidebar-link.active,
+.sidebar-sublink.active {
   background: var(--brand);
   color: #fff;
   font-weight: 600;
 }
 
-/* Sub-items: same left edge as their parent link (see .sidebar-group note
-   above) — distinguished by smaller/dimmer text and the dot marker
-   instead of an extra indent, which used to push them 18px further right
-   than "All Orders" / "Catalogue" / etc. */
-.sidebar-sublink {
-  display: block;
-  margin: 1px 6px;
-  padding: 7px 10px 7px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  text-decoration: none;
-  color: #9ca3af;
-  transition: 0.15s ease;
-  position: relative;
-}
-
-.sidebar-sublink::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #4b5563;
-}
-
-.sidebar-sublink:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e5e7eb;
-}
-
-.sidebar-sublink:hover::before {
-  background: #9ca3af;
-}
-
-.sidebar-sublink.active {
-  color: #fff;
-  background: rgba(232, 35, 26, 0.18);
-  font-weight: 600;
+.sidebar-link.active::before,
+.sidebar-sublink.active::before {
+  background: #fff;
 }
 
 .sidebar-sublink.active::before {

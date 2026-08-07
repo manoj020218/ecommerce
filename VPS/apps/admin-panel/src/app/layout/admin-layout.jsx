@@ -95,7 +95,18 @@ export function AdminLayout() {
         <nav className="sidebar-nav">
           {visibleGroups.map((group) => (
             <section key={group.group}>
-              <p className="sidebar-group">{group.group}</p>
+              {group.groupPath && hasPermission(session, group.groupPermission) ? (
+                <NavLink
+                  to={group.groupPath}
+                  className={({ isActive }) =>
+                    `sidebar-group sidebar-group-link${isActive ? " active" : ""}`
+                  }
+                >
+                  {group.group}
+                </NavLink>
+              ) : (
+                <p className="sidebar-group">{group.group}</p>
+              )}
               {group.items.map((item) => (
                 <div key={item.key}>
                   {item.external ? (

@@ -106,6 +106,7 @@ a {
    parent — three different treatments for what should read as one
    consistent list. */
 .sidebar-group {
+  display: block;
   margin: 14px 6px 4px;
   padding: 0 10px;
   font-size: 11px;
@@ -113,6 +114,23 @@ a {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 700;
+}
+
+/* Some groups (e.g. Catalogue) link the header itself to an overview page
+   instead of duplicating that as a separate item below it — keeps the
+   header's compact look, just adds pointer/hover/active feedback. */
+.sidebar-group-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.sidebar-group-link:hover {
+  color: #e5e7eb;
+}
+
+.sidebar-group-link.active {
+  color: var(--brand);
 }
 
 .sidebar-link,

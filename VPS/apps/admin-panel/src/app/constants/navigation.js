@@ -28,21 +28,17 @@ export const ADMIN_NAV_ITEMS = [
   },
   {
     group: "Catalogue",
+    // The group header itself links to /catalogue (Catalogue Overview) —
+    // items below it are a flat list, no separate "Catalogue" entry needed.
+    groupPath: "/catalogue",
+    groupPermission: "products.view",
     items: [
-      {
-        key: "catalogue",
-        label: "Catalogue",
-        path: "/catalogue",
-        permission: "products.view",
-        children: [
-          { key: "categories", label: "Categories", path: "/categories", permission: "categories.view" },
-          { key: "inventory",  label: "Inventory",  path: "/inventory",  permission: "inventory.view" },
-          { key: "hsn-tax",    label: "HSN / Tax",  path: "/hsn-tax",    permission: "hsn_tax.view" },
-          { key: "search",     label: "Search",     path: "/search",     permission: "search.view" }
-        ]
-      },
-      { key: "products", label: "Products", path: "/products", permission: "products.view" },
-      { key: "reviews", label: "Reviews & Ratings", path: "/reviews", permission: "reviews.view" }
+      { key: "categories", label: "Categories", path: "/categories", permission: "categories.view" },
+      { key: "products",   label: "Products",   path: "/products",   permission: "products.view" },
+      { key: "inventory",  label: "Inventory",  path: "/inventory",  permission: "inventory.view" },
+      { key: "hsn-tax",    label: "HSN / Tax",  path: "/hsn-tax",    permission: "hsn_tax.view" },
+      { key: "search",     label: "Search",     path: "/search",     permission: "search.view" },
+      { key: "reviews",    label: "Reviews & Ratings", path: "/reviews", permission: "reviews.view" }
     ]
   },
   {

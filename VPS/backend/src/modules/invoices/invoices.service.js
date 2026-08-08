@@ -592,6 +592,17 @@ function renderInvoiceHtml(invoice) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(invoice.invoiceNumber || "Invoice")}</title>
     <style>
+      /* No @page rule meant printing this HTML fell back to the browser's
+         default print margin (~0.5in/side on A4), leaving under 720px of
+         content width — which silently trips the .party-grid/.bottom-grid
+         @media (max-width:720px) mobile fallback further down, stacking
+         the 2-column Bill-To/Ship-To grid into 1 column and spilling the
+         invoice onto a second page. Confirmed live. This applies no
+         matter how the HTML is printed — admin panel's combined
+         invoice+label flow, a plain downloaded file opened and printed
+         directly, or anything else — since it's baked into the template
+         itself rather than injected only by one caller. */
+      @page { size: A4; margin: 10mm 6mm; }
       :root{
         --ink:#1c2129; --sub:#5b6472; --line:#dbe1e8; --paper:#ffffff;
         --accent:#14324f; --accent-soft:#eaf0f6;

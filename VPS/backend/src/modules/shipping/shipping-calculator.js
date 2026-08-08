@@ -15,6 +15,34 @@ function toUpperCode(value) {
     .toUpperCase();
 }
 
+// Buyer-submitted stateCode can be a 2-letter abbreviation ("RJ", "KA") or a
+// GST numeric code ("08", "29") — confirmed live that the storefront's
+// address form actually submits the numeric GST code. zoneStateMap,
+// localPincodePrefixes matching, and originStateCode are all keyed by
+// 2-letter abbreviation, so a numeric code never matched anything and every
+// such order silently fell through to the "All India" zone regardless of
+// the buyer's real location — reproduced against a live order before this
+// fix. Only the states actually used in zoneStateMap need mapping; unlisted
+// ones intentionally fall through to All India either way.
+const GST_CODE_TO_STATE_ABBR = {
+  "01": "JK", "02": "HP", "03": "PB", "04": "CH", "05": "UK", "06": "HR",
+  "07": "DL", "08": "RJ", "09": "UP", "10": "BR", "11": "SK", "12": "AR",
+  "13": "NL", "14": "MN", "15": "MZ", "16": "TR", "17": "ML", "18": "AS",
+  "19": "WB", "20": "JH", "21": "OD", "22": "CG", "23": "MP", "24": "GJ",
+  "26": "DN", "27": "MH", "29": "KA", "30": "GA", "31": "LD", "32": "KL",
+  "33": "TN", "34": "PY", "35": "AN", "36": "TS", "37": "AP", "38": "LA",
+  "97": "OT"
+};
+
+function normalizeStateCode(rawValue) {
+  const value = toUpperCode(rawValue);
+  if (!value) return "";
+  if (/^\d+$/.test(value)) {
+    return GST_CODE_TO_STATE_ABBR[value.padStart(2, "0")] || value;
+  }
+  return value;
+}
+
 function normalizePincode(value) {
   return String(value || "")
     .trim()
@@ -28,8 +56,8 @@ function safeArray(value) {
 
 function resolveDestinationZone(destination, settings) {
   const pincode = normalizePincode(destination?.pincode);
-  const stateCode = toUpperCode(destination?.stateCode || destination?.state);
-  const originStateCode = toUpperCode(settings.originStateCode || "");
+  const stateCode = normalizeStateCode(destination?.stateCode || destination?.state);
+  const originStateCode = normalizeStateCode(settings.originStateCode || "");
 
   const localPrefixes = safeArray(settings.localPincodePrefixes).map((value) =>
     String(value || "").trim()

@@ -991,7 +991,8 @@ function createOrderFromSession(authStore, session, options = {}) {
       gstRate: item.gstRate,
       taxableValue: item.taxableValue,
       gstAmount: item.gstAmount,
-      lineTotal: item.lineTotal
+      lineTotal: item.lineTotal,
+      shippingClass: item.shippingClass || "normal"
     })),
     productSubtotal: Number(session.cart.pricing.productSubtotal || 0),
     discountAmount: Number(session.cart.pricing.discountAmount || 0),
@@ -1109,7 +1110,8 @@ async function recalculateOrderItems(orderId, newItems, extraDiscountAmount, act
     gstRate: line.gstRate,
     taxableValue: line.taxableValue,
     gstAmount: line.gstAmount,
-    lineTotal: line.lineTotal
+    lineTotal: line.lineTotal,
+    shippingClass: line.shippingClass || "normal"
   }));
   order.productSubtotal = pricing.productSubtotal;
   order.discountAmount = pricing.discountAmount;

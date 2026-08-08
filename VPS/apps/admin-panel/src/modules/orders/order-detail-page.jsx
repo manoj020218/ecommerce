@@ -1802,6 +1802,17 @@ export function OrderDetailPage() {
                         <div style={{ fontWeight: 600 }}>{item.title}</div>
                         {item.sku && <div style={{ fontSize: 11, color: "var(--muted)" }}>SKU: {item.sku}</div>}
                         {item.hsnCode && <div style={{ fontSize: 11, color: "var(--muted)" }}>HSN: {item.hsnCode}</div>}
+                        {item.shippingClass && item.shippingClass !== "normal" && (
+                          <div style={{ marginTop: 3 }}>
+                            <span style={{
+                              display: "inline-block", fontSize: 10, fontWeight: 600,
+                              color: "#7e22ce", background: "rgba(126,34,206,0.08)",
+                              border: "1px solid rgba(126,34,206,0.25)", borderRadius: 20, padding: "1px 8px"
+                            }}>
+                              Shipping: {humanize(item.shippingClass)}
+                            </span>
+                          </div>
+                        )}
                         {canViewProducts && item.productId && (
                           lookedUpProduct === null ? (
                             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>Product no longer available</div>
@@ -1832,6 +1843,18 @@ export function OrderDetailPage() {
                 </tr>
                 );
               })}
+              <tr>
+                <td style={{ padding: "12px 14px" }}>
+                  <div style={{ fontWeight: 600 }}>Shipping</div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    Method: {humanize(order.shippingMethod) || "—"}
+                  </div>
+                </td>
+                <td colSpan={3}></td>
+                <td style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {formatCurrencyInr(order.pricing?.shippingCharge)}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

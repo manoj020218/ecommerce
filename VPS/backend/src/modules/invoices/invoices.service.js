@@ -208,6 +208,7 @@ function buildOrderItemSnapshot(orderItem, productLookup, placeOfSupply) {
     gstRate: Number(orderItem.gstRate || 0),
     gstAmount: Number(orderItem.gstAmount || 0),
     lineTotal: Number(orderItem.lineTotal || 0),
+    shippingClass: orderItem.shippingClass || "",
     ...taxSplit
   };
 }
@@ -422,6 +423,25 @@ function renderInfoPairs(entries) {
     .join("");
 }
 
+function humanizeLabel(value) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const SHIPPING_METHOD_LABELS = {
+  standard: "Standard",
+  express: "Express",
+  local_pickup: "Local Pickup",
+  self_pickup: "Self Pickup",
+  transport: "Transport",
+  manual_delivery: "Manual Delivery"
+};
+
+function humanizeShippingMethodLabel(method) {
+  return SHIPPING_METHOD_LABELS[method] || (method ? humanizeLabel(method) : "");
+}
+
 function humanizePaymentMethodLabel(method) {
   const labels = {
     online: "Online",
@@ -485,10 +505,14 @@ function renderInvoiceHtml(invoice) {
     .map((item, index) => {
       const qty = Number(item.qty || 0);
       const rateWithoutGst = qty > 0 ? roundMoney(Number(item.taxableValue || 0) / qty) : 0;
+      const shippingClassNote =
+        item.shippingClass && item.shippingClass !== "normal"
+          ? `<div class="item-shipping-class">Shipping: ${escapeHtml(humanizeLabel(item.shippingClass))}</div>`
+          : "";
       return `
         <tr>
           <td class="sr">${index + 1}</td>
-          <td>${escapeHtml(item.title || "Item")}</td>
+          <td>${escapeHtml(item.title || "Item")}${shippingClassNote}</td>
           <td>${escapeHtml(item.hsnCode || "--")}</td>
           <td class="num">${escapeHtml(String(qty))}</td>
           <td class="num">${escapeHtml(formatNumberInr(rateWithoutGst))}</td>
@@ -664,6 +688,7 @@ function renderInvoiceHtml(invoice) {
       table.items tbody td{ padding:8px 9px; border:1px solid var(--line); vertical-align:top; }
       table.items tbody td.num{ text-align:right; }
       table.items tbody td.sr{ color:var(--sub); }
+      .item-shipping-class{ margin-top:2px; font-size:10px; font-weight:600; color:var(--accent); text-transform:uppercase; letter-spacing:0.02em; }
       table.items tfoot td{ padding:8px 9px; border:1px solid var(--line); font-weight:700; background:#fafbfc; }
       table.items tfoot td.num{ text-align:right; }
       .totals-wrap{ display:flex; justify-content:flex-end; margin-bottom:20px; }
@@ -740,6 +765,11 @@ function renderInvoiceHtml(invoice) {
         <div class="meta-strip">
           <span>Place of Supply: <strong>${escapeHtml(joinTextParts([placeOfSupply.state, placeOfSupply.stateCode ? `(${placeOfSupply.stateCode})` : ""]) || "--")}</strong></span>
           <span>Payment: <strong>${invoice.paymentStatus === "paid" ? "Paid" : "Pending"} &mdash; ${escapeHtml(humanizePaymentMethodLabel(invoice.paymentMethod))}</strong></span>
+          ${
+            humanizeShippingMethodLabel(pricing.shippingMethod)
+              ? `<span>Shipping Method: <strong>${escapeHtml(humanizeShippingMethodLabel(pricing.shippingMethod))}</strong></span>`
+              : ""
+          }
           <span>Reverse Charge: <strong>No</strong></span>
         </div>
 
@@ -775,7 +805,7 @@ function renderInvoiceHtml(invoice) {
               <tr><td class="t-label">Product Subtotal</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.productSubtotal || 0))}</td></tr>
               ${
                 display.showShippingLine !== false || Number(pricing.shippingCharge || 0) !== 0
-                  ? `<tr><td class="t-label">Shipping</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.shippingCharge || 0))}</td></tr>`
+                  ? `<tr><td class="t-label">Shipping${humanizeShippingMethodLabel(pricing.shippingMethod) ? ` (${escapeHtml(humanizeShippingMethodLabel(pricing.shippingMethod))})` : ""}</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.shippingCharge || 0))}</td></tr>`
                   : ""
               }
               ${
@@ -1003,6 +1033,7 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
       sgstTotal,
       igstTotal,
       shippingCharge: Number(order.shippingCharge || 0),
+      shippingMethod: order.shippingMethod || "",
       shippingGstAmount,
       roundOff: Number(order.roundOff || 0),
       grandTotal: Number(order.grandTotal || 0),

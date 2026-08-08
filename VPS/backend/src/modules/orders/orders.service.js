@@ -195,7 +195,10 @@ function buildOrderDetail(order, shipment, invoice, manualPaymentInstructions) {
       gstRate: Number(item.gstRate || 0),
       taxableValue: Number(item.taxableValue || 0),
       gstAmount: Number(item.gstAmount || 0),
-      lineTotal: Number(item.lineTotal || 0)
+      lineTotal: Number(item.lineTotal || 0),
+      // Only present on orders placed after this field was added — older
+      // orders show as "" here, handled by falling back to "Normal" in the UI.
+      shippingClass: item.shippingClass || ""
     })),
     pricing: {
       productSubtotal: Number(order.productSubtotal || 0),

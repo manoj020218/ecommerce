@@ -83,7 +83,8 @@ function sanitizeCartLine(line) {
         ? null
         : Number(line.quoteRequiredAboveQty),
     availabilityStatus: line.availabilityStatus || "out_of_stock",
-    stockVisibility: "hide_quantity"
+    stockVisibility: "hide_quantity",
+    shippingClass: line.shippingClass || "normal"
   };
 }
 

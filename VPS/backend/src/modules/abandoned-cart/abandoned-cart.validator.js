@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { HttpError } = require("../../common/http-error");
+const { booleanQueryParam } = require("../../common/zod-helpers");
 const { SHARE_CLAIM_MODES } = require("../cart-checkout/cart-checkout.model");
 const {
   RECOVERY_FEEDBACK_REASONS,
@@ -10,20 +11,6 @@ const optionalString = (max = 300) =>
   z.string().trim().max(max, `Must be ${max} characters or less`).optional();
 
 const sessionIdSchema = z.string().trim().min(3).max(120);
-
-// z.coerce.boolean() runs JS `Boolean(value)` under the hood, so the string
-// "false" (sent by query params for an unchecked checkbox) coerces to
-// `true` — any non-empty string is truthy. This parses "true"/"false"
-// strings by their actual text instead.
-const booleanQueryParam = (defaultValue) =>
-  z
-    .preprocess((value) => {
-      if (typeof value === "boolean") return value;
-      if (typeof value === "string") return value.toLowerCase() === "true";
-      return value;
-    }, z.boolean())
-    .optional()
-    .default(defaultValue);
 
 const listRecoveriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),

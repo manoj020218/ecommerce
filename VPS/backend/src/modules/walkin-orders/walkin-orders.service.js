@@ -742,7 +742,8 @@ async function createWalkInOrder(payload, actor) {
       gstRate: line.gstRate,
       taxableValue: line.taxableValue,
       gstAmount: line.gstAmount,
-      lineTotal: line.lineTotal
+      lineTotal: line.lineTotal,
+      shippingClass: line.shippingClass || "normal"
     })),
     productSubtotal: pricing.productSubtotal,
     discountAmount: pricing.discountAmount,

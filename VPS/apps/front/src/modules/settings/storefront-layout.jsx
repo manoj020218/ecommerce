@@ -491,20 +491,26 @@ export function StorefrontLayout() {
               navigate(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : "/products");
             }}
           >
-            <input
-              id="storefront-search-input"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              placeholder="Search cameras, smart locks, gate motors..."
-            />
-            <div className="proto-header-search-actions">
+            {/* Search (submit) and Clear are both always shown now — not
+                everyone knows to press Enter after typing, so the search
+                button stays put as an explicit tap target rather than
+                swapping away. Clear lives inline inside the white input
+                itself (grey/secondary, not brand-colored) so it doesn't
+                visually compete with the actual Search action. */}
+            <div className="proto-header-search-input-wrap">
+              <input
+                id="storefront-search-input"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
+                placeholder="Search cameras, smart locks, gate motors..."
+              />
               {searchText ? (
                 <button
                   type="button"
                   aria-label="Clear search"
-                  className="proto-search-clear-btn"
+                  className="proto-search-inline-clear"
                   onMouseDown={(event) => {
                     event.preventDefault();
                     setSearchText("");
@@ -513,11 +519,12 @@ export function StorefrontLayout() {
                 >
                   <ClearIcon />
                 </button>
-              ) : (
-                <button type="submit" aria-label="Search storefront">
-                  <SearchIcon />
-                </button>
-              )}
+              ) : null}
+            </div>
+            <div className="proto-header-search-actions">
+              <button type="submit" aria-label="Search storefront">
+                <SearchIcon />
+              </button>
             </div>
           </form>
 

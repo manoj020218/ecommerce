@@ -1858,7 +1858,41 @@ textarea {
 .proto-header-search input {
   border: 0;
   border-radius: 0;
-  padding: 15px 16px;
+  padding: 15px 40px 15px 16px;
+}
+
+.proto-header-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.proto-search-inline-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #9ca3af;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.proto-search-inline-clear:hover {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.proto-search-inline-clear svg {
+  width: 14px;
+  height: 14px;
 }
 
 .proto-header-search-actions {
@@ -6227,34 +6261,12 @@ textarea {
 .proto-header-search input {
   border: 0 !important;
   border-radius: 0 !important;
-  padding: 6px 10px !important;
+  padding: 6px 34px 6px 10px !important;
   font-size: 13px !important;
 }
 
 .proto-header-search button {
   width: 38px !important;
-}
-
-/* ── Search clear button: same visual as search button ── */
-.proto-search-clear-btn {
-  border: 0;
-  background: #374151;
-  color: #fff;
-  width: 38px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  flex-shrink: 0;
-}
-
-.proto-search-clear-btn:hover {
-  background: var(--brand);
-}
-
-.proto-search-clear-btn svg {
-  width: 16px;
-  height: 16px;
 }
 
 /* ── Category marquee section: no extra top padding ───── */

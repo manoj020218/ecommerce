@@ -915,14 +915,16 @@ async function saveSetupWizardStep(stepKey, payload, actor) {
     }
     case "shipping_courier": {
       const normalizedCode = trimValue(payload.courierCode).toUpperCase();
+      // Match by courier code, not by the profile this step last touched —
+      // matching by the previously-bound courierProfileId meant re-using this
+      // step to enter a second, different courier silently overwrote the
+      // first one instead of adding a new profile. Matching by code means a
+      // repeat submission of the same code still edits that courier in
+      // place, while a new code always creates a new courier profile.
       let courierProfile =
         shippingStore.courierProfiles.find(
-          (profile) => profile.id === wizard.shippingCourier?.courierProfileId
-        ) ||
-        shippingStore.courierProfiles.find(
           (profile) => trimValue(profile.courierCode).toUpperCase() === normalizedCode
-        ) ||
-        null;
+        ) || null;
 
       if (!courierProfile) {
         courierProfile = {

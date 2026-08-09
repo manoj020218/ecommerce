@@ -30,21 +30,21 @@ async function adminListCouriers(req, res) {
 
 async function adminAddCourier(req, res) {
   const adminEmail = req.actor?.email;
-  const courier = await addCustomCourier(req.body, adminEmail);
+  const courier = await addCustomCourier(req.body, adminEmail, req.actor);
   res.status(201).json(courier);
 }
 
 async function adminUpdateCourier(req, res) {
   const { id } = req.params;
   const adminEmail = req.actor?.email;
-  const courier = await updateCustomCourier(id, req.body, adminEmail);
+  const courier = await updateCustomCourier(id, req.body, adminEmail, req.actor);
   res.json(courier);
 }
 
 async function adminDeleteCourier(req, res) {
   const { id } = req.params;
   const adminEmail = req.actor?.email;
-  await deleteCustomCourier(id, adminEmail);
+  await deleteCustomCourier(id, adminEmail, req.actor);
   res.json({ success: true });
 }
 

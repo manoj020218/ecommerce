@@ -5,7 +5,12 @@ const {
   writeIntegrationsStore
 } = require("../../database/integrations-store");
 const { jsonFileStore } = require("../../database/json-file-store");
+const { readShippingStore } = require("../../database/shipping-store");
 const { cloneDefaultSettingsDocument } = require("../settings/settings.model");
+const {
+  upsertCourierProfileForIntegration,
+  deactivateCourierProfileForIntegration
+} = require("../shipping/shipping.service");
 
 const ALLOWED_CODES = new Set([
   "shiprocket", "delhivery", "shiprazor",
@@ -235,10 +240,31 @@ async function getAllIntegrations() {
 
 async function getCustomCouriers() {
   const store = await readIntegrationsStore();
-  return Array.isArray(store.customCouriers) ? store.customCouriers : [];
+  const couriers = Array.isArray(store.customCouriers) ? store.customCouriers : [];
+
+  // Self-heal: a courier added here should always be selectable from the
+  // Mark-as-Packed courier dropdown, which reads shippingStore.courierProfiles
+  // instead. Back-fill any courier that isn't mirrored there yet (covers both
+  // couriers created before this sync existed, and any that fail to sync).
+  const shippingStore = await readShippingStore();
+  const linkedIds = new Set(
+    ensureArray(shippingStore.courierProfiles)
+      .map((profile) => profile.linkedIntegrationCourierId)
+      .filter(Boolean)
+  );
+  const unsynced = couriers.filter((courier) => !linkedIds.has(courier.id));
+  for (const courier of unsynced) {
+    await upsertCourierProfileForIntegration(courier);
+  }
+
+  return couriers;
 }
 
-async function addCustomCourier(data, adminEmail) {
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+async function addCustomCourier(data, adminEmail, actor = null) {
   const name = String(data?.name || "").trim();
   if (!name) throw new HttpError(400, "Courier name is required.");
   const store = await readIntegrationsStore();
@@ -254,10 +280,11 @@ async function addCustomCourier(data, adminEmail) {
   store.customCouriers.push(newCourier);
   store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
   await writeIntegrationsStore(store);
+  await upsertCourierProfileForIntegration(newCourier, actor);
   return newCourier;
 }
 
-async function updateCustomCourier(id, patch, adminEmail) {
+async function updateCustomCourier(id, patch, adminEmail, actor = null) {
   if (!id) throw new HttpError(400, "Courier ID is required.");
   const store = await readIntegrationsStore();
   const idx = store.customCouriers.findIndex((c) => c.id === id);
@@ -276,10 +303,11 @@ async function updateCustomCourier(id, patch, adminEmail) {
   store.customCouriers[idx] = updated;
   store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
   await writeIntegrationsStore(store);
+  await upsertCourierProfileForIntegration(updated, actor);
   return updated;
 }
 
-async function deleteCustomCourier(id, adminEmail) {
+async function deleteCustomCourier(id, adminEmail, actor = null) {
   if (!id) throw new HttpError(400, "Courier ID is required.");
   const store = await readIntegrationsStore();
   const target = store.customCouriers.find((c) => c.id === id);
@@ -288,6 +316,9 @@ async function deleteCustomCourier(id, adminEmail) {
   store.customCouriers = store.customCouriers.filter((c) => c.id !== id);
   store.meta = { updatedAt: nowIso(), updatedBy: adminEmail || "admin" };
   await writeIntegrationsStore(store);
+  // Soft-deactivate rather than remove the mirrored courierProfile — it may
+  // already be referenced by historical shipments/orders.
+  await deactivateCourierProfileForIntegration(id, actor);
 }
 
 async function syncWhatsAppToPublicSettings(config) {

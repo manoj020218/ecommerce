@@ -15,6 +15,7 @@ import {
   fetchInvoiceDownloadData,
   correctInvoiceBuyer,
   fetchShippingCouriers,
+  createShippingCourier,
   createShipment,
   updateShipmentTracking,
   updateShipmentStatus,
@@ -676,9 +677,129 @@ function EditItemsModal({ order, onClose, onSave, saving, error }) {
   );
 }
 
+// ── Courier Partner select, with inline "create new" onboarding ───────────────
+// Shared by FulfillModal and EditTrackingModal so a new courier can be added
+// without leaving the packing/tracking flow. Only offered to admins with
+// shipping.manage_config — same permission the standalone Shipping Couriers
+// admin screen requires.
+function CourierSelectWithCreate({ value, onChange, couriers, canCreate, onCourierCreated }) {
+  const [creating, setCreating] = useState(false);
+  const [newCourier, setNewCourier] = useState({
+    courierName: "",
+    courierCode: "",
+    trackingUrlTemplate: "",
+    supportPhone: ""
+  });
+  const [saving, setSaving] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  const inputStyle = {
+    padding: "6px 9px",
+    fontSize: 12,
+    border: "1px solid var(--border)",
+    borderRadius: 6
+  };
+
+  const handleSelectChange = (event) => {
+    if (event.target.value === "__create_new__") {
+      setCreateError("");
+      setCreating(true);
+      return;
+    }
+    onChange(event.target.value);
+  };
+
+  const handleCreate = async () => {
+    const courierName = newCourier.courierName.trim();
+    const courierCode = newCourier.courierCode.trim();
+    const trackingUrlTemplate = newCourier.trackingUrlTemplate.trim();
+    if (!courierName || !courierCode || !trackingUrlTemplate) {
+      setCreateError("Courier name, code, and tracking URL are required.");
+      return;
+    }
+    setSaving(true);
+    setCreateError("");
+    try {
+      const created = await createShippingCourier({
+        courierName,
+        courierCode,
+        trackingUrlTemplate,
+        supportPhone: newCourier.supportPhone.trim(),
+        isActive: true
+      });
+      onCourierCreated(created);
+      onChange(created.id);
+      setCreating(false);
+      setNewCourier({ courierName: "", courierCode: "", trackingUrlTemplate: "", supportPhone: "" });
+    } catch (err) {
+      setCreateError(err.message || "Failed to create courier.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <select
+        value={value}
+        onChange={handleSelectChange}
+        style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, background: "var(--surface)" }}
+      >
+        <option value="">Select courier...</option>
+        {couriers.map((c) => (
+          <option key={c.id} value={c.id}>{c.courierName}</option>
+        ))}
+        {canCreate && <option value="__create_new__">+ Create new Shipping partner</option>}
+      </select>
+
+      {creating && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, border: "1px dashed var(--border)", borderRadius: 8, background: "rgba(37,99,235,0.04)" }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: "var(--text)" }}>New Shipping Partner</p>
+          <input
+            placeholder="Courier name (e.g. Blue Dart)"
+            value={newCourier.courierName}
+            onChange={(e) => setNewCourier((f) => ({ ...f, courierName: e.target.value }))}
+            style={inputStyle}
+          />
+          <input
+            placeholder="Courier code (e.g. BLUEDART)"
+            value={newCourier.courierCode}
+            onChange={(e) => setNewCourier((f) => ({ ...f, courierCode: e.target.value }))}
+            style={inputStyle}
+          />
+          <input
+            placeholder="Tracking URL template (e.g. https://track.example.com/{trackingId})"
+            value={newCourier.trackingUrlTemplate}
+            onChange={(e) => setNewCourier((f) => ({ ...f, trackingUrlTemplate: e.target.value }))}
+            style={inputStyle}
+          />
+          <input
+            placeholder="Support phone (optional)"
+            value={newCourier.supportPhone}
+            onChange={(e) => setNewCourier((f) => ({ ...f, supportPhone: e.target.value }))}
+            style={inputStyle}
+          />
+          {createError && <p style={{ margin: 0, fontSize: 11, color: "#dc2626" }}>{createError}</p>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="btn btn-primary" disabled={saving} onClick={handleCreate}
+              style={{ fontSize: 12, padding: "6px 12px" }}>
+              {saving ? "Saving…" : "Save Courier"}
+            </button>
+            <button type="button" className="btn" disabled={saving}
+              onClick={() => { setCreating(false); setCreateError(""); }}
+              style={{ fontSize: 12, padding: "6px 12px" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Convert to Fulfill modal ──────────────────────────────────────────────────
 
-function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error }) {
+function FulfillModal({ order, invoice, couriers, canCreateCourier, onCourierCreated, onClose, onSave, saving, error }) {
   const [form, setForm] = useState({
     courierProfileId: "",
     trackingId: "",
@@ -757,13 +878,13 @@ function FulfillModal({ order, invoice, couriers, onClose, onSave, saving, error
 
         <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Courier Partner</span>
-          <select value={form.courierProfileId} onChange={(e) => set("courierProfileId", e.target.value)}
-            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, background: "var(--surface)" }}>
-            <option value="">Select courier...</option>
-            {couriers.map((c) => (
-              <option key={c.id} value={c.id}>{c.courierName}</option>
-            ))}
-          </select>
+          <CourierSelectWithCreate
+            value={form.courierProfileId}
+            onChange={(val) => set("courierProfileId", val)}
+            couriers={couriers}
+            canCreate={canCreateCourier}
+            onCourierCreated={onCourierCreated}
+          />
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -907,7 +1028,7 @@ function DeliveryConfirmModal({ onClose, onSave, saving, error }) {
 
 // ── Edit Tracking modal (re-ship with a different courier, etc.) ─────────────
 
-function EditTrackingModal({ trackingDetails, couriers, onClose, onSave, saving, error }) {
+function EditTrackingModal({ trackingDetails, couriers, canCreateCourier, onCourierCreated, onClose, onSave, saving, error }) {
   const matchedCourier = couriers.find(
     (c) => c.courierCode === trackingDetails.courierCode || c.courierName === trackingDetails.courierName
   );
@@ -934,13 +1055,13 @@ function EditTrackingModal({ trackingDetails, couriers, onClose, onSave, saving,
         )}
         <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Courier Partner</span>
-          <select value={form.courierProfileId} onChange={(e) => set("courierProfileId", e.target.value)}
-            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, background: "var(--surface)" }}>
-            <option value="">Select courier...</option>
-            {couriers.map((c) => (
-              <option key={c.id} value={c.id}>{c.courierName}</option>
-            ))}
-          </select>
+          <CourierSelectWithCreate
+            value={form.courierProfileId}
+            onChange={(val) => set("courierProfileId", val)}
+            couriers={couriers}
+            canCreate={canCreateCourier}
+            onCourierCreated={onCourierCreated}
+          />
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -1248,6 +1369,7 @@ export function OrderDetailPage() {
   const { session } = useAuthSession();
   const canView = hasPermission(session, "orders.view");
   const canViewProducts = hasPermission(session, "products.view");
+  const canManageShippingConfig = hasPermission(session, "shipping.manage_config");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1331,6 +1453,13 @@ export function OrderDetailPage() {
     };
     init();
   }, [orderId]);
+
+  const handleCourierCreated = (courier) => {
+    setCouriers((list) => {
+      const withoutDuplicate = list.filter((c) => c.id !== courier.id);
+      return [...withoutDuplicate, courier].sort((a, b) => a.courierName.localeCompare(b.courierName));
+    });
+  };
 
   // Order items only snapshot title/sku/price at purchase time, so the
   // current product (for its image + a live View/Edit link) is fetched
@@ -2052,10 +2181,24 @@ export function OrderDetailPage() {
           order={order}
           invoice={invoice}
           couriers={couriers}
+          canCreateCourier={canManageShippingConfig}
+          onCourierCreated={handleCourierCreated}
           onClose={() => setFulfillModal(false)}
           onSave={handleFulfill}
           saving={fulfillSaving}
           error={fulfillError}
+        />
+      )}
+      {editTrackingModal && (
+        <EditTrackingModal
+          trackingDetails={order.trackingDetails}
+          couriers={couriers}
+          canCreateCourier={canManageShippingConfig}
+          onCourierCreated={handleCourierCreated}
+          onClose={() => setEditTrackingModal(false)}
+          onSave={handleEditTracking}
+          saving={editTrackingSaving}
+          error={editTrackingError}
         />
       )}
       {deliveryModal && (

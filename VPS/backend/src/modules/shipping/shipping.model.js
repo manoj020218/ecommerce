@@ -74,6 +74,7 @@ function sanitizeCourierProfile(profile) {
     apiEnabled: Boolean(profile.apiEnabled),
     apiProvider: profile.apiProvider || SHIPPING_API_PROVIDERS.MANUAL_COURIER,
     isActive: Boolean(profile.isActive),
+    linkedIntegrationCourierId: profile.linkedIntegrationCourierId || null,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt
   };

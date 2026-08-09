@@ -62,7 +62,8 @@ const SETUP_WIZARD_STEPS = Object.freeze([
   {
     key: "shipping_courier",
     label: "Shipping / Courier Profile",
-    description: "Default courier profile and tracking template for dispatch workflows.",
+    description:
+      "Courier profile and tracking template for dispatch workflows. Saving with a new Courier Code always adds a new courier; saving with an existing code edits that courier. Manage the full courier list from Third Party Integrations.",
     optional: false
   },
   {

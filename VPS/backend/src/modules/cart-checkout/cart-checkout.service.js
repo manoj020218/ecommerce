@@ -1777,7 +1777,7 @@ async function createCartShare(context, payload) {
   return {
     shareId: shareRecord.id,
     shareToken,
-    shareUrl: `${env.publicBaseUrl}/cart/share/${shareToken}`,
+    shareUrl: `${env.storefrontBaseUrl}/cart/share/${shareToken}`,
     sourceOwnerType: owner.ownerType,
     expiresAt: shareRecord.expiresAt,
     itemCount: lines.reduce((sum, line) => sum + Number(line.qty || 0), 0)

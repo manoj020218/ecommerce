@@ -57,6 +57,10 @@ export function fetchShippingCouriers() {
   return apiFetch("/admin/shipping/couriers");
 }
 
+export function createShippingCourier(payload) {
+  return apiFetch("/admin/shipping/couriers", { method: "POST", body: payload });
+}
+
 export function createShipment(payload) {
   return apiFetch("/admin/shipping/shipments", { method: "POST", body: payload });
 }

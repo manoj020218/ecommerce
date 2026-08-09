@@ -713,6 +713,100 @@ async function updateCourierProfile(courierProfileId, patch, actor) {
   return sanitizeCourierProfile(next);
 }
 
+function generateUniqueCourierCode(existingCodes, name) {
+  const base =
+    String(name || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 12) || "COURIER";
+  let code = base;
+  let suffix = 1;
+  while (existingCodes.has(code)) {
+    code = `${base}${suffix}`;
+    suffix += 1;
+  }
+  return code;
+}
+
+// Keeps a shippingStore.courierProfiles row (the list order fulfillment reads
+// from) in sync with a courier created/edited via Third Party Integrations,
+// so a courier added there shows up in the Mark-as-Packed dropdown without a
+// separate manual step. Matched by linkedIntegrationCourierId, not name, so
+// renaming the integration courier doesn't spawn a duplicate profile.
+async function upsertCourierProfileForIntegration(integrationCourier, actor = null) {
+  const shippingStore = await readShippingStore();
+  ensureShippingStoreShape(shippingStore);
+
+  const profiles = ensureArray(shippingStore.courierProfiles);
+  let row = profiles.find(
+    (profile) => profile.linkedIntegrationCourierId === integrationCourier.id
+  );
+  const now = nowIso();
+
+  if (!row) {
+    const existingCodes = new Set(
+      profiles.map((profile) => String(profile.courierCode || "").toUpperCase())
+    );
+    row = {
+      id: generateId("courier"),
+      courierName: integrationCourier.name,
+      courierCode: generateUniqueCourierCode(existingCodes, integrationCourier.name),
+      trackingUrlTemplate: integrationCourier.trackingUrl || "",
+      trackingPageUrl: "",
+      supportPhone: integrationCourier.phone || "",
+      supportEmail: "",
+      apiEnabled: Boolean(integrationCourier.trackingApiUrl),
+      apiProvider: SHIPPING_API_PROVIDERS.MANUAL_COURIER,
+      isActive: integrationCourier.isActive !== false,
+      linkedIntegrationCourierId: integrationCourier.id,
+      createdAt: now,
+      updatedAt: now
+    };
+    shippingStore.courierProfiles.push(row);
+  } else {
+    row.courierName = integrationCourier.name;
+    row.trackingUrlTemplate = integrationCourier.trackingUrl || row.trackingUrlTemplate;
+    row.supportPhone = integrationCourier.phone || row.supportPhone;
+    row.apiEnabled = Boolean(integrationCourier.trackingApiUrl) || row.apiEnabled;
+    row.isActive = integrationCourier.isActive !== false;
+    row.updatedAt = now;
+  }
+
+  await writeShippingStore(shippingStore);
+
+  await addActivityLog({
+    action: "shipping.courier.synced_from_integration",
+    actorId: actor?.id || "system",
+    actorRole: actor?.role || "system",
+    resourceType: "shipping_courier",
+    resourceId: row.id
+  });
+
+  return sanitizeCourierProfile(row);
+}
+
+async function deactivateCourierProfileForIntegration(integrationCourierId, actor = null) {
+  const shippingStore = await readShippingStore();
+  ensureShippingStoreShape(shippingStore);
+
+  const row = ensureArray(shippingStore.courierProfiles).find(
+    (profile) => profile.linkedIntegrationCourierId === integrationCourierId
+  );
+  if (!row) return;
+
+  row.isActive = false;
+  row.updatedAt = nowIso();
+  await writeShippingStore(shippingStore);
+
+  await addActivityLog({
+    action: "shipping.courier.deactivated_from_integration",
+    actorId: actor?.id || "system",
+    actorRole: actor?.role || "system",
+    resourceType: "shipping_courier",
+    resourceId: row.id
+  });
+}
+
 async function listShippingQueue(filters) {
   const [authStore, shippingStore] = await Promise.all([readAuthStore(), readShippingStore()]);
   const authChanged = ensureAuthStoreShape(authStore);
@@ -1319,6 +1413,8 @@ module.exports = {
   listCourierProfiles,
   createCourierProfile,
   updateCourierProfile,
+  upsertCourierProfileForIntegration,
+  deactivateCourierProfileForIntegration,
   listShippingQueue,
   createShipment,
   getShipment,

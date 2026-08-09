@@ -842,7 +842,7 @@ async function exportGoogleShoppingFeed() {
     const price = `${Number(p.salePrice || p.basePrice || 0).toFixed(2)} INR`;
     const availability = p.stockStatus === "out_of_stock" ? "out of stock" : "in stock";
     const image = Array.isArray(p.images) && p.images[0] ? p.images[0] : "";
-    const link = `${env.publicBaseUrl}/products/${p.slug}`;
+    const link = `${env.storefrontBaseUrl}/products/${p.slug}`;
     const title = escape(p.googleShoppingTitle || p.title);
     const desc = escape(p.googleShoppingDescription || p.shortDescription || "");
     return [

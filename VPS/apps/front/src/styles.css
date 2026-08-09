@@ -6837,12 +6837,24 @@ textarea {
 .proto-wa-enquiry-split > * {
   flex: 1;
   min-width: 0;
+}
+.proto-wa-enquiry-btn {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding-left: 8px;
   padding-right: 8px;
   white-space: nowrap;
 }
+.proto-wa-enquiry-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
 @media (max-width: 380px) {
-  .proto-wa-enquiry-split > * { font-size: 11px; padding-left: 4px; padding-right: 4px; }
+  .proto-wa-enquiry-btn { font-size: 11px; padding-left: 6px; padding-right: 6px; gap: 4px; }
+  .proto-wa-enquiry-icon { width: 14px; height: 14px; }
 }
 
 /* ── Swipeable Carousel (Recent Viewed / Linked Products) ─── */

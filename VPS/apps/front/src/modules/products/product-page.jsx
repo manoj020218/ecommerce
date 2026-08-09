@@ -110,6 +110,17 @@ const RECENT_MAX = 12;
 // the Contact Us page — the two are deliberately different lines.
 const PRODUCT_ENQUIRY_WHATSAPP_NUMBER = "917891012342";
 
+function WhatsAppEnquiryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="proto-wa-enquiry-icon">
+      <path
+        d="M12 2a10 10 0 00-8.7 15l-1.2 5 5.1-1.3A10 10 0 1012 2zm5.1 13.4c-.2.6-1.2 1.2-1.7 1.3-.5.1-1.1.2-3.1-.6-2.4-1-4-3.5-4.1-3.7-.1-.2-1-1.4-1-2.7s.7-1.9.9-2.2c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5.2.5.7 1.7.8 1.8.1.2.1.4 0 .6-.1.2-.2.3-.4.5-.2.2-.3.3-.5.5-.2.2-.3.4-.1.7.2.3 1 1.7 2.4 2.7 1.8 1.3 3.3 1.7 3.7 1.9.4.2.7.1.9-.1.3-.3 1-.9 1.2-1.2.2-.3.4-.3.7-.2l1.8.9c.3.2.5.3.6.5.1.2.1.9-.1 1.4z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function readRecentViewed() {
   try { return JSON.parse(localStorage.getItem(RECENT_VIEWED_KEY) || "[]"); } catch { return []; }
 }
@@ -979,16 +990,20 @@ export function ProductPage() {
                 target="_blank"
                 rel="noreferrer"
                 variant="whatsapp"
+                className="proto-wa-enquiry-btn"
               >
-                WhatsApp Enquiry
+                <WhatsAppEnquiryIcon />
+                <span>Enquiry</span>
               </StorefrontButton>
               <StorefrontButton
                 href={`https://wa.me/${PRODUCT_ENQUIRY_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Bulk Enquiry: ${product.title} — ${window.location.href}`)}`}
                 target="_blank"
                 rel="noreferrer"
                 variant="whatsapp"
+                className="proto-wa-enquiry-btn"
               >
-                Bulk Enquiry
+                <WhatsAppEnquiryIcon />
+                <span>Bulk</span>
               </StorefrontButton>
             </div>
             {isAuthenticated ? (

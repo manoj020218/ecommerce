@@ -4,10 +4,19 @@ import { createCustomerSession, useCustomerSession } from "../../shared/auth/cus
 import { exchangeGoogleCode } from "./google-auth.api";
 import { linkGuestCheckout } from "./account.api";
 
+// Module-level (not component-level) so it survives this page component being
+// unmounted and remounted for the same navigation — a plain useRef resets on
+// every fresh mount and doesn't protect against that. Google authorization
+// codes are single-use; resubmitting the same one gets rejected by Google
+// even though the first exchange already succeeded, which is exactly what
+// showed up as an intermittent "sign-in failed" that only cleared up after
+// a manual retry (a retry gets a brand-new code from Google).
+let lastAttemptedCode = "";
+
 export function GoogleCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setSession } = useCustomerSession();
+  const { setSession, isAuthenticated } = useCustomerSession();
   const [error, setError] = useState("");
   const hasRun = useRef(false);
 
@@ -17,6 +26,26 @@ export function GoogleCallbackPage() {
 
     const code = searchParams.get("code");
     const stateStr = searchParams.get("state");
+
+    // Strip the code out of the URL immediately — if this page reloads or
+    // gets revisited (browser back/forward, a manual refresh), there's
+    // nothing left in the address bar to resubmit.
+    if (code) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+
+    // A prior mount (or the previous page load) already used this exact
+    // code. If we're already signed in, the earlier attempt succeeded —
+    // just continue on instead of trying (and failing) to reuse it.
+    if (code && code === lastAttemptedCode) {
+      if (isAuthenticated) {
+        navigate("/account", { replace: true });
+      } else {
+        setError("This sign-in link was already used. Please try again.");
+      }
+      return;
+    }
+    if (code) lastAttemptedCode = code;
 
     let state = {};
     try {
@@ -28,6 +57,10 @@ export function GoogleCallbackPage() {
       : "/account";
 
     if (!code) {
+      if (isAuthenticated) {
+        navigate(redirectPath, { replace: true });
+        return;
+      }
       const errorParam = searchParams.get("error");
       setError(errorParam === "access_denied"
         ? "Google sign-in was cancelled."

@@ -1885,6 +1885,29 @@ textarea {
   box-shadow: 0 0 0 2px rgba(232, 35, 26, 0.22);
 }
 
+/* Mobile: the search bar sits compact next to the logo/icons by default —
+   tapping into it (proto-header-main-search-active, set on input focus)
+   hides the logo and header icons and lets it fill the whole row, since a
+   tap there means the visitor wants to type. Collapses back automatically
+   on blur or when Clear is pressed. Desktop (>=900px) never applies this —
+   there's room for everything already. */
+@media (max-width: 899px) {
+  .proto-header-search {
+    flex: 0 1 130px;
+    min-width: 0;
+    transition: flex-basis 0.2s ease;
+  }
+
+  .proto-header-main-search-active .proto-header-search {
+    flex: 1 1 auto;
+  }
+
+  .proto-header-main-search-active .proto-logo-link,
+  .proto-header-main-search-active .proto-header-actions {
+    display: none;
+  }
+}
+
 .proto-header-search svg,
 .proto-header-action svg,
 .proto-icon-action svg,

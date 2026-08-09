@@ -470,11 +470,19 @@ export function StorefrontLayout() {
       </div>
 
       <header className="proto-header-shell">
-        <div className="proto-header-main">
+        <div className={`proto-header-main${isSearchFocused ? " proto-header-main-search-active" : ""}`}>
           <Link to="/" className="proto-logo-link" aria-label={storeName}>
             <StorefrontLogo branding={branding} storeName={storeName} />
           </Link>
 
+          {/* On mobile the search bar sits compact alongside the logo and
+              header icons by default — tapping into it expands it across
+              the full row (hiding the logo/icons for that moment) since a
+              tap there means the visitor wants to type a query, not look at
+              the logo. Collapses back on blur (tapping anywhere else) or on
+              the Clear button, which now also explicitly un-focuses instead
+              of just clearing text. Desktop is unaffected (see CSS — the
+              expand/collapse only applies below the 900px breakpoint). */}
           <form
             className="proto-header-search"
             onSubmit={(event) => {
@@ -491,14 +499,6 @@ export function StorefrontLayout() {
               onBlur={() => setIsSearchFocused(false)}
               placeholder="Search cameras, smart locks, gate motors..."
             />
-            {/* One icon, not two — it used to swap out for a Clear button
-                whenever isSearchFocused was false, but tapping the search
-                button itself blurs the input first, so the tap could land
-                after the icon had already swapped, hitting Clear instead of
-                Search. Keying the swap off searchText instead of focus
-                avoids that race (typing doesn't change focus), and only
-                ever renders a single button, so it no longer eats extra
-                width in the search bar on mobile. */}
             <div className="proto-header-search-actions">
               {searchText ? (
                 <button
@@ -508,6 +508,7 @@ export function StorefrontLayout() {
                   onMouseDown={(event) => {
                     event.preventDefault();
                     setSearchText("");
+                    setIsSearchFocused(false);
                   }}
                 >
                   <ClearIcon />

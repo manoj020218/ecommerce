@@ -1,12 +1,9 @@
 import { useState } from "react";
 import {
   StorefrontAlert,
-  StorefrontButton,
-  StorefrontCard,
-  StorefrontInput,
-  StorefrontPageHeader,
-  StorefrontSectionHeader
+  StorefrontButton
 } from "../../shared/storefront/storefront-ui";
+import { FieldRow, RegInput } from "../../shared/storefront/auth-form-fields";
 import { requestCustomerPasswordReset } from "./account.api";
 
 export function CustomerForgotPasswordPage() {
@@ -37,49 +34,51 @@ export function CustomerForgotPasswordPage() {
   }
 
   return (
-    <main className="proto-main-shell account-shell">
-      <StorefrontPageHeader
-        eyebrow="Fallback Access"
-        title="Forgot Password"
-        description="Google login can remain the primary path. This email-password reset flow exists as fallback account access when needed."
-        actions={<StorefrontButton to="/account/login" variant="light">Back to Login</StorefrontButton>}
-      />
+    <main className="proto-main-shell account-shell auth-shell">
+      <div className="auth-topbar">
+        <StorefrontButton to="/account/login" variant="light" className="auth-back-link">
+          ← Back to Sign In
+        </StorefrontButton>
+      </div>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
 
-      <StorefrontCard as="section" className="section-card" elevated>
-        <StorefrontSectionHeader
-          title="Request Reset Link"
-          description="Enter the customer email address. If the account exists, a reset link will be generated for email delivery."
-        />
-        <form className="stack-form" onSubmit={handleSubmit}>
-          <div className="field-grid">
-            <StorefrontInput
-              label="Customer Email"
+      <article className="proto-checkout-card proto-login-gate-v2 auth-card">
+        <div className="proto-login-gate-badge" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 3" />
+          </svg>
+        </div>
+        <div className="proto-checkout-card-head">
+          <h2>Forgot your password?</h2>
+          <span>Enter your email and we'll send you a reset link</span>
+        </div>
+
+        <form className="reg-form" onSubmit={handleSubmit}>
+          <FieldRow label="Email">
+            <RegInput
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="name@example.com"
               required
             />
-          </div>
-          <StorefrontButton type="submit" disabled={busy}>
-            {busy ? "Preparing..." : "Send Reset Link"}
-          </StorefrontButton>
+          </FieldRow>
+          <button type="submit" className="proto-login-gate-btn proto-btn proto-btn-primary" disabled={busy}>
+            {busy ? "Sending..." : "Send Reset Link"}
+          </button>
         </form>
-      </StorefrontCard>
+      </article>
 
       {devResetUrl ? (
-        <StorefrontCard as="section" className="section-card" elevated>
-          <StorefrontSectionHeader
-            title="Development Reset Link"
-            description="This helper is shown only in non-production environments for local fallback testing."
-          />
+        <article className="proto-checkout-card auth-card">
+          <p className="auth-footnote-title" style={{ marginBottom: 8 }}>Development reset link</p>
           <StorefrontAlert>
             <a href={devResetUrl}>{devResetUrl}</a>
           </StorefrontAlert>
-        </StorefrontCard>
+        </article>
       ) : null}
     </main>
   );

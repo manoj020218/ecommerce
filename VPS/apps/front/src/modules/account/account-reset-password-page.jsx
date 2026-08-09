@@ -3,12 +3,9 @@ import { useSearchParams } from "react-router-dom";
 import {
   StorefrontAlert,
   StorefrontButton,
-  StorefrontCard,
-  StorefrontErrorState,
-  StorefrontInput,
-  StorefrontPageHeader,
-  StorefrontSectionHeader
+  StorefrontErrorState
 } from "../../shared/storefront/storefront-ui";
+import { FieldRow, RegInput } from "../../shared/storefront/auth-form-fields";
 import { resetCustomerPassword } from "./account.api";
 
 export function CustomerResetPasswordPage() {
@@ -61,46 +58,52 @@ export function CustomerResetPasswordPage() {
   }
 
   return (
-    <main className="proto-main-shell account-shell">
-      <StorefrontPageHeader
-        eyebrow="Fallback Access"
-        title="Reset Password"
-        description="Set a new fallback password for customer email login. Google login can still remain the primary sign-in path."
-        actions={<StorefrontButton to="/account/login" variant="light">Back to Login</StorefrontButton>}
-      />
+    <main className="proto-main-shell account-shell auth-shell">
+      <div className="auth-topbar">
+        <StorefrontButton to="/account/login" variant="light" className="auth-back-link">
+          ← Back to Sign In
+        </StorefrontButton>
+      </div>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
 
-      <StorefrontCard as="section" className="section-card" elevated>
-        <StorefrontSectionHeader
-          title="Choose New Password"
-          description="Use at least 8 characters. After reset, sign in from the customer login page."
-        />
-        <form className="stack-form" onSubmit={handleSubmit}>
-          <div className="field-grid">
-            <StorefrontInput
-              label="New Password"
+      <article className="proto-checkout-card proto-login-gate-v2 auth-card">
+        <div className="proto-login-gate-badge" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="10" width="16" height="10" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+        </div>
+        <div className="proto-checkout-card-head">
+          <h2>Choose a new password</h2>
+          <span>Use at least 8 characters</span>
+        </div>
+
+        <form className="reg-form" onSubmit={handleSubmit}>
+          <FieldRow label="New Password">
+            <RegInput
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Enter new password"
               required
             />
-            <StorefrontInput
-              label="Confirm Password"
+          </FieldRow>
+          <FieldRow label="Confirm Password">
+            <RegInput
               type="password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="Re-enter new password"
               required
             />
-          </div>
-          <StorefrontButton type="submit" disabled={busy}>
+          </FieldRow>
+          <button type="submit" className="proto-login-gate-btn proto-btn proto-btn-primary" disabled={busy}>
             {busy ? "Updating..." : "Reset Password"}
-          </StorefrontButton>
+          </button>
         </form>
-      </StorefrontCard>
+      </article>
     </main>
   );
 }

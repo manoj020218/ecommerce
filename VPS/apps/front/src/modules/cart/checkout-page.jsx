@@ -261,7 +261,7 @@ function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTota
       </form>
 
       <StorefrontButton
-        to="/account/login?redirect=%2Fcheckout"
+        to="/account/login?redirect=%2Fcheckout&mode=signup"
         variant="light"
         className="proto-login-gate-btn"
       >

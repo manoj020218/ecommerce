@@ -4,11 +4,10 @@ import { createCustomerSession, useCustomerSession } from "../../shared/auth/cus
 import {
   StorefrontAlert,
   StorefrontButton,
-  StorefrontCard,
   StorefrontInput,
-  StorefrontLoadingState,
-  StorefrontSectionHeader
+  StorefrontLoadingState
 } from "../../shared/storefront/storefront-ui";
+import { FieldRow, RegInput } from "../../shared/storefront/auth-form-fields";
 import {
   loginCustomerEmail,
   registerCustomerEmail,
@@ -70,63 +69,13 @@ export function GoogleSignInButton({ redirectPath }) {
   );
 }
 
-function FieldRow({ label, badge, children }) {
-  return (
-    <div className="reg-field-wrap">
-      <div className="reg-label-row">
-        <label className="reg-label">{label}</label>
-        {badge && <span className="reg-badge-optional">{badge}</span>}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function RegInput({ type = "text", value, onChange, placeholder, required, inputMode }) {
-  const [showPw, setShowPw] = useState(false);
-  const isPw = type === "password";
-  return (
-    <div className="reg-input-wrap">
-      <input
-        className="reg-input"
-        type={isPw ? (showPw ? "text" : "password") : type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        inputMode={inputMode}
-        autoComplete={isPw ? "new-password" : undefined}
-      />
-      {isPw && (
-        <button type="button" className="reg-pw-eye" onClick={() => setShowPw((v) => !v)} tabIndex={-1} aria-label="Toggle password visibility">
-          {showPw ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          )}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function CreateAccountCard({ busy, onSubmit }) {
+function CreateAccountFields({ busy, onSubmit }) {
   const [form, setForm] = useState({ name: "", email: "", mobile: "", password: "", company: "", gstin: "" });
   const [showBiz, setShowBiz] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
-    <StorefrontCard as="article" className="section-card reg-card" elevated>
-      <div className="reg-card-header">
-        <div className="reg-card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>
-        <div>
-          <h2 className="reg-card-title">Create Account</h2>
-          <p className="reg-card-subtitle">Start shopping in under 60 seconds</p>
-        </div>
-      </div>
-
+    <>
       <form className="reg-form" onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}>
         <FieldRow label="Full Name">
           <RegInput value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Your full name" required />
@@ -186,7 +135,7 @@ function CreateAccountCard({ busy, onSubmit }) {
           <a href="/terms-and-conditions" className="reg-legal-link">Terms of Service</a>.
         </p>
       </form>
-    </StorefrontCard>
+    </>
   );
 }
 
@@ -203,6 +152,8 @@ export function CustomerAccountLoginPage() {
   const [searchParams] = useSearchParams();
   const redirectPath = resolveRedirect(searchParams);
   const { isAuthenticated, loading, setSession } = useCustomerSession();
+
+  const [mode, setMode] = useState(searchParams.get("mode") === "signup" ? "signup" : "login");
 
   const [emailLogin, setEmailLogin] = useState({
     email: "",
@@ -250,110 +201,111 @@ export function CustomerAccountLoginPage() {
   }
 
   return (
-    <main className="proto-main-shell account-shell">
-      <div className="proto-page-hero">
-        <div className="hero-kicker-row">
-          <StorefrontButton to="/" variant="light">
-            Browse products
-          </StorefrontButton>
-          <span className="eyebrow-chip">Customer Access</span>
-        </div>
-        <div className="account-hero-copy">
-          <div>
-            <p className="eyebrow-text">Customer self-service</p>
-            <h1>Sign in to orders, invoices, tracking, and GST details</h1>
-            <p className="hero-muted">
-              Use email login, create a new account, or verify a mobile number with OTP.
-              Verified email or verified mobile is required before linking guest orders later.
-            </p>
-          </div>
-          <div className="hero-stat-grid">
-            <div className="metric-card">
-              <strong>Orders</strong>
-              <span>View order history and reorder with current pricing.</span>
-            </div>
-            <div className="metric-card">
-              <strong>Invoices</strong>
-              <span>Download GST invoices from your own account only.</span>
-            </div>
-          </div>
-        </div>
+    <main className="proto-main-shell account-shell auth-shell">
+      <div className="auth-topbar">
+        <StorefrontButton to="/" variant="light" className="auth-back-link">
+          ← Back to shop
+        </StorefrontButton>
       </div>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {info ? <StorefrontAlert>{info}</StorefrontAlert> : null}
 
-      <GoogleSignInButton redirectPath={redirectPath} />
+      <article className="proto-checkout-card proto-login-gate-v2 auth-card">
+        <div className="proto-login-gate-badge" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="10" width="16" height="10" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+        </div>
+        <div className="proto-checkout-card-head">
+          <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+          <span>
+            {mode === "login"
+              ? "Sign in to view orders, invoices & tracking"
+              : "Takes less than a minute"}
+          </span>
+        </div>
 
-      <section className="proto-auth-grid">
-        <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
-            title="Email Login"
-            description="Use an existing email and password."
-          />
-          <form
-            className="stack-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              setBusy("login");
-              applySession(loginCustomerEmail(emailLogin), "Customer session ready.").finally(
-                () => setBusy("")
-              );
-            }}
+        <div className="auth-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "login"}
+            className={`auth-tab${mode === "login" ? " auth-tab-active" : ""}`}
+            onClick={() => setMode("login")}
           >
-            <div className="field-grid">
-              <StorefrontInput
-                label="Email"
-                type="email"
-                value={emailLogin.email}
-                onChange={(event) =>
-                  setEmailLogin((current) => ({
-                    ...current,
-                    email: event.target.value
-                  }))
-                }
-                placeholder="name@example.com"
-                required
-              />
-              <StorefrontInput
-                label="Password"
-                type="password"
-                value={emailLogin.password}
-                onChange={(event) =>
-                  setEmailLogin((current) => ({
-                    ...current,
-                    password: event.target.value
-                  }))
-                }
-                placeholder="Your password"
-                required
-              />
-            </div>
-            <StorefrontButton type="submit" disabled={busy === "login"}>
-              {busy === "login" ? "Signing in..." : "Sign In"}
-            </StorefrontButton>
-            <div className="action-row">
-              <StorefrontButton to="/account/forgot-password" variant="light">
-                Forgot Password
-              </StorefrontButton>
-            </div>
-          </form>
-        </StorefrontCard>
+            Sign In
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "signup"}
+            className={`auth-tab${mode === "signup" ? " auth-tab-active" : ""}`}
+            onClick={() => setMode("signup")}
+          >
+            Create Account
+          </button>
+        </div>
 
-        <CreateAccountCard busy={busy} onSubmit={(form) => {
-          setBusy("register");
-          applySession(
-            registerCustomerEmail(form),
-            "Account created. Redirecting to your dashboard."
-          ).finally(() => setBusy(""));
-        }} />
+        {mode === "login" ? (
+          <>
+            <GoogleSignInButton redirectPath={redirectPath} />
+            <div className="proto-login-gate-divider"><span>or sign in with email</span></div>
+
+            <form
+              className="reg-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setBusy("login");
+                applySession(loginCustomerEmail(emailLogin), "Customer session ready.").finally(
+                  () => setBusy("")
+                );
+              }}
+            >
+              <FieldRow label="Email">
+                <RegInput
+                  type="email"
+                  value={emailLogin.email}
+                  onChange={(event) =>
+                    setEmailLogin((current) => ({ ...current, email: event.target.value }))
+                  }
+                  placeholder="name@example.com"
+                  required
+                />
+              </FieldRow>
+              <FieldRow label="Password">
+                <RegInput
+                  type="password"
+                  value={emailLogin.password}
+                  onChange={(event) =>
+                    setEmailLogin((current) => ({ ...current, password: event.target.value }))
+                  }
+                  placeholder="Your password"
+                  required
+                />
+              </FieldRow>
+              <button type="submit" className="proto-login-gate-btn proto-btn proto-btn-primary" disabled={busy === "login"}>
+                {busy === "login" ? "Signing in..." : "Sign In"}
+              </button>
+            </form>
+
+            <StorefrontButton to="/account/forgot-password" variant="light" className="proto-login-gate-btn">
+              Forgot Password?
+            </StorefrontButton>
+          </>
+        ) : (
+          <CreateAccountFields busy={busy} onSubmit={(form) => {
+            setBusy("register");
+            applySession(
+              registerCustomerEmail(form),
+              "Account created. Redirecting to your dashboard."
+            ).finally(() => setBusy(""));
+          }} />
+        )}
 
         {/* Mobile OTP hidden — pending WhatsApp free-message OTP integration */}
-        <StorefrontCard as="article" className="section-card" elevated style={{ display: "none" }}>
-          <StorefrontSectionHeader
-            title="Mobile OTP"
-            description="Verify a mobile number and access guest-linked orders safely."
-          />
+        <div style={{ display: "none" }}>
           <form
             className="stack-form"
             onSubmit={(event) => {
@@ -450,7 +402,30 @@ export function CustomerAccountLoginPage() {
               {busy === "otp-verify" ? "Verifying..." : "Verify OTP"}
             </StorefrontButton>
           </form>
-        </StorefrontCard>
+        </div>
+      </article>
+
+      {/* Self-service description — moved below the login/signup card itself.
+          A first-time visitor wants the form front and center; the "why
+          create an account" pitch reads better as reassurance after they've
+          already found the form, not as a wall of marketing copy blocking
+          it. */}
+      <section className="auth-footnote">
+        <p className="auth-footnote-title">Customer self-service</p>
+        <p className="auth-footnote-text">
+          Sign in to view your order history, download GST invoices, and track shipments —
+          all in one place.
+        </p>
+        <div className="auth-footnote-grid">
+          <div className="auth-footnote-item">
+            <strong>Orders</strong>
+            <span>View order history and reorder with current pricing.</span>
+          </div>
+          <div className="auth-footnote-item">
+            <strong>Invoices</strong>
+            <span>Download GST invoices from your own account only.</span>
+          </div>
+        </div>
       </section>
     </main>
   );

@@ -6829,6 +6829,22 @@ textarea {
 .proto-wa-save-row > :first-child { flex: 7; }
 .proto-wa-save-row > :last-child { flex: 3; }
 
+.proto-wa-enquiry-split {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.proto-wa-enquiry-split > * {
+  flex: 1;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: nowrap;
+}
+@media (max-width: 380px) {
+  .proto-wa-enquiry-split > * { font-size: 11px; padding-left: 4px; padding-right: 4px; }
+}
+
 /* ── Swipeable Carousel (Recent Viewed / Linked Products) ─── */
 .proto-auto-carousel-shell {
   width: 100%;

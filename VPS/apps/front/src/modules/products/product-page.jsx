@@ -105,6 +105,11 @@ function defaultAddress(savedAddresses = []) {
 const RECENT_VIEWED_KEY = "jenix_recently_viewed";
 const RECENT_MAX = 12;
 
+// Pre-sales product questions go to the support line (the number actually
+// staffed/connected for WhatsApp), not the general contact number used on
+// the Contact Us page — the two are deliberately different lines.
+const PRODUCT_ENQUIRY_WHATSAPP_NUMBER = "917891012342";
+
 function readRecentViewed() {
   try { return JSON.parse(localStorage.getItem(RECENT_VIEWED_KEY) || "[]"); } catch { return []; }
 }
@@ -968,14 +973,24 @@ export function ProductPage() {
           {cartActionError ? <p className="proto-inline-error">{cartActionError}</p> : null}
 
           <div className="proto-wa-save-row">
-            <StorefrontButton
-              href={`https://wa.me/?text=${encodeURIComponent(`I have an enquiry about this product: ${product.title} — ${window.location.href}`)}`}
-              target="_blank"
-              rel="noreferrer"
-              variant="whatsapp"
-            >
-              WhatsApp Enquiry
-            </StorefrontButton>
+            <div className="proto-wa-enquiry-split">
+              <StorefrontButton
+                href={`https://wa.me/${PRODUCT_ENQUIRY_WHATSAPP_NUMBER}?text=${encodeURIComponent(`I have an enquiry about this product: ${product.title} — ${window.location.href}`)}`}
+                target="_blank"
+                rel="noreferrer"
+                variant="whatsapp"
+              >
+                WhatsApp Enquiry
+              </StorefrontButton>
+              <StorefrontButton
+                href={`https://wa.me/${PRODUCT_ENQUIRY_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Bulk Enquiry: ${product.title} — ${window.location.href}`)}`}
+                target="_blank"
+                rel="noreferrer"
+                variant="whatsapp"
+              >
+                Bulk Enquiry
+              </StorefrontButton>
+            </div>
             {isAuthenticated ? (
               <StorefrontButton
                 type="button"

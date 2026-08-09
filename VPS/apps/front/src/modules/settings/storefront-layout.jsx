@@ -491,13 +491,14 @@ export function StorefrontLayout() {
               onBlur={() => setIsSearchFocused(false)}
               placeholder="Search cameras, smart locks, gate motors..."
             />
-            {/* The search (submit) button used to be swapped out for a Clear
-                button whenever isSearchFocused was false — but tapping the
-                search button itself blurs the input first, so on mobile the
-                tap could land after the swap already happened, hitting
-                Clear instead of Search. The submit button now always stays
-                put; Clear renders alongside it (gated on searchText alone,
-                not focus) instead of replacing it. */}
+            {/* One icon, not two — it used to swap out for a Clear button
+                whenever isSearchFocused was false, but tapping the search
+                button itself blurs the input first, so the tap could land
+                after the icon had already swapped, hitting Clear instead of
+                Search. Keying the swap off searchText instead of focus
+                avoids that race (typing doesn't change focus), and only
+                ever renders a single button, so it no longer eats extra
+                width in the search bar on mobile. */}
             <div className="proto-header-search-actions">
               {searchText ? (
                 <button
@@ -511,10 +512,11 @@ export function StorefrontLayout() {
                 >
                   <ClearIcon />
                 </button>
-              ) : null}
-              <button type="submit" aria-label="Search storefront">
-                <SearchIcon />
-              </button>
+              ) : (
+                <button type="submit" aria-label="Search storefront">
+                  <SearchIcon />
+                </button>
+              )}
             </div>
           </form>
 

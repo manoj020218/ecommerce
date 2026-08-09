@@ -1942,14 +1942,15 @@ textarea {
   white-space: nowrap;
 }
 
-/* Unlike the account/cart icon actions, "Install" only ever appears when
-   the browser has actually offered it (canInstall) — rare enough that it
-   should stay legible on mobile too, not hidden behind the >=900px-only
-   .proto-header-action-label rule. */
+/* Below 900px the Install button now matches the other header icon
+   actions (icon-only, fixed circular size) — with its text label always
+   shown it was eating enough width to squeeze the search bar down to
+   nearly unusable on phones. Label comes back at >=900px alongside the
+   other .proto-header-action-label text. */
 .proto-install-action {
-  width: auto;
-  height: auto;
-  padding: 6px 10px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 999px;
   cursor: pointer;
@@ -1958,6 +1959,7 @@ textarea {
 }
 
 .proto-install-action-label {
+  display: none;
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
@@ -4945,6 +4947,17 @@ textarea {
   }
 
   .proto-header-action-label {
+    display: inline;
+  }
+
+  .proto-install-action {
+    width: auto;
+    height: auto;
+    padding: 6px 10px;
+    border-radius: 999px;
+  }
+
+  .proto-install-action-label {
     display: inline;
   }
 

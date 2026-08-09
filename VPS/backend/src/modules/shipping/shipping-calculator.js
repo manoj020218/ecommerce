@@ -50,13 +50,46 @@ function normalizePincode(value) {
     .slice(0, 6);
 }
 
+// Fallback only — used when a caller has a pincode but no state (e.g. the
+// product-page "Estimate Shipping" widget only ever collects a pincode).
+// India Post's PIN allocation is state-predictable by the first two digits,
+// so this is accurate enough to pick the right shipping ZONE bucket even
+// though it isn't precise enough for tax/legal state identification. Real
+// checkout/order flows always submit an explicit stateCode from the buyer's
+// selected address, which takes priority over this and is never affected.
+const PINCODE_PREFIX_TO_GST_CODE = {
+  11: "07", 12: "06", 13: "06", 14: "03", 15: "03", 16: "03",
+  17: "02", 18: "01", 19: "01",
+  20: "09", 21: "09", 22: "09", 23: "09", 24: "09", 25: "09", 26: "05", 27: "09", 28: "09",
+  30: "08", 31: "08", 32: "08", 33: "08", 34: "08",
+  36: "24", 37: "24", 38: "24", 39: "24",
+  40: "27", 41: "27", 42: "27", 43: "27", 44: "27",
+  45: "23", 46: "23", 47: "23", 48: "23", 49: "22",
+  50: "36", 51: "37", 52: "37", 53: "37",
+  56: "29", 57: "29", 58: "29", 59: "29",
+  60: "33", 61: "33", 62: "33", 63: "33", 64: "33",
+  67: "32", 68: "32", 69: "32",
+  70: "19", 71: "19", 72: "19", 73: "19", 74: "19",
+  75: "21", 76: "21", 77: "21",
+  78: "18", 79: "16",
+  80: "10", 81: "10", 82: "10", 85: "10",
+  83: "20", 84: "20"
+};
+
+function guessStateCodeFromPincode(pincode) {
+  if (!pincode || pincode.length < 2) return "";
+  return PINCODE_PREFIX_TO_GST_CODE[pincode.slice(0, 2)] || "";
+}
+
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
 function resolveDestinationZone(destination, settings) {
   const pincode = normalizePincode(destination?.pincode);
-  const stateCode = normalizeStateCode(destination?.stateCode || destination?.state);
+  const stateCode =
+    normalizeStateCode(destination?.stateCode || destination?.state) ||
+    normalizeStateCode(guessStateCodeFromPincode(pincode));
   const originStateCode = normalizeStateCode(settings.originStateCode || "");
 
   const localPrefixes = safeArray(settings.localPincodePrefixes).map((value) =>

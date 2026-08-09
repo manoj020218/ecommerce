@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import {
@@ -62,22 +62,21 @@ function buildAddressForm(address = {}) {
   };
 }
 
-function MetricCard({ value, label, meta }) {
-  return (
-    <StorefrontCard className="metric-card">
-      <strong>{value}</strong>
-      <span>{label}</span>
-      {meta ? <small>{meta}</small> : null}
-    </StorefrontCard>
-  );
-}
-
 function visibleProductPrice(product) {
   return Number(product?.pricing?.visiblePrice ?? product?.salePrice ?? 0);
 }
 
 function StatusBadge({ children }) {
   return <StorefrontBadge className="eyebrow-chip">{children}</StorefrontBadge>;
+}
+
+function initialsFor(name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] || "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
 }
 
 export function CustomerAccountPage() {
@@ -103,6 +102,7 @@ export function CustomerAccountPage() {
   const [addressForm, setAddressForm] = useState(EMPTY_ADDRESS);
   const [editingAddressId, setEditingAddressId] = useState("");
   const [guestOrderId, setGuestOrderId] = useState("");
+  const addAddressFormRef = useRef(null);
 
   function redirectToLogin(requestError) {
     if (requestError?.status !== 401) {
@@ -301,6 +301,14 @@ export function CustomerAccountPage() {
     setNotice("");
   }
 
+  function handleAddNewAddress() {
+    setEditingAddressId("");
+    setAddressForm(EMPTY_ADDRESS);
+    setError("");
+    setNotice("");
+    addAddressFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function handleRemoveSaved(productId) {
     setBusy(`saved:${productId}`);
     setError("");
@@ -367,54 +375,67 @@ export function CustomerAccountPage() {
   const profile = dashboard?.profile || {};
   const isEditingAddress = Boolean(editingAddressId);
 
+  const displayName = dashboard?.profile?.name || customer?.name || "Customer";
+
   return (
     <main className="proto-main-shell account-shell">
-      <div className="proto-page-hero">
-        <div className="hero-kicker-row">
-          <StorefrontButton to="/" variant="light">
-            Back to storefront
-          </StorefrontButton>
-          <StorefrontButton
-            type="button"
-            variant="light"
-            className="compact-btn"
-            onClick={handleLogout}
-            disabled={busy === "logout"}
-          >
-            {busy === "logout" ? "Signing out..." : "Logout"}
-          </StorefrontButton>
+      <div className="account-topbar">
+        <StorefrontButton to="/" variant="light" className="auth-back-link">
+          ← Back to shop
+        </StorefrontButton>
+        <StorefrontButton
+          type="button"
+          variant="light"
+          className="auth-back-link"
+          onClick={handleLogout}
+          disabled={busy === "logout"}
+        >
+          {busy === "logout" ? "Signing out..." : "Logout"}
+        </StorefrontButton>
+      </div>
+
+      <article className="account-profile-card">
+        <div className="account-profile-avatar" aria-hidden="true">{initialsFor(displayName)}</div>
+        <div className="account-profile-info">
+          <h1>{displayName}</h1>
+          <p>
+            {dashboard?.profile?.email || "No email linked"} · {dashboard?.profile?.mobile || "No mobile linked"}
+          </p>
+          <div className="account-profile-badges">
+            <StatusBadge>
+              {dashboard?.profile?.verifiedEmail ? "Verified email" : "Email not verified"}
+            </StatusBadge>
+            <StatusBadge>
+              {dashboard?.profile?.verifiedMobile ? "Verified mobile" : "Mobile not verified"}
+            </StatusBadge>
+            <StatusBadge>{humanizeStatus(profile.customerType || "retail")}</StatusBadge>
+            {profile.isB2BApproved ? <StatusBadge>B2B Approved</StatusBadge> : null}
+            {profile.priceGroup ? (
+              <StatusBadge>Price Group: {humanizeStatus(profile.priceGroup)}</StatusBadge>
+            ) : null}
+            {profile.orderMode ? (
+              <StatusBadge>Order Mode: {humanizeStatus(profile.orderMode)}</StatusBadge>
+            ) : null}
+          </div>
         </div>
-        <div className="account-hero-copy">
-          <div>
-            <p className="eyebrow-text">My Account</p>
-            <h1>{dashboard?.profile?.name || customer?.name || "Customer"}</h1>
-            <p className="hero-muted">
-              {dashboard?.profile?.email || "No email linked"} <span className="hero-divider">|</span>{" "}
-              {dashboard?.profile?.mobile || "No mobile linked"}
-            </p>
-            <div className="chip-row">
-              <StatusBadge>
-                {dashboard?.profile?.verifiedEmail ? "Verified email" : "Email not verified"}
-              </StatusBadge>
-              <StatusBadge>
-                {dashboard?.profile?.verifiedMobile ? "Verified mobile" : "Mobile not verified"}
-              </StatusBadge>
-              <StatusBadge>{humanizeStatus(profile.customerType || "retail")}</StatusBadge>
-              {profile.isB2BApproved ? <StatusBadge>B2B Approved</StatusBadge> : null}
-              {profile.priceGroup ? (
-                <StatusBadge>Price Group: {humanizeStatus(profile.priceGroup)}</StatusBadge>
-              ) : null}
-              {profile.orderMode ? (
-                <StatusBadge>Order Mode: {humanizeStatus(profile.orderMode)}</StatusBadge>
-              ) : null}
-            </div>
-          </div>
-          <div className="hero-stat-grid">
-            <MetricCard value={orders.length} label="Orders" meta="Own orders only" />
-            <MetricCard value={invoices.length} label="Invoices" meta="GST invoice history" />
-            <MetricCard value={tracking.length} label="Tracking" meta="Latest shipment status" />
-            <MetricCard value={savedProducts.length} label="Saved" meta="Product shortlist" />
-          </div>
+      </article>
+
+      <div className="account-stat-strip">
+        <div className="account-stat">
+          <strong>{orders.length}</strong>
+          <span>Orders</span>
+        </div>
+        <div className="account-stat">
+          <strong>{invoices.length}</strong>
+          <span>Invoices</span>
+        </div>
+        <div className="account-stat">
+          <strong>{tracking.length}</strong>
+          <span>Tracking</span>
+        </div>
+        <div className="account-stat">
+          <strong>{savedProducts.length}</strong>
+          <span>Saved</span>
         </div>
       </div>
 
@@ -651,7 +672,12 @@ export function CustomerAccountPage() {
         <StorefrontCard as="article" className="section-card" elevated>
           <StorefrontSectionHeader
             title="My Addresses"
-            description="Saved billing and shipping addresses."
+            description="Save as many billing and shipping addresses as you need."
+            action={
+              <StorefrontButton type="button" variant="light" onClick={handleAddNewAddress}>
+                + Add New Address
+              </StorefrontButton>
+            }
           />
           <div className="card-list">
             {savedAddresses.length ? (
@@ -694,6 +720,7 @@ export function CustomerAccountPage() {
         </StorefrontCard>
 
         <StorefrontCard as="article" className="section-card" elevated>
+          <div ref={addAddressFormRef} style={{ scrollMarginTop: 16 }} />
           <StorefrontSectionHeader
             title={isEditingAddress ? "Edit Address" : "Add Address"}
             description={

@@ -1258,6 +1258,102 @@ textarea {
   gap: 18px;
 }
 
+/* Account dashboard header — replaces the old marketing-hero treatment
+   (giant H1 + paragraph + chip wall) with a compact app-style profile
+   card, same spirit as the login page redesign. */
+.account-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.account-profile-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(232, 35, 26, 0.1), rgba(232, 35, 26, 0.18));
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 19px;
+  flex-shrink: 0;
+}
+
+.account-profile-info {
+  min-width: 0;
+}
+
+.account-profile-info h1 {
+  margin: 0 0 2px;
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.account-profile-info p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.account-profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.account-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.account-stat {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+.account-stat strong {
+  display: block;
+  font-size: 19px;
+  color: var(--text);
+}
+
+.account-stat span {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 480px) {
+  .account-profile-card {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .account-profile-badges {
+    justify-content: center;
+  }
+}
+
 .account-hero-copy {
   display: grid;
   gap: 16px;

@@ -1,6 +1,7 @@
 const { env } = require("./config/env");
 const { createApp } = require("./app");
 const { runReminderDispatch } = require("./modules/abandoned-cart/abandoned-cart.service");
+const { resumeIfSessionExists } = require("./modules/whatsapp/whatsapp.service");
 
 const app = createApp();
 
@@ -8,6 +9,11 @@ const server = app.listen(env.port, () => {
   // eslint-disable-next-line no-console
   console.log(`Jenix backend listening on port ${env.port}`);
 });
+
+// Every pm2 restart previously dropped the WhatsApp connection and left it
+// sitting there until an admin noticed and clicked Connect again — the
+// paired session on disk was still valid the whole time.
+resumeIfSessionExists();
 
 // Abandoned-cart reminders previously only ever went out when an admin
 // clicked "Run Due Reminders" in the admin panel — the 30 min / 6 hr / 24 hr

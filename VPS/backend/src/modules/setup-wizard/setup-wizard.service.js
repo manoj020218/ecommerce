@@ -323,7 +323,17 @@ function buildForms(settings, authStore, paymentStore, shippingStore) {
         paymentGateway?.credentials?.webhookSecret ||
           wizard.paymentGateway?.webhookSecretConfigured
       ),
-      configured: Boolean(wizard.paymentGateway?.configured)
+      // Payment Gateways has its own full admin page — most admins configure
+      // Razorpay/Cashfree there directly and never touch this wizard step, so
+      // gating "done" purely on wizard.paymentGateway.configured (only ever
+      // set by submitting this step's own form) left a genuinely working,
+      // fully-credentialed gateway stuck showing "Pending" forever. Treat it
+      // as configured if real credentials exist too, so this step reflects
+      // live reality either way.
+      configured: Boolean(
+        wizard.paymentGateway?.configured ||
+          (paymentGateway?.credentials?.keyId && paymentGateway?.credentials?.keySecret)
+      )
     },
     manual_bank_upi: {
       beneficiaryName:

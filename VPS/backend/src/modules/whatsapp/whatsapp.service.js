@@ -20,6 +20,8 @@ const state = {
   starting: false
 };
 
+let reconnectTimer = null;
+
 // Customer mobile numbers are stored as plain 10-digit Indian numbers with
 // no country code (checkout never asks for one) — the previous version only
 // stripped a leading trunk "0" and left a bare 10-digit number as-is, which
@@ -49,6 +51,10 @@ function publicStatus() {
 
 async function startConnection() {
   if (state.starting || state.status === "connected") return publicStatus();
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   state.starting = true;
   state.lastError = null;
 
@@ -101,8 +107,19 @@ async function startConnection() {
           state.connectedNumber = null;
           fs.rmSync(SESSION_DIR, { recursive: true, force: true });
         } else {
-          state.status = "error";
-          state.lastError = "Connection closed unexpectedly. Try connecting again.";
+          // Any other close (network blip, WhatsApp-side restart, phone
+          // briefly offline, etc.) is normal for a long-lived WebSocket and
+          // does not mean the paired session is invalid — reconnecting with
+          // the same persisted credentials picks it back up with no new QR
+          // scan needed. Previously this always dropped to "error" and sat
+          // there until an admin clicked Connect again.
+          state.status = "connecting";
+          state.qrDataUrl = null;
+          state.lastError = null;
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            startConnection().catch(() => {});
+          }, 3000);
         }
       }
     });
@@ -117,6 +134,10 @@ async function startConnection() {
 }
 
 async function disconnect() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
   try {
     if (state.sock) {
       await state.sock.logout().catch(() => {});
@@ -140,4 +161,22 @@ async function sendMessage(phone, message) {
   await state.sock.sendMessage(toJid(phone), { text: message });
 }
 
-module.exports = { startConnection, disconnect, sendMessage, getStatus: publicStatus };
+// A pm2 restart / deploy wipes the in-memory connection state, but the
+// paired session on disk is still valid — without this the admin had to
+// manually click Connect after every single restart even though nothing
+// about the WhatsApp pairing actually changed. Only fires when a previously
+// paired session exists; never auto-triggers a fresh QR flow.
+function resumeIfSessionExists() {
+  const credsPath = path.join(SESSION_DIR, "creds.json");
+  if (fs.existsSync(credsPath)) {
+    startConnection().catch(() => {});
+  }
+}
+
+module.exports = {
+  startConnection,
+  disconnect,
+  sendMessage,
+  getStatus: publicStatus,
+  resumeIfSessionExists
+};

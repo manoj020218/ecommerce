@@ -108,10 +108,18 @@ function AccountIcon({ name }) {
 function AccountSectionHead({ icon, title, description, action }) {
   return (
     <div className="account-section-head">
-      <div className="account-section-head-icon"><AccountIcon name={icon} /></div>
-      <div className="storefront-section-header-copy">
-        <h2>{title}</h2>
-        {description ? <p>{description}</p> : null}
+      {/* Icon + title/description are grouped into one flex unit that never
+          wraps internally — previously they were three separate flex items
+          in the same wrapping row as the optional action button, so on
+          narrower widths (or whenever an action button was present) the
+          icon could end up wrapping onto its own line, away from the
+          title it belongs to. */}
+      <div className="account-section-head-title-row">
+        <div className="account-section-head-icon"><AccountIcon name={icon} /></div>
+        <div className="storefront-section-header-copy">
+          <h2>{title}</h2>
+          {description ? <p>{description}</p> : null}
+        </div>
       </div>
       {action ? <div className="storefront-section-header-action">{action}</div> : null}
     </div>
@@ -140,6 +148,7 @@ export function CustomerAccountPage() {
   });
   const [addressForm, setAddressForm] = useState(EMPTY_ADDRESS);
   const [editingAddressId, setEditingAddressId] = useState("");
+  const [showAddressForm, setShowAddressForm] = useState(false);
   const [guestOrderId, setGuestOrderId] = useState("");
   const addAddressFormRef = useRef(null);
 
@@ -295,6 +304,7 @@ export function CustomerAccountPage() {
       }
       setEditingAddressId("");
       setAddressForm(EMPTY_ADDRESS);
+      setShowAddressForm(false);
       await loadAccount(false);
     } catch (requestError) {
       if (!redirectToLogin(requestError)) {
@@ -331,6 +341,10 @@ export function CustomerAccountPage() {
     setAddressForm(buildAddressForm(address));
     setError("");
     setNotice("");
+    setShowAddressForm(true);
+    requestAnimationFrame(() => {
+      addAddressFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function handleCancelAddressEdit() {
@@ -338,6 +352,7 @@ export function CustomerAccountPage() {
     setAddressForm(EMPTY_ADDRESS);
     setError("");
     setNotice("");
+    setShowAddressForm(false);
   }
 
   function handleAddNewAddress() {
@@ -345,7 +360,10 @@ export function CustomerAccountPage() {
     setAddressForm(EMPTY_ADDRESS);
     setError("");
     setNotice("");
-    addAddressFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setShowAddressForm(true);
+    requestAnimationFrame(() => {
+      addAddressFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function handleRemoveSaved(productId) {
@@ -712,18 +730,17 @@ export function CustomerAccountPage() {
         </StorefrontCard>
       </section>
 
-      <section className="account-grid">
-        <StorefrontCard as="article" className="section-card" elevated>
-          <AccountSectionHead
-            icon="address"
-            title="My Addresses"
-            description="Save as many billing and shipping addresses as you need."
-            action={
-              <StorefrontButton type="button" variant="light" onClick={handleAddNewAddress}>
-                + Add New Address
-              </StorefrontButton>
-            }
-          />
+      <StorefrontCard as="article" className="section-card" elevated>
+        <AccountSectionHead
+          icon="address"
+          title="My Addresses"
+          description="Save as many billing and shipping addresses as you need."
+          action={
+            <StorefrontButton type="button" variant="light" onClick={handleAddNewAddress}>
+              + Add New Address
+            </StorefrontButton>
+          }
+        />
           <div className="card-list">
             {savedAddresses.length ? (
               savedAddresses.map((address) => (
@@ -764,6 +781,7 @@ export function CustomerAccountPage() {
           </div>
         </StorefrontCard>
 
+      {showAddressForm ? (
         <StorefrontCard as="article" className="section-card" elevated>
           <div ref={addAddressFormRef} style={{ scrollMarginTop: 16 }} />
           <AccountSectionHead
@@ -927,20 +945,18 @@ export function CustomerAccountPage() {
                     ? "Update Address"
                     : "Save Address"}
               </StorefrontButton>
-              {isEditingAddress ? (
-                <StorefrontButton
-                  type="button"
-                  variant="light"
-                  onClick={handleCancelAddressEdit}
-                  disabled={busy === "address"}
-                >
-                  Cancel
-                </StorefrontButton>
-              ) : null}
+              <StorefrontButton
+                type="button"
+                variant="light"
+                onClick={handleCancelAddressEdit}
+                disabled={busy === "address"}
+              >
+                Cancel
+              </StorefrontButton>
             </div>
           </form>
         </StorefrontCard>
-      </section>
+      ) : null}
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>

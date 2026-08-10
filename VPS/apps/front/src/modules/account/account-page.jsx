@@ -9,7 +9,6 @@ import {
   StorefrontChip,
   StorefrontInput,
   StorefrontLoadingState,
-  StorefrontSectionHeader,
   StorefrontSelect
 } from "../../shared/storefront/storefront-ui";
 import { INDIA_GST_STATES } from "../../shared/india-gst-states";
@@ -77,6 +76,46 @@ function initialsFor(name) {
   const first = parts[0]?.[0] || "";
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (first + last).toUpperCase();
+}
+
+// Same badge-circle-plus-copy language as the profile card / login page,
+// applied to every card on this page instead of just the top one — a
+// drop-in replacement for StorefrontSectionHeader (used sitewide, left
+// untouched) scoped to just this file so no other page is affected.
+const ACCOUNT_ICON_PATHS = {
+  profile: ["M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2", "M12 11a4 4 0 100-8 4 4 0 000 8z"],
+  gst: ["M9 7h6M9 11h6M9 15h4", "M7 3h10a1 1 0 011 1v16l-3-2-2 2-2-2-2 2-2-2-1 2V4a1 1 0 011-1z"],
+  orders: ["M21 8l-9-5-9 5 9 5 9-5z", "M3 8v8l9 5 9-5V8", "M12 13v8"],
+  invoices: ["M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z", "M14 2v6h6", "M9 13h6M9 17h6"],
+  tracking: ["M3 7h11v9H3z", "M14 10h4l3 3v3h-7z", "M6.5 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z", "M17.5 19a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"],
+  address: ["M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z", "M12 13a3 3 0 100-6 3 3 0 000 6z"],
+  addAddress: ["M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z", "M12 8v5M9.5 10.5h5"],
+  saved: ["M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"],
+  viewed: ["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z", "M12 15a3 3 0 100-6 3 3 0 000 6z"],
+  link: ["M10 13a5 5 0 007.5.5l2-2a5 5 0 00-7.1-7.1l-1.2 1.1", "M14 11a5 5 0 00-7.5-.5l-2 2a5 5 0 007.1 7.1l1.1-1.1"],
+  support: ["M3 18v-6a9 9 0 0118 0v6", "M21 19a2 2 0 01-2 2h-1v-8h3z", "M3 19a2 2 0 002 2h1v-8H3z"]
+};
+
+function AccountIcon({ name }) {
+  const paths = ACCOUNT_ICON_PATHS[name] || [];
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths.map((d, i) => <path key={i} d={d} />)}
+    </svg>
+  );
+}
+
+function AccountSectionHead({ icon, title, description, action }) {
+  return (
+    <div className="account-section-head">
+      <div className="account-section-head-icon"><AccountIcon name={icon} /></div>
+      <div className="storefront-section-header-copy">
+        <h2>{title}</h2>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {action ? <div className="storefront-section-header-action">{action}</div> : null}
+    </div>
+  );
 }
 
 export function CustomerAccountPage() {
@@ -378,7 +417,7 @@ export function CustomerAccountPage() {
   const displayName = dashboard?.profile?.name || customer?.name || "Customer";
 
   return (
-    <main className="proto-main-shell account-shell">
+    <main className="proto-main-shell account-shell account-dashboard-shell">
       <div className="account-topbar">
         <StorefrontButton to="/" variant="light" className="auth-back-link">
           ← Back to shop
@@ -444,7 +483,8 @@ export function CustomerAccountPage() {
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="profile"
             title="My Profile"
             description="Update display information."
           />
@@ -482,7 +522,8 @@ export function CustomerAccountPage() {
         </StorefrontCard>
 
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="gst"
             title="GST Details"
             description="Maintain invoice-ready tax details."
           />
@@ -530,7 +571,8 @@ export function CustomerAccountPage() {
       </section>
 
       <StorefrontCard as="section" className="section-card" elevated>
-        <StorefrontSectionHeader
+        <AccountSectionHead
+          icon="orders"
           title="My Orders"
           description="View totals, shipment status, invoice status, and reorder."
         />
@@ -588,7 +630,8 @@ export function CustomerAccountPage() {
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="invoices"
             title="My Invoices"
             description="Download your own invoice records."
           />
@@ -625,7 +668,8 @@ export function CustomerAccountPage() {
         </StorefrontCard>
 
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="tracking"
             title="My Tracking"
             description="Latest courier updates entered by admin."
           />
@@ -670,7 +714,8 @@ export function CustomerAccountPage() {
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="address"
             title="My Addresses"
             description="Save as many billing and shipping addresses as you need."
             action={
@@ -721,7 +766,8 @@ export function CustomerAccountPage() {
 
         <StorefrontCard as="article" className="section-card" elevated>
           <div ref={addAddressFormRef} style={{ scrollMarginTop: 16 }} />
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="addAddress"
             title={isEditingAddress ? "Edit Address" : "Add Address"}
             description={
               isEditingAddress
@@ -898,7 +944,8 @@ export function CustomerAccountPage() {
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="saved"
             title="Saved Products"
             description="Products you marked for follow-up."
           />
@@ -940,7 +987,8 @@ export function CustomerAccountPage() {
         </StorefrontCard>
 
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="viewed"
             title="Recently Viewed"
             description="Signed-in browsing history and recent searches."
           />
@@ -979,7 +1027,8 @@ export function CustomerAccountPage() {
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="link"
             title="Link Guest Order"
             description="Requires verified email or verified mobile on your account."
           />
@@ -1000,7 +1049,8 @@ export function CustomerAccountPage() {
         </StorefrontCard>
 
         <StorefrontCard as="article" className="section-card" elevated>
-          <StorefrontSectionHeader
+          <AccountSectionHead
+            icon="support"
             title="Support"
             description="Contact the store team directly from your account."
           />

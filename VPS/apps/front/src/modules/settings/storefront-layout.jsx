@@ -674,7 +674,7 @@ export function StorefrontLayout() {
                   </a>
                 ))
               : null}
-            {publicAddress ? <p>{publicAddress}</p> : null}
+            {publicAddress ? <p><strong>Address:</strong> {publicAddress}</p> : null}
           </div>
 
           <div className="proto-footer-column">
@@ -682,9 +682,9 @@ export function StorefrontLayout() {
             <Link to="/account">My Account</Link>
             <Link to="/account/orders">Track Order</Link>
             <Link to="/cart">View Cart</Link>
-            {supportPhone ? <a href={`tel:${supportPhone}`}>{supportPhone}</a> : null}
-            {supportTiming ? <p>{supportTiming}</p> : null}
-            {storeProfile.gstNumber ? <p>GSTIN: {storeProfile.gstNumber}</p> : null}
+            {supportPhone ? <a href={`tel:${supportPhone}`}><strong>Call:</strong> {supportPhone}</a> : null}
+            {supportTiming ? <p><strong>Support Hours:</strong> {supportTiming}</p> : null}
+            {storeProfile.gstNumber ? <p><strong>GSTIN:</strong> {storeProfile.gstNumber}</p> : null}
           </div>
 
           <div className="proto-footer-column">

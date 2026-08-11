@@ -21,12 +21,38 @@ function resolveImageUrl(image) {
   return `${BACKEND_BASE}/static/migration/${src}`;
 }
 
+function isEmptyArray(value) {
+  return !Array.isArray(value) || value.length === 0;
+}
+
 function isMissingKeyFeatures(product) {
-  return !Array.isArray(product.keyFeatures) || product.keyFeatures.length === 0;
+  return isEmptyArray(product.keyFeatures);
 }
 
 function isMissingSpecifications(product) {
   return !product.specifications || Object.keys(product.specifications).length === 0;
+}
+
+function isMissingSearchTags(product) {
+  return isEmptyArray(product.technicalKeywords) || isEmptyArray(product.customerKeywords);
+}
+
+function isMissingApplications(product) {
+  return isEmptyArray(product.useCases) || isEmptyArray(product.problemStatements);
+}
+
+function isMissingSeoMeta(product) {
+  return !String(product.metaTitle || "").trim() || !String(product.metaDescription || "").trim();
+}
+
+function hasAnyGap(product) {
+  return (
+    isMissingKeyFeatures(product) ||
+    isMissingSpecifications(product) ||
+    isMissingSearchTags(product) ||
+    isMissingApplications(product) ||
+    isMissingSeoMeta(product)
+  );
 }
 
 function specsObjectToPairs(specs) {
@@ -41,6 +67,17 @@ function pairsToSpecsObject(pairs) {
     if (key && value) result[key] = value;
   }
   return result;
+}
+
+function toCsv(values) {
+  return Array.isArray(values) ? values.join(", ") : "";
+}
+
+function fromCsv(text) {
+  return String(text || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function ProductContentAssistantPage() {
@@ -62,6 +99,12 @@ export function ProductContentAssistantPage() {
   const [draftWarnings, setDraftWarnings] = useState([]);
   const [draftFeatures, setDraftFeatures] = useState([]);
   const [draftSpecs, setDraftSpecs] = useState([]);
+  const [draftTechnicalKeywords, setDraftTechnicalKeywords] = useState("");
+  const [draftCustomerKeywords, setDraftCustomerKeywords] = useState("");
+  const [draftUseCases, setDraftUseCases] = useState("");
+  const [draftProblemStatements, setDraftProblemStatements] = useState("");
+  const [draftMetaTitle, setDraftMetaTitle] = useState("");
+  const [draftMetaDescription, setDraftMetaDescription] = useState("");
 
   const bootstrap = async () => {
     setLoading(true);
@@ -81,9 +124,7 @@ export function ProductContentAssistantPage() {
   }, []);
 
   const missingList = useMemo(() => {
-    const needsWork = products.filter(
-      (p) => isMissingKeyFeatures(p) || isMissingSpecifications(p)
-    );
+    const needsWork = products.filter(hasAnyGap);
     const q = search.trim().toLowerCase();
     const filtered = q ? needsWork.filter((p) => p.title.toLowerCase().includes(q)) : needsWork;
     return filtered.sort((a, b) => a.title.localeCompare(b.title));
@@ -92,14 +133,26 @@ export function ProductContentAssistantPage() {
   const visibleList = missingList.slice(0, visibleCount);
   const missingFeaturesCount = products.filter(isMissingKeyFeatures).length;
   const missingSpecsCount = products.filter(isMissingSpecifications).length;
+  const missingSearchTagsCount = products.filter(isMissingSearchTags).length;
+  const missingSeoMetaCount = products.filter(isMissingSeoMeta).length;
+
+  const loadDraftFromProduct = (product) => {
+    setDraftFeatures(Array.isArray(product.keyFeatures) ? [...product.keyFeatures] : []);
+    setDraftSpecs(specsObjectToPairs(product.specifications));
+    setDraftTechnicalKeywords(toCsv(product.technicalKeywords));
+    setDraftCustomerKeywords(toCsv(product.customerKeywords));
+    setDraftUseCases(toCsv(product.useCases));
+    setDraftProblemStatements(toCsv(product.problemStatements));
+    setDraftMetaTitle(product.metaTitle || "");
+    setDraftMetaDescription(product.metaDescription || "");
+  };
 
   const openGenerate = async (product) => {
     setActiveProduct(product);
     setModalOpen(true);
     setDraftError("");
     setDraftWarnings([]);
-    setDraftFeatures(Array.isArray(product.keyFeatures) ? [...product.keyFeatures] : []);
-    setDraftSpecs(specsObjectToPairs(product.specifications));
+    loadDraftFromProduct(product);
     await runGenerate(product);
   };
 
@@ -110,6 +163,12 @@ export function ProductContentAssistantPage() {
       const draft = await generateProductContentDraft(product.id);
       if (draft.keyFeatures.length) setDraftFeatures(draft.keyFeatures);
       if (Object.keys(draft.specifications).length) setDraftSpecs(specsObjectToPairs(draft.specifications));
+      if (draft.technicalKeywords.length) setDraftTechnicalKeywords(toCsv(draft.technicalKeywords));
+      if (draft.customerKeywords.length) setDraftCustomerKeywords(toCsv(draft.customerKeywords));
+      if (draft.useCases.length) setDraftUseCases(toCsv(draft.useCases));
+      if (draft.problemStatements.length) setDraftProblemStatements(toCsv(draft.problemStatements));
+      if (draft.metaTitle) setDraftMetaTitle(draft.metaTitle);
+      if (draft.metaDescription) setDraftMetaDescription(draft.metaDescription);
       setDraftWarnings(draft.warnings || []);
     } catch (apiError) {
       setDraftError(apiError.message || "Failed to generate draft.");
@@ -125,6 +184,12 @@ export function ProductContentAssistantPage() {
     setDraftSpecs([]);
     setDraftWarnings([]);
     setDraftError("");
+    setDraftTechnicalKeywords("");
+    setDraftCustomerKeywords("");
+    setDraftUseCases("");
+    setDraftProblemStatements("");
+    setDraftMetaTitle("");
+    setDraftMetaDescription("");
   };
 
   const onSaveDraft = async () => {
@@ -132,11 +197,19 @@ export function ProductContentAssistantPage() {
     setSaving(true);
     setDraftError("");
     try {
-      const keyFeatures = draftFeatures.map((f) => f.trim()).filter(Boolean);
-      const specifications = pairsToSpecsObject(draftSpecs);
-      await updateProduct(activeProduct.id, { keyFeatures, specifications });
+      const patch = {
+        keyFeatures: draftFeatures.map((f) => f.trim()).filter(Boolean),
+        specifications: pairsToSpecsObject(draftSpecs),
+        technicalKeywords: fromCsv(draftTechnicalKeywords),
+        customerKeywords: fromCsv(draftCustomerKeywords),
+        useCases: fromCsv(draftUseCases),
+        problemStatements: fromCsv(draftProblemStatements),
+        metaTitle: draftMetaTitle.trim(),
+        metaDescription: draftMetaDescription.trim()
+      };
+      await updateProduct(activeProduct.id, patch);
       setProducts((current) =>
-        current.map((p) => (p.id === activeProduct.id ? { ...p, keyFeatures, specifications } : p))
+        current.map((p) => (p.id === activeProduct.id ? { ...p, ...patch } : p))
       );
       setNotice(`Saved content for "${activeProduct.title}".`);
       closeModal();
@@ -159,7 +232,7 @@ export function ProductContentAssistantPage() {
     <section className="stack">
       <PageHeader
         title="Content Assistant"
-        description="AI-drafted Key Features and Specifications for products missing them — every draft is reviewed and saved one product at a time, nothing is applied automatically."
+        description="AI-drafted Key Features, Specifications, search tags, SEO meta, and applications for products missing them — every draft is reviewed and saved one product at a time, nothing is applied automatically."
         actions={
           <button type="button" className="btn btn-secondary" onClick={bootstrap}>
             Refresh
@@ -179,6 +252,16 @@ export function ProductContentAssistantPage() {
         <article className="summary-card">
           <p>Missing Specifications</p>
           <h3>{missingSpecsCount}</h3>
+          <span>of {products.length} active products</span>
+        </article>
+        <article className="summary-card">
+          <p>Missing Search Tags</p>
+          <h3>{missingSearchTagsCount}</h3>
+          <span>of {products.length} active products</span>
+        </article>
+        <article className="summary-card">
+          <p>Missing SEO Meta</p>
+          <h3>{missingSeoMetaCount}</h3>
           <span>of {products.length} active products</span>
         </article>
       </div>
@@ -204,7 +287,7 @@ export function ProductContentAssistantPage() {
         {missingList.length === 0 ? (
           <EmptyBlock
             title="Nothing missing."
-            description="Every active product has Key Features and Specifications filled in."
+            description="Every active product has Key Features, Specifications, search tags, SEO meta, and applications filled in."
           />
         ) : (
           <>
@@ -237,6 +320,15 @@ export function ProductContentAssistantPage() {
                         ) : null}{" "}
                         {isMissingSpecifications(product) ? (
                           <span className="status-pill amber">Specifications</span>
+                        ) : null}{" "}
+                        {isMissingSearchTags(product) ? (
+                          <span className="status-pill amber">Search Tags</span>
+                        ) : null}{" "}
+                        {isMissingApplications(product) ? (
+                          <span className="status-pill amber">Applications</span>
+                        ) : null}{" "}
+                        {isMissingSeoMeta(product) ? (
+                          <span className="status-pill amber">SEO Meta</span>
                         ) : null}
                       </td>
                       <td className="row-actions">
@@ -259,9 +351,13 @@ export function ProductContentAssistantPage() {
                     <h4>{product.title}</h4>
                   </div>
                   <p className="muted">
-                    {isMissingKeyFeatures(product) ? "Missing Key Features" : ""}
-                    {isMissingKeyFeatures(product) && isMissingSpecifications(product) ? " · " : ""}
-                    {isMissingSpecifications(product) ? "Missing Specifications" : ""}
+                    {[
+                      isMissingKeyFeatures(product) && "Key Features",
+                      isMissingSpecifications(product) && "Specifications",
+                      isMissingSearchTags(product) && "Search Tags",
+                      isMissingApplications(product) && "Applications",
+                      isMissingSeoMeta(product) && "SEO Meta"
+                    ].filter(Boolean).join(" · ")}
                   </p>
                   {canEdit ? (
                     <div className="card-actions">
@@ -390,6 +486,49 @@ export function ProductContentAssistantPage() {
                     </button>
                   </div>
                 </div>
+
+                <label className="field">
+                  <span>Technical Keywords (search tags, comma separated)</span>
+                  <input
+                    value={draftTechnicalKeywords}
+                    onChange={(event) => setDraftTechnicalKeywords(event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Customer Keywords (search tags, comma separated)</span>
+                  <input
+                    value={draftCustomerKeywords}
+                    onChange={(event) => setDraftCustomerKeywords(event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Use Cases / Applications (comma separated)</span>
+                  <input value={draftUseCases} onChange={(event) => setDraftUseCases(event.target.value)} />
+                </label>
+
+                <label className="field">
+                  <span>Problem Statements (comma separated)</span>
+                  <input
+                    value={draftProblemStatements}
+                    onChange={(event) => setDraftProblemStatements(event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>SEO Meta Title</span>
+                  <input value={draftMetaTitle} onChange={(event) => setDraftMetaTitle(event.target.value)} />
+                </label>
+
+                <label className="field">
+                  <span>SEO Meta Description</span>
+                  <textarea
+                    rows={3}
+                    value={draftMetaDescription}
+                    onChange={(event) => setDraftMetaDescription(event.target.value)}
+                  />
+                </label>
 
                 <div className="form-actions">
                   <button type="button" className="btn btn-secondary" onClick={() => runGenerate(activeProduct)}>

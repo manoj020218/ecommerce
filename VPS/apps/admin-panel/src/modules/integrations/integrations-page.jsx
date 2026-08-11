@@ -97,16 +97,6 @@ const INTEGRATIONS = {
       fields: [{ key: "gtmId", label: "GTM Container ID (GTM-XXXXX)", type: "text" }]
     },
     {
-      code: "aiContentAssistant",
-      label: "AI Content Assistant",
-      logo: "🤖",
-      description: "OpenAI-powered draft generator for product Key Features & Specifications (used by Catalogue → Content Assistant)",
-      fields: [
-        { key: "apiKey", label: "OpenAI API Key", type: "password" },
-        { key: "model", label: "Model", type: "text", placeholder: "gpt-4o-mini" }
-      ]
-    },
-    {
       code: "whatsapp",
       label: "WhatsApp Business",
       logo: "💬",
@@ -128,6 +118,28 @@ const INTEGRATIONS = {
       fields: [
         { key: "username", label: "Dashboard Username", type: "text" },
         { key: "password", label: "Dashboard Password", type: "password" }
+      ]
+    }
+  ],
+  aiAssistants: [
+    {
+      code: "aiContentAssistant",
+      label: "OpenAI",
+      logo: "🤖",
+      description: "Powers the AI drafts used in Catalogue → Content Assistant",
+      fields: [
+        { key: "apiKey", label: "OpenAI API Key", type: "password" },
+        { key: "model", label: "Model", type: "text", placeholder: "gpt-4o-mini" }
+      ]
+    },
+    {
+      code: "claudeAssistant",
+      label: "Claude (Anthropic)",
+      logo: "✳️",
+      description: "Alternative provider for the same AI drafts — used if OpenAI isn't configured",
+      fields: [
+        { key: "apiKey", label: "Anthropic API Key", type: "password" },
+        { key: "model", label: "Model", type: "text", placeholder: "claude-sonnet-5" }
       ]
     }
   ]
@@ -1357,6 +1369,21 @@ export function IntegrationsPage() {
             onToggle={(val) => handlePgToggle(gw.code, val)}
             onConfigure={() => handlePgConfigure(gw)}
             saving={pgSaving === gw.code}
+          />
+        ))}
+      </IntegrationSection>
+
+      {/* ── AI Assistant Accounts ── */}
+      <IntegrationSection
+        title="AI Assistant Accounts"
+        subtitle="Powers AI-drafted content across the admin panel (Catalogue → Content Assistant today; more tools planned)"
+      >
+        {INTEGRATIONS.aiAssistants.map((meta) => (
+          <IntegrationCard
+            key={meta.code} meta={meta} config={configs[meta.code]}
+            onToggle={(val) => handleToggle(meta.code, val)}
+            onConfigure={() => { setConfiguring(meta); setSaveError(""); }}
+            saving={saving === meta.code}
           />
         ))}
       </IntegrationSection>

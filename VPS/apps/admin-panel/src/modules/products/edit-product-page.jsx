@@ -12,7 +12,8 @@ import {
   fetchProducts,
   updateProduct,
   uploadProductImage,
-  deleteProductImage
+  deleteProductImage,
+  generateProductContentDraft
 } from "./products.api";
 import { fetchShippingClasses } from "../shipping/shipping.api";
 
@@ -507,6 +508,33 @@ export function EditProductPage() {
     setForm(f => ({ ...f, ...autoGenerateSeo(f, firstImgUrl) }));
   };
 
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const onGenerateWithAi = async () => {
+    setAiGenerating(true);
+    setAiError("");
+    try {
+      const draft = await generateProductContentDraft(productId);
+      setForm(f => ({
+        ...f,
+        keyFeaturesText: draft.keyFeatures.length ? draft.keyFeatures.join("\n") : f.keyFeaturesText,
+        specificationsText: Object.keys(draft.specifications).length
+          ? JSON.stringify(draft.specifications, null, 2)
+          : f.specificationsText,
+        technicalKeywordsText: draft.technicalKeywords.length ? toCsvInput(draft.technicalKeywords) : f.technicalKeywordsText,
+        customerKeywordsText: draft.customerKeywords.length ? toCsvInput(draft.customerKeywords) : f.customerKeywordsText,
+        useCasesText: draft.useCases.length ? toCsvInput(draft.useCases) : f.useCasesText,
+        problemStatementsText: draft.problemStatements.length ? toCsvInput(draft.problemStatements) : f.problemStatementsText,
+        metaTitle: draft.metaTitle || f.metaTitle,
+        metaDescription: draft.metaDescription || f.metaDescription
+      }));
+    } catch (e) {
+      setAiError(e.message || "Failed to generate AI draft.");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setSaving(true); setError(""); setFieldErrors({});
@@ -808,7 +836,21 @@ export function EditProductPage() {
               </Field>
             </Section>
 
-            <Section title="Descriptions">
+            <Section title={
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                Descriptions
+                <button
+                  type="button"
+                  onClick={onGenerateWithAi}
+                  disabled={aiGenerating}
+                  style={{ fontSize: 12, fontWeight: 600, padding: "3px 12px", background: "var(--brand)", color: "#fff", border: "none", borderRadius: 6, cursor: aiGenerating ? "default" : "pointer", opacity: aiGenerating ? 0.7 : 1 }}
+                >
+                  {aiGenerating ? "Generating…" : "✦ Generate with AI"}
+                </button>
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>Drafts keywords, features, specs & SEO meta from the description above — review before saving</span>
+              </div>
+            }>
+              {aiError ? <p className="form-error" style={{ marginTop: -4 }}>{aiError}</p> : null}
               <Field label="Short Description" hint={`(${stripHtml(form.shortDescription).length}/400)`} full noLabel>
                 <RichTextEditor value={form.shortDescription} onChange={html => set("shortDescription", html)} minRows={3} placeholder="Brief product summary shown in listing cards…" />
               </Field>

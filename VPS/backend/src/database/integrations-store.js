@@ -42,7 +42,8 @@ const DEFAULT_INTEGRATIONS_STORE = Object.freeze({
     whatsapp: { enabled: false, phoneNumber: "", enableLiveChat: false, liveChatMessage: "" },
     abandonedCart: { enabled: false, delayMinutes: 60, templateMessage: "" },
     googleOAuth: { enabled: false, clientId: "", clientSecret: "" },
-    aiContentAssistant: { enabled: false, apiKey: "", model: "gpt-4o-mini" }
+    aiContentAssistant: { enabled: false, apiKey: "", model: "gpt-4o-mini" },
+    claudeAssistant: { enabled: false, apiKey: "", model: "claude-sonnet-5" }
   },
   meta: { updatedAt: null, updatedBy: null }
 });

@@ -55,3 +55,10 @@ export function updateInvoiceSettings(payload) {
     body: payload
   });
 }
+
+export function updateWhatsappAutomation(payload) {
+  return apiFetch("/admin/settings/whatsapp-automation", {
+    method: "PUT",
+    body: payload
+  });
+}

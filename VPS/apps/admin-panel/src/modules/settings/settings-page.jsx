@@ -14,6 +14,7 @@ import {
   updateInvoiceSettings,
   updateSeoDefaults,
   updateStoreProfile,
+  updateWhatsappAutomation,
   uploadBrandingAsset
 } from "./settings.api";
 
@@ -94,6 +95,9 @@ const EMPTY_SETTINGS = {
     showHsnSummary: true,
     showShippingLine: true,
     showDiscountLine: true
+  },
+  whatsappAutomation: {
+    dailyEarlyNudgeCap: 40
   },
   meta: {
     updatedAt: "",
@@ -1280,6 +1284,57 @@ export function SettingsPage() {
 
       <div hidden={activeTab !== "whatsapp"}>
         <WhatsAppConnectCard canManage={canEditCustomCode} />
+
+        <article className="settings-card">
+          <div className="settings-card-head">
+            <div>
+              <h3>Automated Send Limit</h3>
+              <p>
+                Caps how many automated early cart-reminder WhatsApp messages go out per
+                day. Keep this low while the connected number is new, so it doesn't get
+                flagged for high outbound volume. Set to 0 to pause these nudges entirely.
+              </p>
+            </div>
+          </div>
+          <form
+            className="form-grid wide"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveSection(
+                "whatsappAutomation",
+                () => updateWhatsappAutomation(settings.whatsappAutomation),
+                "WhatsApp automation settings updated."
+              );
+            }}
+          >
+            <label className="field">
+              <span>Daily Early-Nudge Cap</span>
+              <input
+                type="number" min="0" max="1000"
+                value={settings.whatsappAutomation.dailyEarlyNudgeCap}
+                onChange={(event) =>
+                  updateSectionValue(
+                    "whatsappAutomation",
+                    "dailyEarlyNudgeCap",
+                    Number(event.target.value)
+                  )
+                }
+                disabled={!canEdit}
+              />
+            </label>
+            {canEdit ? (
+              <div className="form-actions">
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingSection === "whatsappAutomation"}
+                >
+                  {savingSection === "whatsappAutomation" ? "Saving..." : "Save Send Limit"}
+                </button>
+              </div>
+            ) : null}
+          </form>
+        </article>
       </div>
 
       <article className="settings-card" hidden={activeTab !== "commerce-watchdog"}>

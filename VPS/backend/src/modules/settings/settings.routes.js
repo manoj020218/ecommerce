@@ -77,6 +77,11 @@ function createAdminSettingsRouter() {
     controller.adminUpdateReviewSettings
   );
   router.put(
+    "/whatsapp-automation",
+    ensurePermission(SETTINGS_PERMISSIONS.EDIT),
+    controller.adminUpdateWhatsappAutomation
+  );
+  router.put(
     "/contact-information",
     ensurePermission(SETTINGS_PERMISSIONS.EDIT),
     controller.adminUpdateContactInformation

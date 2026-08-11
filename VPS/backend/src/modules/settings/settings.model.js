@@ -10,7 +10,8 @@ const SETTINGS_SECTION_MAP = Object.freeze({
   "custom-code": "customCodeTags",
   "invoice-settings": "invoiceSettings",
   "hero-banners": "heroBanners",
-  "review-settings": "reviewSettings"
+  "review-settings": "reviewSettings",
+  "whatsapp-automation": "whatsappAutomation"
 });
 
 const INVOICE_SETTINGS_UPLOAD_ASSET_MAP = Object.freeze({
@@ -109,6 +110,12 @@ const DEFAULT_SETTINGS_DOCUMENT = Object.freeze({
   },
   heroBanners: {
     slides: []
+  },
+  whatsappAutomation: {
+    // Safety cap for the early cart-abandonment WhatsApp nudge — keeps
+    // automated outbound volume low while the WhatsApp number is new,
+    // so it doesn't get flagged/blocked. 0 = nudges disabled.
+    dailyEarlyNudgeCap: 40
   },
   setupWizard: cloneDefaultSetupWizardSection(),
   meta: {

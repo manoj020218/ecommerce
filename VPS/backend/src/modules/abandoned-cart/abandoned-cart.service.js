@@ -8,7 +8,7 @@ const {
   writeRecoveryStore
 } = require("../../database/recovery-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
-const { getPublicSettingsBundle } = require("../settings/settings.service");
+const { getPublicSettingsBundle, getSettingsSection } = require("../settings/settings.service");
 const {
   CART_OWNER_TYPES
 } = require("../cart-checkout/cart-checkout.model");
@@ -65,6 +65,16 @@ function parseDateOrNull(value) {
 function addMinutes(isoString, minutes) {
   const baseTimestamp = parseDateOrNull(isoString) || Date.now();
   return new Date(baseTimestamp + Number(minutes || 0) * 60 * 1000).toISOString();
+}
+
+// Same IST calendar-day boundary used for the dashboard's "today" stats
+// (dashboard.service.js) — the VPS runs in UTC, so a naive server-local
+// day boundary would roll over at 5:30am IST instead of midnight.
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+function istDayStartMs(utcMs) {
+  const shifted = utcMs + IST_OFFSET_MS;
+  return Math.floor(shifted / DAY_MS) * DAY_MS - IST_OFFSET_MS;
 }
 
 // /recover/:token is a storefront SPA route, not a backend API route —
@@ -522,11 +532,28 @@ const EARLY_NUDGE_MIN_AGE_MINUTES = 8;
 // which would read as spam months after the fact instead of a fast nudge.
 const EARLY_NUDGE_MAX_AGE_MINUTES = 45;
 
-async function dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp) {
+function countEarlyNudgesSentToday(recoveryStore, nowMs) {
+  const todayStartMs = istDayStartMs(nowMs);
+  let count = 0;
+  for (const record of ensureArray(recoveryStore.recoveries)) {
+    const sentMs = parseDateOrNull(record.earlyNudgeSentAt);
+    if (sentMs !== null && sentMs >= todayStartMs) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+async function dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp, dailyCap) {
   const nowMs = parseDateOrNull(timestamp) || Date.now();
   const nudges = [];
+  const cap = Number.isFinite(dailyCap) ? dailyCap : Infinity;
+  let sentToday = countEarlyNudgesSentToday(recoveryStore, nowMs);
 
   for (const record of ensureArray(recoveryStore.recoveries)) {
+    if (sentToday >= cap) {
+      break;
+    }
     if (isClosedStage(record.stage) || record.earlyNudgeSentAt || !record.mobile) {
       continue;
     }
@@ -565,6 +592,7 @@ async function dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp
 
     record.earlyNudgeSentAt = timestamp;
     record.updatedAt = timestamp;
+    sentToday += 1;
     nudges.push({
       recoveryId: record.id,
       sendStatus: sendResult?.status || "skipped_no_recipient"
@@ -576,9 +604,12 @@ async function dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp
 
 async function runReminderDispatch(payload, actor) {
   const timestamp = payload.nowIso || nowIso();
-  const [recoveryStore, settingsBundle] = await Promise.all([
+  const [recoveryStore, settingsBundle, whatsappAutomation] = await Promise.all([
     refreshRecoveryStore(timestamp),
-    getPublicSettingsBundle()
+    getPublicSettingsBundle(),
+    // Not part of the public bundle above — this cap is an internal
+    // operational setting, never exposed to the storefront.
+    getSettingsSection("whatsappAutomation")
   ]);
   ensureRecoveryStoreShape(recoveryStore);
 
@@ -658,7 +689,13 @@ async function runReminderDispatch(payload, actor) {
     refreshRecordLifecycle(record, timestamp);
   }
 
-  const earlyNudges = await dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp);
+  const dailyEarlyNudgeCap = Number(whatsappAutomation?.dailyEarlyNudgeCap);
+  const earlyNudges = await dispatchEarlyWhatsappNudges(
+    recoveryStore,
+    supportInfo,
+    timestamp,
+    dailyEarlyNudgeCap
+  );
   if (earlyNudges.length) {
     changed = true;
   }

@@ -7,6 +7,7 @@ const {
   parseBrandingPatch,
   parseSeoDefaultsPatch,
   parseReviewSettingsPatch,
+  parseWhatsappAutomationPatch,
   parseContactInformationPatch,
   parseCustomCodePatch,
   parseInvoiceSettingsPatch,
@@ -65,6 +66,12 @@ const adminUpdateReviewSettings = asyncHandler(async (req, res) => {
   const patch = parseReviewSettingsPatch(req.body);
   const data = await settingsService.updateSection("reviewSettings", patch, req.actor);
   return ok(res, data, "Review settings updated.");
+});
+
+const adminUpdateWhatsappAutomation = asyncHandler(async (req, res) => {
+  const patch = parseWhatsappAutomationPatch(req.body);
+  const data = await settingsService.updateSection("whatsappAutomation", patch, req.actor);
+  return ok(res, data, "WhatsApp automation settings updated.");
 });
 
 const adminUpdateContactInformation = asyncHandler(async (req, res) => {
@@ -170,6 +177,7 @@ module.exports = {
   adminUpdateBranding,
   adminUpdateSeoDefaults,
   adminUpdateReviewSettings,
+  adminUpdateWhatsappAutomation,
   adminUpdateContactInformation,
   adminUpdateCustomCode,
   adminUpdateInvoiceSettings,

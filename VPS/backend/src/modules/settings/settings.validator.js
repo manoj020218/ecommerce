@@ -52,6 +52,10 @@ const reviewSettingsSchema = z.object({
   moderationMode: z.enum(["auto", "gated"]).optional()
 });
 
+const whatsappAutomationSchema = z.object({
+  dailyEarlyNudgeCap: z.coerce.number().int().min(0).max(1000).optional()
+});
+
 const contactInformationSchema = z.object({
   publicPhone: optionalString(20),
   publicEmail: optionalString(150),
@@ -133,6 +137,11 @@ function parseReviewSettingsPatch(payload) {
   return reviewSettingsSchema.parse(payload);
 }
 
+function parseWhatsappAutomationPatch(payload) {
+  ensureNonEmptyPayload(payload, "WhatsApp automation");
+  return whatsappAutomationSchema.parse(payload);
+}
+
 function parseContactInformationPatch(payload) {
   ensureNonEmptyPayload(payload, "Contact information");
   return contactInformationSchema.parse(payload);
@@ -161,6 +170,7 @@ module.exports = {
   parseBrandingPatch,
   parseSeoDefaultsPatch,
   parseReviewSettingsPatch,
+  parseWhatsappAutomationPatch,
   parseContactInformationPatch,
   parseCustomCodePatch,
   parseInvoiceSettingsPatch,

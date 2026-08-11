@@ -473,7 +473,7 @@ const EMPTY_FORM = {
   title: "", slug: "", oldUrl: "", categoryId: "", subcategoryId: "",
   brand: "", modelNumber: "", hsnCode: "",
   basePrice: "", salePrice: "", shortDescription: "", fullDescription: "",
-  specificationsText: "{}", technicalKeywordsText: "", customerKeywordsText: "",
+  specificationsText: "{}", keyFeaturesText: "", technicalKeywordsText: "", customerKeywordsText: "",
   useCasesText: "", problemStatementsText: "",
   moq: 1, bulkPricingEnabled: false, bulkPriceSlabsText: "", priceGroupPricesText: "",
   customerSpecificPricesText: "", quoteRequiredAboveQty: "",
@@ -648,6 +648,7 @@ export function AddProductPage() {
       shortDescription: form.shortDescription,
       fullDescription: form.fullDescription,
       specifications: specs,
+      keyFeatures: form.keyFeaturesText.split("\n").map(s => s.trim()).filter(Boolean),
       technicalKeywords: splitCsvInput(form.technicalKeywordsText),
       customerKeywords: splitCsvInput(form.customerKeywordsText),
       useCases: splitCsvInput(form.useCasesText),
@@ -1046,6 +1047,9 @@ export function AddProductPage() {
                     <input name="problemStatementsText" value={form.problemStatementsText} onChange={onFC} style={inputStyle()} />
                   </Field>
                 </FieldRow>
+                <Field label="Key Features" hint="(one bullet per line — shown as highlight chips and the default product-page tab)" full>
+                  <textarea name="keyFeaturesText" value={form.keyFeaturesText} onChange={onFC} rows={4} style={inputStyle()} placeholder={"IP66 waterproof housing\n2-year replacement warranty\nWorks with existing 12V wiring"} />
+                </Field>
                 <Field label="Specifications (JSON)" error={fieldErrors.specificationsText} full>
                   <textarea ref={registerRef("specificationsText")} name="specificationsText"
                     value={form.specificationsText} onChange={onFC} rows={5}

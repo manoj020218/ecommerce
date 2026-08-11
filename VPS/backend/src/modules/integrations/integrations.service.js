@@ -17,7 +17,7 @@ const ALLOWED_CODES = new Set([
   "razorpay", "cashfree", "phonepe", "ccavenue", "payu", "paytm", "cod",
   "googleProductFeed", "facebookProductFeed", "facebookPixel",
   "googleAnalytics", "googleTagManager", "whatsapp", "abandonedCart",
-  "commerceWatchdog"
+  "commerceWatchdog", "aiContentAssistant"
 ]);
 
 function nowIso() {

@@ -13,6 +13,7 @@ import { CustomerDetailPage } from "../modules/customers/customer-detail-page";
 import { FacebookFeedPage } from "../modules/facebook-feed/facebook-feed-page";
 import { GoogleMerchantPage } from "../modules/google-merchant/google-merchant-page";
 import { ProductsPage } from "../modules/products/products-page";
+import { ProductContentAssistantPage } from "../modules/products/product-content-assistant-page";
 import { HsnTaxPage } from "../modules/hsn-tax/hsn-tax-page";
 import { InventoryPage } from "../modules/inventory/inventory-page";
 import { InvoicesPage } from "../modules/invoices/invoices-page";
@@ -55,6 +56,7 @@ export function AppRouter() {
           <Route path="products/add" element={<AddProductPage />} />
           <Route path="products/:productId/edit" element={<EditProductPage />} />
           <Route path="reviews" element={<ReviewsPage />} />
+          <Route path="content-assistant" element={<ProductContentAssistantPage />} />
           <Route path="hsn-tax" element={<HsnTaxPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="search" element={<SearchPage />} />

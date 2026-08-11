@@ -109,6 +109,7 @@ function formFromProduct(product) {
     shortDescription: product.shortDescription || "",
     fullDescription: product.fullDescription || "",
     specificationsText: JSON.stringify(product.specifications || {}, null, 2),
+    keyFeaturesText: Array.isArray(product.keyFeatures) ? product.keyFeatures.join("\n") : "",
     technicalKeywordsText: toCsvInput(product.technicalKeywords),
     customerKeywordsText: toCsvInput(product.customerKeywords),
     useCasesText: toCsvInput(product.useCases),
@@ -533,6 +534,7 @@ export function EditProductPage() {
       salePrice: form.salePrice === "" ? undefined : Number(form.salePrice),
       shortDescription: form.shortDescription, fullDescription: form.fullDescription,
       specifications: specs,
+      keyFeatures: form.keyFeaturesText.split("\n").map(s => s.trim()).filter(Boolean),
       technicalKeywords: splitCsvInput(form.technicalKeywordsText),
       customerKeywords: splitCsvInput(form.customerKeywordsText),
       useCases: splitCsvInput(form.useCasesText),
@@ -832,6 +834,9 @@ export function EditProductPage() {
                     <input name="problemStatementsText" value={form.problemStatementsText} onChange={onFC} style={inputStyle()} />
                   </Field>
                 </FieldRow>
+                <Field label="Key Features" hint="(one bullet per line — shown as highlight chips and the default product-page tab)" full>
+                  <textarea name="keyFeaturesText" value={form.keyFeaturesText} onChange={onFC} rows={4} style={inputStyle()} placeholder={"IP66 waterproof housing\n2-year replacement warranty\nWorks with existing 12V wiring"} />
+                </Field>
                 <Field label="Specifications (JSON)" error={fieldErrors.specificationsText} full>
                   <textarea ref={registerRef("specificationsText")} name="specificationsText" value={form.specificationsText} onChange={onFC} rows={5} style={{ ...inputStyle(fieldErrors.specificationsText), fontFamily: "monospace", fontSize: 12 }} />
                 </Field>

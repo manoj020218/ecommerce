@@ -2,6 +2,7 @@ const { ZodError } = require("zod");
 const { HttpError } = require("../../common/http-error");
 const { ok, created } = require("../../common/http-response");
 const service = require("./products.service");
+const { generateProductContentDraft } = require("./product-content-ai.service");
 const {
   parseListAdminProductsQuery,
   parseListPublicProductsQuery,
@@ -50,6 +51,12 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   const patch = parseUpdateProductPayload(req.body);
   const data = await service.updateProduct(req.params.productId, patch, req.actor);
   return ok(res, data, "Product updated.");
+});
+
+const adminGenerateProductContentDraft = asyncHandler(async (req, res) => {
+  const product = await service.getAdminProductById(req.params.productId);
+  const draft = await generateProductContentDraft(product);
+  return ok(res, draft, "Draft generated.");
 });
 
 const adminUpdateProductRelations = asyncHandler(async (req, res) => {
@@ -265,6 +272,7 @@ module.exports = {
   adminGetProduct,
   adminCreateProduct,
   adminUpdateProduct,
+  adminGenerateProductContentDraft,
   adminUpdateProductRelations,
   adminArchiveProduct,
   adminDeleteProduct,

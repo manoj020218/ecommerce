@@ -97,6 +97,16 @@ const INTEGRATIONS = {
       fields: [{ key: "gtmId", label: "GTM Container ID (GTM-XXXXX)", type: "text" }]
     },
     {
+      code: "aiContentAssistant",
+      label: "AI Content Assistant",
+      logo: "🤖",
+      description: "OpenAI-powered draft generator for product Key Features & Specifications (used by Catalogue → Content Assistant)",
+      fields: [
+        { key: "apiKey", label: "OpenAI API Key", type: "password" },
+        { key: "model", label: "Model", type: "text", placeholder: "gpt-4o-mini" }
+      ]
+    },
+    {
       code: "whatsapp",
       label: "WhatsApp Business",
       logo: "💬",

@@ -120,6 +120,11 @@ function createAdminProductsRouter() {
     requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
     controller.adminUpdateProduct
   );
+  router.post(
+    "/:productId/ai-content-draft",
+    requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),
+    controller.adminGenerateProductContentDraft
+  );
   router.put(
     "/:productId/relations",
     requireAdminPermission(PRODUCTS_PERMISSIONS.EDIT),

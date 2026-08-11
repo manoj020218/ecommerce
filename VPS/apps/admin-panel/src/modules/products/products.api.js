@@ -92,6 +92,12 @@ export function uploadProductDocument(productId, title, file) {
   return apiFetch(`/admin/products/${productId}/documents`, { method: "POST", body: formData });
 }
 
+export function generateProductContentDraft(productId) {
+  return apiFetch(`/admin/products/${productId}/ai-content-draft`, {
+    method: "POST"
+  });
+}
+
 export function getGoogleShoppingExportUrl(apiBase) {
   // Returns the direct download URL (used as href, not apiFetch)
   return `${apiBase}/admin/products/google-shopping-export`;

@@ -41,7 +41,8 @@ const DEFAULT_INTEGRATIONS_STORE = Object.freeze({
     googleTagManager: { enabled: false, gtmId: "" },
     whatsapp: { enabled: false, phoneNumber: "", enableLiveChat: false, liveChatMessage: "" },
     abandonedCart: { enabled: false, delayMinutes: 60, templateMessage: "" },
-    googleOAuth: { enabled: false, clientId: "", clientSecret: "" }
+    googleOAuth: { enabled: false, clientId: "", clientSecret: "" },
+    aiContentAssistant: { enabled: false, apiKey: "", model: "gpt-4o-mini" }
   },
   meta: { updatedAt: null, updatedBy: null }
 });

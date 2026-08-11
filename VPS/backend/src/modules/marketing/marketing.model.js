@@ -46,7 +46,8 @@ const TEMPLATE_KEYS = Object.freeze([
   "review_approved",
   "review_approved_whatsapp",
   "review_rejected",
-  "review_rejected_whatsapp"
+  "review_rejected_whatsapp",
+  "cart_early_nudge_whatsapp"
 ]);
 
 // The 7 customer lifecycle events the storefront actually fires today, each with
@@ -273,6 +274,15 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     label: "Cart Left Behind (WhatsApp)",
     subject: "",
     body: "Hi {{customerName}}, you left items worth {{orderTotal}} in your cart at {{businessName}}. Continue here: {{recoveryUrl}}"
+  },
+  // Fires ~8-45 min after cart activity (see abandoned-cart.service.js
+  // dispatchEarlyWhatsappNudges) — a fast, casual first touch while the
+  // buyer is likely still in a browsing mindset, separate from the slower
+  // 30min/6hr/24hr order_left_in_cart schedule which is email-first.
+  cart_early_nudge_whatsapp: {
+    label: "Early Cart Nudge (WhatsApp)",
+    subject: "",
+    body: "Hi {{customerName}}, still deciding? Your cart worth {{orderTotal}} at {{businessName}} is saved and waiting — {{recoveryUrl}}. Reply here if you have any questions, happy to help: {{whatsappNumber}}"
   }
 });
 

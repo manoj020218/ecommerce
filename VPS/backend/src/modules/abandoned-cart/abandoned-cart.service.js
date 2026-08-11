@@ -205,6 +205,7 @@ function createRecoveryRecord(recoveryStore, owner, timestamp) {
     reminderCount: 0,
     reminders: [],
     nextReminderAt: null,
+    earlyNudgeSentAt: null,
     recoveryToken,
     recoveryUrl: buildRecoveryUrl(recoveryToken),
     restoredAt: null,
@@ -505,6 +506,74 @@ async function getRecoveryDetail(recoveryId) {
   return sanitizeRecoveryDetail(record);
 }
 
+// Real abandoned-cart data audit (Aug 2026): of every reminder ever sent,
+// 100% went out by email — resolveReminderTarget() prefers email whenever
+// both are known, and in practice every record with a mobile number also
+// has an email, so the WhatsApp channel was defined but never actually
+// used. This runs independently of that email-first schedule: a fast,
+// WhatsApp-only first touch for anyone with a mobile number, while they're
+// likely still in a browsing mindset — not a replacement for the slower
+// 30min/6hr/24hr schedule, which keeps running as-is on top of it.
+const EARLY_NUDGE_MIN_AGE_MINUTES = 8;
+// Upper bound matters here specifically because this shipped against a
+// store that already had thousands of old abandoned-cart records — without
+// it, the very first dispatch tick after deploy would fire a "still
+// deciding?" WhatsApp message for every old record with a phone number,
+// which would read as spam months after the fact instead of a fast nudge.
+const EARLY_NUDGE_MAX_AGE_MINUTES = 45;
+
+async function dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp) {
+  const nowMs = parseDateOrNull(timestamp) || Date.now();
+  const nudges = [];
+
+  for (const record of ensureArray(recoveryStore.recoveries)) {
+    if (isClosedStage(record.stage) || record.earlyNudgeSentAt || !record.mobile) {
+      continue;
+    }
+    if (Number(record.cartItemCount || 0) <= 0) {
+      continue;
+    }
+
+    const anchorMs = parseDateOrNull(record.lastActivityAt || record.createdAt);
+    if (!anchorMs) {
+      continue;
+    }
+    const ageMinutes = (nowMs - anchorMs) / 60000;
+    if (ageMinutes < EARLY_NUDGE_MIN_AGE_MINUTES || ageMinutes > EARLY_NUDGE_MAX_AGE_MINUTES) {
+      continue;
+    }
+
+    // Lazy require — see the matching comment in runReminderDispatch below,
+    // same circular-require reason.
+    const { safeSendTemplateNotification } = require("../marketing/marketing.service");
+    const sendResult = await safeSendTemplateNotification({
+      templateKey: "cart_early_nudge_whatsapp",
+      toMobile: record.mobile,
+      relatedResourceType: "abandoned_cart_recovery",
+      relatedResourceId: record.id,
+      variables: {
+        customerName: record.customerName || "there",
+        itemsTable: buildCartItemsEmailTable(record.cartItems),
+        orderTotal: formatInrForReminderEmail(record.cartValue),
+        recoveryUrl: record.recoveryUrl,
+        whatsappNumber: supportInfo.supportWhatsApp || supportInfo.supportPhone || "",
+        whatsappLink: supportInfo.supportWhatsApp
+          ? `https://wa.me/${String(supportInfo.supportWhatsApp).replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Hi, I'd like help completing my order — cart worth ${formatInrForReminderEmail(record.cartValue)}.`)}`
+          : ""
+      }
+    });
+
+    record.earlyNudgeSentAt = timestamp;
+    record.updatedAt = timestamp;
+    nudges.push({
+      recoveryId: record.id,
+      sendStatus: sendResult?.status || "skipped_no_recipient"
+    });
+  }
+
+  return nudges;
+}
+
 async function runReminderDispatch(payload, actor) {
   const timestamp = payload.nowIso || nowIso();
   const [recoveryStore, settingsBundle] = await Promise.all([
@@ -589,6 +658,11 @@ async function runReminderDispatch(payload, actor) {
     refreshRecordLifecycle(record, timestamp);
   }
 
+  const earlyNudges = await dispatchEarlyWhatsappNudges(recoveryStore, supportInfo, timestamp);
+  if (earlyNudges.length) {
+    changed = true;
+  }
+
   if (changed) {
     await writeRecoveryStore(recoveryStore);
   }
@@ -607,9 +681,24 @@ async function runReminderDispatch(payload, actor) {
     });
   }
 
+  for (const nudge of earlyNudges) {
+    await addActivityLog({
+      action: "abandoned_cart.early_nudge.sent",
+      actorId: actor?.id || "system",
+      actorRole: actor?.role || "system",
+      resourceType: "abandoned_cart_recovery",
+      resourceId: nudge.recoveryId,
+      metadata: {
+        channel: "whatsapp",
+        sendStatus: nudge.sendStatus
+      }
+    });
+  }
+
   return {
     nowIso: timestamp,
     dispatchedCount: reminders.length,
+    earlyNudgeCount: earlyNudges.length,
     reminders
   };
 }

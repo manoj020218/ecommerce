@@ -73,6 +73,7 @@ function sanitizeRecoverySummary(record) {
     failureReason: record.failureReason || "",
     reminderCount: Number(record.reminderCount || 0),
     nextReminderAt: record.nextReminderAt || null,
+    earlyNudgeSentAt: record.earlyNudgeSentAt || null,
     lastActivityAt: record.lastActivityAt || null,
     checkoutSessionId: record.checkoutSessionId || null,
     recoveryToken: record.recoveryToken || "",

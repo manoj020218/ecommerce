@@ -30,6 +30,11 @@
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- API + product image origin — starts the DNS/TLS handshake while the
+         page/JS is still loading, instead of waiting until the app's first
+         fetch() call to begin connecting. -->
+    <link rel="preconnect" href="https://api.jenixindia.com" crossorigin />
+    <link rel="dns-prefetch" href="https://api.jenixindia.com" />
 
     <!-- Canonical (will be updated by JS per page) -->
     <link rel="canonical" href="https://jenixindia.com/" />

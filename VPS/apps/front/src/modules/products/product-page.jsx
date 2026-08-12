@@ -765,7 +765,7 @@ export function ProductPage() {
             }}
           >
             {activeImage ? (
-              <img src={activeImage} alt={product.title} draggable={false} />
+              <img src={activeImage} alt={product.title} draggable={false} fetchPriority="high" />
             ) : (
               <div className="proto-product-placeholder large">Product image</div>
             )}

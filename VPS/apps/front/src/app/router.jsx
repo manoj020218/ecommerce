@@ -3,6 +3,18 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { StorefrontLayout } from "../modules/settings/storefront-layout";
 import { StorefrontLoadingState } from "../shared/storefront/storefront-ui";
 import { useCustomerSession } from "../shared/auth/customer-session";
+// Home and product pages are bundled eagerly (not lazy) on purpose: they're
+// the two highest-traffic routes and visitors bounce between them
+// constantly (home -> product -> back to home, product -> another product,
+// etc). Lazy-loading them meant every one of those navigations could show
+// the generic Suspense "Loading..." fallback while that page's JS chunk
+// downloaded for the first time in the session -- most noticeable
+// navigating back to home from an SSR'd product page, which had something
+// real to look at during its own chunk load and home didn't. The ~7KB
+// gzipped cost of including both in the main bundle is worth it to remove
+// that flash on the two routes people move through the most.
+import { StorefrontHomePage } from "../modules/products/storefront-home-page";
+import { ProductPage } from "../modules/products/product-page";
 
 // Route-level code splitting — each page only downloads when a visitor
 // actually navigates to it, instead of every page's JS shipping in one
@@ -58,16 +70,6 @@ const OrderSuccessPage = lazy(() =>
 const ProductsListPage = lazy(() =>
   import("../modules/products/products-list-page").then((m) => ({
     default: m.ProductsListPage
-  }))
-);
-const ProductPage = lazy(() =>
-  import("../modules/products/product-page").then((m) => ({
-    default: m.ProductPage
-  }))
-);
-const StorefrontHomePage = lazy(() =>
-  import("../modules/products/storefront-home-page").then((m) => ({
-    default: m.StorefrontHomePage
   }))
 );
 const RecoveryPage = lazy(() =>

@@ -12,7 +12,6 @@ import {
   StorefrontBadge,
   StorefrontButton,
   StorefrontInput,
-  StorefrontLoadingState,
   StorefrontSectionHeader,
   StorefrontSelect,
   StorefrontStickyActionBar
@@ -48,6 +47,19 @@ function resolveImg(img) {
   if (!img) return "";
   if (typeof img === "string") return img;
   return img.url || img.thumbnail || "";
+}
+
+// Rough title guess from the URL slug, shown the instant the page mounts —
+// before the API call even resolves — so the visitor sees a real (if
+// slightly rough) heading instead of a bare "Loading..." message. Swapped
+// for the real title the moment product data arrives.
+function titleFromSlug(slug) {
+  if (!slug) return "";
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((word) => (word.length <= 4 ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ");
 }
 
 function statusLabel(stockStatus) {
@@ -683,8 +695,20 @@ export function ProductPage() {
 
   if (loading) {
     return (
-      <main className="proto-main-shell">
-        <StorefrontLoadingState label="Loading product..." />
+      <main className="proto-main-shell proto-product-page">
+        <section className="proto-product-layout">
+          <div className="proto-product-gallery">
+            <div className="proto-product-main-image">
+              <div className="proto-product-placeholder large" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="proto-product-summary">
+            <h1>{titleFromSlug(slug)}</h1>
+            <div className="proto-skel-line proto-skel-sm" style={{ maxWidth: 140, marginTop: 14 }} aria-hidden="true" />
+            <div className="proto-skel-line proto-skel-lg" style={{ maxWidth: 200, marginTop: 16 }} aria-hidden="true" />
+            <div className="proto-skel-btn-bar" style={{ marginTop: 24, maxWidth: 260 }} aria-hidden="true" />
+          </div>
+        </section>
       </main>
     );
   }

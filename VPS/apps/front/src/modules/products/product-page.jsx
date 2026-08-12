@@ -274,6 +274,13 @@ export function ProductPage() {
   const [recommendations, setRecommendations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Distinguishes a genuine "this product doesn't exist" (404) from any
+  // other failure (network blip, rate limit, timeout, 5xx) — showing
+  // "Product not found" for the latter is the worst possible message: it
+  // tells a real customer an existing product doesn't exist, which reads as
+  // "this store doesn't sell that" rather than "try again in a second".
+  const [errorStatus, setErrorStatus] = useState(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [recommendationError, setRecommendationError] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState("keyFeatures");
@@ -352,6 +359,7 @@ export function ProductPage() {
     }
 
     setError("");
+    setErrorStatus(null);
     setRecommendationError("");
     setShipping(null);
     setShippingError("");
@@ -380,6 +388,7 @@ export function ProductPage() {
       .catch((requestError) => {
         if (mounted) {
           setError(requestError.message || "Failed to load product.");
+          setErrorStatus(requestError.status || null);
         }
       })
       .finally(() => {
@@ -427,7 +436,7 @@ export function ProductPage() {
     return () => {
       mounted = false;
     };
-  }, [slug]);
+  }, [slug, retryToken]);
 
   useEffect(() => {
     if (product?.id) pushRecentViewed(product);
@@ -739,12 +748,24 @@ export function ProductPage() {
   }
 
   if (error || !product) {
+    const isGenuinelyMissing = errorStatus === 404;
     return (
       <main className="proto-main-shell">
-        <StorefrontAlert tone="error">{error || "Product not found."}</StorefrontAlert>
-        <StorefrontButton to="/products" variant="light">
-          Back to products
-        </StorefrontButton>
+        <StorefrontAlert tone="error">
+          {isGenuinelyMissing
+            ? "Product not found."
+            : "We couldn't load this product right now — this is usually temporary. Please try again."}
+        </StorefrontAlert>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {!isGenuinelyMissing ? (
+            <StorefrontButton type="button" onClick={() => setRetryToken((n) => n + 1)}>
+              Try Again
+            </StorefrontButton>
+          ) : null}
+          <StorefrontButton to="/products" variant="light">
+            Back to products
+          </StorefrontButton>
+        </div>
       </main>
     );
   }

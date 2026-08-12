@@ -22,6 +22,21 @@ const {
 function createApp() {
   const app = express();
 
+  // nginx is the sole reverse-proxy hop in front of this app (no CDN in
+  // between — direct Let's Encrypt certs on this VPS). Without this, Express
+  // sees every request as originating from nginx's own loopback connection
+  // instead of the real visitor, which breaks two things silently in
+  // production only (rate limiters are dev-disabled, so this never showed up
+  // in testing): (1) express-rate-limit's per-IP buckets collapse into one
+  // shared bucket across ALL simultaneous visitors combined, so real
+  // customers could get 429'd on ordinary browsing once concurrent traffic
+  // exceeded the limit — a very plausible explanation for the intermittent
+  // "product not found on a real, live product" reports (2026-08-12); (2)
+  // any per-IP logging/analytics downstream would also be wrong. `1` trusts
+  // exactly the nearest hop (nginx), matching `proxy_set_header
+  // X-Forwarded-For $proxy_add_x_forwarded_for;` in the nginx config.
+  app.set("trust proxy", 1);
+
   // Express auto-generates an ETag for every res.json() response by
   // default. Confirmed live: this made GET /api/admin/dashboard return 304
   // on repeat requests once the browser cached an ETag — and since

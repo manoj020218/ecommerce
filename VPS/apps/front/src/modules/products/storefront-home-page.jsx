@@ -12,6 +12,7 @@ import { listBlogs } from "../blogs/blogs.api";
 import { WebsiteBuyerLeadSection } from "../website-leads/website-buyer-lead-section";
 import {
   addCartItem,
+  listBestSellers,
   listCategories,
   listProducts
 } from "./products.api";
@@ -173,6 +174,84 @@ function ProductRailCard({ product, categories, busy, onAddToCart }) {
         </StorefrontButton>
       </div>
     </Link>
+  );
+}
+
+// Renders immediately with a skeleton and only fetches its own products once
+// it scrolls near the viewport — so the 13-ish category rails on a typical
+// storefront don't all fire their API calls in one burst the moment the page
+// loads, and the visitor sees new rails keep arriving as they scroll instead
+// of a single big wait.
+const CATEGORY_RAIL_LIMIT = 5;
+
+function CategoryRailSection({ category, index, categories, busyProductId, onAddToCart }) {
+  const [items, setItems] = useState(null); // null = not fetched yet
+  const [visible, setVisible] = useState(false);
+  const sectionRef = useRef(null);
+
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px 0px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible || items !== null) return undefined;
+    let active = true;
+    listProducts({ categoryId: category.id, limit: CATEGORY_RAIL_LIMIT, availability: "in_stock" })
+      .then((res) => {
+        if (active) setItems(res?.items ?? []);
+      })
+      .catch(() => {
+        if (active) setItems([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [visible, items, category.id]);
+
+  if (items !== null && items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      ref={sectionRef}
+      className={`proto-section${index % 2 === 0 ? " proto-section-surface" : ""}`}
+    >
+      <StorefrontSectionHeader
+        title={category.name}
+        action={<Link to={`/categories/${category.slug}`}>View all →</Link>}
+      />
+      <div className="proto-product-scroller">
+        {items === null ? (
+          <ProductSkeletonGrid count={CATEGORY_RAIL_LIMIT} variant="rail" />
+        ) : (
+          items.map((product) => (
+            <ProductRailCard
+              key={product.id}
+              product={product}
+              categories={categories}
+              busy={busyProductId === product.id}
+              onAddToCart={onAddToCart}
+            />
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -389,9 +468,9 @@ export function StorefrontHomePage() {
   const { settings: publicSettings } = usePublicSettings();
   const { isAuthenticated } = useCustomerSession();
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);           // first 8 — bestsellers rail
+  const [products, setProducts] = useState([]);           // first 8 in-stock — new-arrivals fallback source
+  const [bestSellers, setBestSellers] = useState([]);      // ranked by actual units sold
   const [latestProducts, setLatestProducts] = useState([]); // next 8 — new arrivals rail
-  const [categoryRails, setCategoryRails] = useState([]); // one scroller per category, in-stock only
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newArrivalsLoading, setNewArrivalsLoading] = useState(true);
@@ -408,11 +487,12 @@ export function StorefrontHomePage() {
         setNewArrivalsLoading(true);
         setError("");
 
-        // Phase 1: categories + first 8 in-stock products + blogs in parallel
-        const [categoryRows, firstBatch, blogRows] = await Promise.all([
+        // Phase 1: categories + first 8 in-stock products + blogs + bestsellers in parallel
+        const [categoryRows, firstBatch, blogRows, bestSellerRows] = await Promise.all([
           listCategories(),
           listProducts({ limit: 8, offset: 0, availability: "in_stock" }),
-          listBlogs({ limit: 6 })
+          listBlogs({ limit: 6 }),
+          listBestSellers(8).catch(() => [])
         ]);
 
         if (!active) return;
@@ -420,6 +500,7 @@ export function StorefrontHomePage() {
         const categoryList = Array.isArray(categoryRows) ? categoryRows : [];
         setCategories(categoryList);
         setBlogs(Array.isArray(blogRows) ? blogRows : []);
+        setBestSellers(Array.isArray(bestSellerRows) ? bestSellerRows : []);
 
         const firstItems = firstBatch?.items ?? (Array.isArray(firstBatch) ? firstBatch : []);
         setProducts(firstItems);
@@ -436,18 +517,9 @@ export function StorefrontHomePage() {
         }
         setNewArrivalsLoading(false);
 
-        // Phase 3: one in-stock rail per category, loaded last so it never blocks first paint
-        if (categoryList.length > 0) {
-          const railResults = await Promise.all(
-            categoryList.map((category) =>
-              listProducts({ categoryId: category.id, limit: 10, availability: "in_stock" })
-                .then((res) => ({ category, items: res?.items ?? [] }))
-                .catch(() => ({ category, items: [] }))
-            )
-          );
-          if (!active) return;
-          setCategoryRails(railResults.filter((rail) => rail.items.length > 0));
-        }
+        // Per-category rails no longer fetched here — each CategoryRailSection
+        // fetches its own ~5 products lazily as it scrolls into view (see
+        // that component), instead of firing one call per category upfront.
       } catch (requestError) {
         if (active) {
           setError(requestError.message || "Failed to load the storefront.");
@@ -727,27 +799,29 @@ export function StorefrontHomePage() {
         ) : null}
       </section>
 
-      <section className="proto-section proto-section-surface">
-        <StorefrontSectionHeader
-          title="Bestsellers"
-          action={<Link to="/products">View all →</Link>}
-        />
-        {loading ? (
-          <StorefrontLoadingState label="Loading products..." />
-        ) : (
-          <div className="proto-product-scroller">
-            {products.map((product) => (
-              <ProductRailCard
-                key={product.id}
-                product={product}
-                categories={categories}
-                busy={busyProductId === product.id}
-                onAddToCart={addProductToCart}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      {loading || bestSellers.length > 0 ? (
+        <section className="proto-section proto-section-surface">
+          <StorefrontSectionHeader
+            title="Bestsellers"
+            action={<Link to="/products">View all →</Link>}
+          />
+          {loading ? (
+            <StorefrontLoadingState label="Loading products..." />
+          ) : (
+            <div className="proto-product-scroller">
+              {bestSellers.map((product) => (
+                <ProductRailCard
+                  key={product.id}
+                  product={product}
+                  categories={categories}
+                  busy={busyProductId === product.id}
+                  onAddToCart={addProductToCart}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className="proto-usp-strip">
         {TRUST_POINTS.map((item) => (
@@ -779,27 +853,15 @@ export function StorefrontHomePage() {
         </div>
       </section>
 
-      {categoryRails.map((rail, index) => (
-        <section
-          key={rail.category.id}
-          className={`proto-section${index % 2 === 0 ? " proto-section-surface" : ""}`}
-        >
-          <StorefrontSectionHeader
-            title={rail.category.name}
-            action={<Link to={`/categories/${rail.category.slug}`}>View all →</Link>}
-          />
-          <div className="proto-product-scroller">
-            {rail.items.map((product) => (
-              <ProductRailCard
-                key={product.id}
-                product={product}
-                categories={categories}
-                busy={busyProductId === product.id}
-                onAddToCart={addProductToCart}
-              />
-            ))}
-          </div>
-        </section>
+      {categories.map((category, index) => (
+        <CategoryRailSection
+          key={category.id}
+          category={category}
+          index={index}
+          categories={categories}
+          busyProductId={busyProductId}
+          onAddToCart={addProductToCart}
+        />
       ))}
 
       <section className="proto-section proto-section-surface">

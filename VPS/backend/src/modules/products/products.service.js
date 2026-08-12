@@ -917,6 +917,39 @@ async function listPublicProducts(filters, options = {}) {
   return sorted.map((product) => toPublicProduct(product, { customerPricingContext }));
 }
 
+// Ranks by actual units sold across paid orders — not a proxy like
+// "newest" or "in stock". With a small order history this may return
+// fewer than `limit` products (or none); the caller decides whether to
+// hide the section rather than padding it with unrelated products.
+async function listBestSellingProducts(limit = 8, options = {}) {
+  const [catalogStore, authStore, customerPricingContext] = await Promise.all([
+    readCatalogStore(),
+    readAuthStore(),
+    resolveCustomerPricingContext(options.customerId)
+  ]);
+
+  const soldQtyByProductId = new Map();
+  for (const order of authStore.orders || []) {
+    if (order.paymentStatus !== "paid") continue;
+    for (const item of order.items || []) {
+      if (!item.productId) continue;
+      soldQtyByProductId.set(
+        item.productId,
+        (soldQtyByProductId.get(item.productId) || 0) + Number(item.qty || 0)
+      );
+    }
+  }
+
+  const productsById = new Map(catalogStore.products.map((p) => [p.id, p]));
+  const ranked = [...soldQtyByProductId.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([productId]) => productsById.get(productId))
+    .filter((product) => product && product.isActive)
+    .slice(0, limit);
+
+  return ranked.map((product) => toPublicProduct(product, { customerPricingContext }));
+}
+
 async function getPublicProductBySlug(slug, options = {}) {
   const store = await readCatalogStore();
   const row = findActiveProductBySlug(store, slug);
@@ -1317,6 +1350,7 @@ module.exports = {
   bulkImportProducts,
   bulkPatchProducts,
   listPublicProducts,
+  listBestSellingProducts,
   getPublicProductBySlug,
   getPublicProductRecommendations,
   getPublicProductPage,

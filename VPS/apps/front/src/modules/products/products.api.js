@@ -30,6 +30,10 @@ export function listCategories() {
   return apiFetch("/categories");
 }
 
+export function listBestSellers(limit = 8) {
+  return apiFetch(`/products/best-sellers?limit=${limit}`, { auth: true });
+}
+
 export function searchStorefront(params = {}) {
   const query = new URLSearchParams();
   if (params.q) {

@@ -176,6 +176,7 @@ function createPublicProductsRouter() {
   const router = express.Router();
 
   router.get("/", controller.publicListProducts);
+  router.get("/best-sellers", controller.publicListBestSellers);
   router.get("/:slug/page", controller.publicGetProductPage);
   router.get("/:slug/recommendations", controller.publicGetProductRecommendations);
   router.post("/:slug/shipping-estimate", controller.publicEstimateShipping);

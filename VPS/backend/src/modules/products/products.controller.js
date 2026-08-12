@@ -231,6 +231,14 @@ const publicListProducts = asyncHandler(async (req, res) => {
   return ok(res, data, "Public products fetched.");
 });
 
+const publicListBestSellers = asyncHandler(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 20);
+  const data = await service.listBestSellingProducts(limit, {
+    customerId: req.customer?.id || null
+  });
+  return ok(res, data, "Best sellers fetched.");
+});
+
 const publicGetProductBySlug = asyncHandler(async (req, res) => {
   const data = await service.getPublicProductBySlug(req.params.slug, {
     customerId: req.customer?.id || null
@@ -282,6 +290,7 @@ module.exports = {
   adminUploadProductDocument,
   adminExportGoogleShopping,
   publicListProducts,
+  publicListBestSellers,
   publicGetProductBySlug,
   publicGetProductRecommendations,
   publicGetProductPage,

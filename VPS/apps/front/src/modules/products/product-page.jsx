@@ -324,7 +324,33 @@ export function ProductPage() {
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
+
+    // If this page load was server-rendered with real product data (see
+    // prerender.service.js's injectInitialData), use it for the very first
+    // render instead of showing the loading skeleton — getProduct(slug)
+    // below still runs afterward to revalidate in the background. Cleared
+    // immediately so a later client-side navigation to a different product
+    // (no fresh server response, no seed for that slug) falls back to the
+    // normal loading flow exactly as before.
+    const seed = window.__INITIAL_PRODUCT__;
+    const hasSeed = Boolean(seed && seed.slug === slug);
+    window.__INITIAL_PRODUCT__ = null;
+
+    if (hasSeed) {
+      setProduct(seed);
+      setSelectedImage(Array.isArray(seed.images) && seed.images[0] ? resolveImg(seed.images[0]) : "");
+      setQuantity(Math.max(1, Number(seed.moq || 1)));
+      setBreadcrumb([
+        { label: "Home", href: "/" },
+        { label: "Products", href: "/products" },
+        { label: seed.title, href: `/products/${seed.slug}` }
+      ]);
+      setLoading(false);
+    } else {
+      setLoading(true);
+      setSelectedImage("");
+    }
+
     setError("");
     setRecommendationError("");
     setShipping(null);
@@ -335,7 +361,6 @@ export function ProductPage() {
     setNotifyNotice("");
     setCartActionError("");
     setCartActionNotice("");
-    setSelectedImage("");
 
     getProduct(slug)
       .then((data) => {

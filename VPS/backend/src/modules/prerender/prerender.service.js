@@ -9,10 +9,14 @@ const { getPublicProductPage } = require("../products/products.service");
 const { getPublicCategoryPage } = require("../categories/categories.service");
 const { getPublicBlogBySlug } = require("../blogs/blogs.service");
 
-// Only known crawler/link-preview user agents ever reach this route (nginx
-// routes them here, everyone else keeps getting the plain SPA build) — see
-// the `map $http_user_agent $is_crawler` block in the nginx config. This
-// module stays dumb on purpose: no UA re-check here, single source of truth.
+// Product pages: EVERY visitor (bot and human) is routed here now, not just
+// crawlers — see nginx's /products/:slug location. Category/guide pages
+// still route bots-only through $is_crawler; product pages were singled out
+// first because that's the page real visitors actually complained about
+// ("feels slow coming from Google search"). nginx falls back to the plain
+// SPA shell (error_page 502/503/504 -> @spa_fallback) if this endpoint or
+// the backend itself is unavailable, so a bug here degrades to today's
+// behavior instead of breaking the page outright.
 
 function resolveDistIndexPath() {
   return path.resolve(process.cwd(), env.frontDistIndexPath);
@@ -94,13 +98,22 @@ function injectJsonLd(html, structuredData) {
   return html.replace("</head>", `${blocks}\n  </head>`);
 }
 
-// Real users never see this — the SPA does a fresh createRoot().render() on
-// mount (no hydration), which fully replaces #root's contents. This exists
-// purely so a non-JS-executing crawler sees real text instead of an empty
-// div, which also helps the "content looks empty" side of the soft-404
-// problem, not just the meta-tag side.
+const inrFormatter = new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0
+});
+
+// Crawlers only ever read this markup (no JS execution). Real visitors now
+// see it too, but only for a moment: it uses the same CSS classes as the
+// real product-page.jsx layout (so it's already styled/positioned
+// correctly, not a plain-text flash) and is replaced by the full
+// interactive React page the instant the JS bundle finishes loading and
+// boots — see injectInitialData below for how that handoff avoids a second
+// "loading" flash on top of this one.
 function buildVisibleSkeleton(product, breadcrumb, seo) {
-  const price = Number(product.pricing?.visiblePrice || 0).toFixed(2);
+  const price = Number(product.pricing?.visiblePrice || 0);
+  const compareAtPrice = Number(product.pricing?.compareAtPrice || 0);
   const crumbLinks = breadcrumb
     .map((item) => `<a href="${escapeXml(item.href)}">${escapeXml(item.label)}</a>`)
     .join(" &raquo; ");
@@ -111,27 +124,52 @@ function buildVisibleSkeleton(product, breadcrumb, seo) {
   // predate that pipeline, so this endpoint can't assume every stored
   // shortDescription is safe to embed as raw HTML.
   const safeShortDescription = sanitizeRichText(product.shortDescription || "");
-
   const reviewCount = Number(product.reviewCount || 0);
+  const heroImage = Array.isArray(product.images) && product.images[0]
+    ? escapeXml(product.images[0].url || product.images[0].thumbnail || "")
+    : "";
 
-  return [
-    `<nav>${crumbLinks}</nav>`,
-    `<h1>${escapeXml(product.title)}</h1>`,
-    safeShortDescription ? `<div>${safeShortDescription}</div>` : "",
-    `<p>Price: &#8377;${escapeXml(price)}</p>`,
-    `<p>SKU: ${escapeXml(product.sku || "")}</p>`,
-    reviewCount > 0
-      ? `<p>Rating: ${escapeXml(Number(product.avgRating || 0).toFixed(1))}/5 (${reviewCount} review${reviewCount === 1 ? "" : "s"})</p>`
-      : ""
-  ]
-    .filter(Boolean)
-    .join("\n    ");
+  return `
+    <nav class="proto-breadcrumb">${crumbLinks}</nav>
+    <main class="proto-main-shell proto-product-page">
+      <section class="proto-product-layout">
+        <div class="proto-product-gallery">
+          <div class="proto-product-main-image">
+            ${heroImage ? `<img src="${heroImage}" alt="${escapeXml(product.title)}" fetchpriority="high" />` : ""}
+          </div>
+        </div>
+        <div class="proto-product-summary">
+          <h1>${escapeXml(product.title)}</h1>
+          <p class="proto-product-subtitle">SKU: ${escapeXml(product.sku || "--")}</p>
+          <div class="proto-price-row proto-price-row-large">
+            <strong>${escapeXml(inrFormatter.format(price))}</strong>
+            ${compareAtPrice > price ? `<span>${escapeXml(inrFormatter.format(compareAtPrice))}</span>` : ""}
+          </div>
+          ${reviewCount > 0 ? `<p>Rating: ${escapeXml(Number(product.avgRating || 0).toFixed(1))}/5 (${reviewCount} review${reviewCount === 1 ? "" : "s"})</p>` : ""}
+          ${safeShortDescription ? `<div>${safeShortDescription}</div>` : ""}
+        </div>
+      </section>
+    </main>`;
 }
 
 function injectBody(html, skeletonHtml) {
   return html.replace(
     '<div id="root"></div>',
     `<div id="root">\n    ${skeletonHtml}\n  </div>`
+  );
+}
+
+// Embeds the exact same product payload the client would otherwise fetch
+// from GET /api/products/:slug, so product-page.jsx's first render can use
+// it immediately instead of showing its own loading skeleton and firing a
+// redundant request. product-page.jsx still revalidates in the background
+// (covers price/stock changing between this response and the JS finishing
+// load) — this only removes the *visible wait*, not the fetch itself.
+function injectInitialData(html, product) {
+  const json = JSON.stringify(product).replace(/</g, "\\u003c");
+  return html.replace(
+    "</body>",
+    `    <script>window.__INITIAL_PRODUCT__ = ${json};</script>\n  </body>`
   );
 }
 
@@ -203,6 +241,7 @@ async function renderProductPageHtml(slug) {
   let html = injectHeadTags(baseHtml, seo);
   html = injectJsonLd(html, structuredData);
   html = injectBody(html, buildVisibleSkeleton(product, breadcrumb, seo));
+  html = injectInitialData(html, product);
 
   return { status: 200, html };
 }

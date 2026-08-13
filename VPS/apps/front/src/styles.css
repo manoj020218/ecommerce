@@ -2686,13 +2686,25 @@ textarea {
 .proto-product-media img,
 .proto-mini-product-media img,
 .proto-cart-line-media img,
-.proto-checkout-item-media img,
+.proto-checkout-item-media img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Full product photo visible, never cropped — cover fills the fixed-size
+   box by cutting off whatever doesn't fit, which can hide real product
+   detail (ports, labels, included accessories) that a shopper needs to
+   see before buying. contain fits the whole image inside the box instead,
+   letterboxed on the white background already set on these containers. */
 .proto-product-main-image img,
 .proto-product-thumb img {
   width: 100%;
   height: 100%;
   max-width: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 
@@ -7149,8 +7161,9 @@ textarea {
   max-width: 100vw;
   max-height: 90vh;
   object-fit: contain;
-  touch-action: pinch-zoom;
-  cursor: zoom-in;
+  /* touch-action + cursor are set inline by ZoomableFullscreenImage, which
+     drives zoom/pan itself via Pointer Events instead of native browser
+     pinch-zoom (unreliable on position:fixed overlays like this one). */
 }
 .proto-fullscreen-close {
   position: absolute;

@@ -62,6 +62,120 @@ function titleFromSlug(slug) {
     .join(" ");
 }
 
+// Custom pinch-zoom via Pointer Events instead of the CSS-only
+// `touch-action: pinch-zoom` approach — that relies on the browser's native
+// page-zoom gesture, which is unreliable on `position: fixed` overlays
+// (this one included) across mobile browsers, especially iOS Safari. This
+// implementation doesn't depend on native zoom at all: it tracks pointers
+// directly and drives a CSS transform, so it works the same everywhere.
+function ZoomableFullscreenImage({ src, alt, onRequestClose }) {
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const pointers = useRef(new Map());
+  const gesture = useRef({ startDistance: 0, startScale: 1, panStart: null, moved: false });
+
+  function distanceBetween(points) {
+    const [a, b] = points;
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function clampScale(value) {
+    return Math.min(4, Math.max(1, value));
+  }
+
+  function onPointerDown(event) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    gesture.current.moved = false;
+
+    if (pointers.current.size === 2) {
+      gesture.current.startDistance = distanceBetween([...pointers.current.values()]);
+      gesture.current.startScale = scale;
+      gesture.current.panStart = null;
+    } else if (pointers.current.size === 1) {
+      gesture.current.panStart = { x: event.clientX, y: event.clientY, translate: { ...translate } };
+    }
+  }
+
+  function onPointerMove(event) {
+    if (!pointers.current.has(event.pointerId)) return;
+    pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.current.size === 2 && gesture.current.startDistance) {
+      const newDistance = distanceBetween([...pointers.current.values()]);
+      const nextScale = clampScale(gesture.current.startScale * (newDistance / gesture.current.startDistance));
+      setScale(nextScale);
+      gesture.current.moved = true;
+    } else if (pointers.current.size === 1 && scale > 1 && gesture.current.panStart) {
+      const dx = event.clientX - gesture.current.panStart.x;
+      const dy = event.clientY - gesture.current.panStart.y;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) gesture.current.moved = true;
+      setTranslate({
+        x: gesture.current.panStart.translate.x + dx,
+        y: gesture.current.panStart.translate.y + dy
+      });
+    }
+  }
+
+  function onPointerUp(event) {
+    pointers.current.delete(event.pointerId);
+
+    if (pointers.current.size === 0) {
+      const wasTap = !gesture.current.moved;
+      gesture.current.startDistance = 0;
+      gesture.current.panStart = null;
+
+      if (scale <= 1.05) {
+        setScale(1);
+        setTranslate({ x: 0, y: 0 });
+      }
+
+      // A real tap (no drag/pinch happened) closes the viewer, same as
+      // tapping the backdrop — but only while not zoomed in, so a tap meant
+      // to inspect a zoomed detail doesn't immediately close the overlay.
+      if (wasTap && scale <= 1.05) {
+        onRequestClose();
+      }
+    } else if (pointers.current.size === 1) {
+      // Dropped from a pinch (two fingers) down to one — restart panning
+      // from the remaining finger's current position instead of jumping.
+      const [remaining] = pointers.current.values();
+      gesture.current.panStart = { x: remaining.x, y: remaining.y, translate: { ...translate } };
+      gesture.current.startDistance = 0;
+    }
+  }
+
+  function onDoubleClick(event) {
+    event.stopPropagation();
+    if (scale > 1) {
+      setScale(1);
+      setTranslate({ x: 0, y: 0 });
+    } else {
+      setScale(2.5);
+    }
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      draggable={false}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onDoubleClick={onDoubleClick}
+      onClick={(event) => event.stopPropagation()}
+      style={{
+        transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+        transition: pointers.current.size > 0 ? "none" : "transform 0.15s ease-out",
+        cursor: scale > 1 ? "grab" : "zoom-in",
+        touchAction: "none"
+      }}
+    />
+  );
+}
+
 function statusLabel(stockStatus) {
   if (stockStatus === "in_stock") {
     return "In Stock";
@@ -774,9 +888,22 @@ export function ProductPage() {
     <main className="proto-main-shell proto-product-page" onClick={() => setShareOpen(false)}>
       {fullscreenOpen ? (
         <div className="proto-product-fullscreen-overlay" onClick={() => setFullscreenOpen(false)}>
-          <button className="proto-fullscreen-close" aria-label="Close">✕</button>
-          <img src={activeImage} alt={product.title} />
-          <p className="proto-fullscreen-hint">Pinch to zoom · Tap to close</p>
+          <button
+            className="proto-fullscreen-close"
+            aria-label="Close"
+            onClick={(event) => {
+              event.stopPropagation();
+              setFullscreenOpen(false);
+            }}
+          >
+            ✕
+          </button>
+          <ZoomableFullscreenImage
+            src={activeImage}
+            alt={product.title}
+            onRequestClose={() => setFullscreenOpen(false)}
+          />
+          <p className="proto-fullscreen-hint">Pinch or double-tap to zoom · Tap image to close</p>
         </div>
       ) : null}
 

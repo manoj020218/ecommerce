@@ -76,7 +76,9 @@ function ProductCard({ product, busy, onAddToCart }) {
               <strong>{currency(price)}</strong>
               {comparePrice && comparePrice > price ? <span>{currency(comparePrice)}</span> : null}
             </div>
-            <small>+{Number(product.gstRate || 18)}% GST</small>
+            <small>
+              {product.priceIncludesGst ? "GST included" : `+${Number(product.gstRate || 18)}% GST`}
+            </small>
           </>
         )}
         <StorefrontButton

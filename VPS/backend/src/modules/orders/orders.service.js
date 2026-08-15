@@ -527,6 +527,13 @@ async function exportOrdersCsv(filters) {
 }
 
 const STUCK_PAYMENT_THRESHOLD_MINUTES = 15;
+// Routine abandonment (no gateway txn ID) is only useful to surface while
+// it's fresh enough that someone might still act on it — past a day it's
+// unambiguously dead and just clutters the list forever, since nothing
+// ever flips checkoutSession.status away from "payment_attempt_created" on
+// its own. Genuinely urgent rows (likelyCharged) are NEVER dropped by age
+// -- an old unresolved one is more concerning, not less.
+const STALE_ABANDONED_ROW_MAX_AGE_MINUTES = 24 * 60;
 
 // Flags checkout sessions stuck at "payment_attempt_created" past the
 // threshold. Most of these are ordinary abandonment (buyer backed out before
@@ -583,8 +590,12 @@ async function listStuckPaymentSessions() {
     };
   });
 
-  rows.sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
-  return rows;
+  const visibleRows = rows.filter(
+    (row) => row.likelyCharged || (row.stuckForMinutes ?? 0) <= STALE_ABANDONED_ROW_MAX_AGE_MINUTES
+  );
+
+  visibleRows.sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+  return visibleRows;
 }
 
 module.exports = {

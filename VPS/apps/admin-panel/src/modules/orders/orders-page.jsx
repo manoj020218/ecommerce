@@ -344,46 +344,96 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancel
 
 // ── stuck payments alert ─────────────────────────────────────────────────────
 
-function StuckPaymentsAlert({ rows }) {
-  if (!rows.length) return null;
+function StuckPaymentRow({ row, tone }) {
+  const borderColor = tone === "danger" ? "#fee2e2" : "#f3f4f6";
+  const stuckColor = tone === "danger" ? "#b91c1c" : "#9ca3af";
 
   return (
     <div style={{
-      background:"rgba(239,68,68,0.06)", border:"1px solid #fca5a5",
-      borderRadius:16, padding:"14px 16px", marginBottom:14
+      display:"flex", flexWrap:"wrap", alignItems:"center", gap:"4px 12px",
+      background:"#fff", border:`1px solid ${borderColor}`, borderRadius:10,
+      padding:"8px 12px", fontSize:12
     }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-        <span style={{ fontSize:16 }}>⚠️</span>
-        <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#b91c1c" }}>
-          Payment received but no order created ({rows.length})
-        </p>
-      </div>
-      <p style={{ margin:"0 0 10px", fontSize:12, color:"#7f1d1d" }}>
-        These customers reached the payment gateway but the order was never created — usually
-        because their browser closed before confirming. Verify the payment with the gateway
-        order/txn ID below before reconciling manually.
-      </p>
-      <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-        {rows.map((row) => (
-          <div key={row.checkoutSessionId} style={{
-            display:"flex", flexWrap:"wrap", alignItems:"center", gap:"4px 12px",
-            background:"#fff", border:"1px solid #fee2e2", borderRadius:10,
-            padding:"8px 12px", fontSize:12
-          }}>
-            <strong style={{ color:"#111827" }}>{row.customerName || "Unknown"}</strong>
-            <span style={{ color:"#374151", fontWeight:700 }}>{formatCurrencyInr(row.amount)}</span>
-            <span style={{ color:"#6b7280" }}>{row.customerEmail}</span>
-            <span style={{ color:"#6b7280" }}>{row.customerMobile}</span>
-            <span style={{ color:"#9ca3af" }}>via {row.gateway || "unknown gateway"}</span>
-            {row.gatewayOrderId && (
-              <span style={{ color:"#9ca3af", fontFamily:"monospace", fontSize:11 }}>{row.gatewayOrderId}</span>
-            )}
-            <span style={{ marginLeft:"auto", color:"#b91c1c", fontWeight:600, whiteSpace:"nowrap" }}>
-              stuck {row.stuckForMinutes != null ? `${row.stuckForMinutes}m` : "—"}
-            </span>
+      <strong style={{ color:"#111827" }}>{row.customerName || "Unknown"}</strong>
+      <span style={{ color:"#374151", fontWeight:700 }}>{formatCurrencyInr(row.amount)}</span>
+      <span style={{ color:"#6b7280" }}>{row.customerEmail}</span>
+      <span style={{ color:"#6b7280" }}>{row.customerMobile}</span>
+      <span style={{ color:"#9ca3af" }}>via {row.gateway || "unknown gateway"}</span>
+      {row.gatewayTxnId ? (
+        <span style={{ color:"#b91c1c", fontFamily:"monospace", fontSize:11 }}>
+          txn: {row.gatewayTxnId}
+        </span>
+      ) : row.gatewayOrderId ? (
+        <span style={{ color:"#9ca3af", fontFamily:"monospace", fontSize:11 }}>{row.gatewayOrderId}</span>
+      ) : null}
+      <span style={{ marginLeft:"auto", color:stuckColor, fontWeight:600, whiteSpace:"nowrap" }}>
+        stuck {row.stuckForMinutes != null ? `${row.stuckForMinutes}m` : "—"}
+      </span>
+    </div>
+  );
+}
+
+// Split, not one blanket "payment received" claim: a payment attempt only
+// gets a gateway txn ID once the gateway actually processed something. No
+// txn ID almost always means the buyer backed out before paying anything —
+// already tracked separately by the abandoned-cart recovery flow — not a
+// captured payment we lost track of. Confirmed 2026-08-15 against two real
+// "stuck" sessions: zero-txn-ID ones were never in Razorpay/Cashfree's
+// dashboards either. Mixing both cases under one urgent-red banner made the
+// alert cry wolf on every routine abandonment, which is exactly the kind of
+// thing that gets ignored right when it's flagging a real one.
+function StuckPaymentsAlert({ rows }) {
+  if (!rows.length) return null;
+
+  const chargeable = rows.filter((row) => row.likelyCharged);
+  const abandoned = rows.filter((row) => !row.likelyCharged);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:10, marginBottom:14 }}>
+      {chargeable.length > 0 ? (
+        <div style={{
+          background:"rgba(239,68,68,0.06)", border:"1px solid #fca5a5",
+          borderRadius:16, padding:"14px 16px"
+        }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+            <span style={{ fontSize:16 }}>⚠️</span>
+            <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#b91c1c" }}>
+              Payment may have been captured — no order created ({chargeable.length})
+            </p>
           </div>
-        ))}
-      </div>
+          <p style={{ margin:"0 0 10px", fontSize:12, color:"#7f1d1d" }}>
+            The gateway returned a transaction ID for these but no order was created — usually a
+            missed/unregistered webhook. Verify the txn ID below directly in Razorpay/Cashfree's
+            dashboard before reconciling manually.
+          </p>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {chargeable.map((row) => (
+              <StuckPaymentRow key={row.checkoutSessionId} row={row} tone="danger" />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {abandoned.length > 0 ? (
+        <div style={{
+          background:"#f9fafb", border:"1px solid #e5e7eb",
+          borderRadius:16, padding:"14px 16px"
+        }}>
+          <p style={{ margin:"0 0 10px", fontSize:13, fontWeight:700, color:"#374151" }}>
+            Checkout abandoned before payment ({abandoned.length})
+          </p>
+          <p style={{ margin:"0 0 10px", fontSize:12, color:"#6b7280" }}>
+            No transaction ID was ever issued for these — nothing was charged. The buyer likely
+            closed the tab before reaching or completing the gateway's checkout screen. Already
+            tracked in the abandoned-cart recovery flow; nothing to reconcile here.
+          </p>
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {abandoned.map((row) => (
+              <StuckPaymentRow key={row.checkoutSessionId} row={row} tone="muted" />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

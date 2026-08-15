@@ -528,11 +528,15 @@ async function exportOrdersCsv(filters) {
 
 const STUCK_PAYMENT_THRESHOLD_MINUTES = 15;
 
-// Flags checkout sessions where the buyer reached the payment gateway (an attempt
-// was created) but the confirm round-trip never came back — this is the orphaned
-// payment class: gateway captured the money, we have no order. A missing/unregistered
-// webhook is the usual cause. See paymentAttempts for the gateway order/txn id to
-// cross-check directly in Razorpay/Cashfree's dashboard.
+// Flags checkout sessions stuck at "payment_attempt_created" past the
+// threshold. Most of these are ordinary abandonment (buyer backed out before
+// completing payment, already picked up separately by the abandoned-cart
+// recovery flow) -- `likelyCharged` (true only when the gateway actually
+// returned a txn ID) is what separates that routine case from the genuinely
+// urgent one: gateway captured payment but our confirm round-trip/webhook
+// never came back, so we have money with no order. See paymentAttempts for
+// the gateway order/txn id to cross-check directly in Razorpay/Cashfree's
+// dashboard when likelyCharged is true.
 async function listStuckPaymentSessions() {
   const authStore = await readAuthStore();
   ensureAuthStoreShape(authStore);
@@ -564,7 +568,18 @@ async function listStuckPaymentSessions() {
       amount: session.cart?.pricing?.grandTotal ?? null,
       gateway: attempt?.gateway || "",
       gatewayOrderId: attempt?.gatewayOrderId || "",
-      attemptId: attempt?.id || ""
+      attemptId: attempt?.id || "",
+      // The gateway only ever hands back a txn ID once it has actually
+      // processed something on its end (captured payment, or at minimum
+      // started a transaction attempt). An attempt stuck at "created" with
+      // no txn ID never got that far — almost always the buyer backed out
+      // before reaching (or completing) the gateway's own checkout screen,
+      // not a captured payment we lost track of. Surfacing this distinction
+      // directly instead of leaving every row under one alarming banner —
+      // confirmed by cross-checking real "stuck" sessions against Razorpay/
+      // Cashfree dashboards (2026-08-15): zero-txn-ID ones were never there.
+      gatewayTxnId: attempt?.gatewayTxnId || "",
+      likelyCharged: Boolean(attempt?.gatewayTxnId)
     };
   });
 

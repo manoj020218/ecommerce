@@ -56,6 +56,27 @@ function SuccessIcon() {
   );
 }
 
+const GATEWAY_LABELS = {
+  razorpay: "Razorpay",
+  cashfree: "Cashfree",
+  phonepe: "PhonePe",
+  ccavenue: "CCAvenue",
+  payu: "PayU",
+  paytm: "Paytm",
+  mock_online: "Test Gateway"
+};
+
+function gatewayLabel(gatewayCode) {
+  const key = String(gatewayCode || "").trim().toLowerCase();
+  return GATEWAY_LABELS[key] || (key ? humanizeStatus(key) : "Payment Gateway");
+}
+
+function manualPaymentMethodLabel(paymentMethod) {
+  if (paymentMethod === "manual_upi") return "UPI";
+  if (paymentMethod === "direct_bank_transfer") return "Bank Transfer";
+  return humanizeStatus(paymentMethod);
+}
+
 function humanizeInstructionKey(value) {
   return String(value || "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -568,6 +589,13 @@ export function OrderSuccessPage() {
   );
   const canSubmitManualPayment = canSubmitManualPaymentProof(order);
   const currentPhase = resolveCurrentPhase(order);
+  // Already paid through a payment gateway — nothing left for the buyer to
+  // do, so the detailed "what happens next" process list is unnecessary
+  // clutter here. Show a simple confirmation instead.
+  const isGatewayPaid = paymentMethod === "online" && paymentStatus === "paid";
+  const isManualPaymentMethod = ["manual_upi", "direct_bank_transfer"].includes(paymentMethod);
+  const manualVerificationPending = isManualPaymentMethod && order?.manualPaymentStatus === "submitted";
+  const manualPaymentNotYetMade = isManualPaymentMethod && canSubmitManualPayment;
   const nextStepCopy = resolveNextStep({
     order,
     session: checkoutSession,
@@ -696,9 +724,25 @@ export function OrderSuccessPage() {
         <h1>{headline}</h1>
         <p>
           {effectiveOrderNo
-            ? `Reference ${effectiveOrderNo}. Keep this number for payment, support, and invoice follow-up.`
+            ? `Order Number: ${effectiveOrderNo}. Keep this number for payment, support, and invoice follow-up.`
             : "Your checkout record has been created."}
         </p>
+        {isGatewayPaid ? (
+          <p className="proto-success-payment-line">
+            Paid By — {gatewayLabel(order?.paymentGateway)}
+          </p>
+        ) : isManualPaymentMethod ? (
+          <p className="proto-success-payment-line">
+            Payment Method: {manualPaymentMethodLabel(paymentMethod)}
+            {" · "}
+            Payment Status:{" "}
+            {manualVerificationPending
+              ? "Verification Pending"
+              : manualPaymentNotYetMade
+                ? "Payment Not Yet Made"
+                : humanizeStatus(order?.manualPaymentStatus || paymentStatus)}
+          </p>
+        ) : null}
       </section>
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
@@ -723,6 +767,16 @@ export function OrderSuccessPage() {
                 title={canSubmitManualPayment ? "Awaiting Your Payment Proof" : "Payment Instructions"}
                 description="Use these details if this order requires manual bank transfer or UPI verification."
               />
+              {isManualPaymentMethod ? (
+                <p className="proto-success-payment-line">
+                  Payment Method: {manualPaymentMethodLabel(paymentMethod)}
+                  {" · "}
+                  Payment Status:{" "}
+                  <strong>
+                    {manualVerificationPending ? "Verification Pending" : "Payment Not Yet Made"}
+                  </strong>
+                </p>
+              ) : null}
               {paymentMethod === "manual_upi" && manualInstructions?.upiId ? (
                 <UpiPaymentPanel
                   upiId={manualInstructions.upiId}
@@ -842,7 +896,9 @@ export function OrderSuccessPage() {
                 <StorefrontBadge tone={statusTone(paymentStatus)}>
                   {paymentStatus === "paid" ? "Payment confirmed" : humanizeStatus(paymentStatus)}
                 </StorefrontBadge>
-                <span className="proto-snapshot-order-no">{effectiveOrderNo || "--"}</span>
+                <span className="proto-snapshot-order-no">
+                  {effectiveOrderNo ? `Order #${effectiveOrderNo}` : "--"}
+                </span>
               </div>
               <div className="proto-snapshot-bar-right">
                 <strong>{formatCurrency(total)}</strong>
@@ -863,7 +919,13 @@ export function OrderSuccessPage() {
                   </div>
                   <div>
                     <span>Payment Method</span>
-                    <strong>{humanizeStatus(paymentMethod)}</strong>
+                    <strong>
+                      {isGatewayPaid
+                        ? `Paid via ${gatewayLabel(order?.paymentGateway)}`
+                        : isManualPaymentMethod
+                          ? manualPaymentMethodLabel(paymentMethod)
+                          : humanizeStatus(paymentMethod)}
+                    </strong>
                   </div>
                   <div>
                     <span>Shipping Method</span>
@@ -909,47 +971,59 @@ export function OrderSuccessPage() {
             ) : null}
           </StorefrontCard>
 
-          <StorefrontCard className="proto-checkout-card proto-next-steps-card">
-            <StorefrontSectionHeader
-              title="What Happens Next?"
-              description="Here's what to expect after placing your order."
-            />
-            <ol className="proto-next-steps">
-              <li className={currentPhase > 1 ? "done" : currentPhase === 1 ? "active" : "upcoming"}>
-                <div className="proto-step-circle amber">{currentPhase > 1 ? "✓" : 1}</div>
-                <div>
-                  <strong>{currentPhase > 1 ? "Payment Verified" : "Payment Verification (2–4 hrs)"}</strong>
-                  <p>
-                    {currentPhase > 1
-                      ? "Your payment has been confirmed."
-                      : "Our team verifies your payment and confirms your order."}
-                  </p>
-                </div>
-              </li>
-              <li className={currentPhase > 2 ? "done" : currentPhase === 2 ? "active" : "upcoming"}>
-                <div className="proto-step-circle blue">{currentPhase > 2 ? "✓" : 2}</div>
-                <div>
-                  <strong>{currentPhase > 2 ? "Order Processed" : "Order Processing (1 business day)"}</strong>
-                  <p>
-                    {currentPhase > 2
-                      ? "Packed and ready — your GST invoice has been generated."
-                      : "We'll pack your items and generate your GST invoice."}
-                  </p>
-                </div>
-              </li>
-              <li className={currentPhase > 3 ? "done" : currentPhase === 3 ? "active" : "upcoming"}>
-                <div className="proto-step-circle green">{currentPhase > 3 ? "✓" : 3}</div>
-                <div>
-                  <strong>{currentPhase > 3 ? "Dispatched" : "Dispatch & Tracking (5–7 days)"}</strong>
-                  <p>
-                    {currentPhase > 3
-                      ? "On its way — check the tracking link sent via SMS and email."
-                      : "You'll receive a tracking link via SMS and email once dispatched."}
-                  </p>
-                </div>
-              </li>
-            </ol>
-          </StorefrontCard>
+          {isGatewayPaid ? (
+            // Payment is already confirmed and there's nothing left for the
+            // buyer to do — the detailed step-by-step process list (which
+            // still exists below for manual/pending payments) is just
+            // clutter here. "Continue Shopping" already lives in the
+            // sidebar regardless of this card.
+            <StorefrontCard className="proto-checkout-card proto-next-steps-card">
+              <StorefrontSectionHeader title="You're All Set" />
+              <p>Your order will be processed soon.</p>
+            </StorefrontCard>
+          ) : (
+            <StorefrontCard className="proto-checkout-card proto-next-steps-card">
+              <StorefrontSectionHeader
+                title="What Happens Next?"
+                description="Here's what to expect after placing your order."
+              />
+              <ol className="proto-next-steps">
+                <li className={currentPhase > 1 ? "done" : currentPhase === 1 ? "active" : "upcoming"}>
+                  <div className="proto-step-circle amber">{currentPhase > 1 ? "✓" : 1}</div>
+                  <div>
+                    <strong>{currentPhase > 1 ? "Payment Verified" : "Payment Verification (2–4 hrs)"}</strong>
+                    <p>
+                      {currentPhase > 1
+                        ? "Your payment has been confirmed."
+                        : "Our team verifies your payment and confirms your order."}
+                    </p>
+                  </div>
+                </li>
+                <li className={currentPhase > 2 ? "done" : currentPhase === 2 ? "active" : "upcoming"}>
+                  <div className="proto-step-circle blue">{currentPhase > 2 ? "✓" : 2}</div>
+                  <div>
+                    <strong>{currentPhase > 2 ? "Order Processed" : "Order Processing (1 business day)"}</strong>
+                    <p>
+                      {currentPhase > 2
+                        ? "Packed and ready — your GST invoice has been generated."
+                        : "We'll pack your items and generate your GST invoice."}
+                    </p>
+                  </div>
+                </li>
+                <li className={currentPhase > 3 ? "done" : currentPhase === 3 ? "active" : "upcoming"}>
+                  <div className="proto-step-circle green">{currentPhase > 3 ? "✓" : 3}</div>
+                  <div>
+                    <strong>{currentPhase > 3 ? "Dispatched" : "Dispatch & Tracking (5–7 days)"}</strong>
+                    <p>
+                      {currentPhase > 3
+                        ? "On its way — check the tracking link sent via SMS and email."
+                        : "You'll receive a tracking link via SMS and email once dispatched."}
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            </StorefrontCard>
+          )}
         </section>
 
         <aside className="proto-checkout-sidebar">

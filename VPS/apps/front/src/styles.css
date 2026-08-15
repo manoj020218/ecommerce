@@ -5204,6 +5204,16 @@ textarea {
   max-width: 560px;
 }
 
+.proto-success-payment-line {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.proto-success-payment-line strong {
+  color: #b45309;
+}
+
 @keyframes proto-check-pop {
   0% { transform: scale(0); opacity: 0; }
   70% { transform: scale(1.15); }

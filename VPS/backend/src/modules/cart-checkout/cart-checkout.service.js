@@ -216,6 +216,7 @@ function buildCheckoutOrderFollowup(order, shipment, invoice, manualPaymentInstr
     shipmentStatus: shipment?.shipmentStatus || order.shipmentStatus || "pending_packing",
     manualPaymentStatus: order.manualPaymentStatus || "",
     paymentMethod: order.paymentMethod || "",
+    paymentGateway: order.paymentGateway || "",
     shippingMethod: order.shippingMethod || "",
     customerType: order.customerType || "retail",
     priceGroup: order.priceGroup || "",
@@ -2825,6 +2826,7 @@ async function finalizeSuccessfulPaymentAttempt(
     order.paymentStatus = "paid";
     order.orderStatus = "placed";
     order.gatewayTxnId = attempt.gatewayTxnId;
+    order.paymentGateway = attempt.gateway || order.paymentGateway || "";
     order.paymentVerifiedAt = nowIso();
   } else {
     order = createOrderFromSession(authStore, session, {
@@ -2832,6 +2834,7 @@ async function finalizeSuccessfulPaymentAttempt(
       orderStatus: "placed"
     });
     order.gatewayTxnId = attempt.gatewayTxnId;
+    order.paymentGateway = attempt.gateway || "";
     order.paymentVerifiedAt = nowIso();
     authStore.orders.push(order);
     session.orderId = order.id;

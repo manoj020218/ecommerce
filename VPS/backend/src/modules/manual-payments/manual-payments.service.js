@@ -21,6 +21,7 @@ const {
   ensurePaymentStoreShape
 } = require("../payment-gateways/payment-gateways.service");
 const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
+const partnersService = require("../partners/partners.service");
 const {
   trackPaymentFailed,
   trackRecoveryCompleted
@@ -436,6 +437,8 @@ async function verifyManualPaymentSubmission(submissionId, payload, actor) {
       gatewayTxnId: order.gatewayTxnId,
       failureReason: ""
     });
+
+    await partnersService.creditPartnerCommissionForOrder(order);
   }
 
   if (checkoutSession) {

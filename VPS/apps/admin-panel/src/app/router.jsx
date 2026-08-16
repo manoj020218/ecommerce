@@ -18,6 +18,8 @@ import { HsnTaxPage } from "../modules/hsn-tax/hsn-tax-page";
 import { InventoryPage } from "../modules/inventory/inventory-page";
 import { InvoicesPage } from "../modules/invoices/invoices-page";
 import { ReviewsPage } from "../modules/reviews/reviews-page";
+import { PartnersPage } from "../modules/partners/partners-page";
+import { PartnerDetailPage } from "../modules/partners/partner-detail-page";
 import { MarketingPage } from "../modules/marketing/marketing-page";
 import { NotificationsPage } from "../modules/notifications/notifications-page";
 import { OrdersPage } from "../modules/orders/orders-page";
@@ -56,6 +58,8 @@ export function AppRouter() {
           <Route path="products/add" element={<AddProductPage />} />
           <Route path="products/:productId/edit" element={<EditProductPage />} />
           <Route path="reviews" element={<ReviewsPage />} />
+          <Route path="partners" element={<PartnersPage />} />
+          <Route path="partners/:partnerId" element={<PartnerDetailPage />} />
           <Route path="content-assistant" element={<ProductContentAssistantPage />} />
           <Route path="hsn-tax" element={<HsnTaxPage />} />
           <Route path="inventory" element={<InventoryPage />} />

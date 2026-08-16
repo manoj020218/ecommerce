@@ -50,6 +50,8 @@ const AVAILABLE_PERMISSIONS = Object.freeze([
   "reviews.view",
   "reviews.moderate",
   "reviews.delete",
+  "partners.view",
+  "partners.manage",
   "reports.view",
   "reports.export",
   "blogs.view",

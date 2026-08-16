@@ -16,6 +16,11 @@ const {
   createPublicReviewsRouter
 } = require("../modules/reviews/reviews.routes");
 const {
+  createAdminPartnersRouter,
+  createPublicPartnersRouter,
+  createPublicPartnerFeedRouter
+} = require("../modules/partners/partners.routes");
+const {
   createRolesPermissionsRouter
 } = require("../modules/roles-permissions/roles-permissions.routes");
 const { createStaffRouter } = require("../modules/staff/staff.routes");
@@ -105,6 +110,9 @@ function createApiRouter() {
   router.use("/products", createPublicProductsRouter());
   router.use("/admin/reviews", createAdminReviewsRouter());
   router.use("/reviews", createPublicReviewsRouter());
+  router.use("/admin/partners", createAdminPartnersRouter());
+  router.use("/partners", createPublicPartnersRouter());
+  router.use("/partner-feed", createPublicPartnerFeedRouter());
   router.use("/settings", createPublicSettingsRouter());
   router.use("/search", createSearchRouter());
   router.use("/cart", createCartRouter());

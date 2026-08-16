@@ -4,6 +4,7 @@ const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { readPaymentStore } = require("../../database/payment-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
+const partnersService = require("../partners/partners.service");
 const {
   SHIPPING_METHODS
 } = require("../cart-checkout/cart-checkout.model");
@@ -517,6 +518,7 @@ async function finalizePaidOrder(authStore, catalogStore, order, actor, options 
       order.gatewayTxnId = options.paymentReference;
     }
     orderChanged = true;
+    await partnersService.creditPartnerCommissionForOrder(order);
   } else if (options.paymentReference && !order.gatewayTxnId) {
     order.gatewayTxnId = options.paymentReference;
     order.updatedAt = nowIso();

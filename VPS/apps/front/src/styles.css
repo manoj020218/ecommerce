@@ -1928,6 +1928,43 @@ textarea {
   gap: 18px;
 }
 
+.proto-partner-banner {
+  background: #111827;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 14px;
+}
+
+.proto-partner-banner-link {
+  color: #fff;
+  text-decoration: none;
+}
+
+.proto-partner-banner-link:hover {
+  text-decoration: underline;
+}
+
+.proto-partner-banner-dismiss {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.proto-partner-banner-dismiss svg {
+  width: 14px;
+  height: 14px;
+}
+
 .proto-announcement-bar {
   background: var(--brand);
   color: #fff;

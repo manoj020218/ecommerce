@@ -53,6 +53,7 @@ const {
   notifyCustomerEvent
 } = require("../marketing/marketing.service");
 const { getAllSettings } = require("../settings/settings.service");
+const partnersService = require("../partners/partners.service");
 const {
   CART_OWNER_TYPES,
   PAYMENT_METHODS,
@@ -1015,6 +1016,8 @@ function createOrderFromSession(authStore, session, options = {}) {
     approvedAt: null,
     approvedBy: null,
     paymentVerifiedAt: null,
+    sourcePartnerCode: session.sourcePartnerCode || "",
+    sourcePartnerId: session.sourcePartnerId || "",
     createdAt: nowIso()
   };
 }
@@ -1963,6 +1966,10 @@ async function startCheckout(context, payload) {
   ]);
   ensurePhase7StoreShape(authStore);
   ensurePaymentStoreShape(paymentStore);
+  const partnerAttribution = await partnersService.resolveAttribution(
+    payload.sourcePartnerCode,
+    payload.sourcePartnerCapturedAt
+  );
   const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
   const usesOfflineOrderRequest = Boolean(customerPricingContext?.usesOfflineOrderRequest);
 
@@ -2080,6 +2087,8 @@ async function startCheckout(context, payload) {
         customerPricingContext
       ),
       newsletterSubscribed: Boolean(payload.newsletterSubscribed),
+      sourcePartnerCode: partnerAttribution?.partnerCode || "",
+      sourcePartnerId: partnerAttribution?.partnerId || "",
       createdAt: now,
       updatedAt: now
     };
@@ -2133,6 +2142,8 @@ async function startCheckout(context, payload) {
       customerPricingContext
     ),
     newsletterSubscribed: Boolean(payload.newsletterSubscribed),
+    sourcePartnerCode: partnerAttribution?.partnerCode || "",
+    sourcePartnerId: partnerAttribution?.partnerId || "",
     createdAt: now,
     updatedAt: now
   };
@@ -2839,6 +2850,8 @@ async function finalizeSuccessfulPaymentAttempt(
     authStore.orders.push(order);
     session.orderId = order.id;
   }
+
+  await partnersService.creditPartnerCommissionForOrder(order);
 
   clearOwnerCart(authStore, {
     ownerType: session.ownerType,

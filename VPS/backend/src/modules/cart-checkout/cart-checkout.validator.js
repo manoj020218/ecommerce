@@ -91,7 +91,15 @@ const checkoutStartSchema = z.object({
   billingAddress: z.record(z.any()).optional().default({}),
   shippingAddress: z.record(z.any()).optional().default({}),
   expectedCartUpdatedAt: z.string().trim().max(64).optional().nullable(),
-  newsletterSubscribed: z.boolean().optional().default(false)
+  newsletterSubscribed: z.boolean().optional().default(false),
+  // Partner-referral attribution (see backend/src/modules/partners) --
+  // captured client-side from a ?ref= landing param, carried through to
+  // checkout so an order can be credited to whichever partner sent the
+  // buyer. Both optional: a normal checkout with no referral simply omits
+  // them, and an expired/unknown code is resolved to "no attribution" by
+  // the backend, never rejected here.
+  sourcePartnerCode: z.string().trim().max(24).optional(),
+  sourcePartnerCapturedAt: z.string().trim().max(40).optional()
 });
 
 const checkoutViewQuerySchema = z.object({

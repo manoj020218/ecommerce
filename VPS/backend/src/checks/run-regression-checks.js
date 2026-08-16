@@ -22,6 +22,7 @@ const {
 const { jsonFileStore } = require("../database/json-file-store");
 const { resetAuthStoreForRegression } = require("../database/auth-store");
 const { resetReviewStoreForRegression } = require("../database/review-store");
+const { resetPartnerStoreForRegression } = require("../database/partner-store");
 const { ensureAuthBootstrap } = require("../modules/auth/auth.service");
 
 const execFileAsync = promisify(execFile);
@@ -107,6 +108,7 @@ async function run() {
   await resetWebsiteLeadsStoreForRegression();
   await resetAuthStoreForRegression();
   await resetReviewStoreForRegression();
+  await resetPartnerStoreForRegression();
   await ensureAuthBootstrap();
 
   const app = createApp();
@@ -5395,6 +5397,292 @@ async function run() {
     );
     assert.equal(phase23ProductAfterReject.response.status, 200);
     assert.equal(phase23ProductAfterReject.json.data.reviewCount, 0);
+
+    // ── Phase 24: partner product feed + referral attribution + commission ──
+    const phase24Partner = await requestJson(baseUrl, "/api/admin/partners", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        name: "Phase 24 Partner B",
+        commissionRatePercent: 10,
+        attributionWindowDays: 7,
+        returnUrl: "https://partnerb.example.com/deals"
+      })
+    });
+    assert.equal(phase24Partner.response.status, 201);
+    const phase24PartnerId = phase24Partner.json.data.id;
+    const phase24PartnerCode = phase24Partner.json.data.code;
+    const phase24ApiKey = phase24Partner.json.data.apiKey;
+
+    const phase24Product = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 24 Partner Feed Speaker",
+        categoryId,
+        brand: "Jenix",
+        mpn: "JNX-P24-PARTNER",
+        hsnCode: "8525",
+        basePrice: 2000,
+        salePrice: 1900,
+        deadWeightKg: 1,
+        shortDescription: "Phase 24 test product for partner feed.",
+        fullDescription: "Phase 24 test product for partner feed.",
+        stockQty: 10,
+        lowStockThreshold: 2
+      })
+    });
+    assert.equal(phase24Product.response.status, 201);
+    const phase24ProductId = phase24Product.json.data.id;
+
+    // Unassigned products must never leak into a partner's feed.
+    const phase24FeedBeforeAssign = await requestJson(
+      baseUrl,
+      `/api/partner-feed/${phase24PartnerCode}?key=${phase24ApiKey}`
+    );
+    assert.equal(phase24FeedBeforeAssign.response.status, 200);
+    assert.equal(phase24FeedBeforeAssign.json.data.productCount, 0);
+
+    const phase24Assign = await requestJson(
+      baseUrl,
+      `/api/admin/partners/${phase24PartnerId}/products`,
+      {
+        method: "POST",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ productIds: [phase24ProductId] })
+      }
+    );
+    assert.equal(phase24Assign.response.status, 200);
+
+    const phase24Feed = await requestJson(
+      baseUrl,
+      `/api/partner-feed/${phase24PartnerCode}?key=${phase24ApiKey}`
+    );
+    assert.equal(phase24Feed.response.status, 200);
+    assert.equal(phase24Feed.json.data.productCount, 1);
+    const phase24FeedRow = phase24Feed.json.data.products[0];
+    assert.equal(phase24FeedRow.id, phase24ProductId);
+    assert.equal(phase24FeedRow.buyNowUrl.includes(`ref=${phase24PartnerCode}`), true);
+
+    // Wrong/missing API key must be rejected, not silently serve the feed.
+    const phase24FeedBadKey = await requestJson(
+      baseUrl,
+      `/api/partner-feed/${phase24PartnerCode}?key=wrong-key`
+    );
+    assert.equal(phase24FeedBadKey.response.status, 401);
+
+    // The public resolve endpoint (backs the storefront's "Back to Partner"
+    // banner) must expose name/returnUrl but never the feed API key.
+    const phase24Resolve = await requestJson(
+      baseUrl,
+      `/api/partners/resolve/${phase24PartnerCode}`
+    );
+    assert.equal(phase24Resolve.response.status, 200);
+    assert.equal(phase24Resolve.json.data.name, "Phase 24 Partner B");
+    assert.equal(phase24Resolve.json.data.returnUrl, "https://partnerb.example.com/deals");
+    assert.equal(phase24Resolve.json.data.apiKey, undefined);
+
+    // Checkout #1: attribution captured just now -- well inside the 7-day
+    // window, should ride onto the order and credit a commission once paid.
+    const phase24CartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ productId: phase24ProductId, qty: 1 })
+    });
+    assert.equal(phase24CartAdd.response.status, 201);
+
+    const phase24Checkout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        sourcePartnerCode: phase24PartnerCode,
+        sourcePartnerCapturedAt: new Date().toISOString(),
+        billingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          addressLine1: "B-12 Market Road",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase24Checkout.response.status, 200);
+    const phase24CheckoutId = phase24Checkout.json.data.checkoutSession.id;
+
+    const phase24Attempt = await requestJson(baseUrl, "/api/payments/create-attempt", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ checkoutSessionId: phase24CheckoutId, gateway: "mock_online" })
+    });
+    assert.equal(phase24Attempt.response.status, 201);
+
+    // Commission must not exist yet -- order is placed but not paid.
+    const phase24LedgerBeforePaid = await requestJson(
+      baseUrl,
+      `/api/admin/partners/${phase24PartnerId}/commissions`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase24LedgerBeforePaid.response.status, 200);
+    assert.equal(phase24LedgerBeforePaid.json.data.length, 0);
+
+    const phase24Webhook = await requestJson(baseUrl, "/api/payments/webhook/mock", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        attemptId: phase24Attempt.json.data.attemptId,
+        status: "success",
+        gatewayTxnId: "txn_phase24_partner_01"
+      })
+    });
+    assert.equal(phase24Webhook.response.status, 200);
+
+    const phase24LedgerAfterPaid = await requestJson(
+      baseUrl,
+      `/api/admin/partners/${phase24PartnerId}/commissions`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase24LedgerAfterPaid.response.status, 200);
+    assert.equal(phase24LedgerAfterPaid.json.data.length, 1);
+    const phase24LedgerEntry = phase24LedgerAfterPaid.json.data[0];
+    assert.equal(phase24LedgerEntry.partnerCode, phase24PartnerCode);
+    assert.equal(phase24LedgerEntry.status, "pending");
+    assert.equal(phase24LedgerEntry.commissionAmount, phase24LedgerEntry.commissionBase * 0.1);
+
+    const phase24MarkPaid = await requestJson(
+      baseUrl,
+      `/api/admin/partners/commissions/${phase24LedgerEntry.id}/mark-paid`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ note: "Paid via bank transfer, phase 24 test." })
+      }
+    );
+    assert.equal(phase24MarkPaid.response.status, 200);
+    assert.equal(phase24MarkPaid.json.data.status, "paid");
+
+    // Checkout #2: attribution captured 30 days ago, well outside the 7-day
+    // window -- the order must place normally but carry NO attribution, so
+    // no commission is credited even after payment succeeds.
+    const phase24CartAdd2 = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ productId: phase24ProductId, qty: 1 })
+    });
+    assert.equal(phase24CartAdd2.response.status, 201);
+
+    const phase24ExpiredCapturedAt = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const phase24Checkout2 = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        sourcePartnerCode: phase24PartnerCode,
+        sourcePartnerCapturedAt: phase24ExpiredCapturedAt,
+        billingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          addressLine1: "B-12 Market Road",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase24Checkout2.response.status, 200);
+    const phase24CheckoutId2 = phase24Checkout2.json.data.checkoutSession.id;
+
+    const phase24Attempt2 = await requestJson(baseUrl, "/api/payments/create-attempt", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ checkoutSessionId: phase24CheckoutId2, gateway: "mock_online" })
+    });
+    assert.equal(phase24Attempt2.response.status, 201);
+
+    const phase24Webhook2 = await requestJson(baseUrl, "/api/payments/webhook/mock", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        attemptId: phase24Attempt2.json.data.attemptId,
+        status: "success",
+        gatewayTxnId: "txn_phase24_partner_02"
+      })
+    });
+    assert.equal(phase24Webhook2.response.status, 200);
+
+    const phase24LedgerAfterExpiredOrder = await requestJson(
+      baseUrl,
+      `/api/admin/partners/${phase24PartnerId}/commissions`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase24LedgerAfterExpiredOrder.response.status, 200);
+    // Still exactly 1 -- the expired-attribution order added zero new rows.
+    assert.equal(phase24LedgerAfterExpiredOrder.json.data.length, 1);
+
+    // A garbage ?ref= code must never block checkout -- order places
+    // normally with no attribution, exactly as if no ref was present.
+    const phase24CartAdd3 = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ productId: phase24ProductId, qty: 1 })
+    });
+    assert.equal(phase24CartAdd3.response.status, 201);
+
+    const phase24CheckoutBadCode = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        sourcePartnerCode: "DOES-NOT-EXIST",
+        sourcePartnerCapturedAt: new Date().toISOString(),
+        billingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          addressLine1: "B-12 Market Road",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase24CheckoutBadCode.response.status, 200);
 
     // eslint-disable-next-line no-console
     console.log("Regression checks passed.");

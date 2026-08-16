@@ -14,6 +14,11 @@ import {
 } from "../cart/cart.utils";
 import { usePublicSettings } from "./public-settings-context";
 import { useInstallPrompt } from "../../shared/hooks/use-install-prompt";
+import { apiFetch } from "../../shared/api/http-client";
+import { capturePartnerAttribution } from "../../shared/marketing/partner-attribution";
+
+const PARTNER_BANNER_CACHE_KEY = "jenix.front.partnerBanner";
+const PARTNER_BANNER_DISMISSED_KEY = "jenix.front.partnerBannerDismissed";
 
 const SOCIAL_LABELS = {
   facebook: "Facebook",
@@ -152,6 +157,35 @@ async function captureAndDownloadPageScreenshot() {
     }, "image/png");
   } catch (_error) {
     // Silently skip — the WhatsApp chat already opened either way.
+  }
+}
+
+// Resolved once per tab session (sessionStorage, not localStorage -- the
+// attribution itself outlives the tab via partner-attribution.js's
+// localStorage record, but the banner's display copy is cheap to re-fetch
+// on a genuinely new visit rather than carried forever).
+function readCachedPartnerBanner() {
+  try {
+    const raw = window.sessionStorage.getItem(PARTNER_BANNER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeCachedPartnerBanner(banner) {
+  try {
+    window.sessionStorage.setItem(PARTNER_BANNER_CACHE_KEY, JSON.stringify(banner));
+  } catch (_error) {
+    // Best-effort only.
+  }
+}
+
+function isPartnerBannerDismissed() {
+  try {
+    return window.sessionStorage.getItem(PARTNER_BANNER_DISMISSED_KEY) === "true";
+  } catch (_error) {
+    return false;
   }
 }
 
@@ -311,6 +345,9 @@ export function StorefrontLayout() {
   const [cartCount, setCartCount] = useState(0);
   const [searchText, setSearchText] = useState("");
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [partnerBanner, setPartnerBanner] = useState(() =>
+    isPartnerBannerDismissed() ? null : readCachedPartnerBanner()
+  );
 
   const storeProfile = settings.storeProfile || {};
   const contactInformation = settings.contactInformation || {};
@@ -370,6 +407,42 @@ export function StorefrontLayout() {
     setSearchText(nextQuery);
   }, [location.search]);
 
+  // Partner-referral landing: a Buy Now button on a partner's site links
+  // here with ?ref=CODE. Resolve it once (cached for the tab session so
+  // clicking around the storefront doesn't re-fetch on every navigation),
+  // capture the attribution so it rides along at checkout, and show a
+  // persistent "Back to X" banner. An invalid/unknown code just resolves to
+  // nothing -- never shown, never blocks anything.
+  useEffect(() => {
+    const refCode = new URLSearchParams(location.search).get("ref");
+    if (!refCode) {
+      return;
+    }
+    if (isPartnerBannerDismissed()) {
+      return;
+    }
+
+    let active = true;
+
+    apiFetch(`/partners/resolve/${encodeURIComponent(refCode)}`)
+      .then((partner) => {
+        if (!active || !partner?.code) {
+          return;
+        }
+        capturePartnerAttribution(partner.code);
+        const banner = { name: partner.name, returnUrl: partner.returnUrl || "" };
+        writeCachedPartnerBanner(banner);
+        setPartnerBanner(banner);
+      })
+      .catch(() => {
+        // Unknown/inactive partner code -- silently ignore.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [location.search]);
+
   useEffect(() => {
     let active = true;
 
@@ -406,6 +479,15 @@ export function StorefrontLayout() {
       window.open(link, "_blank", "noopener,noreferrer");
     }
     captureAndDownloadPageScreenshot();
+  }
+
+  function handleDismissPartnerBanner() {
+    try {
+      window.sessionStorage.setItem(PARTNER_BANNER_DISMISSED_KEY, "true");
+    } catch (_error) {
+      // Best-effort only.
+    }
+    setPartnerBanner(null);
   }
 
   if (usesMinimalShell) {
@@ -445,6 +527,24 @@ export function StorefrontLayout() {
 
   return (
     <>
+      {partnerBanner ? (
+        <div className="proto-partner-banner">
+          <a
+            className="proto-partner-banner-link"
+            href={partnerBanner.returnUrl || "#"}
+          >
+            ← Back to {partnerBanner.name}
+          </a>
+          <button
+            type="button"
+            className="proto-partner-banner-dismiss"
+            aria-label="Dismiss"
+            onClick={handleDismissPartnerBanner}
+          >
+            <ClearIcon />
+          </button>
+        </div>
+      ) : null}
       <div className="proto-announcement-bar">
         <div className="proto-announcement-inner">
           <div className="proto-announcement-track">

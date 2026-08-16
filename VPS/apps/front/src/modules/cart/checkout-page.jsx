@@ -31,6 +31,7 @@ import {
   startCheckout,
   updateCartItem
 } from "../products/products.api";
+import { getStoredPartnerAttribution } from "../../shared/marketing/partner-attribution";
 
 // Plain <script> onload/onerror never fires on some flaky mobile connections
 // (the request just stalls) — without a timeout, `await`ing this hangs the
@@ -721,6 +722,7 @@ export function CheckoutPage() {
 
     try {
       const context = resolveCartContext(true) || {};
+      const partnerAttribution = getStoredPartnerAttribution();
       const response = await startCheckout({
         ...context,
         paymentMethod,
@@ -731,7 +733,18 @@ export function CheckoutPage() {
         // cart mutated from another tab (same guest/customer session) can't silently
         // get ordered instead of what was reviewed and confirmed here.
         expectedCartUpdatedAt: cart?.updatedAt || null,
-        newsletterSubscribed
+        newsletterSubscribed,
+        // Partner-referral attribution captured on landing (see
+        // storefront-layout.jsx + shared/marketing/partner-attribution.js).
+        // The backend is the sole authority on whether this is still within
+        // the partner's attribution window -- an expired/missing value here
+        // simply results in no attribution, never a blocked checkout.
+        ...(partnerAttribution
+          ? {
+              sourcePartnerCode: partnerAttribution.code,
+              sourcePartnerCapturedAt: partnerAttribution.capturedAt
+            }
+          : {})
       });
 
       const nextCheckoutSession = response.checkoutSession || null;

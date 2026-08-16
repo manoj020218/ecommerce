@@ -9,6 +9,7 @@ const {
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { notifyCustomerEvent } = require("../marketing/marketing.service");
 const { recalculateOrderItems } = require("../cart-checkout/cart-checkout.service");
+const partnersService = require("../partners/partners.service");
 
 const MANUAL_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
 
@@ -406,6 +407,7 @@ async function updateOrder(orderId, patch, actor) {
       order.paymentStatus = "paid";
       order.paymentVerifiedAt = new Date().toISOString();
       if (actor) order.paymentVerifiedByAdminId = actor.id;
+      await partnersService.creditPartnerCommissionForOrder(order);
     }
   }
   if (patch.adminNote !== undefined) order.adminNote = String(patch.adminNote || "").trim();

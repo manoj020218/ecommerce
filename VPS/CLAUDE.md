@@ -1,5 +1,11 @@
 # Jenix Commerce — VPS Project Context
 
+> **Read `HANDOFF.md` (same folder) first** — current live state, what
+> shipped most recently, and what's deliberately deferred. This file
+> below is the stable architecture/ops reference; `HANDOFF.md` is the
+> "where things actually stand right now" doc, updated at the end of
+> each work session.
+
 ## What This Is
 Full-stack B2B/B2C e-commerce platform for Jenix India (industrial equipment/IoT devices).
 Monorepo in `VPS/` folder managed with pnpm workspaces.

@@ -1,12 +1,11 @@
 # Handoff — read this first
 
-Last updated: **2026-08-18**. `origin/main` HEAD: **`02153c8`** (local
-commit — not yet pushed to `origin`; push whenever the user wants it up).
+Last updated: **2026-08-18**. `origin/main` HEAD: **`c34a739`** — pushed.
 Working tree clean aside from one unrelated stray empty file (`p.images`
 at repo root, dated Jul 7, predates this feature entirely — leave it
 alone unless the user asks about it). Everything described below as
-"shipped" is committed and deployed to the production VPS, verified
-live.
+"shipped" is committed, pushed, and deployed to the production VPS,
+verified live.
 
 This file is the project-folder counterpart to Claude's own memory system
 (which also has a fuller version of this under the name
@@ -15,7 +14,7 @@ Keeping a copy here means a fresh session can resume correctly even if
 memory isn't available for some reason — read this file first, before
 `CLAUDE.md`'s architecture reference.
 
-## Aug 18 2026 — what shipped (not yet committed at time of writing)
+## Aug 18 2026 — what shipped (commit `c34a739`, pushed to origin/main)
 
 1. **Major notification bug found and fixed: `buildTemplateVariables()`
    in `marketing.service.js` was a separate, manually-maintained field
@@ -63,6 +62,14 @@ memory isn't available for some reason — read this file first, before
    with the button admins actually want to press 99% of the time.
 4. Backend regression suite re-run and passing with the new assertions
    included.
+5. **Fix verified with a real send**, not just regression assertions —
+   ran a one-off script through the actual `safeSendTemplateNotification`
+   pipeline (SMTP, not simulated) sending a corrected `order_left_in_cart`
+   email to a real test inbox. Confirmed status `"sent"` and the real
+   rendered email had a working recovery link, a populated 2-row items
+   table, and a working WhatsApp deep-link with the real support number —
+   all three previously blank. Script was scratch-only (uploaded to the
+   VPS, run once, deleted immediately after) — nothing added to the repo.
 
 ## Aug 15–17 2026 — what shipped (commit `02153c8`)
 

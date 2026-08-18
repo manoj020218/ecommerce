@@ -798,7 +798,10 @@ export function OrdersPage() {
                 </div>
                 <div style={{ textAlign:"right" }}>
                   <p style={{ margin:0, fontWeight:700, fontSize:16, color:BRAND }}>{formatCurrencyInr(row.orderTotal)}</p>
-                  <div style={{ marginTop:4 }}><PayBadge row={row}/></div>
+                  <div style={{ marginTop:4, display:"flex", flexDirection:"column", gap:4, alignItems:"flex-end" }}>
+                    <PayBadge row={row}/>
+                    <ShipBadge row={row}/>
+                  </div>
                 </div>
               </div>
               <div style={{ display:"flex", gap:8 }}>

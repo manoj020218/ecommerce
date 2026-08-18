@@ -2539,6 +2539,37 @@ async function run() {
       true
     );
 
+    // Regression guard: buildTemplateVariables() in marketing.service.js
+    // used to be a separate, manually-maintained field list that silently
+    // dropped recoveryUrl/whatsappLink/whatsappNumber/itemsTable/
+    // customerEmail/customerMobile/rejectionReason -- every one of those
+    // was declared in TEMPLATE_VARIABLES (marketing.model.js) but missing
+    // from buildTemplateVariables' own hardcoded object, so the abandoned-
+    // cart email's "Continue My Order" button rendered href="" in
+    // production for months. Confirms the actual recovery link (not an
+    // empty string) lands in the rendered email body, not just that a
+    // template exists and "sent".
+    const phase12ReminderLogs = await requestJson(
+      baseUrl,
+      "/api/admin/marketing/notification-logs?templateKey=order_left_in_cart&limit=50",
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase12ReminderLogs.response.status, 200);
+    const phase12ReminderLog = phase12ReminderLogs.json.data.find(
+      (row) => row.relatedResourceId === phase12ReminderRecovery.id
+    );
+    assert.equal(Boolean(phase12ReminderLog), true);
+    assert.equal(phase12ReminderLog.variables.recoveryUrl.includes("/recover/"), true);
+    // The specific "Continue My Order" button must carry the real URL, not
+    // an empty href -- checked directly against the template's href
+    // attribute rather than a blanket "no href=\"\" anywhere" scan, since
+    // the WhatsApp box's href is legitimately empty in this test (no
+    // WhatsApp number configured in the ephemeral test settings).
+    assert.equal(
+      phase12ReminderLog.body.includes(`href="${phase12ReminderLog.variables.recoveryUrl}"`),
+      true
+    );
+
     const phase12RunReminderB = await requestJson(
       baseUrl,
       "/api/admin/abandoned-carts/reminders/run",
@@ -2990,6 +3021,14 @@ async function run() {
       phase17Logs.json.data.some((row) => row.templateKey === "order_placed"),
       true
     );
+    // Same buildTemplateVariables regression guard as Phase 12 above, but
+    // for the order-confirmation email specifically: {{itemsTable}} was
+    // silently rendering blank in production, meaning every "Order Placed"
+    // email since the field was introduced showed the order number/total
+    // but never the actual products purchased.
+    const phase17OrderPlacedLog = phase17Logs.json.data.find((row) => row.templateKey === "order_placed");
+    assert.equal(phase17OrderPlacedLog.variables.itemsTable.includes("<tr"), true);
+    assert.equal(phase17OrderPlacedLog.body.includes("<tr"), true);
     assert.equal(
       phase17Logs.json.data.some((row) => row.templateKey === "payment_failed"),
       true

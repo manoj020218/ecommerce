@@ -2116,52 +2116,62 @@ export function OrderDetailPage() {
 
       {/* Single controlled pipeline action — one button drives Processing -> Invoice ->
           Shipping -> Delivered, so the same order can't be advanced out of order or
-          twice by accident. */}
-      <div className="order-detail-action-row" style={{ display: "flex", gap: 10, paddingTop: 8 }}>
+          twice by accident. Cancel is deliberately styled as a small, low-emphasis
+          text link (not a full-size button next to the primary action) — 99% of the
+          time no one wants to cancel an order, so it shouldn't be as easy to hit by
+          mistake as the button that actually drives the order forward. */}
+      <div className="order-detail-action-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 8 }}>
+        <div>
+          {orderStage === "new" && (
+            <button type="button" className="btn btn-primary" onClick={() => { setProcessingModal(true); setProcessingError(""); }}>
+              Mark as Processing
+            </button>
+          )}
+          {orderStage === "ready_for_invoice" && (
+            <button type="button" className="btn btn-primary" disabled={invoiceGenerating} onClick={handleGenerateInvoice}>
+              {invoiceGenerating ? "Generating…" : "Generate Invoice"}
+            </button>
+          )}
+          {orderStage === "ready_to_ship" && (
+            <button type="button" className="btn btn-primary" style={{ background: "#16a34a" }}
+              onClick={() => { setFulfillModal(true); setFulfillError(""); }}>
+              Packed
+            </button>
+          )}
+          {orderStage === "packed" && (
+            <button type="button" className="btn btn-primary" style={{ background: "#7e22ce" }}
+              disabled={printingLabel} onClick={handlePrintShippingLabel}>
+              {printingLabel ? "Printing…" : "Print Shipping Address"}
+            </button>
+          )}
+          {orderStage === "waiting_for_shipping" && (
+            <button type="button" className="btn btn-primary" style={{ background: "#2563eb" }}
+              disabled={markingShipped} onClick={handleMarkShipped}>
+              {markingShipped ? "Marking…" : "Mark as Shipped"}
+            </button>
+          )}
+          {orderStage === "shipped" && (
+            <button type="button" className="btn btn-primary" style={{ background: "#2563eb" }}
+              onClick={() => { setDeliveryModal(true); setDeliveryError(""); }}>
+              Shipped
+            </button>
+          )}
+          {orderStage === "delivered" && (
+            <button type="button" className="btn btn-primary" disabled
+              style={{ background: "#16a34a", opacity: 0.85, cursor: "default" }}>
+              Delivered
+            </button>
+          )}
+        </div>
+
         {canCancel && (
-          <button type="button" className="btn btn-secondary" disabled={cancelSaving} onClick={handleCancelOrder}
-            style={{ color: "var(--danger)", borderColor: "rgba(220,38,38,0.3)" }}>
-            {cancelSaving ? "Cancelling…" : "Cancel Order"}
-          </button>
-        )}
-        {orderStage === "new" && (
-          <button type="button" className="btn btn-primary" onClick={() => { setProcessingModal(true); setProcessingError(""); }}>
-            Mark as Processing
-          </button>
-        )}
-        {orderStage === "ready_for_invoice" && (
-          <button type="button" className="btn btn-primary" disabled={invoiceGenerating} onClick={handleGenerateInvoice}>
-            {invoiceGenerating ? "Generating…" : "Generate Invoice"}
-          </button>
-        )}
-        {orderStage === "ready_to_ship" && (
-          <button type="button" className="btn btn-primary" style={{ background: "#16a34a" }}
-            onClick={() => { setFulfillModal(true); setFulfillError(""); }}>
-            Packed
-          </button>
-        )}
-        {orderStage === "packed" && (
-          <button type="button" className="btn btn-primary" style={{ background: "#7e22ce" }}
-            disabled={printingLabel} onClick={handlePrintShippingLabel}>
-            {printingLabel ? "Printing…" : "Print Shipping Address"}
-          </button>
-        )}
-        {orderStage === "waiting_for_shipping" && (
-          <button type="button" className="btn btn-primary" style={{ background: "#2563eb" }}
-            disabled={markingShipped} onClick={handleMarkShipped}>
-            {markingShipped ? "Marking…" : "Mark as Shipped"}
-          </button>
-        )}
-        {orderStage === "shipped" && (
-          <button type="button" className="btn btn-primary" style={{ background: "#2563eb" }}
-            onClick={() => { setDeliveryModal(true); setDeliveryError(""); }}>
-            Shipped
-          </button>
-        )}
-        {orderStage === "delivered" && (
-          <button type="button" className="btn btn-primary" disabled
-            style={{ background: "#16a34a", opacity: 0.85, cursor: "default" }}>
-            Delivered
+          <button type="button" disabled={cancelSaving} onClick={handleCancelOrder}
+            style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              fontSize: 11, color: "var(--muted)", padding: "4px 2px",
+              textDecoration: "underline", textDecorationStyle: "dotted"
+            }}>
+            {cancelSaving ? "Cancelling…" : "Cancel order"}
           </button>
         )}
       </div>

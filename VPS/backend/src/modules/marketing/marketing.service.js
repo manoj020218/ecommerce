@@ -17,6 +17,7 @@ const {
 const { getAllSettings } = require("../settings/settings.service");
 const { calculateAvailableQty } = require("../products/products.model");
 const {
+  TEMPLATE_VARIABLES,
   cloneDefaultMarketingStore,
   ensureTemplateCoverage,
   fillTemplateText,
@@ -87,30 +88,24 @@ async function readNormalizedMarketingStore() {
   return store;
 }
 
+// Derived directly from TEMPLATE_VARIABLES (marketing.model.js) rather than
+// its own hardcoded field list -- that used to be a separate, manually
+// maintained copy that silently fell out of sync every time a new template
+// variable was introduced (recoveryUrl, whatsappLink, whatsappNumber,
+// itemsTable, customerEmail, customerMobile, rejectionReason were all added
+// to TEMPLATE_VARIABLES over time but never added here), so every template
+// referencing any of those seven rendered a blank/dead value in production
+// -- e.g. the abandoned-cart email's "Continue My Order" button had
+// href="" and its WhatsApp box had no number, both silently broken since
+// the day recoveryUrl/whatsappLink were introduced. Deriving from the same
+// list as fillTemplateText() makes that class of bug structurally
+// impossible going forward.
 function buildTemplateVariables(input = {}) {
-  return {
-    customerName: input.customerName || "",
-    orderNo: input.orderNo || "",
-    invoiceNo: input.invoiceNo || "",
-    paymentLink: input.paymentLink || "",
-    resetPasswordUrl: input.resetPasswordUrl || "",
-    trackingId: input.trackingId || "",
-    trackingUrl: input.trackingUrl || "",
-    courierName: input.courierName || "",
-    cartItems: input.cartItems || "",
-    invoiceDownloadUrl: input.invoiceDownloadUrl || "",
-    supportPhone: input.supportPhone || "",
-    businessName: input.businessName || "",
-    refundAmount: input.refundAmount || "",
-    productName: input.productName || "",
-    pickupLocation: input.pickupLocation || "",
-    pickupInstructions: input.pickupInstructions || "",
-    otpCode: input.otpCode || "",
-    orderTotal: input.orderTotal || "",
-    paymentMethod: input.paymentMethod || "",
-    paymentInstructions: input.paymentInstructions || "",
-    expectedDeliveryDate: input.expectedDeliveryDate || ""
-  };
+  const variables = {};
+  for (const key of TEMPLATE_VARIABLES) {
+    variables[key] = input[key] || "";
+  }
+  return variables;
 }
 
 function findTemplateOrThrow(store, templateKey) {

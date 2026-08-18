@@ -1,21 +1,12 @@
 # Handoff — read this first
 
-Last updated: **2026-08-17**. `origin/main` HEAD: **`817aad0`**.
-
-**⚠️ Working tree is NOT clean.** Everything in the "Aug 15–17" section
-below is deployed to production and verified live, but **not committed to
-git** — `git status` shows the full custom-print feature (backend
-modules, admin panel, storefront) as modified/untracked files sitting on
-top of `817aad0`. It was shipped the same way the rest of this repo
-always has been (build → pscp to VPS → restart/verify), just without a
-commit afterward. Don't assume `git log` reflects what's actually live —
-check `git status` before trusting it. Commit only if the user explicitly
-asks; if picking this work back up, be aware a `git checkout`/`reset` on
-this tree would discard it.
-
-Everything described in earlier dated sections as "shipped" **is**
-committed, pushed, and verified live — that convention broke only for the
-most recent section below.
+Last updated: **2026-08-18**. `origin/main` HEAD: **`02153c8`** (local
+commit — not yet pushed to `origin`; push whenever the user wants it up).
+Working tree clean aside from one unrelated stray empty file (`p.images`
+at repo root, dated Jul 7, predates this feature entirely — leave it
+alone unless the user asks about it). Everything described below as
+"shipped" is committed and deployed to the production VPS, verified
+live.
 
 This file is the project-folder counterpart to Claude's own memory system
 (which also has a fuller version of this under the name
@@ -24,7 +15,56 @@ Keeping a copy here means a fresh session can resume correctly even if
 memory isn't available for some reason — read this file first, before
 `CLAUDE.md`'s architecture reference.
 
-## Aug 15–17 2026 — what shipped (NOT yet committed — see warning above)
+## Aug 18 2026 — what shipped (not yet committed at time of writing)
+
+1. **Major notification bug found and fixed: `buildTemplateVariables()`
+   in `marketing.service.js` was a separate, manually-maintained field
+   list that silently dropped any variable not on it** — `recoveryUrl`,
+   `whatsappLink`, `whatsappNumber`, `itemsTable`, `customerEmail`,
+   `customerMobile`, `rejectionReason` were all declared in the real
+   source of truth (`TEMPLATE_VARIABLES` in `marketing.model.js`) but
+   never added to this second hardcoded copy. Confirmed via real
+   production notification logs (`marketing-store.json` on the VPS):
+   the abandoned-cart email's "Continue My Order" button had
+   `href=""`, its WhatsApp box had no number, and — much bigger —
+   **every single `order_placed` confirmation email had a completely
+   blank items list** (no product names/qty/price at all, just order
+   no/total/payment method), since it too depends on `{{itemsTable}}`.
+   review_rejected/print_job_rejected emails also silently dropped the
+   rejection reason. User's original report was specifically about the
+   abandoned-cart email/WhatsApp; investigating "check if this is in
+   other templates too" surfaced the order-confirmation bug, which is
+   larger. Fixed by rewriting `buildTemplateVariables` to derive its
+   field list from `TEMPLATE_VARIABLES` directly (loop + default `""`)
+   instead of a hand-maintained duplicate — structurally eliminates this
+   whole bug class going forward, verified via a script that diffed
+   every `{{placeholder}}` actually used in template bodies against
+   `TEMPLATE_VARIABLES` (zero gaps after the fix). Added regression
+   assertions (Phase 12 abandoned-cart section, Phase 17 order-placed
+   section) that check the *rendered body*, not just "did it send" —
+   asserting the real recovery URL and a real `<tr>` items row actually
+   appear in the notification log's stored body, which is what would
+   have caught this originally.
+2. **Admin Orders (mobile view): fulfillment status was invisible** —
+   the desktop table shows both a payment badge (`PayBadge`: Paid/
+   Verify Pending/Failed) and a separate fulfillment badge (`ShipBadge`:
+   Awaiting/Packing/Shipped/Delivered/Cancelled), but the mobile card
+   only ever rendered `PayBadge` — so on mobile, every order looked
+   permanently stuck at "Paid" with no way to see Packed/Shipped/
+   Delivered progress. Added `ShipBadge` to the mobile card.
+3. **Admin Order Detail: Cancel Order button was too easy to hit by
+   mistake** — it was a full-size `.btn.btn-secondary`, same size as
+   and directly adjacent to the primary pipeline action button (Mark as
+   Processing / Generate Invoice / etc.), distinguished only by red
+   text. Restyled as a small, low-emphasis text link, separated from
+   the primary action button group (`justify-content: space-between`)
+   instead of sitting right next to it — still requires the same
+   `window.confirm()` before acting, just no longer visually competing
+   with the button admins actually want to press 99% of the time.
+4. Backend regression suite re-run and passing with the new assertions
+   included.
+
+## Aug 15–17 2026 — what shipped (commit `02153c8`)
 
 1. **New product type: Custom Print** — a product where the buyer uploads
    their own design, picks option choices that each add/subtract from the

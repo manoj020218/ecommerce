@@ -54,11 +54,14 @@ const QUOTE_REQUEST_STATUSES = Object.freeze({
 
 function sanitizeCartLine(line) {
   return {
+    lineId: line.lineId || "",
     productId: line.productId,
     title: line.title,
     slug: line.slug,
     sku: line.sku,
     imageUrl: line.imageUrl || "",
+    customization: Array.isArray(line.customization) ? line.customization : [],
+    designUploadIds: Array.isArray(line.designUploadIds) ? line.designUploadIds : [],
     hsnCode: line.hsnCode || "",
     qty: Number(line.qty || 0),
     moq: Number(line.moq || 1),

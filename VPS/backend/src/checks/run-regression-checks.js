@@ -23,6 +23,7 @@ const { jsonFileStore } = require("../database/json-file-store");
 const { resetAuthStoreForRegression } = require("../database/auth-store");
 const { resetReviewStoreForRegression } = require("../database/review-store");
 const { resetPartnerStoreForRegression } = require("../database/partner-store");
+const { resetPrintStoreForRegression } = require("../database/print-store");
 const { ensureAuthBootstrap } = require("../modules/auth/auth.service");
 
 const execFileAsync = promisify(execFile);
@@ -109,6 +110,7 @@ async function run() {
   await resetAuthStoreForRegression();
   await resetReviewStoreForRegression();
   await resetPartnerStoreForRegression();
+  await resetPrintStoreForRegression();
   await ensureAuthBootstrap();
 
   const app = createApp();
@@ -5683,6 +5685,383 @@ async function run() {
       })
     });
     assert.equal(phase24CheckoutBadCode.response.status, 200);
+
+    // ── Phase 25: custom-print products -- add-on pricing, uploads, print jobs ──
+    const phase25CustomOptions = [
+      {
+        id: "frequency",
+        label: "Frequency Type",
+        required: true,
+        choices: [
+          { id: "mifare", label: "Mifare", priceDelta: 15 },
+          { id: "rfid", label: "RFID", priceDelta: 15 },
+          { id: "none", label: "No Frequency", priceDelta: 0, default: true }
+        ]
+      },
+      {
+        id: "fixing",
+        label: "Fixing Type",
+        required: true,
+        choices: [
+          { id: "screw", label: "2-Screw Fix", priceDelta: 20, safeZoneTemplateId: "screw_2hole" },
+          { id: "pocket", label: "Pocket-Friendly", priceDelta: 0, default: true }
+        ]
+      },
+      {
+        id: "finish",
+        label: "Finish",
+        required: true,
+        choices: [
+          { id: "matte", label: "Matte", priceDelta: 0, default: true },
+          { id: "uv", label: "UV Protected", priceDelta: 40 }
+        ]
+      }
+    ];
+    const phase25PrintTemplates = [
+      {
+        id: "screw_2hole",
+        label: "2-Screw Fix",
+        holes: [
+          { edge: "left", distanceFromSideMm: 8, distanceFromTopMm: 8, diameterMm: 3, marginMm: 1.5 },
+          { edge: "right", distanceFromSideMm: 8, distanceFromTopMm: 8, diameterMm: 3, marginMm: 1.5 }
+        ]
+      }
+    ];
+
+    const phase25Product = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 25 Custom Print Card",
+        categoryId,
+        brand: "Jenix",
+        hsnCode: "8525",
+        basePrice: 100,
+        salePrice: 100,
+        priceIncludesGst: false,
+        shippingIncluded: false,
+        deadWeightKg: 0.05,
+        shippingClass: "normal",
+        stockQty: 999,
+        allowBackorder: true,
+        fulfillmentType: "custom_print",
+        uploadMode: "single_design",
+        uploadSpec: {
+          cardWidthMm: 85.6,
+          cardHeightMm: 54,
+          minWidthPx: 0,
+          minHeightPx: 0,
+          maxFileSizeMb: 20,
+          allowedFormats: ["jpg", "png", "pdf"]
+        },
+        customOptions: phase25CustomOptions,
+        printTemplates: phase25PrintTemplates
+      })
+    });
+    assert.equal(phase25Product.response.status, 201);
+    const phase25ProductId = phase25Product.json.data.id;
+    assert.equal(phase25Product.json.data.fulfillmentType, "custom_print");
+
+    // Strict-spec sibling product, used only to confirm dimension validation
+    // actually rejects an undersized upload rather than silently accepting it.
+    const phase25StrictProduct = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 25 Strict Custom Print Card",
+        categoryId,
+        brand: "Jenix",
+        hsnCode: "8525",
+        basePrice: 100,
+        deadWeightKg: 0.05,
+        stockQty: 999,
+        allowBackorder: true,
+        fulfillmentType: "custom_print",
+        uploadMode: "single_design",
+        uploadSpec: { minWidthPx: 500, minHeightPx: 500, maxFileSizeMb: 20, allowedFormats: ["jpg", "png", "pdf"] },
+        customOptions: [{ id: "opt", label: "Option", choices: [{ id: "a", label: "A", priceDelta: 0, default: true }] }]
+      })
+    });
+    assert.equal(phase25StrictProduct.response.status, 201);
+    const phase25StrictProductId = phase25StrictProduct.json.data.id;
+
+    const phase25TinyPng = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8Xw8AApMBgQnUnx0AAAAASUVORK5CYII=",
+      "base64"
+    );
+
+    // Uploading without customer auth must be rejected outright.
+    const phase25UnauthUploadForm = new FormData();
+    phase25UnauthUploadForm.append("file", new Blob([phase25TinyPng], { type: "image/png" }), "design.png");
+    phase25UnauthUploadForm.append("productId", phase25ProductId);
+    const phase25UnauthUpload = await fetch(`${baseUrl}/api/print-uploads`, {
+      method: "POST",
+      body: phase25UnauthUploadForm
+    });
+    assert.equal(phase25UnauthUpload.status, 401);
+
+    // Undersized image against the strict product's uploadSpec is rejected.
+    const phase25RejectForm = new FormData();
+    phase25RejectForm.append("file", new Blob([phase25TinyPng], { type: "image/png" }), "design.png");
+    phase25RejectForm.append("productId", phase25StrictProductId);
+    const phase25RejectUpload = await fetch(`${baseUrl}/api/print-uploads`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${phase11AccountCustomerToken}` },
+      body: phase25RejectForm
+    });
+    assert.equal(phase25RejectUpload.status, 400);
+
+    // Same image against the permissive product succeeds.
+    const phase25UploadForm = new FormData();
+    phase25UploadForm.append("file", new Blob([phase25TinyPng], { type: "image/png" }), "design.png");
+    phase25UploadForm.append("productId", phase25ProductId);
+    const phase25UploadResponse = await fetch(`${baseUrl}/api/print-uploads`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${phase11AccountCustomerToken}` },
+      body: phase25UploadForm
+    });
+    const phase25UploadJson = await phase25UploadResponse.json();
+    assert.equal(phase25UploadResponse.status, 201);
+    const phase25UploadId = phase25UploadJson.data.id;
+
+    // The stored file must only ever be reachable through admin auth.
+    const phase25UnauthFile = await fetch(`${baseUrl}/api/admin/print-uploads/${phase25UploadId}/file`);
+    assert.equal(phase25UnauthFile.status, 401);
+    const phase25AdminFile = await fetch(`${baseUrl}/api/admin/print-uploads/${phase25UploadId}/file`, {
+      headers: authHeaders(superAdminToken)
+    });
+    assert.equal(phase25AdminFile.status, 200);
+
+    // Crop persistence: buyer drags/zooms to choose which part of the photo
+    // shows through the card cutout -- must be saved server-side (so the
+    // admin's Print Jobs review renders the same framing) and only the
+    // uploading customer may update it.
+    const phase25UnauthCrop = await fetch(`${baseUrl}/api/print-uploads/${phase25UploadId}/crop`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ panX: 0.5, panY: 0.5, zoom: 1.5 })
+    });
+    assert.equal(phase25UnauthCrop.status, 401);
+
+    const phase25OtherCrop = await fetch(`${baseUrl}/api/print-uploads/${phase25UploadId}/crop`, {
+      method: "PATCH",
+      headers: authHeaders(phase11OtherCustomerToken),
+      body: JSON.stringify({ panX: 0.5, panY: 0.5, zoom: 1.5 })
+    });
+    assert.equal(phase25OtherCrop.status, 403);
+
+    const phase25CropUpdate = await fetch(`${baseUrl}/api/print-uploads/${phase25UploadId}/crop`, {
+      method: "PATCH",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ panX: 0.3, panY: 0.7, zoom: 1.8 })
+    });
+    const phase25CropJson = await phase25CropUpdate.json();
+    assert.equal(phase25CropUpdate.status, 200);
+    assert.deepEqual(phase25CropJson.data.crop, { panX: 0.3, panY: 0.7, zoom: 1.8 });
+
+    // Add to cart with a specific option combination: 100 base + 15 (Mifare)
+    // + 20 (2-Screw Fix) + 40 (UV Protected) = 175/unit -- confirms the
+    // customOptions price-delta injection in buildCartLineFromItem.
+    const phase25CartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        productId: phase25ProductId,
+        qty: 1,
+        customization: { frequency: "mifare", fixing: "screw", finish: "uv" },
+        designUploadIds: [phase25UploadId]
+      })
+    });
+    assert.equal(phase25CartAdd.response.status, 201);
+    const phase25Line = phase25CartAdd.json.data.items.find((row) => row.productId === phase25ProductId);
+    assert.equal(phase25Line.unitPrice, 175);
+    // taxableValue is the pre-GST line amount (unitPrice x qty, qty=1 here) --
+    // confirms the add-on delta flowed into the same value GST gets computed
+    // from, not just a display-only price.
+    assert.equal(phase25Line.taxableValue, 175);
+    assert.equal(phase25Line.customization.length, 3);
+    assert.equal(phase25Line.designUploadIds[0], phase25UploadId);
+    const phase25LineId = phase25Line.lineId;
+
+    // Bumping qty via the lineId-aware update path must not drop the
+    // customization/designUploadIds carried on that line.
+    const phase25QtyUpdate = await requestJson(baseUrl, `/api/cart/items/${phase25ProductId}`, {
+      method: "PATCH",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ qty: 2, lineId: phase25LineId })
+    });
+    assert.equal(phase25QtyUpdate.response.status, 200);
+    const phase25UpdatedLine = phase25QtyUpdate.json.data.items.find((row) => row.lineId === phase25LineId);
+    assert.equal(phase25UpdatedLine.qty, 2);
+    assert.equal(phase25UpdatedLine.designUploadIds[0], phase25UploadId);
+    assert.equal(phase25UpdatedLine.lineTotal > 0, true);
+
+    // unique_batch mode: one add-to-cart call with 2 uploaded designs must
+    // split into 2 separate lines (qty 1 each), never merge into one.
+    const phase25BatchProduct = await requestJson(baseUrl, "/api/admin/products", {
+      method: "POST",
+      headers: authHeaders(superAdminToken),
+      body: JSON.stringify({
+        title: "Phase 25 Batch Custom Print Card",
+        categoryId,
+        brand: "Jenix",
+        hsnCode: "8525",
+        basePrice: 100,
+        deadWeightKg: 0.05,
+        stockQty: 999,
+        allowBackorder: true,
+        fulfillmentType: "custom_print",
+        uploadMode: "unique_batch",
+        uploadSpec: { minWidthPx: 0, minHeightPx: 0, maxFileSizeMb: 20, allowedFormats: ["jpg", "png", "pdf"] },
+        customOptions: [{ id: "opt", label: "Option", choices: [{ id: "a", label: "A", priceDelta: 0, default: true }] }]
+      })
+    });
+    assert.equal(phase25BatchProduct.response.status, 201);
+    const phase25BatchProductId = phase25BatchProduct.json.data.id;
+
+    const phase25BatchUploadIds = [];
+    for (const filename of ["card-a.png", "card-b.png"]) {
+      const form = new FormData();
+      form.append("file", new Blob([phase25TinyPng], { type: "image/png" }), filename);
+      form.append("productId", phase25BatchProductId);
+      const response = await fetch(`${baseUrl}/api/print-uploads`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${phase11AccountCustomerToken}` },
+        body: form
+      });
+      const json = await response.json();
+      assert.equal(response.status, 201);
+      phase25BatchUploadIds.push(json.data.id);
+    }
+
+    const phase25BatchAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        productId: phase25BatchProductId,
+        qty: 1,
+        customization: { opt: "a" },
+        designUploadIds: phase25BatchUploadIds
+      })
+    });
+    assert.equal(phase25BatchAdd.response.status, 201);
+    const phase25BatchLines = phase25BatchAdd.json.data.items.filter(
+      (row) => row.productId === phase25BatchProductId
+    );
+    assert.equal(phase25BatchLines.length, 2);
+    assert.equal(phase25BatchLines.every((row) => row.qty === 1), true);
+    assert.equal(
+      new Set(phase25BatchLines.map((row) => row.lineId)).size,
+      2,
+      "each split line must have its own distinct lineId"
+    );
+
+    // Checkout + pay the single_design line, confirm the order carries the
+    // customization/designUploadIds through, and that it shows up as a
+    // print job only once payment is confirmed (never at order placement).
+    const phase25Checkout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          addressLine1: "B-12 Market Road",
+          city: "Delhi",
+          state: "Delhi",
+          stateCode: "DL",
+          pincode: "110001"
+        },
+        shippingAddress: {
+          name: "Phase 11 Account User",
+          email: "phase11.account@example.com",
+          mobile: "+91-9898989898",
+          pincode: "110001",
+          state: "Delhi",
+          stateCode: "DL"
+        }
+      })
+    });
+    assert.equal(phase25Checkout.response.status, 200);
+    const phase25CheckoutId = phase25Checkout.json.data.checkoutSession.id;
+
+    const phase25JobsBeforePaid = await requestJson(baseUrl, "/api/admin/print-jobs", {
+      headers: authHeaders(superAdminToken)
+    });
+    const phase25JobCountBeforePaid = phase25JobsBeforePaid.json.data.length;
+
+    const phase25Attempt = await requestJson(baseUrl, "/api/payments/create-attempt", {
+      method: "POST",
+      headers: authHeaders(phase11AccountCustomerToken),
+      body: JSON.stringify({ checkoutSessionId: phase25CheckoutId, gateway: "mock_online" })
+    });
+    assert.equal(phase25Attempt.response.status, 201);
+
+    const phase25Webhook = await requestJson(baseUrl, "/api/payments/webhook/mock", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        attemptId: phase25Attempt.json.data.attemptId,
+        status: "success",
+        gatewayTxnId: "txn_phase25_print_01"
+      })
+    });
+    assert.equal(phase25Webhook.response.status, 200);
+
+    const phase25JobsAfterPaid = await requestJson(baseUrl, "/api/admin/print-jobs", {
+      headers: authHeaders(superAdminToken)
+    });
+    // The whole cart (both the single_design line and the 2 batch lines)
+    // gets paid together, so all 3 print jobs should now exist.
+    assert.equal(phase25JobsAfterPaid.json.data.length, phase25JobCountBeforePaid + 3);
+
+    const phase25Job = phase25JobsAfterPaid.json.data.find(
+      (row) => row.productId === phase25ProductId
+    );
+    assert.ok(phase25Job, "expected a print job for the single_design line");
+    assert.equal(phase25Job.status, "needs_review");
+    assert.equal(phase25Job.customization.length, 3);
+    assert.equal(phase25Job.designUploadIds[0], phase25UploadId);
+
+    const phase25JobDetail = await requestJson(
+      baseUrl,
+      `/api/admin/print-jobs/${phase25Job.orderId}/${phase25Job.lineId}`,
+      { headers: authHeaders(superAdminToken) }
+    );
+    assert.equal(phase25JobDetail.response.status, 200);
+    assert.equal(phase25JobDetail.json.data.uploads.length, 1);
+    assert.equal(phase25JobDetail.json.data.printTemplate.id, "screw_2hole");
+
+    const phase25Approve = await requestJson(
+      baseUrl,
+      `/api/admin/print-jobs/${phase25Job.orderId}/${phase25Job.lineId}/moderate`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ action: "approve" })
+      }
+    );
+    assert.equal(phase25Approve.response.status, 200);
+    assert.equal(phase25Approve.json.data.status, "approved");
+
+    const phase25BatchJob = phase25JobsAfterPaid.json.data.find(
+      (row) => row.productId === phase25BatchProductId
+    );
+    assert.ok(phase25BatchJob, "expected a print job for a batch line");
+    const phase25Reject = await requestJson(
+      baseUrl,
+      `/api/admin/print-jobs/${phase25BatchJob.orderId}/${phase25BatchJob.lineId}/moderate`,
+      {
+        method: "PATCH",
+        headers: authHeaders(superAdminToken),
+        body: JSON.stringify({ action: "reject", rejectionReason: "Resolution too low for this batch card." })
+      }
+    );
+    assert.equal(phase25Reject.response.status, 200);
+    assert.equal(phase25Reject.json.data.status, "rejected");
 
     // eslint-disable-next-line no-console
     console.log("Regression checks passed.");

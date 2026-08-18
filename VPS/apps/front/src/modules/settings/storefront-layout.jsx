@@ -369,7 +369,19 @@ export function StorefrontLayout() {
   );
 
   const isCheckoutRoute = location.pathname.startsWith("/checkout");
-  const accountHref = isAuthenticated ? "/account" : "/account/login";
+  // Every other login link in the app carries a ?redirect= back to wherever
+  // the customer actually was (see product-page.jsx, checkout-page.jsx,
+  // custom-print-configurator.jsx) -- this header icon is the one place
+  // that didn't, so tapping it (rather than an inline "Log In" prompt)
+  // silently dropped the customer at /account instead of back where they
+  // started. Never points redirect at /account or /account/login itself,
+  // so it can't create a pointless self-referencing loop.
+  const currentPath = `${location.pathname}${location.search}`;
+  const skipRedirectTarget =
+    location.pathname.startsWith("/account/login") || location.pathname === "/account";
+  const accountHref = isAuthenticated
+    ? "/account"
+    : `/account/login${skipRedirectTarget ? "" : `?redirect=${encodeURIComponent(currentPath)}`}`;
   const accountLabel = isAuthenticated
     ? customer?.name
       ? String(customer.name).split(" ")[0]

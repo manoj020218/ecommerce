@@ -39,6 +39,7 @@ export const ADMIN_NAV_ITEMS = [
       { key: "hsn-tax",    label: "HSN / Tax",  path: "/hsn-tax",    permission: "hsn_tax.view" },
       { key: "search",     label: "Search",     path: "/search",     permission: "search.view" },
       { key: "reviews",    label: "Reviews & Ratings", path: "/reviews", permission: "reviews.view" },
+      { key: "print-jobs", label: "Print Jobs", path: "/print-jobs", permission: "print_jobs.view" },
       { key: "content-assistant", label: "Content Assistant", path: "/content-assistant", permission: "products.view" }
     ]
   },

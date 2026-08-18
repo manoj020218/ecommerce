@@ -108,18 +108,22 @@ export function CartPage() {
     };
   }, [isAuthenticated, sessionLoading]);
 
-  const changeQuantity = async (productId, nextQty) => {
-    setBusyKey(`qty:${productId}`);
+  // lineId disambiguates between several lines for the same product (a
+  // custom-print product can have one line per uploaded design) -- omitted
+  // for every normal product, where a productId alone is still unambiguous.
+  const changeQuantity = async (productId, nextQty, lineId) => {
+    setBusyKey(`qty:${lineId || productId}`);
     setError("");
     setNotice("");
 
     try {
       if (nextQty <= 0) {
-        await deleteCartItem(productId, buildCartContext(isAuthenticated));
+        await deleteCartItem(productId, { ...buildCartContext(isAuthenticated), lineId });
       } else {
         await updateCartItem(productId, {
           ...buildCartContext(isAuthenticated),
-          qty: nextQty
+          qty: nextQty,
+          lineId
         });
       }
 
@@ -132,13 +136,13 @@ export function CartPage() {
     }
   };
 
-  const removeItem = async (productId) => {
-    setBusyKey(`remove:${productId}`);
+  const removeItem = async (productId, lineId) => {
+    setBusyKey(`remove:${lineId || productId}`);
     setError("");
     setNotice("");
 
     try {
-      await deleteCartItem(productId, buildCartContext(isAuthenticated));
+      await deleteCartItem(productId, { ...buildCartContext(isAuthenticated), lineId });
       await loadCart();
       notifyStorefrontCartUpdated();
     } catch (requestError) {
@@ -181,7 +185,7 @@ export function CartPage() {
           <section className="proto-cart-layout">
             <div className="proto-cart-lines">
               {items.map((item) => (
-                <article key={item.productId} className="proto-cart-line-card">
+                <article key={item.lineId || item.productId} className="proto-cart-line-card">
                   <div className="proto-cart-line-media">
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.title} loading="lazy" />
@@ -198,15 +202,20 @@ export function CartPage() {
                           {item.title}
                         </Link>
                         <small>SKU: {item.sku || item.productId}</small>
+                        {item.customization?.length ? (
+                          <small style={{ display: "block", marginTop: 2 }}>
+                            {item.customization.map((opt) => opt.choiceLabel).join(" · ")}
+                          </small>
+                        ) : null}
                       </div>
                       <button
                         type="button"
                         className="proto-line-remove"
                         aria-label="Remove item"
-                        onClick={() => removeItem(item.productId)}
-                        disabled={busyKey === `remove:${item.productId}`}
+                        onClick={() => removeItem(item.productId, item.lineId)}
+                        disabled={busyKey === `remove:${item.lineId || item.productId}`}
                       >
-                        {busyKey === `remove:${item.productId}` ? (
+                        {busyKey === `remove:${item.lineId || item.productId}` ? (
                           <span style={{ fontSize: 11 }}>…</span>
                         ) : (
                           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -226,16 +235,16 @@ export function CartPage() {
                       <div className="proto-qty-control">
                         <button
                           type="button"
-                          onClick={() => changeQuantity(item.productId, Number(item.qty || 0) - 1)}
-                          disabled={busyKey === `qty:${item.productId}`}
+                          onClick={() => changeQuantity(item.productId, Number(item.qty || 0) - 1, item.lineId)}
+                          disabled={busyKey === `qty:${item.lineId || item.productId}`}
                         >
                           -
                         </button>
                         <strong>{Number(item.qty || 0)}</strong>
                         <button
                           type="button"
-                          onClick={() => changeQuantity(item.productId, Number(item.qty || 0) + 1)}
-                          disabled={busyKey === `qty:${item.productId}`}
+                          onClick={() => changeQuantity(item.productId, Number(item.qty || 0) + 1, item.lineId)}
+                          disabled={busyKey === `qty:${item.lineId || item.productId}`}
                         >
                           +
                         </button>

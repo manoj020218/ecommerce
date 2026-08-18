@@ -38,16 +38,29 @@ const getCartQuerySchema = z.object({
 const addItemSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   productId: productIdSchema,
-  qty: z.coerce.number().int().min(1).max(100000)
+  qty: z.coerce.number().int().min(1).max(100000),
+  // Custom-print products only (see backend/src/modules/products) -- a map
+  // of customOptions group id -> chosen choice id, and the id(s) of a
+  // design already uploaded via POST /api/print-uploads. Both ignored for
+  // standard products.
+  customization: z.record(z.string().trim().max(80)).optional(),
+  designUploadIds: z.array(z.string().trim().min(1).max(120)).max(500).optional()
 });
 
 const updateItemSchema = z.object({
   sessionId: sessionIdSchema.optional(),
-  qty: z.coerce.number().int().min(1).max(100000)
+  qty: z.coerce.number().int().min(1).max(100000),
+  // When a product has multiple custom-print lines (e.g. several unique
+  // uploaded card designs), lineId disambiguates which one to update --
+  // omitted, this falls back to the original "first line matching this
+  // productId" behavior so every existing (non-custom-print) caller is
+  // unaffected.
+  lineId: z.string().trim().min(1).optional()
 });
 
 const deleteItemQuerySchema = z.object({
-  sessionId: sessionIdSchema.optional()
+  sessionId: sessionIdSchema.optional(),
+  lineId: z.string().trim().min(1).optional()
 });
 
 const mergeGuestSchema = z.object({

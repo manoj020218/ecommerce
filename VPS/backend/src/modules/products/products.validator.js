@@ -32,6 +32,49 @@ const downloadItemSchema = z.object({
   url: z.string().trim().min(3).max(1000)
 });
 
+// Custom-print products (buyer uploads their own design) -- see
+// backend/src/modules/products/products.model.js for how these drive
+// per-line add-on pricing and the storefront configurator.
+const priceDeltaSchema = z.coerce.number().min(-100000).max(100000);
+
+const printHoleSchema = z.object({
+  edge: z.enum(["left", "right"]),
+  distanceFromSideMm: z.coerce.number().min(0).max(500),
+  distanceFromTopMm: z.coerce.number().min(0).max(500),
+  diameterMm: z.coerce.number().min(0.5).max(50),
+  marginMm: z.coerce.number().min(0).max(50).optional().default(1.5)
+});
+
+const printTemplateSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().max(120).optional().default(""),
+  holes: z.array(printHoleSchema).max(8).optional().default([])
+});
+
+const customOptionChoiceSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(160),
+  priceDelta: priceDeltaSchema.optional().default(0),
+  default: z.boolean().optional().default(false),
+  safeZoneTemplateId: z.string().trim().max(80).optional().default("")
+});
+
+const customOptionGroupSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(160),
+  required: z.boolean().optional().default(true),
+  choices: z.array(customOptionChoiceSchema).min(1).max(20)
+});
+
+const uploadSpecSchema = z.object({
+  cardWidthMm: z.coerce.number().min(0).max(2000).optional().default(0),
+  cardHeightMm: z.coerce.number().min(0).max(2000).optional().default(0),
+  minWidthPx: z.coerce.number().int().min(0).max(20000).optional().default(0),
+  minHeightPx: z.coerce.number().int().min(0).max(20000).optional().default(0),
+  maxFileSizeMb: z.coerce.number().min(1).max(100).optional().default(20),
+  allowedFormats: z.array(z.enum(["jpg", "png", "pdf"])).optional().default(["jpg", "png", "pdf"])
+});
+
 const videoItemSchema = z.object({
   url: z.string().trim().min(4).max(500),
   label: z.string().trim().max(120).optional().default("")
@@ -147,7 +190,15 @@ const createProductSchema = z.object({
   priceIncludesGst: z.boolean().optional().default(false),
   shippingIncluded: z.boolean().optional().default(false),
   maxOrderQty: z.coerce.number().int().min(1).max(100000).optional().default(1000),
-  lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional().default(0)
+  lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional().default(0),
+
+  // Custom-print configuration -- defaults leave every existing/standard
+  // product completely unaffected. See products.model.js.
+  fulfillmentType: z.enum(["standard", "custom_print"]).optional().default("standard"),
+  uploadMode: z.enum(["single_design", "unique_batch"]).optional().default("single_design"),
+  uploadSpec: uploadSpecSchema.optional().default({}),
+  customOptions: z.array(customOptionGroupSchema).max(10).optional().default([]),
+  printTemplates: z.array(printTemplateSchema).max(20).optional().default([])
 });
 
 const updateProductSchema = z.object({
@@ -203,7 +254,13 @@ const updateProductSchema = z.object({
   stockStatus: z.enum(["in_stock", "low_stock", "out_of_stock", "backorder"]).optional(),
   allowBackorder: z.boolean().optional(),
   maxOrderQty: z.coerce.number().int().min(1).max(100000).optional(),
-  lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional()
+  lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional(),
+
+  fulfillmentType: z.enum(["standard", "custom_print"]).optional(),
+  uploadMode: z.enum(["single_design", "unique_batch"]).optional(),
+  uploadSpec: uploadSpecSchema.optional(),
+  customOptions: z.array(customOptionGroupSchema).max(10).optional(),
+  printTemplates: z.array(printTemplateSchema).max(20).optional()
 });
 
 const updateProductRelationsSchema = relationMapSchema.refine(

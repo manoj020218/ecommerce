@@ -613,14 +613,17 @@ export function CheckoutPage() {
   // tab last loaded it" 409 guard on submit already catches that — nothing
   // new needed there, this just makes sure THIS tab's edits are the ones
   // actually recorded rather than a stale in-memory copy.
-  async function handleReviewQtyChange(productId, nextQty) {
+  // lineId disambiguates between several lines for the same product (a
+  // custom-print product can have one line per uploaded design) -- omitted
+  // for every normal product, where a productId alone is still unambiguous.
+  async function handleReviewQtyChange(productId, nextQty, lineId) {
     if (nextQty < 1) {
       return;
     }
     setReviewItemsBusy(true);
     setError("");
     try {
-      await updateCartItem(productId, { qty: nextQty });
+      await updateCartItem(productId, { qty: nextQty, lineId });
       await refreshCartPreview();
       notifyStorefrontCartUpdated();
     } catch (requestError) {
@@ -630,11 +633,11 @@ export function CheckoutPage() {
     }
   }
 
-  async function handleReviewRemoveItem(productId) {
+  async function handleReviewRemoveItem(productId, lineId) {
     setReviewItemsBusy(true);
     setError("");
     try {
-      await deleteCartItem(productId);
+      await deleteCartItem(productId, { lineId });
       await refreshCartPreview();
       notifyStorefrontCartUpdated();
     } catch (requestError) {

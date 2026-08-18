@@ -149,6 +149,20 @@ function formFromProduct(product) {
     tags: Array.isArray(product.tags) ? product.tags : [],
     productLabel: product.productLabel || "",
     relatedProductIds: Array.isArray(product.relations?.related) ? product.relations.related : [],
+    fulfillmentType: product.fulfillmentType || "standard",
+    uploadMode: product.uploadMode || "single_design",
+    uploadSpec: {
+      cardWidthMm: product.uploadSpec?.cardWidthMm ?? "",
+      cardHeightMm: product.uploadSpec?.cardHeightMm ?? "",
+      minWidthPx: product.uploadSpec?.minWidthPx ?? "",
+      minHeightPx: product.uploadSpec?.minHeightPx ?? "",
+      maxFileSizeMb: product.uploadSpec?.maxFileSizeMb ?? 20,
+      allowedFormats: Array.isArray(product.uploadSpec?.allowedFormats) && product.uploadSpec.allowedFormats.length
+        ? product.uploadSpec.allowedFormats
+        : ["jpg", "png", "pdf"]
+    },
+    customOptions: Array.isArray(product.customOptions) ? product.customOptions : [],
+    printTemplates: Array.isArray(product.printTemplates) ? product.printTemplates : [],
   };
 }
 
@@ -411,6 +425,178 @@ function DownloadsPanel({ downloads, onChange }) {
   );
 }
 
+// Custom-print add-on pricing editor -- this is the "product type changes
+// what admin can configure" mechanism: option groups (e.g. "Frequency
+// Type") each holding choices (e.g. "Mifare") with a per-choice price
+// delta, generic across any custom-print product rather than one-off code
+// per product. A choice can optionally reference a print template (below)
+// for the safe-zone hole overlay.
+function CustomOptionsPanel({ groups, templates, onChange }) {
+  const addGroup = () => {
+    onChange([
+      ...groups,
+      { id: `group_${Date.now()}`, label: "New Option Group", required: true, choices: [] }
+    ]);
+  };
+  const updateGroup = (gi, patch) => {
+    onChange(groups.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
+  };
+  const removeGroup = (gi) => onChange(groups.filter((_, i) => i !== gi));
+  const addChoice = (gi) => {
+    const choices = [
+      ...groups[gi].choices,
+      { id: `choice_${Date.now()}`, label: "New Choice", priceDelta: 0, default: groups[gi].choices.length === 0, safeZoneTemplateId: "" }
+    ];
+    updateGroup(gi, { choices });
+  };
+  const updateChoice = (gi, ci, patch) => {
+    const choices = groups[gi].choices.map((c, i) => (i === ci ? { ...c, ...patch } : c));
+    updateGroup(gi, { choices });
+  };
+  const removeChoice = (gi, ci) => {
+    updateGroup(gi, { choices: groups[gi].choices.filter((_, i) => i !== ci) });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {groups.map((group, gi) => (
+        <div key={gi} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+            <input
+              value={group.label}
+              onChange={(e) => updateGroup(gi, { label: e.target.value })}
+              style={{ ...inputStyle(), flex: 1, fontWeight: 700 }}
+              placeholder="Option group label (e.g. Frequency Type)"
+            />
+            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, whiteSpace: "nowrap" }}>
+              <input type="checkbox" checked={Boolean(group.required)} onChange={(e) => updateGroup(gi, { required: e.target.checked })} />
+              Required
+            </label>
+            <button type="button" onClick={() => removeGroup(gi)} style={{ background: "#fee2e2", border: "none", borderRadius: 5, padding: "4px 9px", cursor: "pointer", color: "#ef4444", fontWeight: 700 }}>Remove Group</button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {group.choices.map((choice, ci) => (
+              <div key={ci} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  value={choice.label}
+                  onChange={(e) => updateChoice(gi, ci, { label: e.target.value })}
+                  style={{ ...inputStyle(), flex: "1 1 160px" }}
+                  placeholder="Choice label (e.g. Mifare 13.56MHz)"
+                />
+                <span style={{ fontSize: 12, color: "var(--muted)" }}>+₹</span>
+                <input
+                  type="number"
+                  value={choice.priceDelta}
+                  onChange={(e) => updateChoice(gi, ci, { priceDelta: Number(e.target.value) })}
+                  style={{ ...inputStyle(), flex: "0 0 80px" }}
+                />
+                <select
+                  value={choice.safeZoneTemplateId || ""}
+                  onChange={(e) => updateChoice(gi, ci, { safeZoneTemplateId: e.target.value })}
+                  style={{ ...selectStyle(), flex: "0 0 170px" }}
+                >
+                  <option value="">No safe-zone template</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.label || t.id}</option>
+                  ))}
+                </select>
+                <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, whiteSpace: "nowrap" }}>
+                  <input
+                    type="radio"
+                    name={`default-${gi}`}
+                    checked={Boolean(choice.default)}
+                    onChange={() => updateGroup(gi, { choices: group.choices.map((c, i) => ({ ...c, default: i === ci })) })}
+                  />
+                  Default
+                </label>
+                <button type="button" onClick={() => removeChoice(gi, ci)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+            <button type="button" onClick={() => addChoice(gi)} className="btn btn-secondary btn-small" style={{ alignSelf: "flex-start", marginTop: 4 }}>+ Add Choice</button>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={addGroup} className="btn btn-secondary btn-small" style={{ alignSelf: "flex-start" }}>+ Add Option Group</button>
+    </div>
+  );
+}
+
+// Print-safe-zone templates -- referenced by a customOption choice above
+// (e.g. the "2-Screw Fix" choice), drives both the buyer-facing overlay on
+// the storefront configurator and the admin Print Jobs review screen.
+// Distances are measured from the two adjacent edges to the hole CENTER,
+// the way it'd actually be measured off two edges with calipers.
+function PrintTemplatesPanel({ templates, onChange }) {
+  const addTemplate = () => {
+    onChange([
+      ...templates,
+      {
+        id: `template_${Date.now()}`,
+        label: "New Template",
+        holes: [
+          { edge: "left", distanceFromSideMm: 8, distanceFromTopMm: 8, diameterMm: 3, marginMm: 1.5 },
+          { edge: "right", distanceFromSideMm: 8, distanceFromTopMm: 8, diameterMm: 3, marginMm: 1.5 }
+        ]
+      }
+    ]);
+  };
+  const updateTemplate = (ti, patch) => onChange(templates.map((t, i) => (i === ti ? { ...t, ...patch } : t)));
+  const removeTemplate = (ti) => onChange(templates.filter((_, i) => i !== ti));
+  const updateHole = (ti, hi, patch) => {
+    const holes = templates[ti].holes.map((h, i) => (i === hi ? { ...h, ...patch } : h));
+    updateTemplate(ti, { holes });
+  };
+  const addHole = (ti) => {
+    updateTemplate(ti, {
+      holes: [...templates[ti].holes, { edge: "left", distanceFromSideMm: 8, distanceFromTopMm: 8, diameterMm: 3, marginMm: 1.5 }]
+    });
+  };
+  const removeHole = (ti, hi) => updateTemplate(ti, { holes: templates[ti].holes.filter((_, i) => i !== hi) });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {templates.map((template, ti) => (
+        <div key={ti} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+            <input
+              value={template.label}
+              onChange={(e) => updateTemplate(ti, { label: e.target.value })}
+              style={{ ...inputStyle(), flex: 1, fontWeight: 700 }}
+              placeholder="Template name (e.g. 2-Screw Fix)"
+            />
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>id: {template.id}</span>
+            <button type="button" onClick={() => removeTemplate(ti)} style={{ background: "#fee2e2", border: "none", borderRadius: 5, padding: "4px 9px", cursor: "pointer", color: "#ef4444", fontWeight: 700 }}>Remove Template</button>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {template.holes.map((hole, hi) => (
+              <div key={hi} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
+                <select value={hole.edge} onChange={(e) => updateHole(ti, hi, { edge: e.target.value })} style={{ ...selectStyle(), flex: "0 0 90px" }}>
+                  <option value="left">Left edge</option>
+                  <option value="right">Right edge</option>
+                </select>
+                <span>from side</span>
+                <input type="number" value={hole.distanceFromSideMm} onChange={(e) => updateHole(ti, hi, { distanceFromSideMm: Number(e.target.value) })} style={{ ...inputStyle(), flex: "0 0 60px" }} />
+                <span>mm, from top</span>
+                <input type="number" value={hole.distanceFromTopMm} onChange={(e) => updateHole(ti, hi, { distanceFromTopMm: Number(e.target.value) })} style={{ ...inputStyle(), flex: "0 0 60px" }} />
+                <span>mm, ⌀</span>
+                <input type="number" value={hole.diameterMm} onChange={(e) => updateHole(ti, hi, { diameterMm: Number(e.target.value) })} style={{ ...inputStyle(), flex: "0 0 55px" }} />
+                <span>mm, margin</span>
+                <input type="number" value={hole.marginMm} onChange={(e) => updateHole(ti, hi, { marginMm: Number(e.target.value) })} style={{ ...inputStyle(), flex: "0 0 55px" }} />
+                <span>mm</span>
+                <button type="button" onClick={() => removeHole(ti, hi)} style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+            <button type="button" onClick={() => addHole(ti)} className="btn btn-secondary btn-small" style={{ alignSelf: "flex-start", marginTop: 4 }}>+ Add Hole</button>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={addTemplate} className="btn btn-secondary btn-small" style={{ alignSelf: "flex-start" }}>+ Add Template</button>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export function EditProductPage() {
@@ -586,6 +772,18 @@ export function EditProductPage() {
       priceIncludesGst: Boolean(form.priceIncludesGst),
       shippingIncluded: Boolean(form.shippingIncluded),
       isActive: Boolean(form.isActive),
+      fulfillmentType: form.fulfillmentType,
+      uploadMode: form.uploadMode,
+      uploadSpec: {
+        cardWidthMm: form.uploadSpec.cardWidthMm === "" ? 0 : Number(form.uploadSpec.cardWidthMm),
+        cardHeightMm: form.uploadSpec.cardHeightMm === "" ? 0 : Number(form.uploadSpec.cardHeightMm),
+        minWidthPx: form.uploadSpec.minWidthPx === "" ? 0 : Number(form.uploadSpec.minWidthPx),
+        minHeightPx: form.uploadSpec.minHeightPx === "" ? 0 : Number(form.uploadSpec.minHeightPx),
+        maxFileSizeMb: Number(form.uploadSpec.maxFileSizeMb || 20),
+        allowedFormats: form.uploadSpec.allowedFormats
+      },
+      customOptions: form.customOptions,
+      printTemplates: form.printTemplates,
       stockQty: Number(form.stockQty || 0),
       reservedQty: Number(form.reservedQty || 0),
       stockStatus: form.stockStatus, allowBackorder: Boolean(form.allowBackorder),
@@ -834,6 +1032,91 @@ export function EditProductPage() {
                   ))}
                 </select>
               </Field>
+            </Section>
+
+            <Section title="Fulfillment Type">
+              <Field label="Fulfillment Type" hint="Custom Print reveals add-on pricing + upload configuration below">
+                <select name="fulfillmentType" value={form.fulfillmentType} onChange={onFC} style={selectStyle()}>
+                  <option value="standard">Standard product</option>
+                  <option value="custom_print">Custom Print (buyer uploads a design)</option>
+                </select>
+              </Field>
+
+              {form.fulfillmentType === "custom_print" && (
+                <>
+                  <FieldRow>
+                    <Field label="Upload Mode" hint="Single design (visiting cards) vs a bulk batch of unique designs (RFID/ID cards)">
+                      <select name="uploadMode" value={form.uploadMode} onChange={onFC} style={selectStyle()}>
+                        <option value="single_design">Single design per line</option>
+                        <option value="unique_batch">Unique batch (one upload = one card each)</option>
+                      </select>
+                    </Field>
+                    <Field label="Max File Size (MB)">
+                      <input type="number" min="1" value={form.uploadSpec.maxFileSizeMb}
+                        onChange={(e) => set("uploadSpec", { ...form.uploadSpec, maxFileSizeMb: Number(e.target.value) })}
+                        style={inputStyle()} />
+                    </Field>
+                  </FieldRow>
+                  <FieldRow cols={4}>
+                    <Field label="Card Width (mm)">
+                      <input type="number" min="0" value={form.uploadSpec.cardWidthMm}
+                        onChange={(e) => set("uploadSpec", { ...form.uploadSpec, cardWidthMm: e.target.value === "" ? "" : Number(e.target.value) })}
+                        style={inputStyle()} />
+                    </Field>
+                    <Field label="Card Height (mm)">
+                      <input type="number" min="0" value={form.uploadSpec.cardHeightMm}
+                        onChange={(e) => set("uploadSpec", { ...form.uploadSpec, cardHeightMm: e.target.value === "" ? "" : Number(e.target.value) })}
+                        style={inputStyle()} />
+                    </Field>
+                    <Field label="Min Width (px)">
+                      <input type="number" min="0" value={form.uploadSpec.minWidthPx}
+                        onChange={(e) => set("uploadSpec", { ...form.uploadSpec, minWidthPx: e.target.value === "" ? "" : Number(e.target.value) })}
+                        style={inputStyle()} />
+                    </Field>
+                    <Field label="Min Height (px)">
+                      <input type="number" min="0" value={form.uploadSpec.minHeightPx}
+                        onChange={(e) => set("uploadSpec", { ...form.uploadSpec, minHeightPx: e.target.value === "" ? "" : Number(e.target.value) })}
+                        style={inputStyle()} />
+                    </Field>
+                  </FieldRow>
+                  <Field label="Accepted Formats" full>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      {["jpg", "png", "pdf"].map((fmt) => (
+                        <label key={fmt} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, textTransform: "uppercase" }}>
+                          <input
+                            type="checkbox"
+                            checked={form.uploadSpec.allowedFormats.includes(fmt)}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...form.uploadSpec.allowedFormats, fmt]
+                                : form.uploadSpec.allowedFormats.filter((x) => x !== fmt);
+                              set("uploadSpec", { ...form.uploadSpec, allowedFormats: next });
+                            }}
+                          />
+                          {fmt}
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
+
+                  <div style={{ margin: "16px 0 8px", fontSize: 12, fontWeight: 700, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                    Add-On Pricing Options
+                  </div>
+                  <CustomOptionsPanel
+                    groups={form.customOptions}
+                    templates={form.printTemplates}
+                    onChange={(v) => set("customOptions", v)}
+                  />
+
+                  <div style={{ margin: "20px 0 8px", fontSize: 12, fontWeight: 700, color: "var(--text)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                    Print Safe-Zone Templates
+                  </div>
+                  <PrintTemplatesPanel
+                    templates={form.printTemplates}
+                    onChange={(v) => set("printTemplates", v)}
+                  />
+                </>
+              )}
             </Section>
 
             <Section title={

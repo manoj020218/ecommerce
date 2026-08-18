@@ -21,7 +21,8 @@ const {
 } = require("../customers/customers.service");
 const {
   calculateAvailableQty,
-  resolveProductUnitPrice
+  resolveProductUnitPrice,
+  resolveCustomOptionsSelection
 } = require("../products/products.model");
 const {
   createPaymentGateway
@@ -398,7 +399,15 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     qty,
     customerPricingContext: options.customerPricingContext || null
   });
-  const unitPrice = Number(pricing.unitPrice || 0);
+  // Custom-print add-on pricing: resolved once here, the one place a cart
+  // item becomes a priced line -- every downstream consumer (GST, shipping,
+  // checkout, order totals, invoices) reads unitPrice/lineSubtotal off this
+  // return value and needs zero further changes to account for it.
+  const customOptionsSelection =
+    product.fulfillmentType === "custom_print"
+      ? resolveCustomOptionsSelection(product, item.customization)
+      : { unitDelta: 0, resolved: [] };
+  const unitPrice = Number(pricing.unitPrice || 0) + Number(customOptionsSelection.unitDelta || 0);
   const lineSubtotal = roundMoney(unitPrice * qty);
   const quoteRequiredAboveQty =
     product.quoteRequiredAboveQty === null || product.quoteRequiredAboveQty === undefined
@@ -411,6 +420,7 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     : "";
 
   return {
+    lineId: item.lineId || "",
     productId: product.id,
     title: product.title,
     slug: product.slug,
@@ -419,6 +429,8 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     hsnCode: product.hsnCode || "",
     qty,
     moq,
+    customization: customOptionsSelection.resolved,
+    designUploadIds: ensureArray(item.designUploadIds),
     gstRate: Number(product.gstRate || 0),
     priceIncludesGst: Boolean(product.priceIncludesGst),
     unitPrice: Number(unitPrice),
@@ -981,10 +993,13 @@ function createOrderFromSession(authStore, session, options = {}) {
     isB2BOrderRequest,
     requiresAdminApproval: Boolean(options.requiresAdminApproval),
     items: session.cart.items.map((item) => ({
+      lineId: item.lineId || "",
       productId: item.productId,
       title: item.title,
       sku: item.sku,
       hsnCode: item.hsnCode || "",
+      customization: Array.isArray(item.customization) ? item.customization : [],
+      designUploadIds: Array.isArray(item.designUploadIds) ? item.designUploadIds : [],
       qty: item.qty,
       finalUnitPrice: item.finalUnitPriceAfterDiscount,
       priceSource: item.priceSource || "base",
@@ -1436,14 +1451,49 @@ async function addCartItem(context, payload) {
     changed = true;
   }
 
-  const existing = cart.items.find((item) => item.productId === payload.productId);
-  if (existing) {
-    existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
+  const product = ensureArray(catalogStore.products).find(
+    (row) => row.id === payload.productId
+  );
+  const isCustomPrint = product?.fulfillmentType === "custom_print";
+
+  if (isCustomPrint) {
+    // Every custom-print add is its own distinct line -- two different
+    // uploaded designs against the same product must never merge into one
+    // line the way two adds of a plain product would. unique_batch mode
+    // additionally means "one uploaded file per card": if the caller
+    // handed over several designUploadIds in one call, each becomes its
+    // own line at qty 1 rather than one line covering all of them.
+    const uploadIds = ensureArray(payload.designUploadIds);
+    const splitPerFile = product.uploadMode === "unique_batch" && uploadIds.length > 1;
+    const newLines = splitPerFile
+      ? uploadIds.map((uploadId) => ({
+          lineId: generateId("cartline"),
+          productId: payload.productId,
+          qty: 1,
+          customization: payload.customization || {},
+          designUploadIds: [uploadId]
+        }))
+      : [
+          {
+            lineId: generateId("cartline"),
+            productId: payload.productId,
+            qty: Number(payload.qty || 0),
+            customization: payload.customization || {},
+            designUploadIds: uploadIds
+          }
+        ];
+    cart.items.push(...newLines);
   } else {
-    cart.items.push({
-      productId: payload.productId,
-      qty: Number(payload.qty || 0)
-    });
+    const existing = cart.items.find((item) => item.productId === payload.productId);
+    if (existing) {
+      existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
+    } else {
+      cart.items.push({
+        lineId: generateId("cartline"),
+        productId: payload.productId,
+        qty: Number(payload.qty || 0)
+      });
+    }
   }
 
   const lines = buildStrictCartLines(catalogStore, cart.items, {
@@ -1494,12 +1544,22 @@ async function updateCartItem(context, productId, payload) {
   let changed = cleanupExpiredReservations(authStore, catalogStore);
 
   const cart = ensureCartRecord(authStore, owner, true);
-  const index = cart.items.findIndex((item) => item.productId === productId);
+  // A lineId disambiguates between several lines for the same product
+  // (custom-print designs) -- falls back to "first line matching this
+  // productId" when omitted, so every existing non-custom-print caller
+  // behaves exactly as before.
+  const index =
+    payload.lineId
+      ? cart.items.findIndex(
+          (item) => item.productId === productId && item.lineId === payload.lineId
+        )
+      : cart.items.findIndex((item) => item.productId === productId);
   if (index < 0) {
     throw new HttpError(404, "Cart item not found.");
   }
 
   cart.items[index] = {
+    ...cart.items[index],
     productId,
     qty: Number(payload.qty || 0)
   };
@@ -1555,7 +1615,12 @@ async function deleteCartItem(context, productId, query) {
   let changed = cleanupExpiredReservations(authStore, catalogStore);
   const cart = ensureCartRecord(authStore, owner, true);
   const previousLength = cart.items.length;
-  cart.items = cart.items.filter((item) => item.productId !== productId);
+  // Same lineId-disambiguation fallback as updateCartItem above.
+  cart.items = query.lineId
+    ? cart.items.filter(
+        (item) => !(item.productId === productId && item.lineId === query.lineId)
+      )
+    : cart.items.filter((item) => item.productId !== productId);
 
   if (cart.items.length === previousLength) {
     throw new HttpError(404, "Cart item not found.");

@@ -52,6 +52,8 @@ VPS/backend/src/database/whatsapp-session/
 # Portable image-assets folder (not in git — move this folder to migrate servers)
 VPS/image-assets/uploads/*
 VPS/image-assets/migration/*
+VPS/image-assets/print-uploads/*
 !VPS/image-assets/.gitkeep
 !VPS/image-assets/uploads/.gitkeep
 !VPS/image-assets/migration/.gitkeep
+!VPS/image-assets/print-uploads/.gitkeep

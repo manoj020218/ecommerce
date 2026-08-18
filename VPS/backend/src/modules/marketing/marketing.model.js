@@ -47,6 +47,10 @@ const TEMPLATE_KEYS = Object.freeze([
   "review_approved_whatsapp",
   "review_rejected",
   "review_rejected_whatsapp",
+  "print_job_approved",
+  "print_job_approved_whatsapp",
+  "print_job_rejected",
+  "print_job_rejected_whatsapp",
   "cart_early_nudge_whatsapp"
 ]);
 
@@ -64,7 +68,9 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
   { key: "tracking_detail_update", whatsappKey: "tracking_detail_update_whatsapp", group: "Shipping", label: "Order Shipped" },
   { key: "order_left_in_cart", whatsappKey: "order_left_in_cart_whatsapp", group: "Recovery", label: "Cart Left Behind" },
   { key: "review_approved", whatsappKey: "review_approved_whatsapp", group: "Reviews", label: "Review Approved" },
-  { key: "review_rejected", whatsappKey: "review_rejected_whatsapp", group: "Reviews", label: "Review Rejected" }
+  { key: "review_rejected", whatsappKey: "review_rejected_whatsapp", group: "Reviews", label: "Review Rejected" },
+  { key: "print_job_approved", whatsappKey: "print_job_approved_whatsapp", group: "Print Jobs", label: "Print Design Approved" },
+  { key: "print_job_rejected", whatsappKey: "print_job_rejected_whatsapp", group: "Print Jobs", label: "Print Design Rejected" }
 ]);
 
 const BRAND_COLOR = "#E8231A";
@@ -228,6 +234,35 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     label: "Review Not Approved (WhatsApp)",
     subject: "",
     body: "Hi {{customerName}}, your review for *{{productName}}* couldn't be published ({{rejectionReason}}). Feel free to submit an updated one."
+  },
+  print_job_approved: {
+    label: "Print Design Approved (Email)",
+    subject: "Your design for {{productName}} is approved for print ✅",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Good news — your uploaded design for <strong>{{productName}}</strong> (order {{orderNo}}) has passed our print-readiness check and is now queued for printing.</p>` +
+      `<p style="font-size:14px;">We'll notify you again once it ships.</p>`
+    )
+  },
+  print_job_approved_whatsapp: {
+    label: "Print Design Approved (WhatsApp)",
+    subject: "",
+    body: "✅ Hi {{customerName}}, your design for *{{productName}}* (order {{orderNo}}) is approved and queued for printing."
+  },
+  print_job_rejected: {
+    label: "Print Design Needs Changes (Email)",
+    subject: "Your design for {{productName}} needs a small change",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">We reviewed your uploaded design for <strong>{{productName}}</strong> (order {{orderNo}}) and it needs a change before we can print it.</p>` +
+      `<p style="font-size:13px;color:#6b7280;">Reason: {{rejectionReason}}</p>` +
+      `<p style="font-size:14px;">Please reply to this email with an updated file and we'll get it into production right away.</p>`
+    )
+  },
+  print_job_rejected_whatsapp: {
+    label: "Print Design Needs Changes (WhatsApp)",
+    subject: "",
+    body: "Hi {{customerName}}, your design for *{{productName}}* (order {{orderNo}}) needs a change before we can print it: {{rejectionReason}}"
   },
   tracking_detail_update: {
     label: "Order Shipped (Email)",

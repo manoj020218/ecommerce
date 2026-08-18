@@ -60,7 +60,8 @@ const STATUS_CLASS = {
   tax_invoice: "green",
   proforma_invoice: "amber",
   approved: "green",
-  rejected: "red"
+  rejected: "red",
+  needs_review: "amber"
 };
 
 export function StatusBadge({ value, label }) {

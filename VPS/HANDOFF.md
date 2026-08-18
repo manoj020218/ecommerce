@@ -1,9 +1,21 @@
 # Handoff — read this first
 
-Last updated: **2026-08-15**. `origin/main` HEAD: **`47715d4`**. Working
-tree was clean at last check. Everything described below as "shipped" is
-committed, pushed, deployed to the production VPS, and verified live —
-not just written.
+Last updated: **2026-08-17**. `origin/main` HEAD: **`817aad0`**.
+
+**⚠️ Working tree is NOT clean.** Everything in the "Aug 15–17" section
+below is deployed to production and verified live, but **not committed to
+git** — `git status` shows the full custom-print feature (backend
+modules, admin panel, storefront) as modified/untracked files sitting on
+top of `817aad0`. It was shipped the same way the rest of this repo
+always has been (build → pscp to VPS → restart/verify), just without a
+commit afterward. Don't assume `git log` reflects what's actually live —
+check `git status` before trusting it. Commit only if the user explicitly
+asks; if picking this work back up, be aware a `git checkout`/`reset` on
+this tree would discard it.
+
+Everything described in earlier dated sections as "shipped" **is**
+committed, pushed, and verified live — that convention broke only for the
+most recent section below.
 
 This file is the project-folder counterpart to Claude's own memory system
 (which also has a fuller version of this under the name
@@ -11,6 +23,76 @@ This file is the project-folder counterpart to Claude's own memory system
 Keeping a copy here means a fresh session can resume correctly even if
 memory isn't available for some reason — read this file first, before
 `CLAUDE.md`'s architecture reference.
+
+## Aug 15–17 2026 — what shipped (NOT yet committed — see warning above)
+
+1. **New product type: Custom Print** — a product where the buyer uploads
+   their own design, picks option choices that each add/subtract from the
+   price, and the order needs human review of the file before print.
+   Added as a new `fulfillmentType` field (`"standard" | "custom_print"`)
+   rather than overloading the existing free-text `productType` SEO
+   field. Full pipeline built and deployed:
+   - **Schema**: `uploadMode` (`single_design` | `unique_batch`),
+     `uploadSpec` (card mm size, min px resolution, max file size,
+     allowed formats), `customOptions` (option groups → choices, each
+     with a `priceDelta`), `printTemplates` (safe-zone hole
+     position/diameter/margin, for products like ID cards that get
+     physically drilled).
+   - **Pricing injection point**: `buildCartLineFromItem`
+     (`cart-checkout.service.js`) resolves the selected choices' price
+     deltas into `unitPrice` before `lineSubtotal`/GST are computed — one
+     injection point, everything downstream (GST, invoices, order totals)
+     handles it automatically.
+   - **Private file upload**: `backend/src/modules/print-uploads/` — new
+     `image-assets/print-uploads/` directory, deliberately **not** under
+     the publicly-mounted `image-assets/uploads/`. Files only ever
+     served through an authenticated admin route.
+   - **Cart line identity**: added `lineId` to every cart item (new
+     `generateId("cartline")`) — needed because custom-print items never
+     merge (each design is its own line), unlike standard products.
+   - **Admin**: Fulfillment Type section + Custom Options editor + safe-
+     zone template editor on the product edit page; new **Print Jobs**
+     page (queue of every uploaded design across all paid orders, with
+     safe-zone overlay preview, Approve/Reject).
+   - **Storefront**: `CustomPrintConfigurator` component — option chips,
+     upload zone, per-design qty, live price calc — replaces the normal
+     add-to-cart block on any `fulfillmentType: custom_print` product
+     page.
+   - First real product: **RFID/Mifare/IC Card** (`prd_75bd36d1`), base
+     ₹100 + Mifare/RFID +₹15, Screw/Glue Fix +₹20, UV Protection +₹40.
+     Flipped live for real-buyer testing per user's explicit request.
+2. **Post-launch bug fixes**, found by the user testing the live RFID
+   product directly (not simulated):
+   - Stale Google-indexed `/login` link (with a `srsltid` tracking param)
+     hit a real 404 for a real customer via WhatsApp — added a
+     `/login → /account/login` redirect route.
+   - Header account/login icon lost redirect context (dropped the
+     customer at `/account` instead of back where they were) — every
+     *other* login link in the app already carried `?redirect=`, this was
+     the one that didn't.
+   - Qty stepper was coded to only show in `single_design` mode, hidden
+     in `unique_batch` mode (the live product's actual mode) — removed
+     the mode gate so it always shows; means "order extra copies of this
+     exact same design."
+   - "0 cards × ₹100, static" turned out to be silent upload rejection:
+     the product's `uploadSpec.minHeightPx` (630) was stricter than the
+     test photo's real height (600px, confirmed via `sharp` metadata
+     on the server) — lowered the threshold and added a prominent
+     red failed-upload banner so this fails loudly instead of silently
+     next time.
+   - Design preview was a plain thumbnail with no way to tell what would
+     actually get cut off if the photo's aspect ratio didn't match the
+     card. Built a real **drag-to-reposition + pinch/button-zoom crop
+     tool** (`DesignPreview` in `custom-print-configurator.jsx`) — the
+     photo pans/zooms under a fixed card-shaped frame, resolution-
+     independent `{panX, panY, zoom}` model, persisted server-side via
+     new `PATCH /api/print-uploads/:id/crop` (ownership-checked) so the
+     admin's Print Jobs preview renders the *exact same framing* the
+     buyer confirmed, not a guess.
+3. Backend regression suite (Phase 25) extended to cover all of the
+   above — upload validation, crop endpoint auth/ownership, add-on
+   pricing math, batch-upload line-splitting, full checkout→print-job
+   flow. Passing as of last run.
 
 ## Aug 11–15 2026 — what shipped
 

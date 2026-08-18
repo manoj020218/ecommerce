@@ -74,6 +74,14 @@ const env = {
     process.env.REVIEW_STORE_PATH || "backend/src/database/json/review-store.json",
   partnerStorePath:
     process.env.PARTNER_STORE_PATH || "backend/src/database/json/partner-store.json",
+  printStorePath:
+    process.env.PRINT_STORE_PATH || "backend/src/database/json/print-store.json",
+  // Deliberately NOT under uploadDir -- that whole tree is mounted publicly
+  // at /static/uploads (see app.js). Customer print-design uploads often
+  // carry a real name/photo/employee ID and must only ever be served
+  // through the authenticated admin route, never a public static mount.
+  printUploadsDir:
+    process.env.PRINT_UPLOADS_DIR || "image-assets/print-uploads",
   frontDistIndexPath:
     process.env.FRONT_DIST_INDEX_PATH || "apps/front/dist/index.html",
   otpDevDefaultCode: process.env.OTP_DEV_DEFAULT_CODE || "123456",

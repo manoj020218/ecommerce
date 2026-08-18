@@ -21,6 +21,11 @@ const {
   createPublicPartnerFeedRouter
 } = require("../modules/partners/partners.routes");
 const {
+  createPrintUploadsRouter,
+  createAdminPrintUploadsRouter
+} = require("../modules/print-uploads/print-uploads.routes");
+const { createAdminPrintJobsRouter } = require("../modules/print-jobs/print-jobs.routes");
+const {
   createRolesPermissionsRouter
 } = require("../modules/roles-permissions/roles-permissions.routes");
 const { createStaffRouter } = require("../modules/staff/staff.routes");
@@ -113,6 +118,9 @@ function createApiRouter() {
   router.use("/admin/partners", createAdminPartnersRouter());
   router.use("/partners", createPublicPartnersRouter());
   router.use("/partner-feed", createPublicPartnerFeedRouter());
+  router.use("/print-uploads", createPrintUploadsRouter());
+  router.use("/admin/print-uploads", createAdminPrintUploadsRouter());
+  router.use("/admin/print-jobs", createAdminPrintJobsRouter());
   router.use("/settings", createPublicSettingsRouter());
   router.use("/search", createSearchRouter());
   router.use("/cart", createCartRouter());

@@ -34,6 +34,7 @@ import {
 } from "../cart/cart.utils";
 import { watchdog } from "../../shared/watchdog-client";
 import { ProductReviewsSection } from "./product-reviews-section";
+import { CustomPrintConfigurator } from "./custom-print-configurator";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -1109,46 +1110,50 @@ export function ProductPage() {
             </div>
           ) : null}
 
-          <div className="proto-quantity-row">
-            <span>Qty</span>
-            <div className="proto-qty-control">
-              <button
-                type="button"
-                onClick={() => setQuantity((current) => Math.max(Number(product.moq || 1), current - 1))}
-              >
-                -
-              </button>
-              <strong>{quantity}</strong>
-              <button
-                type="button"
-                disabled={quantity >= maxOrderableQty}
-                onClick={() => setQuantity((current) => Math.min(maxOrderableQty, current + 1))}
-              >
-                +
-              </button>
-            </div>
-            <small>
-              Min. order: {Number(product.moq || 1)} unit
-              {quantity >= maxOrderableQty ? " — maximum orderable quantity reached" : ""}
-            </small>
-          </div>
-
-          {effectiveBulkSlabs.length > 0 ? (
-            <div className="proto-bulk-pricing">
-              <p>Bulk Pricing Available</p>
-              <div className="proto-bulk-grid">
-                {effectiveBulkSlabs.map((slab) => (
-                  <div key={`${slab.minQty}-${slab.unitPrice}`}>
-                    <strong>{currency(slab.unitPrice)}</strong>
-                    <span>{Number(slab.minQty)}+ units</span>
-                  </div>
-                ))}
+          {product.fulfillmentType === "custom_print" ? (
+            <CustomPrintConfigurator product={product} />
+          ) : (
+            <>
+              <div className="proto-quantity-row">
+                <span>Qty</span>
+                <div className="proto-qty-control">
+                  <button
+                    type="button"
+                    onClick={() => setQuantity((current) => Math.max(Number(product.moq || 1), current - 1))}
+                  >
+                    -
+                  </button>
+                  <strong>{quantity}</strong>
+                  <button
+                    type="button"
+                    disabled={quantity >= maxOrderableQty}
+                    onClick={() => setQuantity((current) => Math.min(maxOrderableQty, current + 1))}
+                  >
+                    +
+                  </button>
+                </div>
+                <small>
+                  Min. order: {Number(product.moq || 1)} unit
+                  {quantity >= maxOrderableQty ? " — maximum orderable quantity reached" : ""}
+                </small>
               </div>
-            </div>
-          ) : null}
 
-          <div className="proto-product-cta-row">
-            {dealerOrderRequestFlow ? (
+              {effectiveBulkSlabs.length > 0 ? (
+                <div className="proto-bulk-pricing">
+                  <p>Bulk Pricing Available</p>
+                  <div className="proto-bulk-grid">
+                    {effectiveBulkSlabs.map((slab) => (
+                      <div key={`${slab.minQty}-${slab.unitPrice}`}>
+                        <strong>{currency(slab.unitPrice)}</strong>
+                        <span>{Number(slab.minQty)}+ units</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="proto-product-cta-row">
+                {dealerOrderRequestFlow ? (
               <StorefrontButton
                 type="submit"
                 form="dealer-order-request-form"
@@ -1175,10 +1180,12 @@ export function ProductPage() {
                 </StorefrontButton>
               </>
             )}
-          </div>
+              </div>
 
-          {cartActionNotice ? <p className="proto-inline-success">{cartActionNotice}</p> : null}
-          {cartActionError ? <p className="proto-inline-error">{cartActionError}</p> : null}
+              {cartActionNotice ? <p className="proto-inline-success">{cartActionNotice}</p> : null}
+              {cartActionError ? <p className="proto-inline-error">{cartActionError}</p> : null}
+            </>
+          )}
 
           <div className="proto-wa-save-row">
             <div className="proto-wa-enquiry-split">

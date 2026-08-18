@@ -101,6 +101,19 @@ function RouteFallback() {
   );
 }
 
+// /login is not a real route on this SPA -- our customer login page has
+// always lived at /account/login. This exists purely to catch visitors
+// arriving from a stale/incorrectly-indexed external link (confirmed via a
+// real customer WhatsApp report: a Google Shopping/Search result with a
+// srsltid tracking param pointing at /login) so they land on a working
+// page instead of the 404. Preserves the query string in case it ever
+// carries a meaningful param (e.g. ?redirect=...), not just Google's
+// tracking noise.
+function LoginRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/account/login${location.search}`} replace />;
+}
+
 function CustomerProtectedRoute({ children }) {
   const location = useLocation();
   const { isAuthenticated, loading } = useCustomerSession();
@@ -150,6 +163,7 @@ export function AppRouter() {
           <Route path="/refund-policy" element={<StaticPage />} />
           <Route path="/shipping-policy" element={<StaticPage />} />
           <Route path="/account/login" element={<CustomerAccountLoginPage />} />
+          <Route path="/login" element={<LoginRedirect />} />
           <Route path="/account/google-callback" element={<GoogleCallbackPage />} />
           <Route path="/account/forgot-password" element={<CustomerForgotPasswordPage />} />
           <Route path="/account/reset-password" element={<CustomerResetPasswordPage />} />

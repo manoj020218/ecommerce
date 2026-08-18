@@ -299,6 +299,42 @@ function buildPublicPricing(product, customerPricingContext, qty = 1) {
   };
 }
 
+// Resolves a cart line's chosen customOptions (group id -> choice id) into
+// the actual per-unit price delta plus a resolved-label breakdown for
+// order/invoice display. Falls back to each group's `default: true` choice
+// (or the first choice) when the cart item didn't specify one, so a line
+// never silently prices at zero for a required-but-unselected group.
+function resolveCustomOptionsSelection(product, customization) {
+  const groups = Array.isArray(product.customOptions) ? product.customOptions : [];
+  const selection = customization && typeof customization === "object" ? customization : {};
+
+  let unitDelta = 0;
+  const resolved = [];
+
+  for (const group of groups) {
+    const choices = Array.isArray(group.choices) ? group.choices : [];
+    if (!choices.length) continue;
+
+    const chosenId = selection[group.id];
+    const choice =
+      choices.find((row) => row.id === chosenId) ||
+      choices.find((row) => row.default) ||
+      choices[0];
+
+    unitDelta += Number(choice.priceDelta || 0);
+    resolved.push({
+      groupId: group.id,
+      groupLabel: group.label,
+      choiceId: choice.id,
+      choiceLabel: choice.label,
+      priceDelta: Number(choice.priceDelta || 0),
+      safeZoneTemplateId: choice.safeZoneTemplateId || ""
+    });
+  }
+
+  return { unitDelta, resolved };
+}
+
 function sanitizeAdminProduct(product) {
   return {
     ...product,
@@ -381,6 +417,11 @@ function toPublicProduct(product, options = {}) {
     googleShoppingDescription: product.googleShoppingDescription || "",
     googleProductCategory: product.googleProductCategory || "",
     productType: product.productType || "",
+    fulfillmentType: product.fulfillmentType || "standard",
+    uploadMode: product.uploadMode || "single_design",
+    uploadSpec: product.uploadSpec || {},
+    customOptions: Array.isArray(product.customOptions) ? product.customOptions : [],
+    printTemplates: Array.isArray(product.printTemplates) ? product.printTemplates : [],
     relations: sanitizeProductRelations(product.relations),
     stockStatus: product.stockStatus || "in_stock",
     stockVisibility: "hide_quantity",
@@ -435,6 +476,7 @@ module.exports = {
   sanitizeCustomerSpecificPrices,
   resolveProductUnitPrice,
   buildPublicPricing,
+  resolveCustomOptionsSelection,
   createEmptyProductRelations,
   sanitizeProductRelations,
   sanitizeAdminProduct,

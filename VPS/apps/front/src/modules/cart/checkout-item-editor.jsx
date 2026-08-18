@@ -56,7 +56,7 @@ export function CheckoutItemEditor({ items, existingProductIds, busy, onQtyChang
     <div className="proto-review-items-editor">
       <div className="proto-review-items-list">
         {items.map((item) => (
-          <div key={item.productId} className="proto-review-item-row">
+          <div key={item.lineId || item.productId} className="proto-review-item-row">
             <div className="proto-review-item-media">
               {item.imageUrl ? (
                 <img src={item.imageUrl} alt={item.title} loading="lazy" />
@@ -65,14 +65,21 @@ export function CheckoutItemEditor({ items, existingProductIds, busy, onQtyChang
               )}
             </div>
             <div className="proto-review-item-copy">
-              <p>{item.title}</p>
+              <p>
+                {item.title}
+                {item.customization?.length ? (
+                  <span style={{ display: "block", fontSize: 11, fontWeight: 400, color: "var(--muted, #6b7280)" }}>
+                    {item.customization.map((opt) => opt.choiceLabel).join(" · ")}
+                  </span>
+                ) : null}
+              </p>
               <strong>{formatCurrency(item.lineTotal)}</strong>
             </div>
             <div className="proto-review-item-qty">
               <button
                 type="button"
                 disabled={busy || Number(item.qty) <= 1}
-                onClick={() => onQtyChange(item.productId, Number(item.qty) - 1)}
+                onClick={() => onQtyChange(item.productId, Number(item.qty) - 1, item.lineId)}
                 aria-label={`Decrease quantity of ${item.title}`}
               >
                 −
@@ -81,7 +88,7 @@ export function CheckoutItemEditor({ items, existingProductIds, busy, onQtyChang
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => onQtyChange(item.productId, Number(item.qty) + 1)}
+                onClick={() => onQtyChange(item.productId, Number(item.qty) + 1, item.lineId)}
                 aria-label={`Increase quantity of ${item.title}`}
               >
                 +
@@ -91,7 +98,7 @@ export function CheckoutItemEditor({ items, existingProductIds, busy, onQtyChang
               type="button"
               className="proto-review-item-remove"
               disabled={busy}
-              onClick={() => onRemove(item.productId)}
+              onClick={() => onRemove(item.productId, item.lineId)}
               aria-label={`Remove ${item.title}`}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

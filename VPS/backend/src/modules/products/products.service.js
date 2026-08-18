@@ -530,6 +530,11 @@ function createProductRecordFromPayload(store, payload) {
     priceIncludesGst: Boolean(payload.priceIncludesGst),
     shippingIncluded: Boolean(payload.shippingIncluded),
     isActive: Boolean(payload.isActive),
+    fulfillmentType: payload.fulfillmentType || "standard",
+    uploadMode: payload.uploadMode || "single_design",
+    uploadSpec: payload.uploadSpec || {},
+    customOptions: Array.isArray(payload.customOptions) ? payload.customOptions : [],
+    printTemplates: Array.isArray(payload.printTemplates) ? payload.printTemplates : [],
     createdAt: now,
     updatedAt: now
   };

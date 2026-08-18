@@ -15,6 +15,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/categories"))      return "Categories";
   if (pathname.startsWith("/products"))        return "Products";
   if (pathname.startsWith("/reviews"))         return "Reviews & Ratings";
+  if (pathname.startsWith("/print-jobs"))      return "Print Jobs";
   if (pathname.startsWith("/partners"))        return "Partner Feeds";
   if (pathname.startsWith("/content-assistant")) return "Content Assistant";
   if (pathname.startsWith("/inventory"))       return "Inventory";

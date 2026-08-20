@@ -85,8 +85,12 @@ const env = {
   frontDistIndexPath:
     process.env.FRONT_DIST_INDEX_PATH || "apps/front/dist/index.html",
   otpDevDefaultCode: process.env.OTP_DEV_DEFAULT_CODE || "123456",
+  // 15min was too tight against real-world UPI/net-banking flows (bank OTP,
+  // 3D-secure redirect, app-switch to read an SMS routinely eat 5-10min on
+  // their own) -- letting it expire mid-payment is what let a customer get
+  // charged with no order ever created. 25min gives realistic headroom.
   cartStockReservationMinutes: Number.parseInt(
-    process.env.CART_STOCK_RESERVATION_MINUTES || "15",
+    process.env.CART_STOCK_RESERVATION_MINUTES || "25",
     10
   ),
   maxUploadSizeBytes: Number.parseInt(

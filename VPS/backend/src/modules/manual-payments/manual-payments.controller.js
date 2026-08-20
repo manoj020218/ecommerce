@@ -29,7 +29,8 @@ function asyncHandler(handler) {
 function paymentContext(req, sessionId = null) {
   return {
     customerId: req.customer?.id || null,
-    sessionId: sessionId || null
+    sessionId: sessionId || null,
+    authTokenError: req.authTokenError || null
   };
 }
 

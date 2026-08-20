@@ -197,7 +197,7 @@ function buildOrderSuccessUrl({ sessionId, orderId, orderNo, paymentLink }) {
 
 // Shown before the checkout form for anyone not signed in — login is the primary
 // path (like Flipkart/Myntra), guest checkout is a smaller secondary link below.
-function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTotal }) {
+function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTotal, noticeMessage }) {
   const [form, setForm] = useState({ email: "", password: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -231,6 +231,7 @@ function CheckoutLoginGate({ onSignedIn, onContinueAsGuest, itemCount, grandTota
         </span>
       </div>
 
+      {noticeMessage ? <StorefrontAlert tone="error">{noticeMessage}</StorefrontAlert> : null}
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
 
       <GoogleSignInButton redirectPath="/checkout" />
@@ -317,6 +318,11 @@ export function CheckoutPage() {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Set when a request comes back 401 mid-checkout (access token expired while
+  // the buyer was filling the form). Surfaced on the login gate that
+  // isAuthenticated flipping false swaps back in, so it's clear why they were
+  // bounced back to sign-in instead of it looking like a random logout.
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState("");
   const [cart, setCart] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("online");
   const [shippingMethod, setShippingMethod] = useState("standard");
@@ -705,12 +711,61 @@ export function CheckoutPage() {
       setNotice("Payment link created. Continue to the online gateway.");
       return attempt;
     } catch (requestError) {
-      setError(requestError.message || "Failed to create payment link.");
+      if (requestError.status === 401) {
+        // Session already cleared globally via SESSION_EXPIRED_EVENT (see
+        // http-client.js) — force the login gate back on screen even if a
+        // resumed ?session= param had previously suppressed it, and surface
+        // why so it doesn't look like a random logout.
+        setSessionExpiredNotice(
+          requestError.message || "Your session has expired. Please log in again to continue."
+        );
+        setGuestOverride(false);
+        setSearchParams({}, { replace: true });
+      } else {
+        setError(requestError.message || "Failed to create payment link.");
+      }
     } finally {
       setPaymentBusy(false);
     }
 
     return null;
+  }
+
+  // Both Razorpay's and Cashfree's "payment succeeded at the gateway"
+  // callbacks land here. The gateway confirming isn't the same as our
+  // backend having actually created the order -- confirmRazorpayPayment/
+  // confirmCashfreePayment can come back as captured-but-unfulfilled (stock
+  // reservation expired while the customer was on the gateway and the item
+  // sold out in that gap) or fail outright (network drop). Either way,
+  // showing a fabricated "success" page for money that was taken but has no
+  // order behind it is worse than an honest "we're checking" message.
+  // Returns true only when it's safe to show the success page.
+  async function resolvePaymentConfirmOutcome(confirmCall, paymentReferenceId) {
+    try {
+      const result = await confirmCall();
+      if (result?.status === "captured_unfulfilled") {
+        setNotice("");
+        setError(
+          result.message ||
+            "Your payment was received, but the item(s) went out of stock right as you paid. Our team has been notified and will contact you shortly to confirm your order or process a refund."
+        );
+        setSubmitting(false);
+        return false;
+      }
+      return true;
+    } catch (_confirmErr) {
+      // Ambiguous outcome: the backend may still have processed this even
+      // though the response didn't make it back (or the gateway webhook
+      // will independently process the true-success case) -- so don't
+      // declare failure, just don't fabricate a success page for a payment
+      // we can't actually confirm.
+      setNotice("");
+      setError(
+        `We received your payment but couldn't confirm your order right away. Please check your email in a few minutes, or contact support with payment reference ${paymentReferenceId || "N/A"} if you don't hear back.`
+      );
+      setSubmitting(false);
+      return false;
+    }
   }
 
   async function handleSubmit(event) {
@@ -813,7 +868,9 @@ export function CheckoutPage() {
           if (!loaded) {
             releaseAbandonedAttempt(attempt.attemptId);
             watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, "gateway_script_load_timeout");
-            setError("Failed to load payment gateway. Please check your internet connection and try again.");
+            setError(
+              "Failed to load payment gateway. This can happen if an ad-blocker or browser privacy setting is blocking it. Try disabling it and retrying, or switch to Bank Transfer / UPI under Payment Method (Edit) below."
+            );
             setSubmitting(false);
             return;
           }
@@ -832,18 +889,21 @@ export function CheckoutPage() {
               contact: billingForm.mobile || ""
             },
             handler: async function (rzpResponse) {
-              // Payment succeeded — confirm with backend then go to success page
-              try {
-                await confirmRazorpayPayment({
-                  attemptId: attempt.attemptId,
-                  razorpay_payment_id: rzpResponse.razorpay_payment_id,
-                  razorpay_order_id: rzpResponse.razorpay_order_id,
-                  razorpay_signature: rzpResponse.razorpay_signature
-                });
-              } catch (_confirmErr) {
-                // Non-fatal: webhook will also process it
+              // Payment succeeded at the gateway — confirm with backend, and
+              // only show the success page if that confirms an actual order.
+              const confirmed = await resolvePaymentConfirmOutcome(
+                () =>
+                  confirmRazorpayPayment({
+                    attemptId: attempt.attemptId,
+                    razorpay_payment_id: rzpResponse.razorpay_payment_id,
+                    razorpay_order_id: rzpResponse.razorpay_order_id,
+                    razorpay_signature: rzpResponse.razorpay_signature
+                  }),
+                rzpResponse.razorpay_payment_id
+              );
+              if (confirmed) {
+                openOrderSuccess(attempt);
               }
-              openOrderSuccess(attempt);
             },
             modal: {
               ondismiss: function () {
@@ -871,7 +931,9 @@ export function CheckoutPage() {
           if (!loaded || !window.Cashfree) {
             releaseAbandonedAttempt(attempt.attemptId);
             watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, "gateway_script_load_timeout");
-            setError("Failed to load payment gateway. Please check your internet connection and try again.");
+            setError(
+              "Failed to load payment gateway. This can happen if an ad-blocker or browser privacy setting is blocking it. Try disabling it and retrying, or switch to Bank Transfer / UPI under Payment Method (Edit) below."
+            );
             setSubmitting(false);
             return;
           }
@@ -899,12 +961,13 @@ export function CheckoutPage() {
               return;
             }
 
-            try {
-              await confirmCashfreePayment({ attemptId: attempt.attemptId });
-            } catch (_confirmErr) {
-              // Non-fatal: webhook (once configured) will also process it
+            const confirmed = await resolvePaymentConfirmOutcome(
+              () => confirmCashfreePayment({ attemptId: attempt.attemptId }),
+              attempt.attemptId
+            );
+            if (confirmed) {
+              openOrderSuccess(attempt);
             }
-            openOrderSuccess(attempt);
           } catch (cashfreeError) {
             releaseAbandonedAttempt(attempt.attemptId);
             watchdog.trackPaymentFailed(cart?.id, attempt.attemptId, cashfreeError.message || "checkout_error");
@@ -924,11 +987,23 @@ export function CheckoutPage() {
         refreshCartPreview().catch(() => {});
       }
     } catch (requestError) {
-      setError(requestError.message || "Checkout could not be started.");
-      if (requestError.status === 409) {
-        // Cart changed since this tab last loaded it — refresh the on-screen summary
-        // so the buyer reviews the current items before trying to place the order again.
-        refreshCartPreview().catch(() => {});
+      if (requestError.status === 401) {
+        // Session already cleared globally via SESSION_EXPIRED_EVENT (see
+        // http-client.js) — force the login gate back on screen even if a
+        // resumed ?session= param had previously suppressed it, and surface
+        // why so it doesn't look like a random logout.
+        setSessionExpiredNotice(
+          requestError.message || "Your session has expired. Please log in again to continue."
+        );
+        setGuestOverride(false);
+        setSearchParams({}, { replace: true });
+      } else {
+        setError(requestError.message || "Checkout could not be started.");
+        if (requestError.status === 409) {
+          // Cart changed since this tab last loaded it — refresh the on-screen summary
+          // so the buyer reviews the current items before trying to place the order again.
+          refreshCartPreview().catch(() => {});
+        }
       }
     } finally {
       setSubmitting(false);
@@ -962,7 +1037,9 @@ export function CheckoutPage() {
             <CheckoutLoginGate
               itemCount={items.length}
               grandTotal={totals.grandTotal}
+              noticeMessage={sessionExpiredNotice}
               onSignedIn={(session) => {
+                setSessionExpiredNotice("");
                 setSession(session);
               }}
               onContinueAsGuest={() => setGuestOverride(true)}

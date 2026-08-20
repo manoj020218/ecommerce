@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { apiFetch, SESSION_EXPIRED_EVENT } from "../api/http-client";
+import { apiFetch, SESSION_EXPIRED_EVENT, SESSION_REFRESHED_EVENT } from "../api/http-client";
 
 const SESSION_STORAGE_KEY = "jenix.front.customerSession";
 const LEGACY_TOKEN_KEY = "jenix.front.customerToken";
@@ -153,6 +153,25 @@ export function CustomerSessionProvider({ children }) {
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
+
+  // http-client.js silently rotates the access/refresh token pair right
+  // before an authenticated request would otherwise go out with an expired
+  // one (see ensureFreshAccessToken there) and writes the result straight to
+  // localStorage. Mirror that into this context's in-memory session too --
+  // otherwise session.refreshToken here goes stale after the first silent
+  // rotation, and an explicit logout (account-page.jsx) would revoke an
+  // already-superseded refresh session instead of the one actually in use.
+  useEffect(() => {
+    function handleSessionRefreshed(event) {
+      const nextSession = event.detail;
+      if (nextSession?.accessToken) {
+        setSession(nextSession);
+      }
+    }
+    window.addEventListener(SESSION_REFRESHED_EVENT, handleSessionRefreshed);
+    return () =>
+      window.removeEventListener(SESSION_REFRESHED_EVENT, handleSessionRefreshed);
   }, []);
 
   return (

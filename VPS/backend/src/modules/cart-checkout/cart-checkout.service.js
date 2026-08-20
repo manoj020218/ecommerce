@@ -2,7 +2,7 @@ const crypto = require("node:crypto");
 const { HttpError } = require("../../common/http-error");
 const { env } = require("../../config/env");
 const { generateId, hashValue } = require("../../common/identity");
-const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
+const { readAuthStore, writeAuthStore, withAuthStoreLock } = require("../../database/auth-store");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { readInvoiceStore } = require("../../database/invoice-store");
 const { readPaymentStore, writePaymentStore } = require("../../database/payment-store");
@@ -288,6 +288,18 @@ function resolveCartOwner(context) {
       ownerType: CART_OWNER_TYPES.GUEST,
       ownerId: context.sessionId
     };
+  }
+
+  // A bearer token was sent but failed verification (expired/invalid) and the
+  // caller didn't fall back to a guest sessionId -- surface that distinctly
+  // instead of the generic "guest sessionId required" message, which was
+  // confusing customers whose login had simply timed out mid-checkout.
+  if (context.authTokenError) {
+    const message =
+      context.authTokenError.name === "TokenExpiredError"
+        ? "Your session has expired. Please log in again to continue."
+        : "Your session is invalid. Please log in again to continue.";
+    throw new HttpError(401, message);
   }
 
   throw new HttpError(
@@ -1342,6 +1354,46 @@ async function notifyPaymentFailure(session, attempt) {
   });
 }
 
+// Payment was genuinely captured by the gateway but stock could no longer be
+// reserved when confirmation landed -- this needs a human to refund the
+// customer or manually create the order, so it goes to the support inbox as
+// an urgent alert rather than the routine order/payment-failed templates.
+async function notifyPaymentCapturedUnfulfilled(session, attempt, gatewayTxnId) {
+  try {
+    const settings = await getAllSettings();
+    const adminEmail = settings.storeProfile?.supportEmail || "";
+    if (!adminEmail) {
+      return null;
+    }
+    const customerName = resolveNotificationCustomerName(
+      session.billingAddress,
+      session.shippingAddress
+    );
+    const customerEmail = resolveNotificationEmail(session.billingAddress, session.shippingAddress);
+    const customerMobile = resolveNotificationMobile(session.billingAddress, session.shippingAddress);
+    const orderTotal = `₹${Number(session.cart?.pricing?.grandTotal || attempt.amount || 0).toLocaleString("en-IN")}`;
+
+    return await safeSendTemplateNotification({
+      templateKey: "payment_captured_unfulfilled_admin",
+      toEmail: adminEmail,
+      relatedResourceType: "payment_attempt",
+      relatedResourceId: attempt.id,
+      variables: {
+        customerName,
+        customerEmail,
+        customerMobile,
+        orderNo: attempt.id,
+        invoiceNo: gatewayTxnId || attempt.gatewayTxnId || "",
+        itemsTable: buildOrderItemsEmailTable(session.cart?.items || []),
+        orderTotal
+      }
+    });
+  } catch (_notifyError) {
+    // Best-effort -- must never throw back into the payment confirmation path.
+    return null;
+  }
+}
+
 function clearOwnerCart(authStore, owner) {
   const cart = ensureCartRecord(authStore, owner, true);
   cart.items = [];
@@ -1363,7 +1415,8 @@ async function persistStores(authStore, catalogStore, options = {}) {
 async function getCart(context, query) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: query.sessionId || context.sessionId || null
+    sessionId: query.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
@@ -1431,286 +1484,215 @@ async function getCart(context, query) {
 async function addCartItem(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.sessionId || context.sessionId || null
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
-  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
-    readAuthStore(),
-    readCatalogStore(),
-    readShippingStore(),
-    readPaymentStore()
-  ]);
-  ensurePhase7StoreShape(authStore);
-  ensurePaymentStoreShape(paymentStore);
-  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+  // The whole read -> mutate -> write cycle has to be inside the lock, not
+  // just the write -- reading before acquiring it is exactly the race this
+  // is closing (see withAuthStoreLock's comment in auth-store.js).
+  return withAuthStoreLock(async () => {
+    const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+      readAuthStore(),
+      readCatalogStore(),
+      readShippingStore(),
+      readPaymentStore()
+    ]);
+    ensurePhase7StoreShape(authStore);
+    ensurePaymentStoreShape(paymentStore);
+    const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
-  let changed = cleanupExpiredReservations(authStore, catalogStore);
+    let changed = cleanupExpiredReservations(authStore, catalogStore);
 
-  const cart = ensureCartRecord(authStore, owner, true);
-  if (dropInvalidCartItems(catalogStore, cart, customerPricingContext, payload.productId)) {
-    changed = true;
-  }
+    const cart = ensureCartRecord(authStore, owner, true);
+    if (dropInvalidCartItems(catalogStore, cart, customerPricingContext, payload.productId)) {
+      changed = true;
+    }
 
-  const product = ensureArray(catalogStore.products).find(
-    (row) => row.id === payload.productId
-  );
-  const isCustomPrint = product?.fulfillmentType === "custom_print";
+    const product = ensureArray(catalogStore.products).find(
+      (row) => row.id === payload.productId
+    );
+    const isCustomPrint = product?.fulfillmentType === "custom_print";
 
-  if (isCustomPrint) {
-    // Every custom-print add is its own distinct line -- two different
-    // uploaded designs against the same product must never merge into one
-    // line the way two adds of a plain product would. unique_batch mode
-    // additionally means "one uploaded file per card": if the caller
-    // handed over several designUploadIds in one call, each becomes its
-    // own line at qty 1 rather than one line covering all of them.
-    const uploadIds = ensureArray(payload.designUploadIds);
-    const splitPerFile = product.uploadMode === "unique_batch" && uploadIds.length > 1;
-    const newLines = splitPerFile
-      ? uploadIds.map((uploadId) => ({
-          lineId: generateId("cartline"),
-          productId: payload.productId,
-          qty: 1,
-          customization: payload.customization || {},
-          designUploadIds: [uploadId]
-        }))
-      : [
-          {
+    if (isCustomPrint) {
+      // Every custom-print add is its own distinct line -- two different
+      // uploaded designs against the same product must never merge into one
+      // line the way two adds of a plain product would. unique_batch mode
+      // additionally means "one uploaded file per card": if the caller
+      // handed over several designUploadIds in one call, each becomes its
+      // own line at qty 1 rather than one line covering all of them.
+      const uploadIds = ensureArray(payload.designUploadIds);
+      const splitPerFile = product.uploadMode === "unique_batch" && uploadIds.length > 1;
+      const newLines = splitPerFile
+        ? uploadIds.map((uploadId) => ({
             lineId: generateId("cartline"),
             productId: payload.productId,
-            qty: Number(payload.qty || 0),
+            qty: 1,
             customization: payload.customization || {},
-            designUploadIds: uploadIds
-          }
-        ];
-    cart.items.push(...newLines);
-  } else {
-    const existing = cart.items.find((item) => item.productId === payload.productId);
-    if (existing) {
-      existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
+            designUploadIds: [uploadId]
+          }))
+        : [
+            {
+              lineId: generateId("cartline"),
+              productId: payload.productId,
+              qty: Number(payload.qty || 0),
+              customization: payload.customization || {},
+              designUploadIds: uploadIds
+            }
+          ];
+      cart.items.push(...newLines);
     } else {
-      cart.items.push({
-        lineId: generateId("cartline"),
-        productId: payload.productId,
-        qty: Number(payload.qty || 0)
+      const existing = cart.items.find((item) => item.productId === payload.productId);
+      if (existing) {
+        existing.qty = Number(existing.qty || 0) + Number(payload.qty || 0);
+      } else {
+        cart.items.push({
+          lineId: generateId("cartline"),
+          productId: payload.productId,
+          qty: Number(payload.qty || 0)
+        });
+      }
+    }
+
+    const lines = buildStrictCartLines(catalogStore, cart.items, {
+      enforceStockCheck: true,
+      customerPricingContext
+    });
+
+    cart.updatedAt = nowIso();
+    changed = true;
+
+    const pricing = await calculatePricing(
+      lines,
+      PAYMENT_METHODS.ONLINE,
+      SHIPPING_METHODS.STANDARD,
+      {},
+      shippingStore,
+      paymentStore
+    );
+
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
       });
     }
-  }
 
-  const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true,
-    customerPricingContext
+    const cartView = buildCartView(owner, cart, lines, pricing);
+    await trackCartSaved(owner, cartView);
+    return cartView;
   });
-
-  cart.updatedAt = nowIso();
-  changed = true;
-
-  const pricing = await calculatePricing(
-    lines,
-    PAYMENT_METHODS.ONLINE,
-    SHIPPING_METHODS.STANDARD,
-    {},
-    shippingStore,
-    paymentStore
-  );
-
-  if (changed) {
-    await persistStores(authStore, catalogStore, {
-      writeAuth: true,
-      writeCatalog: true
-    });
-  }
-
-  const cartView = buildCartView(owner, cart, lines, pricing);
-  await trackCartSaved(owner, cartView);
-  return cartView;
 }
 
 async function updateCartItem(context, productId, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.sessionId || context.sessionId || null
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
-  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
-    readAuthStore(),
-    readCatalogStore(),
-    readShippingStore(),
-    readPaymentStore()
-  ]);
-  ensurePhase7StoreShape(authStore);
-  ensurePaymentStoreShape(paymentStore);
-  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+  return withAuthStoreLock(async () => {
+    const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+      readAuthStore(),
+      readCatalogStore(),
+      readShippingStore(),
+      readPaymentStore()
+    ]);
+    ensurePhase7StoreShape(authStore);
+    ensurePaymentStoreShape(paymentStore);
+    const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
-  let changed = cleanupExpiredReservations(authStore, catalogStore);
+    let changed = cleanupExpiredReservations(authStore, catalogStore);
 
-  const cart = ensureCartRecord(authStore, owner, true);
-  // A lineId disambiguates between several lines for the same product
-  // (custom-print designs) -- falls back to "first line matching this
-  // productId" when omitted, so every existing non-custom-print caller
-  // behaves exactly as before.
-  const index =
-    payload.lineId
-      ? cart.items.findIndex(
-          (item) => item.productId === productId && item.lineId === payload.lineId
-        )
-      : cart.items.findIndex((item) => item.productId === productId);
-  if (index < 0) {
-    throw new HttpError(404, "Cart item not found.");
-  }
+    const cart = ensureCartRecord(authStore, owner, true);
+    // A lineId disambiguates between several lines for the same product
+    // (custom-print designs) -- falls back to "first line matching this
+    // productId" when omitted, so every existing non-custom-print caller
+    // behaves exactly as before.
+    const index =
+      payload.lineId
+        ? cart.items.findIndex(
+            (item) => item.productId === productId && item.lineId === payload.lineId
+          )
+        : cart.items.findIndex((item) => item.productId === productId);
+    if (index < 0) {
+      throw new HttpError(404, "Cart item not found.");
+    }
 
-  cart.items[index] = {
-    ...cart.items[index],
-    productId,
-    qty: Number(payload.qty || 0)
-  };
+    cart.items[index] = {
+      ...cart.items[index],
+      productId,
+      qty: Number(payload.qty || 0)
+    };
 
-  if (dropInvalidCartItems(catalogStore, cart, customerPricingContext, productId)) {
-    changed = true;
-  }
+    if (dropInvalidCartItems(catalogStore, cart, customerPricingContext, productId)) {
+      changed = true;
+    }
 
-  const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true,
-    customerPricingContext
-  });
-  cart.updatedAt = nowIso();
-  changed = true;
-
-  const pricing = await calculatePricing(
-    lines,
-    PAYMENT_METHODS.ONLINE,
-    SHIPPING_METHODS.STANDARD,
-    {},
-    shippingStore,
-    paymentStore
-  );
-
-  if (changed) {
-    await persistStores(authStore, catalogStore, {
-      writeAuth: true,
-      writeCatalog: true
+    const lines = buildStrictCartLines(catalogStore, cart.items, {
+      enforceStockCheck: true,
+      customerPricingContext
     });
-  }
+    cart.updatedAt = nowIso();
+    changed = true;
 
-  const cartView = buildCartView(owner, cart, lines, pricing);
-  await trackCartSaved(owner, cartView);
-  return cartView;
+    const pricing = await calculatePricing(
+      lines,
+      PAYMENT_METHODS.ONLINE,
+      SHIPPING_METHODS.STANDARD,
+      {},
+      shippingStore,
+      paymentStore
+    );
+
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
+      });
+    }
+
+    const cartView = buildCartView(owner, cart, lines, pricing);
+    await trackCartSaved(owner, cartView);
+    return cartView;
+  });
 }
 
 async function deleteCartItem(context, productId, query) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: query.sessionId || context.sessionId || null
+    sessionId: query.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
-  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
-    readAuthStore(),
-    readCatalogStore(),
-    readShippingStore(),
-    readPaymentStore()
-  ]);
-  ensurePhase7StoreShape(authStore);
-  ensurePaymentStoreShape(paymentStore);
-  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+  return withAuthStoreLock(async () => {
+    const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+      readAuthStore(),
+      readCatalogStore(),
+      readShippingStore(),
+      readPaymentStore()
+    ]);
+    ensurePhase7StoreShape(authStore);
+    ensurePaymentStoreShape(paymentStore);
+    const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
 
-  let changed = cleanupExpiredReservations(authStore, catalogStore);
-  const cart = ensureCartRecord(authStore, owner, true);
-  const previousLength = cart.items.length;
-  // Same lineId-disambiguation fallback as updateCartItem above.
-  cart.items = query.lineId
-    ? cart.items.filter(
-        (item) => !(item.productId === productId && item.lineId === query.lineId)
-      )
-    : cart.items.filter((item) => item.productId !== productId);
+    let changed = cleanupExpiredReservations(authStore, catalogStore);
+    const cart = ensureCartRecord(authStore, owner, true);
+    const previousLength = cart.items.length;
+    // Same lineId-disambiguation fallback as updateCartItem above.
+    cart.items = query.lineId
+      ? cart.items.filter(
+          (item) => !(item.productId === productId && item.lineId === query.lineId)
+        )
+      : cart.items.filter((item) => item.productId !== productId);
 
-  if (cart.items.length === previousLength) {
-    throw new HttpError(404, "Cart item not found.");
-  }
-
-  cart.updatedAt = nowIso();
-  changed = true;
-  const lines = buildStrictCartLines(catalogStore, cart.items, {
-    enforceStockCheck: true,
-    customerPricingContext
-  });
-  const pricing = await calculatePricing(
-    lines,
-    PAYMENT_METHODS.ONLINE,
-    SHIPPING_METHODS.STANDARD,
-    {},
-    shippingStore,
-    paymentStore
-  );
-
-  if (changed) {
-    await persistStores(authStore, catalogStore, {
-      writeAuth: true,
-      writeCatalog: true
-    });
-  }
-
-  return buildCartView(owner, cart, lines, pricing);
-}
-
-async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
-  const owner = {
-    ownerType: CART_OWNER_TYPES.CUSTOMER,
-    ownerId: customerId
-  };
-
-  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
-    readAuthStore(),
-    readCatalogStore(),
-    readShippingStore(),
-    readPaymentStore()
-  ]);
-  ensurePhase7StoreShape(authStore);
-  ensurePaymentStoreShape(paymentStore);
-  const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
-
-  let changed = cleanupExpiredReservations(authStore, catalogStore);
-
-  const userCart = ensureCartRecord(authStore, owner, true);
-  const guestCart = ensureCartRecord(
-    authStore,
-    {
-      ownerType: CART_OWNER_TYPES.GUEST,
-      ownerId: guestSessionId
-    },
-    false
-  );
-
-  const normalizeValidItems = (items) => {
-    const rows = [];
-    for (const item of ensureArray(items)) {
-      try {
-        buildCartLineFromItem(catalogStore, item, {
-          enforceStockCheck: false,
-          customerPricingContext
-        });
-        rows.push({
-          productId: item.productId,
-          qty: Number(item.qty || 0)
-        });
-      } catch (_error) {
-        changed = true;
-      }
+    if (cart.items.length === previousLength) {
+      throw new HttpError(404, "Cart item not found.");
     }
-    return rows;
-  };
 
-  const cleanUserItems = normalizeValidItems(userCart.items);
-  const cleanGuestItems = normalizeValidItems(guestCart?.items || []);
-  if (cleanUserItems.length !== ensureArray(userCart.items).length) {
-    userCart.items = cleanUserItems;
-    userCart.updatedAt = nowIso();
-  }
-  if (guestCart && cleanGuestItems.length !== ensureArray(guestCart.items).length) {
-    guestCart.items = cleanGuestItems;
-    guestCart.updatedAt = nowIso();
-  }
-
-  if (!guestCart || guestCart.items.length === 0) {
-    const lines = buildStrictCartLines(catalogStore, cleanUserItems, {
+    cart.updatedAt = nowIso();
+    changed = true;
+    const lines = buildStrictCartLines(catalogStore, cart.items, {
       enforceStockCheck: true,
       customerPricingContext
     });
@@ -1722,76 +1704,162 @@ async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
       shippingStore,
       paymentStore
     );
+
     if (changed) {
       await persistStores(authStore, catalogStore, {
         writeAuth: true,
         writeCatalog: true
       });
     }
+
+    return buildCartView(owner, cart, lines, pricing);
+  });
+}
+
+async function mergeGuestCartIntoCustomer(customerId, guestSessionId) {
+  const owner = {
+    ownerType: CART_OWNER_TYPES.CUSTOMER,
+    ownerId: customerId
+  };
+
+  return withAuthStoreLock(async () => {
+    const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+      readAuthStore(),
+      readCatalogStore(),
+      readShippingStore(),
+      readPaymentStore()
+    ]);
+    ensurePhase7StoreShape(authStore);
+    ensurePaymentStoreShape(paymentStore);
+    const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+
+    let changed = cleanupExpiredReservations(authStore, catalogStore);
+
+    const userCart = ensureCartRecord(authStore, owner, true);
+    const guestCart = ensureCartRecord(
+      authStore,
+      {
+        ownerType: CART_OWNER_TYPES.GUEST,
+        ownerId: guestSessionId
+      },
+      false
+    );
+
+    const normalizeValidItems = (items) => {
+      const rows = [];
+      for (const item of ensureArray(items)) {
+        try {
+          buildCartLineFromItem(catalogStore, item, {
+            enforceStockCheck: false,
+            customerPricingContext
+          });
+          rows.push({
+            productId: item.productId,
+            qty: Number(item.qty || 0)
+          });
+        } catch (_error) {
+          changed = true;
+        }
+      }
+      return rows;
+    };
+
+    const cleanUserItems = normalizeValidItems(userCart.items);
+    const cleanGuestItems = normalizeValidItems(guestCart?.items || []);
+    if (cleanUserItems.length !== ensureArray(userCart.items).length) {
+      userCart.items = cleanUserItems;
+      userCart.updatedAt = nowIso();
+    }
+    if (guestCart && cleanGuestItems.length !== ensureArray(guestCart.items).length) {
+      guestCart.items = cleanGuestItems;
+      guestCart.updatedAt = nowIso();
+    }
+
+    if (!guestCart || guestCart.items.length === 0) {
+      const lines = buildStrictCartLines(catalogStore, cleanUserItems, {
+        enforceStockCheck: true,
+        customerPricingContext
+      });
+      const pricing = await calculatePricing(
+        lines,
+        PAYMENT_METHODS.ONLINE,
+        SHIPPING_METHODS.STANDARD,
+        {},
+        shippingStore,
+        paymentStore
+      );
+      if (changed) {
+        await persistStores(authStore, catalogStore, {
+          writeAuth: true,
+          writeCatalog: true
+        });
+      }
+      const cartView = buildCartView(owner, userCart, lines, pricing);
+      await trackCartSaved(owner, cartView);
+      return {
+        merged: false,
+        cart: cartView
+      };
+    }
+
+    const combinedMap = new Map();
+    for (const item of cleanUserItems) {
+      combinedMap.set(item.productId, Number(item.qty || 0));
+    }
+    for (const item of cleanGuestItems) {
+      combinedMap.set(
+        item.productId,
+        Number(combinedMap.get(item.productId) || 0) + Number(item.qty || 0)
+      );
+    }
+
+    const combinedItems = [...combinedMap.entries()].map(([productId, qty]) => ({
+      productId,
+      qty
+    }));
+    const lines = buildStrictCartLines(catalogStore, combinedItems, {
+      enforceStockCheck: true,
+      customerPricingContext
+    });
+
+    userCart.items = combinedItems;
+    userCart.updatedAt = nowIso();
+    authStore.guestCarts = authStore.guestCarts.filter(
+      (row) => row.sessionId !== guestSessionId
+    );
+    changed = true;
+
+    const pricing = await calculatePricing(
+      lines,
+      PAYMENT_METHODS.ONLINE,
+      SHIPPING_METHODS.STANDARD,
+      {},
+      shippingStore,
+      paymentStore
+    );
+
+    if (changed) {
+      await persistStores(authStore, catalogStore, {
+        writeAuth: true,
+        writeCatalog: true
+      });
+    }
+
     const cartView = buildCartView(owner, userCart, lines, pricing);
     await trackCartSaved(owner, cartView);
+
     return {
-      merged: false,
+      merged: true,
       cart: cartView
     };
-  }
-
-  const combinedMap = new Map();
-  for (const item of cleanUserItems) {
-    combinedMap.set(item.productId, Number(item.qty || 0));
-  }
-  for (const item of cleanGuestItems) {
-    combinedMap.set(
-      item.productId,
-      Number(combinedMap.get(item.productId) || 0) + Number(item.qty || 0)
-    );
-  }
-
-  const combinedItems = [...combinedMap.entries()].map(([productId, qty]) => ({
-    productId,
-    qty
-  }));
-  const lines = buildStrictCartLines(catalogStore, combinedItems, {
-    enforceStockCheck: true,
-    customerPricingContext
   });
-
-  userCart.items = combinedItems;
-  userCart.updatedAt = nowIso();
-  authStore.guestCarts = authStore.guestCarts.filter(
-    (row) => row.sessionId !== guestSessionId
-  );
-  changed = true;
-
-  const pricing = await calculatePricing(
-    lines,
-    PAYMENT_METHODS.ONLINE,
-    SHIPPING_METHODS.STANDARD,
-    {},
-    shippingStore,
-    paymentStore
-  );
-
-  if (changed) {
-    await persistStores(authStore, catalogStore, {
-      writeAuth: true,
-      writeCatalog: true
-    });
-  }
-
-  const cartView = buildCartView(owner, userCart, lines, pricing);
-  await trackCartSaved(owner, cartView);
-
-  return {
-    merged: true,
-    cart: cartView
-  };
 }
 
 async function createCartShare(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.sessionId || context.sessionId || null
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore, paymentStore] = await Promise.all([
@@ -1923,7 +1991,8 @@ async function getSharedCart(shareToken) {
 async function claimSharedCart(context, shareToken, payload) {
   const targetOwner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.targetSessionId || context.sessionId || null
+    sessionId: payload.targetSessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
@@ -2020,7 +2089,8 @@ async function claimSharedCart(context, shareToken, payload) {
 async function startCheckout(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.sessionId || context.sessionId || null
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
@@ -2341,7 +2411,8 @@ async function startCheckout(context, payload) {
 async function getCheckoutSession(context, checkoutSessionId, query) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: query.sessionId || context.sessionId || null
+    sessionId: query.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore, paymentStore] = await Promise.all([
@@ -2369,7 +2440,8 @@ async function getCheckoutSession(context, checkoutSessionId, query) {
 async function getCheckoutFollowup(context, checkoutSessionId, query) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: query.sessionId || context.sessionId || null
+    sessionId: query.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, invoiceStore, paymentStore, shippingStore] = await Promise.all([
@@ -2405,7 +2477,8 @@ async function getCheckoutFollowup(context, checkoutSessionId, query) {
 async function downloadCheckoutInvoice(context, checkoutSessionId, query) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: query.sessionId || context.sessionId || null
+    sessionId: query.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, invoiceStore] = await Promise.all([readAuthStore(), readInvoiceStore()]);
@@ -2444,7 +2517,8 @@ async function listOnlineGateways() {
 async function createPaymentAttempt(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.sessionId || context.sessionId || null
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore, paymentStore] = await Promise.all([
@@ -2587,7 +2661,8 @@ async function createPaymentAttempt(context, payload) {
 async function cancelPaymentAttempt(context, payload) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
-    sessionId: payload.sessionId || context.sessionId || null
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
   });
 
   const [authStore, catalogStore] = await Promise.all([
@@ -2804,8 +2879,15 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
     changed
   );
 
+  let webhookActivityAction = "payments.webhook.duplicate";
+  if (result.status === "captured_unfulfilled") {
+    webhookActivityAction = "payments.webhook.captured_unfulfilled";
+  } else if (result.order) {
+    webhookActivityAction = "payments.webhook.success";
+  }
+
   await addActivityLog({
-    action: result.order ? "payments.webhook.success" : "payments.webhook.duplicate",
+    action: webhookActivityAction,
     actorId: session.ownerId,
     actorRole: session.ownerType,
     resourceType: "order",
@@ -2864,26 +2946,73 @@ async function finalizeSuccessfulPaymentAttempt(
 
   const cartItems = buildCartItemsFromSession(session);
   const reservedByProduct = mapReservationItemsByProduct(reservation);
-  const lines = buildStrictCartLines(catalogStore, cartItems, {
-    enforceStockCheck: true,
-    reservedByProduct,
-    customerPricingContext: session.customerSnapshot || null
-  });
 
+  // The gateway has ALREADY captured the customer's money by the time we get
+  // here (webhook or browser-confirm both only call this after independently
+  // verifying the payment). If the stock reservation expired while the
+  // customer was on the gateway (bank OTP, 3D-secure, app-switch can easily
+  // eat more than STOCK_RESERVATION_MINUTES) and someone else bought the item
+  // in that gap, re-reserving below throws a 409 -- that must NOT propagate
+  // as a raw exception: the caller (webhook handler / confirm endpoint) has
+  // no order to show and the customer has already been charged. Instead we
+  // record it as its own terminal state and alert a human, rather than
+  // leaving the attempt stuck at CREATED forever with no path to recovery.
   let activeReservation = reservation;
-  if (!activeReservation || activeReservation.status !== RESERVATION_STATUSES.ACTIVE) {
-    activeReservation = reserveStockForCheckout(authStore, catalogStore, {
-      owner: {
-        ownerType: session.ownerType,
-        ownerId: session.ownerId
-      },
-      checkoutSessionId: session.id,
-      ttlMinutes: getReservationTtlMinutes(),
-      lines
+  try {
+    const lines = buildStrictCartLines(catalogStore, cartItems, {
+      enforceStockCheck: true,
+      reservedByProduct,
+      customerPricingContext: session.customerSnapshot || null
     });
-    session.reservationId = activeReservation.id;
-    session.reservationExpiresAt = activeReservation.expiresAt;
+
+    if (!activeReservation || activeReservation.status !== RESERVATION_STATUSES.ACTIVE) {
+      activeReservation = reserveStockForCheckout(authStore, catalogStore, {
+        owner: {
+          ownerType: session.ownerType,
+          ownerId: session.ownerId
+        },
+        checkoutSessionId: session.id,
+        ttlMinutes: getReservationTtlMinutes(),
+        lines
+      });
+      session.reservationId = activeReservation.id;
+      session.reservationExpiresAt = activeReservation.expiresAt;
+      changed = true;
+    }
+  } catch (stockError) {
+    attempt.status = PAYMENT_ATTEMPT_STATUSES.CAPTURED_UNFULFILLED;
+    attempt.gatewayTxnId = gatewayTxnId || attempt.gatewayTxnId || "";
+    attempt.failureReason = "stock_unavailable_after_payment_captured";
+    attempt.updatedAt = nowIso();
+    session.status = CHECKOUT_STATUSES.PAYMENT_FAILED;
+    session.updatedAt = nowIso();
     changed = true;
+
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: true,
+      writePayment: true,
+      paymentStore
+    });
+
+    await notifyPaymentCapturedUnfulfilled(session, attempt, gatewayTxnId);
+
+    await addActivityLog({
+      action: "payments.captured_unfulfilled",
+      actorId: session.ownerId,
+      actorRole: session.ownerType,
+      resourceType: "payment_attempt",
+      resourceId: attempt.id
+    });
+
+    return {
+      handled: true,
+      status: "captured_unfulfilled",
+      attemptId: attempt.id,
+      message:
+        "Payment was received but we couldn't reserve the item(s) automatically. Our team has been notified and will contact you shortly.",
+      stockErrorMessage: stockError.message || ""
+    };
   }
 
   const consumed = consumeReservationInternal(catalogStore, activeReservation);
@@ -3017,8 +3146,15 @@ async function confirmRazorpayCheckout(payload) {
     changed
   );
 
+  let razorpayConfirmAction = "payments.client_confirm.duplicate";
+  if (result.status === "captured_unfulfilled") {
+    razorpayConfirmAction = "payments.client_confirm.captured_unfulfilled";
+  } else if (result.order) {
+    razorpayConfirmAction = "payments.client_confirm.success";
+  }
+
   await addActivityLog({
-    action: result.order ? "payments.client_confirm.success" : "payments.client_confirm.duplicate",
+    action: razorpayConfirmAction,
     actorId: session.ownerId,
     actorRole: session.ownerType,
     resourceType: "order",
@@ -3076,8 +3212,15 @@ async function confirmCashfreeCheckout(payload) {
     changed
   );
 
+  let cashfreeConfirmAction = "payments.client_confirm.duplicate";
+  if (result.status === "captured_unfulfilled") {
+    cashfreeConfirmAction = "payments.client_confirm.captured_unfulfilled";
+  } else if (result.order) {
+    cashfreeConfirmAction = "payments.client_confirm.success";
+  }
+
   await addActivityLog({
-    action: result.order ? "payments.client_confirm.success" : "payments.client_confirm.duplicate",
+    action: cashfreeConfirmAction,
     actorId: session.ownerId,
     actorRole: session.ownerType,
     resourceType: "order",

@@ -15,6 +15,7 @@ const TEMPLATE_KEYS = Object.freeze([
   "otp_login_code",
   "order_placed",
   "order_placed_admin",
+  "payment_captured_unfulfilled_admin",
   "awaiting_payment",
   "payment_failed",
   "payment_successful",
@@ -160,6 +161,25 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
       `<tr><td style="padding:6px 0;color:#6b7280;">Order Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
       `</table>` +
       `<p style="font-size:13px;color:#6b7280;">Open the admin panel to view full order and shipping details.</p>`
+    )
+  },
+  payment_captured_unfulfilled_admin: {
+    label: "URGENT: Payment Captured, Order Not Created (Admin Email)",
+    subject: "ACTION NEEDED: payment captured but no order created ({{orderNo}})",
+    body: emailShell(
+      `<p style="font-size:14px;font-weight:700;color:${BRAND_COLOR};">A customer's payment was captured by the gateway, but their order could not be created automatically — stock was no longer available at confirmation time. This customer has been charged and needs a manual refund or a manually-created order.</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Payment Attempt ID</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderNo}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Customer</td><td style="padding:6px 0;text-align:right;">{{customerName}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;text-align:right;">{{customerEmail}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Mobile</td><td style="padding:6px 0;text-align:right;">{{customerMobile}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Gateway Txn ID</td><td style="padding:6px 0;text-align:right;">{{invoiceNo}}</td></tr>` +
+      `</table>` +
+      `{{itemsTable}}` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:4px 0 16px;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Amount Charged</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
+      `</table>` +
+      `<p style="font-size:13px;color:#6b7280;">Check the gateway dashboard with the transaction ID above to confirm the charge, then either restock and manually create the order, or issue a refund and let the customer know.</p>`
     )
   },
   order_processing: {

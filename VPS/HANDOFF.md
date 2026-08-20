@@ -1,11 +1,153 @@
 # Handoff — read this first
 
-Last updated: **2026-08-18**. `origin/main` HEAD: **`c34a739`** — pushed.
-Working tree clean aside from one unrelated stray empty file (`p.images`
-at repo root, dated Jul 7, predates this feature entirely — leave it
-alone unless the user asks about it). Everything described below as
-"shipped" is committed, pushed, and deployed to the production VPS,
-verified live.
+Last updated: **2026-08-20**. `origin/main` HEAD is still **`dc35794`**
+(Aug 18 docs commit) — **everything in the "Aug 19-20" section below is
+uncommitted, local-only.** Round 1 of that section is fixed, verified,
+and deployed to the VPS; Round 2 is fixed and verified but **not yet
+deployed**. Neither round is `git commit`/pushed yet. Working tree also
+has one unrelated stray empty file (`p.images` at repo root, dated Jul 7,
+predates this feature entirely — leave it alone unless the user asks
+about it). Everything in the Aug 18-and-earlier sections below is
+committed, pushed, and deployed to the production VPS, verified live.
+
+## Aug 19–20 2026 — cart-abandonment investigation + fixes (UNCOMMITTED)
+
+Started from a customer-reported checkout error, expanded into a full
+audit after fixing it. **Nothing in this section has been committed to
+git yet** — ask the user before committing/pushing if picking this back
+up. Deploy status is noted per-item below.
+
+### Round 1 — the reported bug (root cause + fix, DEPLOYED to VPS)
+Customer hit **"Guest sessionId is required when customer authentication
+is not present"** on the Review & Place step, with items still in cart and
+a live Pay Now button that would keep failing forever. Root cause: access
+tokens are short-lived (15min, `JWT_ACCESS_TTL`); when one expired
+mid-checkout, `attachRequestContext` (`middlewares/request-context.js`)
+silently swallowed the verify failure into `req.authTokenError` instead of
+rejecting the request, and the frontend — believing `isAuthenticated` was
+still true — never sent a fallback guest `sessionId`. `resolveCartOwner`
+then had neither identifier and threw a generic 400. Worse: since the
+backend was returning 400 not 401, the frontend's *existing*
+`SESSION_EXPIRED_EVENT` mechanism (which only fires on 401) never
+triggered, so the stale session was never cleared either — customer was
+stuck with no recovery path short of a hard refresh.
+- **Backend**: `resolveCartOwner` (`cart-checkout.service.js`) now checks
+  `context.authTokenError` and throws a clear `401` ("Your session has
+  expired...") instead of the generic 400. Propagated through all 12
+  `cartContext`/`resolveCartOwner` call sites.
+- **Frontend**: `checkout-page.jsx` catches the 401 in `handleSubmit` and
+  `handleCreatePaymentLink`, shows a `sessionExpiredNotice` on the
+  existing `CheckoutLoginGate` screen (forces `guestOverride` back to
+  `false` so a stale `?session=` param can't suppress the gate), instead
+  of leaving the broken form on screen.
+- **Also added**: silent access-token refresh (`http-client.js`
+  `ensureFreshAccessToken`) — every authenticated request now checks the
+  token's own `exp` claim and refreshes via the existing (previously
+  unused) `/auth/customer/refresh` + 30-day refresh token before firing,
+  rather than relying on a background timer (which browsers throttle/kill
+  on backgrounded tabs) — user specifically asked for this to cover a tab
+  left open for days.
+- **Deployed**: backend files synced + `pm2 restart jenix-backend
+  --update-env`; storefront rebuilt and swapped into
+  `apps/front/dist` on the VPS with `restorecon -Rv` (the known SELinux
+  gotcha on this box). Old build kept at
+  `apps/front/dist_backup_20260819_123045` on the VPS, not deleted.
+  Verified live via `/health` and asset-hash check on `jenixindia.com`.
+
+### Round 2 — critical audit + fixes (LOCAL ONLY, not yet deployed)
+User asked for a critical audit of the rest of the codebase for other
+causes of cart abandonment. Ran 4 parallel investigations (payment/stock-
+reservation flow, cart/session/pricing integrity, frontend UX dead-ends,
+auth/identity edge cases). Findings, all fixed:
+
+1. **CRITICAL — payment could be captured with no order ever created,
+   customer shown a fake "success" page.** The stock reservation TTL
+   (15min) was fixed at payment-attempt creation and never extended;
+   realistic UPI/net-banking flows (bank OTP, 3D-secure, app-switch)
+   routinely exceed that, so the reservation could expire and the item
+   sell out *while the gateway was processing the actual charge*. When
+   `finalizeSuccessfulPaymentAttempt` (`cart-checkout.service.js`) then
+   tried to re-reserve stock, it threw an unhandled 409 — after the
+   gateway had already taken the money. The frontend's Razorpay success
+   handler (`checkout-page.jsx`) explicitly swallowed that error
+   ("non-fatal: webhook will also process it" — false, the webhook hits
+   the identical failure) and unconditionally showed the success page.
+   Fixed:
+   - Bumped `CART_STOCK_RESERVATION_MINUTES` default 15→25
+     (`config/env.js`).
+   - `finalizeSuccessfulPaymentAttempt` now catches the stock-unavailable
+     case, marks the attempt with a new status
+     `PAYMENT_ATTEMPT_STATUSES.CAPTURED_UNFULFILLED`
+     (`cart-checkout.model.js`), and returns a defined
+     `captured_unfulfilled` result instead of throwing — covers both the
+     webhook path and the browser-confirm path (shared function).
+   - New urgent admin email alert (`payment_captured_unfulfilled_admin`
+     template, `marketing.model.js`) sent to `storeProfile.supportEmail`
+     via the existing `safeSendTemplateNotification` pattern — flags the
+     payment attempt ID, gateway txn ID, customer contact, and amount for
+     manual refund/order creation. **No admin UI surfaces this state
+     yet** — it's email-alert only; if this fires often, worth a proper
+     admin panel view.
+   - Frontend (`checkout-page.jsx`): new `resolvePaymentConfirmOutcome`
+     helper used by both the Razorpay `handler` and the Cashfree
+     confirm flow — only shows the success page when confirm actually
+     reports success; on `captured_unfulfilled` or a thrown confirm
+     error, shows an honest message instead (with the payment reference
+     ID for support) rather than a fabricated success page.
+2. **Same auth-fallthrough bug as Round 1, unpatched in two sibling
+   modules** — `manual-payments.service.js` (`resolveContextOwner`, hit
+   when a customer with an expired token picks Direct Bank Transfer /
+   Manual UPI instead of online payment) and
+   `abandoned-cart.service.js`'s `resolveRestoreOwner` (cart-recovery
+   link restore). Both mirrored the Round 1 fix exactly — 401 with a
+   clear message instead of the generic 400.
+3. **Guest cart items silently vanishing** — `guest-session.js`'s
+   `getOrCreateGuestSessionId()` handed back a brand-new, unpersisted
+   random ID on every single call whenever `localStorage` threw (Safari
+   private browsing, storage-blocked browsers/extensions) — every cart
+   request got a different guest cart, no error shown. Added an
+   in-memory module-scoped fallback so at least one tab/page-load gets a
+   consistent ID even when storage is unavailable.
+4. **Cart writes not actually atomic** — `auth-store.js`'s mutex only
+   serialized the disk write, not the read-modify-write cycle every cart
+   mutation does. Two near-simultaneous requests (double-tap qty,
+   multi-tab edits) could silently lose one edit. Added
+   `withAuthStoreLock()` (new export in `auth-store.js`) and wrapped
+   `addCartItem`, `updateCartItem`, `deleteCartItem`, and
+   `mergeGuestCartIntoCustomer` in it — scoped to cart mutations only,
+   not the larger checkout/payment write paths (lower risk of
+   introducing a deadlock across a much bigger surface for a lower-
+   frequency operation).
+5. **No fetch timeout anywhere in the storefront** — `http-client.js`'s
+   `apiFetch` used a bare `fetch()` with no `AbortController`. On a
+   stalled connection, every busy/submitting-gated button (Pay Now,
+   Place Order, Add to Cart) froze forever with zero feedback — same
+   *symptom* as the Round 1 bug, far more common trigger. Added a 25s
+   timeout with a clear "Request timed out" error.
+6. **Cross-tab refresh race (self-introduced by the Round 1 silent-
+   refresh feature)** — refresh tokens rotate/are single-use
+   server-side; two tabs racing a refresh near-simultaneously with the
+   same stored token could have the losing tab's request come back
+   "already revoked" and incorrectly log that tab out. `http-client.js`
+   now re-checks storage for a newer token (written by the winning tab)
+   before treating a refresh failure as real.
+7. **Ad-blocked payment gateway script with no fallback offered** —
+   error message on Razorpay/Cashfree script load failure now
+   explicitly suggests trying Bank Transfer/UPI instead of just "check
+   your connection."
+8. Audited every other `req.customer` usage across the backend for the
+   same fallthrough pattern — the rest are either hard-gated by
+   `requireCustomerAuth` (already a clean 401 regardless of cause) or
+   treat a missing customer as "anonymous, no error" by design (search,
+   product recommendations, reviews) — not a bug. One endpoint
+   (`shipping.service.js` `estimateCartShipping`, `/api/shipping/cart-
+   estimate`) has the same unguarded-throw shape but has **no frontend
+   caller at all** — left alone as dead code, flagged here in case it's
+   wired up later.
+
+**Verification**: `node --check` on every edited file, full
+`pnpm run check:backend` regression suite (passing), `pnpm run build`
+on `apps/front` (clean). **Not yet deployed to the VPS, not committed.**
 
 This file is the project-folder counterpart to Claude's own memory system
 (which also has a fuller version of this under the name

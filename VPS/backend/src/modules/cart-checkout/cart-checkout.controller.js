@@ -39,7 +39,8 @@ function asyncHandler(handler) {
 function cartContext(req, sessionId = null) {
   return {
     customerId: req.customer?.id || null,
-    sessionId: sessionId || null
+    sessionId: sessionId || null,
+    authTokenError: req.authTokenError || null
   };
 }
 

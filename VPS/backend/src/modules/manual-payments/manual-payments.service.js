@@ -96,6 +96,20 @@ function resolveContextOwner(context) {
       ownerId: context.sessionId
     };
   }
+
+  // Mirrors resolveCartOwner in cart-checkout.service.js -- a bearer token
+  // was sent but failed verification (expired/invalid) and the caller didn't
+  // fall back to a guest sessionId. Surface that distinctly instead of the
+  // generic message, which was confusing customers on Direct Bank Transfer /
+  // Manual UPI whose login had timed out mid-checkout.
+  if (context.authTokenError) {
+    const message =
+      context.authTokenError.name === "TokenExpiredError"
+        ? "Your session has expired. Please log in again to continue."
+        : "Your session is invalid. Please log in again to continue.";
+    throw new HttpError(401, message);
+  }
+
   throw new HttpError(
     400,
     "Customer login or guest sessionId is required for manual payment submission."

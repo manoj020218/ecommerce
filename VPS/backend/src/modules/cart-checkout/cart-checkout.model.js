@@ -38,7 +38,13 @@ const RESERVATION_STATUSES = Object.freeze({
 const PAYMENT_ATTEMPT_STATUSES = Object.freeze({
   CREATED: "created",
   SUCCESS: "success",
-  FAILED: "failed"
+  FAILED: "failed",
+  // Gateway captured the payment, but stock could no longer be reserved by
+  // the time confirmation landed (reservation TTL expired and someone else
+  // bought the item in the gap). Distinct from FAILED, which means the
+  // customer was never actually charged -- this one needs a manual refund
+  // or manual order creation, not a "payment declined, try again" message.
+  CAPTURED_UNFULFILLED: "captured_unfulfilled"
 });
 
 const SHARE_CLAIM_MODES = Object.freeze({

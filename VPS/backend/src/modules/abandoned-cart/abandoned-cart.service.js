@@ -779,6 +779,17 @@ function resolveRestoreOwner(context, payload) {
     };
   }
 
+  // Mirrors resolveCartOwner in cart-checkout.service.js -- a bearer token
+  // was sent but failed verification (expired/invalid) and the caller
+  // didn't fall back to a guest targetSessionId.
+  if (context.authTokenError) {
+    const message =
+      context.authTokenError.name === "TokenExpiredError"
+        ? "Your session has expired. Please log in again to continue."
+        : "Your session is invalid. Please log in again to continue.";
+    throw new HttpError(401, message);
+  }
+
   throw new HttpError(400, "Customer login or targetSessionId is required for cart restore.");
 }
 

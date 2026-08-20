@@ -58,7 +58,8 @@ const publicRestoreRecovery = asyncHandler(async (req, res) => {
   const data = await service.restoreRecoveryCart(
     {
       customerId: req.customer?.id || null,
-      sessionId: payload.targetSessionId || null
+      sessionId: payload.targetSessionId || null,
+      authTokenError: req.authTokenError || null
     },
     req.params.recoveryToken,
     payload

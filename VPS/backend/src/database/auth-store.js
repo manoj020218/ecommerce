@@ -25,6 +25,26 @@ const DEFAULT_AUTH_STORE = Object.freeze({
 // Mutex to prevent concurrent writes from corrupting the JSON file
 let writeQueue = Promise.resolve();
 
+// This only serializes the disk write itself. It does NOT cover the
+// read -> mutate in memory -> write cycle every cart/checkout mutation
+// actually needs: two near-simultaneous requests (double-tap "add to cart",
+// a qty change firing close to another tab's edit) can both readAuthStore()
+// against the same pre-mutation snapshot, mutate their own in-memory copies
+// independently, and whichever writeAuthStore() lands second silently
+// overwrites the first's change -- a classic lost-update race. This second,
+// broader mutex is for callers that need the whole cycle serialized, not
+// just the write.
+let cartMutationLock = Promise.resolve();
+
+function withAuthStoreLock(fn) {
+  const resultPromise = cartMutationLock.then(fn, fn);
+  cartMutationLock = resultPromise.then(
+    () => {},
+    () => {}
+  );
+  return resultPromise;
+}
+
 function cloneDefaultAuthStore() {
   return JSON.parse(JSON.stringify(DEFAULT_AUTH_STORE));
 }
@@ -79,5 +99,6 @@ module.exports = {
   cloneDefaultAuthStore,
   readAuthStore,
   writeAuthStore,
-  resetAuthStoreForRegression
+  resetAuthStoreForRegression,
+  withAuthStoreLock
 };

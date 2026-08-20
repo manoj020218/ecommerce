@@ -28,6 +28,7 @@ import {
   updateCustomerAddress,
   updateCustomerProfile
 } from "./account.api";
+import { getCart } from "../products/products.api";
 import {
   downloadInvoicePayload,
   formatAddress,
@@ -91,6 +92,7 @@ const ACCOUNT_ICON_PATHS = {
   address: ["M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z", "M12 13a3 3 0 100-6 3 3 0 000 6z"],
   addAddress: ["M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0118 0z", "M12 8v5M9.5 10.5h5"],
   saved: ["M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 10-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"],
+  cart: ["M6 6h15l-1.5 9h-12z", "M6 6L5 3H2", "M9.5 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3z", "M18 20a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"],
   viewed: ["M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z", "M12 15a3 3 0 100-6 3 3 0 000 6z"],
   link: ["M10 13a5 5 0 007.5.5l2-2a5 5 0 00-7.1-7.1l-1.2 1.1", "M14 11a5 5 0 00-7.5-.5l-2 2a5 5 0 007.1 7.1l1.1-1.1"],
   support: ["M3 18v-6a9 9 0 0118 0v6", "M21 19a2 2 0 01-2 2h-1v-8h3z", "M3 19a2 2 0 002 2h1v-8H3z"]
@@ -133,6 +135,11 @@ export function CustomerAccountPage() {
   const [orders, setOrders] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [tracking, setTracking] = useState([]);
+  // Fetched separately from the main dashboard bootstrap, deliberately: it's
+  // the customer's live cart (same one used at checkout, always re-priced
+  // live -- no historical/frozen snapshot involved), and a failure here
+  // must never block the rest of the account page from loading.
+  const [continueCart, setContinueCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -208,6 +215,12 @@ export function CustomerAccountPage() {
 
   useEffect(() => {
     loadAccount();
+
+    getCart()
+      .then((cartData) => setContinueCart(cartData))
+      .catch(() => {
+        // Non-critical -- the rest of the account page must still work.
+      });
   }, []);
 
   async function handleDownloadInvoice(invoiceId) {
@@ -476,6 +489,49 @@ export function CustomerAccountPage() {
           </div>
         </div>
       </article>
+
+      {continueCart?.itemCount > 0 ? (
+        <StorefrontCard as="article" className="section-card continue-cart-card" elevated>
+          <AccountSectionHead
+            icon="cart"
+            title="Continue Where You Left Off"
+            description={`${continueCart.itemCount} item${continueCart.itemCount === 1 ? "" : "s"} waiting in your cart, priced as of today.`}
+            action={
+              <StorefrontButton type="button" onClick={() => navigate("/checkout")}>
+                Continue to Checkout
+              </StorefrontButton>
+            }
+          />
+          <div className="continue-cart-items">
+            {continueCart.items.slice(0, 3).map((item) => (
+              <div key={item.lineId || item.productId} className="continue-cart-item">
+                <div className="continue-cart-item-media">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.title} loading="lazy" />
+                  ) : (
+                    <span>No image</span>
+                  )}
+                </div>
+                <div className="continue-cart-item-body">
+                  <strong>{item.title}</strong>
+                  <span>
+                    Qty {item.qty} · {formatCurrency(item.lineTotal)}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {continueCart.items.length > 3 ? (
+              <div className="continue-cart-item continue-cart-item-more">
+                +{continueCart.items.length - 3} more
+              </div>
+            ) : null}
+          </div>
+          <div className="continue-cart-total">
+            <span>Cart Total</span>
+            <strong>{formatCurrency(continueCart.pricing?.grandTotal)}</strong>
+          </div>
+        </StorefrontCard>
+      ) : null}
 
       <div className="account-stat-strip">
         <div className="account-stat">

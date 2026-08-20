@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import { getOrCreateGuestSessionId } from "../../shared/cart/guest-session";
 import {
@@ -21,6 +21,7 @@ import {
 
 export function RecoveryPage() {
   const { recoveryToken } = useParams();
+  const navigate = useNavigate();
   const { customer, isAuthenticated } = useCustomerSession();
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -72,11 +73,6 @@ export function RecoveryPage() {
             },
         isAuthenticated
       );
-      setNotice(
-        isAuthenticated
-          ? "Cart restored into your customer account."
-          : "Cart restored into this browser session."
-      );
       setPreview((current) =>
         current
           ? {
@@ -86,6 +82,19 @@ export function RecoveryPage() {
             }
           : current
       );
+
+      // Land them straight back at checkout with the restored cart, the way
+      // a recovery email should work -- not on a "here's your cart, now go
+      // find the cart icon yourself" confirmation screen. If they'd already
+      // started checkout before abandoning (address/shipping/payment
+      // picked), resume that exact session too; checkout-page.jsx already
+      // handles a stale/mismatched ?session= gracefully (falls back to a
+      // notice + fresh checkout with the current cart), so this is safe
+      // even when it doesn't apply.
+      const resumeUrl = payload.recovery?.checkoutSessionId
+        ? `/checkout?session=${encodeURIComponent(payload.recovery.checkoutSessionId)}`
+        : "/checkout";
+      navigate(resumeUrl);
     } catch (requestError) {
       setError(requestError.message || "Cart restore failed.");
     } finally {

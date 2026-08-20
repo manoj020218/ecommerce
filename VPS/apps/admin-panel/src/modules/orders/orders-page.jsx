@@ -43,6 +43,20 @@ function isVerifyPending(row) {
   );
 }
 
+// A manual payment submission always requires an uploaded screenshot
+// (backend rejects submission without one — manual-payments.controller.js),
+// so order.manualPaymentStatus === "submitted" is a reliable stand-in for
+// "buyer has attached proof." Before that, there's nothing on file to
+// verify -- "Verify Payment" doesn't make sense yet, only "Demand Proof"
+// (nudge the buyer to submit it) does. order-detail-page.jsx already draws
+// this same distinction (ManualPaymentSection only renders once a
+// submission exists); this mirrors it into the orders list/cards, which
+// previously showed "Verify Payment" the moment an order was placed,
+// before the buyer had submitted anything.
+function hasProofSubmitted(row) {
+  return String(row.manualPaymentStatus || "").toLowerCase() === "submitted";
+}
+
 // ── status badges ─────────────────────────────────────────────────────────────
 
 const PAY_BADGE = {
@@ -54,7 +68,10 @@ const PAY_BADGE = {
 function PayBadge({ row }) {
   const key = String(row.acceptanceStatus || "pending").toLowerCase();
   const s   = PAY_BADGE[key] || PAY_BADGE.pending;
-  const lbl = isVerifyPending(row) ? "Verify Pending" : s.label;
+  const pending = isVerifyPending(row);
+  const lbl = pending
+    ? (hasProofSubmitted(row) ? "Verify Pending" : "Proof Required")
+    : s.label;
   return (
     <span style={{
       display:"inline-flex", alignItems:"center", gap:5,
@@ -315,7 +332,9 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancel
             <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
               {pending && (
                 <SidePanelBtn variant="green" onClick={onNavigate}>
-                  ✓ Verify Payment &amp; Confirm Order
+                  {hasProofSubmitted(o)
+                    ? "✓ Verify Payment & Confirm Order"
+                    : "Demand Payment Proof"}
                 </SidePanelBtn>
               )}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
@@ -732,7 +751,7 @@ export function OrdersPage() {
                           fontSize:11, fontWeight:600, padding:"5px 12px",
                           borderRadius:8, border:"1.5px solid #fcd34d",
                           background:"transparent", color:"#92400e", cursor:"pointer"
-                        }}>Verify</button>
+                        }}>{hasProofSubmitted(row) ? "Verify" : "Demand"}</button>
                       )}
                       {!pending && row.orderStatus === "processing" && !row.trackingId && (
                         <button type="button" onClick={() => openPanel(row)} style={{
@@ -815,7 +834,7 @@ export function OrdersPage() {
                     flex:1, fontSize:12, fontWeight:600, padding:"9px 0",
                     borderRadius:10, border:"1.5px solid #fcd34d",
                     background:"transparent", color:"#92400e", cursor:"pointer"
-                  }}>Verify Payment</button>
+                  }}>{hasProofSubmitted(row) ? "Verify Payment" : "Demand Proof"}</button>
                 )}
                 {!pending && row.orderStatus === "processing" && (
                   <button type="button" onClick={() => openPanel(row)} style={{

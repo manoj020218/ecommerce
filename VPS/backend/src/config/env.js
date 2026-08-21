@@ -58,6 +58,9 @@ const env = {
     process.env.SEARCH_STORE_PATH || "backend/src/database/json/search-store.json",
   contentStorePath:
     process.env.CONTENT_STORE_PATH || "backend/src/database/json/content-store.json",
+  jobVacanciesStorePath:
+    process.env.JOB_VACANCIES_STORE_PATH ||
+    "backend/src/database/json/job-vacancies-store.json",
   websiteLeadsStorePath:
     process.env.WEBSITE_LEADS_STORE_PATH ||
     "backend/src/database/json/website-leads-store.json",

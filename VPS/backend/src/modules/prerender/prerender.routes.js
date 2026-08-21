@@ -26,6 +26,7 @@ function createPublicPrerenderRouter() {
   router.get("/prerender/products/:slug", removeCsp, controller.prerenderProductPage);
   router.get("/prerender/categories/:slug", controller.prerenderCategoryPage);
   router.get("/prerender/guides/:slug", controller.prerenderBlogPage);
+  router.get("/prerender/careers/:slug", controller.prerenderJobVacancyPage);
 
   return router;
 }

@@ -778,6 +778,7 @@ export function StorefrontLayout() {
           <div className="proto-footer-column">
             <h3>Company</h3>
             <Link to="/guides">Guides &amp; Blog</Link>
+            <Link to="/careers">Careers</Link>
             {supportEmail ? <a href={`mailto:${supportEmail}`}>Contact Us</a> : null}
             {socialLinks.length > 0
               ? socialLinks.map(([key, value]) => (

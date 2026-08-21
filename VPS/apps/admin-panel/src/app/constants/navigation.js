@@ -99,6 +99,7 @@ export const ADMIN_NAV_ITEMS = [
     group: "Content",
     items: [
       { key: "blogs", label: "Blogs / Knowledge", path: "/blogs", permission: "blogs.view" },
+      { key: "job-vacancies", label: "Job Vacancies", path: "/job-vacancies", permission: "job_vacancies.view" },
       { key: "web-builder", label: "Web Builder", path: "/web-builder", permission: "settings.view" }
     ]
   },

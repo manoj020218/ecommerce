@@ -1,7 +1,8 @@
 const {
   renderProductPageHtml,
   renderCategoryPageHtml,
-  renderBlogPageHtml
+  renderBlogPageHtml,
+  renderJobVacancyPageHtml
 } = require("./prerender.service");
 
 async function prerenderProductPage(req, res, next) {
@@ -31,4 +32,18 @@ async function prerenderBlogPage(req, res, next) {
   }
 }
 
-module.exports = { prerenderProductPage, prerenderCategoryPage, prerenderBlogPage };
+async function prerenderJobVacancyPage(req, res, next) {
+  try {
+    const { status, html } = await renderJobVacancyPageHtml(req.params.slug);
+    res.status(status).type("html").send(html);
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = {
+  prerenderProductPage,
+  prerenderCategoryPage,
+  prerenderBlogPage,
+  prerenderJobVacancyPage
+};

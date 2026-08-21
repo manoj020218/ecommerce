@@ -4,6 +4,7 @@ const { readCatalogStore } = require("../../database/catalog-store");
 const { readContentStore } = require("../../database/content-store");
 const { getAllSettings } = require("../settings/settings.service");
 const { cloneDefaultContentStore, isBlogPublished } = require("../blogs/blogs.model");
+const { readNormalizedJobVacanciesStore, listPublishedJobRows } = require("../job-vacancies/job-vacancies.service");
 const {
   normalizeBaseUrl,
   collapseText,
@@ -219,10 +220,11 @@ async function buildCategoryPageSeoPayload(category, products, breadcrumb) {
 }
 
 async function collectSitemapEntries() {
-  const [settings, catalogStore, rawContentStore] = await Promise.all([
+  const [settings, catalogStore, rawContentStore, jobVacanciesStore] = await Promise.all([
     getAllSettings(),
     readCatalogStore(),
-    readContentStore()
+    readContentStore(),
+    readNormalizedJobVacanciesStore()
   ]);
 
   if (!settings.seoDefaults.sitemapEnabled) {
@@ -254,12 +256,18 @@ async function collectSitemapEntries() {
       lastmod: blog.updatedAt || blog.createdAt || settings.meta.updatedAt
     }));
 
+  const careerEntries = listPublishedJobRows(jobVacanciesStore).map((job) => ({
+    loc: `${baseUrl}/careers/${job.slug}`,
+    lastmod: job.updatedAt || job.createdAt || settings.meta.updatedAt
+  }));
+
   return {
     baseUrl,
     updatedAt: settings.meta.updatedAt,
     products: productEntries,
     categories: categoryEntries,
-    blogs: blogEntries
+    blogs: blogEntries,
+    careers: careerEntries
   };
 }
 
@@ -276,6 +284,10 @@ async function generateSitemapIndexXml() {
     },
     {
       loc: `${entries.baseUrl}/sitemaps/blogs.xml`,
+      lastmod: entries.updatedAt
+    },
+    {
+      loc: `${entries.baseUrl}/sitemaps/careers.xml`,
       lastmod: entries.updatedAt
     }
   ]);

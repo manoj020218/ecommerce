@@ -5,6 +5,7 @@ import { DashboardPage } from "../modules/dashboard/dashboard-page";
 import { ActivityLogsPage } from "../modules/activity-logs/activity-logs-page";
 import { AbandonedCartsPage } from "../modules/abandoned-carts/abandoned-carts-page";
 import { BlogsPage } from "../modules/blogs/blogs-page";
+import { JobVacanciesPage } from "../modules/job-vacancies/job-vacancies-page";
 import { LoginPage } from "../modules/auth/login-page";
 import { CataloguePage } from "../modules/catalogue/catalogue-page";
 import { CategoriesPage } from "../modules/categories/categories-page";
@@ -81,6 +82,7 @@ export function AppRouter() {
           <Route path="permission-groups" element={<PermissionGroupsPage />} />
           <Route path="payment-gateways" element={<PaymentGatewaysPage />} />
           <Route path="blogs" element={<BlogsPage />} />
+          <Route path="job-vacancies" element={<JobVacanciesPage />} />
           <Route path="marketing" element={<MarketingPage />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="abandoned-carts" element={<AbandonedCartsPage />} />

@@ -54,6 +54,14 @@ const BlogsListPage = lazy(() =>
     default: m.BlogsListPage
   }))
 );
+const CareerPage = lazy(() =>
+  import("../modules/careers/career-page").then((m) => ({ default: m.CareerPage }))
+);
+const CareersListPage = lazy(() =>
+  import("../modules/careers/careers-list-page").then((m) => ({
+    default: m.CareersListPage
+  }))
+);
 const CartPage = lazy(() =>
   import("../modules/cart/cart-page").then((m) => ({ default: m.CartPage }))
 );
@@ -149,6 +157,8 @@ export function AppRouter() {
           <Route path="/categories/:slug" element={<ProductsListPage />} />
           <Route path="/guides" element={<BlogsListPage />} />
           <Route path="/guides/:slug" element={<BlogPage />} />
+          <Route path="/careers" element={<CareersListPage />} />
+          <Route path="/careers/:slug" element={<CareerPage />} />
           <Route path="/products/:slug" element={<ProductPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />

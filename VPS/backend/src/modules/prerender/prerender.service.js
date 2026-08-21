@@ -8,6 +8,7 @@ const { sanitizeRichText } = require("../../common/html-sanitizer");
 const { getPublicProductPage } = require("../products/products.service");
 const { getPublicCategoryPage } = require("../categories/categories.service");
 const { getPublicBlogBySlug } = require("../blogs/blogs.service");
+const { getPublicJobVacancyBySlug } = require("../job-vacancies/job-vacancies.service");
 
 // Product pages: EVERY visitor (bot and human) is routed here now, not just
 // crawlers — see nginx's /products/:slug location. Category/guide pages
@@ -210,6 +211,28 @@ function buildBlogSkeleton(article) {
     .join("\n    ");
 }
 
+// Same "real users never see this" reasoning as the other skeleton builders.
+function buildJobSkeleton(job) {
+  const safeDescription = sanitizeRichText(job.descriptionHtml || "");
+  const salaryLine =
+    job.salaryMin || job.salaryMax
+      ? `₹${Number(job.salaryMin || 0).toLocaleString("en-IN")} – ₹${Number(job.salaryMax || 0).toLocaleString("en-IN")} ${String(job.salaryPeriod || "MONTH").toLowerCase()}`
+      : "";
+
+  return [
+    `<nav><a href="/">Home</a> &raquo; <a href="/careers">Careers</a> &raquo; ${escapeXml(job.title)}</nav>`,
+    `<h1>${escapeXml(job.title)}</h1>`,
+    job.department ? `<p>${escapeXml(job.department)}</p>` : "",
+    salaryLine ? `<p>${escapeXml(salaryLine)}</p>` : "",
+    job.location?.locality
+      ? `<p>${escapeXml([job.location.locality, job.location.region].filter(Boolean).join(", "))}</p>`
+      : "",
+    safeDescription ? `<div>${safeDescription}</div>` : ""
+  ]
+    .filter(Boolean)
+    .join("\n    ");
+}
+
 function build404Html(baseHtml, label) {
   return baseHtml
     .replace(/<title>[^<]*<\/title>/, `<title>${escapeXml(label)} not found — Jenix India</title>`)
@@ -297,4 +320,37 @@ async function renderBlogPageHtml(slug) {
   return { status: 200, html };
 }
 
-module.exports = { renderProductPageHtml, renderCategoryPageHtml, renderBlogPageHtml };
+async function renderJobVacancyPageHtml(slug) {
+  const baseHtml = await fs.readFile(resolveDistIndexPath(), "utf-8");
+
+  let page;
+  try {
+    page = await getPublicJobVacancyBySlug(slug);
+  } catch (error) {
+    if (error instanceof HttpError && error.statusCode === 404) {
+      return { status: 404, html: build404Html(baseHtml, "Job vacancy") };
+    }
+    throw error;
+  }
+
+  const { job, structuredData } = page;
+  const seo = {
+    metaTitle: job.seoTitle,
+    metaDescription: job.seoDescription,
+    canonicalUrl: job.canonicalUrl,
+    ogImageUrl: ""
+  };
+
+  let html = injectHeadTags(baseHtml, seo);
+  html = injectJsonLd(html, structuredData);
+  html = injectBody(html, buildJobSkeleton(job));
+
+  return { status: 200, html };
+}
+
+module.exports = {
+  renderProductPageHtml,
+  renderCategoryPageHtml,
+  renderBlogPageHtml,
+  renderJobVacancyPageHtml
+};

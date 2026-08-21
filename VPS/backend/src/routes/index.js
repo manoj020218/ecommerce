@@ -69,6 +69,10 @@ const {
   createPublicBlogsRouter
 } = require("../modules/blogs/blogs.routes");
 const {
+  createAdminJobVacanciesRouter,
+  createPublicJobVacanciesRouter
+} = require("../modules/job-vacancies/job-vacancies.routes");
+const {
   createAdminWebsiteLeadsRouter,
   createPublicWebsiteLeadsRouter
 } = require("../modules/website-leads/website-leads.routes");
@@ -137,6 +141,7 @@ function createApiRouter() {
   router.use("/admin/tally-export", createTallyExportRouter());
   router.use("/admin/shipping", createAdminShippingRouter());
   router.use("/admin/blogs", createAdminBlogsRouter());
+  router.use("/admin/job-vacancies", createAdminJobVacanciesRouter());
   router.use("/admin/website-leads", createAdminWebsiteLeadsRouter());
   router.use("/admin/marketing", createAdminMarketingRouter());
   router.use("/admin/reports", createReportsRouter());
@@ -147,6 +152,7 @@ function createApiRouter() {
   router.use("/shipping", createPublicShippingRouter());
   router.use("/recovery", createPublicRecoveryRouter());
   router.use("/blogs", createPublicBlogsRouter());
+  router.use("/job-vacancies", createPublicJobVacanciesRouter());
   router.use("/website-leads", createPublicWebsiteLeadsRouter());
   router.use("/marketing", createPublicMarketingRouter());
   router.use("/setup-wizard", createPublicSetupWizardRouter());

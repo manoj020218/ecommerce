@@ -36,6 +36,40 @@ const FIELD_ERROR_MAP = [
   ["meta description", "metaDescription"],
 ];
 
+// Backend validation issues (Zod) carry a `path` matching the actual API
+// schema field name -- for most fields that's identical to the form's
+// input `name`, but a few fields are edited in a differently-shaped local
+// form control (e.g. keyFeatures is an array on the wire, edited here as
+// one newline-delimited textarea named keyFeaturesText). Maps schema path
+// -> form field name so those still get highlighted/focused correctly.
+const SCHEMA_TO_FORM_FIELD = {
+  keyFeatures: "keyFeaturesText"
+};
+
+const FIELD_LABELS = {
+  title: "Title", slug: "Slug", hsnCode: "HSN Code", categoryId: "Category",
+  basePrice: "Base Price", salePrice: "Sale Price", brand: "Brand",
+  modelNumber: "Model Number", stockQty: "Stock", deadWeightKg: "Weight", moq: "MOQ",
+  metaTitle: "Meta Title", metaDescription: "Meta Description", metaKeywords: "Meta Keywords",
+  shortDescription: "Short Description", fullDescription: "Full Description",
+  keyFeaturesText: "Key Features"
+};
+
+// Turns one Zod issue into a { formField, message } pair the save handler
+// can both display and focus by -- this is what actually surfaces *which*
+// field and *why* a save failed instead of the bare "Validation failed."
+// the backend's top-level error message carries (the useful detail only
+// exists in payload.details.issues, which nothing was reading before).
+function describeValidationIssue(issue) {
+  const schemaField = issue?.path?.[0];
+  const formField = SCHEMA_TO_FORM_FIELD[schemaField] || schemaField;
+  let label = FIELD_LABELS[formField] || (typeof schemaField === "string" ? schemaField : "This field");
+  if (schemaField === "keyFeatures" && typeof issue.path?.[1] === "number") {
+    label = `Key Features, line ${issue.path[1] + 1}`;
+  }
+  return { formField, message: `${label}: ${issue?.message || "Invalid value."}` };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function slugify(v) {
@@ -703,17 +737,39 @@ export function AddProductPage() {
 
       navigate("/products", { state: { notice: `Product "${form.title}" created.` } });
     } catch (apiErr) {
-      const msg = apiErr.message || "Failed to save product.";
+      const issues = apiErr.payload?.details?.issues;
+      const fe = {};
+      let msg = apiErr.message || "Failed to save product.";
+      let firstFormField = null;
+
+      if (Array.isArray(issues) && issues.length > 0) {
+        msg = issues
+          .map((issue) => {
+            const { formField, message } = describeValidationIssue(issue);
+            if (formField && !fe[formField]) {
+              fe[formField] = message;
+              if (!firstFormField) firstFormField = formField;
+            }
+            return message;
+          })
+          .join(" | ");
+      }
+
       setError(msg);
 
       // Map error message to field errors
       const lower = msg.toLowerCase();
-      const fe = {};
       for (const [keyword, name] of FIELD_ERROR_MAP) {
-        if (lower.includes(keyword)) { fe[name] = msg; break; }
+        if (lower.includes(keyword) && !fe[name]) { fe[name] = msg; break; }
       }
       setFieldErrors(fe);
-      focusFirstError(msg, fe);
+
+      if (firstFormField && fieldRefs.current[firstFormField]) {
+        fieldRefs.current[firstFormField].focus();
+        fieldRefs.current[firstFormField].scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        focusFirstError(msg, fe);
+      }
 
       // Scroll error banner into view
       document.getElementById("page-error-banner")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1016,13 +1072,13 @@ export function AddProductPage() {
 
             {/* Descriptions */}
             <Section title="Descriptions">
-              <Field label="Short Description" hint={`(${stripHtml(form.shortDescription).length}/400)`} full noLabel>
+              <Field label="Short Description" hint={`(${stripHtml(form.shortDescription).length}/400)`} error={fieldErrors.shortDescription} full noLabel>
                 <RichTextEditor value={form.shortDescription}
                   onChange={html => set("shortDescription", html)} minRows={3}
                   placeholder="Brief product summary shown in listing cards…" />
               </Field>
               <div style={{ marginTop: 12 }}>
-                <Field label="Full Description" full noLabel>
+                <Field label="Full Description" error={fieldErrors.fullDescription} full noLabel>
                   <RichTextEditor value={form.fullDescription}
                     onChange={html => set("fullDescription", html)} minRows={6}
                     placeholder="Detailed product description…" />
@@ -1047,8 +1103,8 @@ export function AddProductPage() {
                     <input name="problemStatementsText" value={form.problemStatementsText} onChange={onFC} style={inputStyle()} />
                   </Field>
                 </FieldRow>
-                <Field label="Key Features" hint="(one bullet per line — shown as highlight chips and the default product-page tab)" full>
-                  <textarea name="keyFeaturesText" value={form.keyFeaturesText} onChange={onFC} rows={4} style={inputStyle()} placeholder={"IP66 waterproof housing\n2-year replacement warranty\nWorks with existing 12V wiring"} />
+                <Field label="Key Features" hint="(one bullet per line, 240 characters max each — shown as highlight chips and the default product-page tab)" error={fieldErrors.keyFeaturesText} full>
+                  <textarea ref={registerRef("keyFeaturesText")} name="keyFeaturesText" value={form.keyFeaturesText} onChange={onFC} rows={4} style={inputStyle(fieldErrors.keyFeaturesText)} placeholder={"IP66 waterproof housing\n2-year replacement warranty\nWorks with existing 12V wiring"} />
                 </Field>
                 <Field label="Specifications (JSON)" error={fieldErrors.specificationsText} full>
                   <textarea ref={registerRef("specificationsText")} name="specificationsText"
@@ -1117,8 +1173,8 @@ export function AddProductPage() {
                   onChange={onFC} rows={2} maxLength={320}
                   style={{ ...inputStyle(fieldErrors.metaDescription) }} placeholder="Brief description for Google snippet…" />
               </Field>
-              <Field label="Meta Keywords" hint="(comma separated, for AI indexing)">
-                <input name="metaKeywords" value={form.metaKeywords} onChange={onFC} style={inputStyle()} placeholder="relay, industrial relay, 24vdc" />
+              <Field label="Meta Keywords" hint="(comma separated, for AI indexing)" error={fieldErrors.metaKeywords}>
+                <input ref={registerRef("metaKeywords")} name="metaKeywords" value={form.metaKeywords} onChange={onFC} maxLength={500} style={inputStyle(fieldErrors.metaKeywords)} placeholder="relay, industrial relay, 24vdc" />
               </Field>
             </Section>
 

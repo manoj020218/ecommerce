@@ -73,6 +73,7 @@ export function AppRouter() {
           <Route path="customers/:customerId" element={<CustomerDetailPage />} />
           <Route path="walk-in-orders" element={<WalkInOrdersPage />} />
           <Route path="walk-in-orders/add" element={<AddWalkInOrderPage />} />
+          <Route path="walk-in-orders/:orderId/edit" element={<AddWalkInOrderPage />} />
           <Route path="invoices" element={<InvoicesPage />} />
           <Route path="tally-export" element={<TallyExportPage />} />
           <Route path="shipping" element={<ShippingPage />} />

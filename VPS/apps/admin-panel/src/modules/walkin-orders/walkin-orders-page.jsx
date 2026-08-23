@@ -7,7 +7,8 @@ import {
   fetchWalkInOrders,
   confirmWalkInPayment,
   generateWalkInInvoice,
-  updateWalkInOrderStatus
+  updateWalkInOrderStatus,
+  sendWalkInPaymentRequest
 } from "./walkin-orders.api";
 
 // ── Status pill ───────────────────────────────────────────────────────────────
@@ -139,6 +140,23 @@ export function WalkInOrdersPage() {
       await loadOrders({ q, status: statusFilter });
       setNotice(`Invoice generated: ${data?.invoice?.invoiceNumber || order.orderNo}`);
     } catch (e) { setError(e.message || "Failed to generate invoice."); }
+    finally { setBusyKey(""); }
+  };
+
+  const handleSendPaymentRequest = async (order) => {
+    const key = `send-request:${order.id}`;
+    setBusyKey(key); setError(""); setNotice("");
+    try {
+      const data = await sendWalkInPaymentRequest(order.id);
+      const parts = [];
+      if (data?.emailResult?.status && data.emailResult.status !== "failed") parts.push("email");
+      if (data?.whatsappResult?.status && data.whatsappResult.status !== "failed") parts.push("WhatsApp");
+      setNotice(
+        parts.length > 0
+          ? `Payment request sent via ${parts.join(" & ")} for ${order.orderNo}.`
+          : `Payment request processed for ${order.orderNo}, but delivery may have failed — check email/WhatsApp settings.`
+      );
+    } catch (e) { setError(e.message || "Failed to send payment request."); }
     finally { setBusyKey(""); }
   };
 
@@ -281,6 +299,20 @@ export function WalkInOrdersPage() {
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                      {canEdit && order.paymentStatus !== "paid" && order.orderStatus !== "cancelled" && (
+                        <button type="button" className="btn btn-secondary btn-small"
+                          onClick={() => navigate(`/walk-in-orders/${order.id}/edit`)}
+                          disabled={!!busyKey}>
+                          Edit
+                        </button>
+                      )}
+                      {canEdit && order.paymentStatus !== "paid" && !["completed", "cancelled"].includes(order.orderStatus) && (
+                        <button type="button" className="btn btn-secondary btn-small"
+                          onClick={() => handleSendPaymentRequest(order)}
+                          disabled={!!busyKey}>
+                          {busyKey === `send-request:${order.id}` ? "Sending…" : "Send for Payment"}
+                        </button>
+                      )}
                       {canEdit && order.paymentStatus !== "paid" && (
                         <button type="button" className="btn btn-primary btn-small"
                           onClick={() => { setConfirmErr(""); setConfirmModal(order); }}

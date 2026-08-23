@@ -7,9 +7,11 @@ const {
   parseSearchCustomersQuery,
   parseSearchProductsQuery,
   parseCreateWalkInOrderPayload,
+  parseUpdateWalkInOrderPayload,
   parseConfirmPaymentPayload,
   parseGenerateInvoicePayload,
-  parseUpdateWalkInOrderStatusPayload
+  parseUpdateWalkInOrderStatusPayload,
+  parseSaveCustomerPayload
 } = require("./walkin-orders.validator");
 
 function mapValidationError(error) {
@@ -58,6 +60,12 @@ const adminCreateWalkInOrder = asyncHandler(async (req, res) => {
   return created(res, data, "Walk-in order created.");
 });
 
+const adminUpdateWalkInOrder = asyncHandler(async (req, res) => {
+  const payload = parseUpdateWalkInOrderPayload(req.body);
+  const data = await service.updateWalkInOrder(req.params.orderId, payload, req.actor);
+  return ok(res, data, "Walk-in order updated.");
+});
+
 const adminConfirmWalkInPayment = asyncHandler(async (req, res) => {
   const payload = parseConfirmPaymentPayload(req.body);
   const data = await service.confirmWalkInPayment(req.params.orderId, payload, req.actor);
@@ -80,13 +88,27 @@ const adminUpdateWalkInOrderStatus = asyncHandler(async (req, res) => {
   return ok(res, data, "Walk-in order updated.");
 });
 
+const adminSaveWalkInCustomer = asyncHandler(async (req, res) => {
+  const payload = parseSaveCustomerPayload(req.body);
+  const data = await service.saveWalkInCustomer(payload, req.actor);
+  return created(res, data, "Customer saved.");
+});
+
+const adminSendWalkInPaymentRequest = asyncHandler(async (req, res) => {
+  const data = await service.sendWalkInPaymentRequest(req.params.orderId, req.actor);
+  return ok(res, data, "Payment request sent.");
+});
+
 module.exports = {
   adminListWalkInOrders,
   adminSearchWalkInCustomers,
   adminSearchWalkInProducts,
   adminListWalkInCategories,
   adminCreateWalkInOrder,
+  adminUpdateWalkInOrder,
   adminConfirmWalkInPayment,
   adminGenerateWalkInInvoice,
-  adminUpdateWalkInOrderStatus
+  adminUpdateWalkInOrderStatus,
+  adminSaveWalkInCustomer,
+  adminSendWalkInPaymentRequest
 };

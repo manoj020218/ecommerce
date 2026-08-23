@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuthSession } from "../auth/use-auth-session";
 import { hasPermission } from "../../shared/utils/permissions";
 import { formatCurrencyInr } from "../../shared/utils/formatters";
+import { fetchOrderDetail } from "../orders/orders.api";
+import { fetchProduct } from "../products/products.api";
 import {
   createWalkInOrder,
+  updateWalkInOrder,
   fetchWalkInCategories,
+  saveWalkInCustomer,
   searchWalkInCustomers,
   searchWalkInProducts
 } from "./walkin-orders.api";
@@ -48,12 +52,47 @@ function resolveLineUnitPrice(product, line) {
   return resolveRetailUnitPrice(product, qty);
 }
 
+// Mirrors buildWalkInLine's manual-discount math in walkin-orders.service.js
+// (applied before GST) so this on-screen preview matches what the backend
+// actually persists -- doesn't include the separate automatic payment-method
+// discount, which only the backend knows about (depends on paymentMethod +
+// live gateway config), so the real order total may still shift slightly
+// after that's applied server-side.
 function buildLinePreview(product, line) {
   const qty = Number(line.qty || 0);
   const unitPrice = resolveLineUnitPrice(product, line);
-  const taxableValue = normalizeMoney(unitPrice * qty);
+  const grossSubtotal = normalizeMoney(unitPrice * qty);
+  const discountPercent = Math.min(100, Math.max(0, Number(line.discountPercent || 0)));
+  const discountAmount = discountPercent > 0 ? normalizeMoney(grossSubtotal * (discountPercent / 100)) : 0;
+  const taxableValue = normalizeMoney(grossSubtotal - discountAmount);
   const gstAmount = normalizeMoney(taxableValue * (Number(product?.gstRate || 0) / 100));
-  return { qty, unitPrice, taxableValue, gstAmount, lineTotal: normalizeMoney(taxableValue + gstAmount) };
+  return {
+    qty,
+    unitPrice,
+    grossSubtotal,
+    discountAmount,
+    taxableValue,
+    gstAmount,
+    lineTotal: normalizeMoney(taxableValue + gstAmount)
+  };
+}
+
+// Maps a full admin product record (from fetchProduct) into the same shape
+// the walk-in product search endpoint returns, so buildLinePreview's pricing
+// math works identically whether a line came from search-and-add or from
+// pre-filling an existing order for editing.
+function toProductCacheEntry(product) {
+  return {
+    id: product.id,
+    title: product.title,
+    sku: product.sku || "",
+    gstRate: Number(product.gstRate || 0),
+    basePrice: Number(product.basePrice || 0),
+    salePrice: Number(product.salePrice || 0),
+    bulkPricingEnabled: Boolean(product.bulkPricingEnabled),
+    bulkPriceSlabs: Array.isArray(product.bulkPriceSlabs) ? product.bulkPriceSlabs : [],
+    priceGroupPrices: Array.isArray(product.priceGroupPrices) ? product.priceGroupPrices : []
+  };
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -81,8 +120,12 @@ const EMPTY_FORM = {
 
 export function AddWalkInOrderPage() {
   const navigate = useNavigate();
+  const { orderId } = useParams();
+  const isEditMode = Boolean(orderId);
   const { session } = useAuthSession();
   const canCreate = hasPermission(session, "orders.create");
+  const canEditOrder = hasPermission(session, "orders.edit");
+  const canAccess = isEditMode ? canEditOrder : canCreate;
 
   // customer section
   const [customerMode, setCustomerMode] = useState("search"); // "search" | "new"
@@ -105,12 +148,79 @@ export function AddWalkInOrderPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [customerSaveNotice, setCustomerSaveNotice] = useState("");
+  const [loadingOrder, setLoadingOrder] = useState(isEditMode);
+  const [lockedNotice, setLockedNotice] = useState("");
 
   useEffect(() => {
     fetchWalkInCategories()
       .then(data => setCategories(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+    setLoadingOrder(true);
+    setLockedNotice("");
+    fetchOrderDetail(orderId)
+      .then(async (detail) => {
+        if (String(detail?.paymentStatus || "").toLowerCase() === "paid") {
+          setLockedNotice("This order is already paid and can no longer be edited. Use the order list to view invoice/fulfilment status instead.");
+          return;
+        }
+        if (String(detail?.orderStatus || "").toLowerCase() === "cancelled") {
+          setLockedNotice("This order is cancelled and can no longer be edited.");
+          return;
+        }
+        const billing = detail.billingAddress || {};
+        setForm({
+          customerId: detail.ownerId || "",
+          customer: {
+            name: billing.name || "",
+            email: billing.email || "",
+            mobile: billing.mobile || "",
+            companyName: billing.companyName || "",
+            gstin: billing.gstin || "",
+            addressLine1: billing.addressLine1 || "",
+            addressLine2: billing.addressLine2 || "",
+            city: billing.city || "",
+            state: billing.state || "",
+            stateCode: billing.stateCode || "",
+            pincode: billing.pincode || "",
+            country: billing.country || "India",
+            customerType: detail.customerType || "retail",
+            priceGroup: detail.priceGroup || "",
+            creditAllowed: Boolean(detail.creditAllowed)
+          },
+          items: (detail.items || []).map(item => ({
+            productId: item.productId,
+            qty: Number(item.qty || 1),
+            priceMode: item.selectedPriceMode || "retail",
+            customUnitPrice: item.selectedPriceMode === "custom" ? item.unitPriceUsed : "",
+            discountPercent: Number(item.discountPercent || 0)
+          })),
+          shippingMethod: detail.shippingMethod || "self_pickup",
+          shippingCharge: detail.pricing?.shippingCharge || 0,
+          paymentMethod: detail.paymentMethod || "cash",
+          markAsPaid: false,
+          generateInvoice: true,
+          paymentReference: detail.gatewayTxnId || "",
+          orderNote: detail.orderNote || ""
+        });
+        setCustomerQuery(billing.companyName || billing.name || "");
+
+        const productIds = [...new Set((detail.items || []).map(i => i.productId))];
+        const products = await Promise.all(productIds.map(id => fetchProduct(id).catch(() => null)));
+        setProductCache(prev => {
+          const next = { ...prev };
+          products.forEach(p => { if (p) next[p.id] = toProductCacheEntry(p); });
+          return next;
+        });
+      })
+      .catch(e => setError(e.message || "Failed to load order."))
+      .finally(() => setLoadingOrder(false));
+  }, [isEditMode, orderId]);
 
   // ── Customer search ─────────────────────────────────────────────────────────
 
@@ -197,7 +307,8 @@ export function AddWalkInOrderPage() {
           productId: product.id,
           qty: 1,
           priceMode: getDefaultPriceMode(f.customer.customerType),
-          customUnitPrice: ""
+          customUnitPrice: "",
+          discountPercent: 0
         }]
       };
     });
@@ -218,17 +329,50 @@ export function AddWalkInOrderPage() {
     setForm(f => ({ ...f, customer: { ...f.customer, [key]: val } }));
   };
 
+  const handleSaveCustomer = async () => {
+    if (!form.customer.name.trim() || form.customer.name.trim().length < 2) {
+      setError("Customer name is required (minimum 2 characters) to save the customer.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (!form.customer.mobile.trim() || form.customer.mobile.trim().length < 8) {
+      setError("Customer mobile is required (minimum 8 digits) to save the customer.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setSavingCustomer(true);
+    setError("");
+    setCustomerSaveNotice("");
+    try {
+      const data = await saveWalkInCustomer(form.customer);
+      const customer = data?.customer;
+      if (customer?.id) {
+        setForm(f => ({ ...f, customerId: customer.id }));
+      }
+      setCustomerSaveNotice(
+        data?.created ? "Customer saved. You can retrieve them next time from Existing Customer search." : "Customer details updated."
+      );
+    } catch (e) {
+      setError(e.message || "Failed to save customer.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
   // ── Summary ─────────────────────────────────────────────────────────────────
 
   const summary = useMemo(() => {
     const lines = form.items.map(line => buildLinePreview(productCache[line.productId], line));
     const taxableValue = lines.reduce((s, l) => s + l.taxableValue, 0);
     const gstTotal = lines.reduce((s, l) => s + l.gstAmount, 0);
+    const discountTotal = lines.reduce((s, l) => s + l.discountAmount, 0);
     const shipCharge = form.shippingMethod === "self_pickup" ? 0 : normalizeMoney(form.shippingCharge);
     return {
       itemCount: lines.reduce((s, l) => s + l.qty, 0),
       taxableValue,
       gstTotal,
+      discountTotal,
       shippingCharge: shipCharge,
       grandTotal: normalizeMoney(taxableValue + gstTotal + shipCharge)
     };
@@ -255,17 +399,36 @@ export function AddWalkInOrderPage() {
     setSaving(true);
     setError("");
     try {
+      const itemsPayload = form.items.map(item => ({
+        productId: item.productId,
+        qty: Number(item.qty || 1),
+        priceMode: item.priceMode,
+        customUnitPrice: item.priceMode === "custom" ? normalizeMoney(item.customUnitPrice) : null,
+        discountPercent: Math.min(100, Math.max(0, Number(item.discountPercent || 0)))
+      }));
+
+      if (isEditMode) {
+        const payload = {
+          customerId: form.customerId || undefined,
+          customer: form.customer,
+          items: itemsPayload,
+          shippingMethod: form.shippingMethod,
+          shippingCharge: form.shippingMethod === "self_pickup" ? 0 : normalizeMoney(form.shippingCharge),
+          paymentMethod: form.paymentMethod,
+          paymentReference: form.paymentReference,
+          orderNote: form.orderNote
+        };
+        const data = await updateWalkInOrder(orderId, payload);
+        navigate("/walk-in-orders", { state: { notice: `Order ${data.order?.orderNo || ""} updated successfully.` } });
+        return;
+      }
+
       const payload = {
         ...form,
         markAsPaid: asDraft ? false : form.markAsPaid,
         generateInvoice: asDraft ? false : (form.markAsPaid ? form.generateInvoice : false),
         shippingCharge: form.shippingMethod === "self_pickup" ? 0 : normalizeMoney(form.shippingCharge),
-        items: form.items.map(item => ({
-          productId: item.productId,
-          qty: Number(item.qty || 1),
-          priceMode: item.priceMode,
-          customUnitPrice: item.priceMode === "custom" ? normalizeMoney(item.customUnitPrice) : null
-        }))
+        items: itemsPayload
       };
       const data = await createWalkInOrder(payload);
       const notice = data?.invoice?.invoiceNumber
@@ -273,16 +436,33 @@ export function AddWalkInOrderPage() {
         : `Order ${data.order?.orderNo || ""} created successfully.`;
       navigate("/walk-in-orders", { state: { notice } });
     } catch (e) {
-      setError(e.message || "Failed to create order.");
+      setError(e.message || (isEditMode ? "Failed to save changes." : "Failed to create order."));
       window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
     }
   };
 
-  if (!canCreate) return (
+  if (!canAccess) return (
     <div style={{ padding: 40, textAlign: "center", color: "var(--muted)", fontSize: 14 }}>
-      You do not have permission to create walk-in orders.
+      You do not have permission to {isEditMode ? "edit" : "create"} walk-in orders.
+    </div>
+  );
+
+  if (isEditMode && loadingOrder) return (
+    <div style={{ padding: 40, textAlign: "center", color: "var(--muted)", fontSize: 14 }}>
+      Loading order…
+    </div>
+  );
+
+  if (isEditMode && lockedNotice) return (
+    <div style={{ padding: "24px 28px", maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ background: "rgba(234,179,8,0.08)", border: "1px solid rgba(234,179,8,0.3)", borderRadius: 10, padding: "18px 20px", fontSize: 14, color: "#92400e" }}>
+        {lockedNotice}
+      </div>
+      <button type="button" className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => navigate("/walk-in-orders")}>
+        Back to Walk-in Orders
+      </button>
     </div>
   );
 
@@ -298,20 +478,28 @@ export function AddWalkInOrderPage() {
       <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>
         <span style={{ cursor: "pointer", color: "var(--brand)" }} onClick={() => navigate("/walk-in-orders")}>Walk-in Orders</span>
         <span style={{ margin: "0 6px" }}>›</span>
-        <span>New Order</span>
+        <span>{isEditMode ? "Edit Order" : "New Order"}</span>
       </div>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 10 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>Add Order</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{isEditMode ? "Edit Order" : "Add Order"}</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" className="btn btn-secondary" onClick={() => navigate("/walk-in-orders")} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-secondary" onClick={() => submit(true)} disabled={saving}>
-            {saving ? "Saving…" : "Save as Draft"}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={saving}>
-            {saving ? "Saving…" : "Save as Order"}
-          </button>
+          {isEditMode ? (
+            <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={saving}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => submit(true)} disabled={saving}>
+                {saving ? "Saving…" : "Save as Draft"}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={saving}>
+                {saving ? "Saving…" : "Save as Order"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -451,6 +639,17 @@ export function AddWalkInOrderPage() {
               <input value={form.customer.pincode} onChange={e => setCustomerField("pincode", e.target.value)}
                 placeholder="Pincode" style={inputStyle} />
             </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+              <button type="button" className="btn btn-secondary btn-small" onClick={handleSaveCustomer} disabled={savingCustomer}>
+                {savingCustomer ? "Saving…" : "Save Customer"}
+              </button>
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                Save these details now so you don't need to re-enter them if this order isn't confirmed today.
+              </span>
+              {customerSaveNotice && (
+                <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>{customerSaveNotice}</span>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -532,7 +731,7 @@ export function AddWalkInOrderPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
-                  {["Product", "Qty", "Price Mode", "Unit Price", "GST", "Line Total", ""].map((h, i) => (
+                  {["Product", "Qty", "Price Mode", "Unit Price", "Disc %", "GST", "Line Total", ""].map((h, i) => (
                     <th key={i} style={{ padding: "8px 10px", textAlign: i >= 3 ? "right" : i === 0 ? "left" : "center", fontWeight: 700, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -570,6 +769,11 @@ export function AddWalkInOrderPage() {
                         ) : (
                           <span style={{ fontWeight: 600 }}>{formatCurrencyInr(preview.unitPrice)}</span>
                         )}
+                      </td>
+                      <td style={{ padding: "10px 10px", textAlign: "right" }}>
+                        <input type="number" min="0" max="100" step="0.01" value={line.discountPercent}
+                          onChange={e => updateLine(line.productId, { discountPercent: Math.min(100, Math.max(0, Number(e.target.value || 0))) })}
+                          style={{ width: 60, padding: "5px 6px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 6, textAlign: "right" }} />
                       </td>
                       <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--muted)" }}>
                         {formatCurrencyInr(preview.gstAmount)}
@@ -639,20 +843,29 @@ export function AddWalkInOrderPage() {
               rows={2} placeholder="Internal note..."
               style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }} />
           </label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <span style={labelTextStyle}>Payment &amp; Invoice</span>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
-              <input type="checkbox" checked={form.markAsPaid}
-                onChange={e => setForm(f => ({ ...f, markAsPaid: e.target.checked }))} />
-              Mark payment as received
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: form.markAsPaid ? "pointer" : "not-allowed", opacity: form.markAsPaid ? 1 : 0.45 }}>
-              <input type="checkbox" checked={form.generateInvoice}
-                disabled={!form.markAsPaid}
-                onChange={e => setForm(f => ({ ...f, generateInvoice: e.target.checked }))} />
-              Generate invoice now
-            </label>
-          </div>
+          {isEditMode ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={labelTextStyle}>Payment &amp; Invoice</span>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>
+                Saved changes regenerate the Proforma Invoice automatically if one already exists. Use "Confirm Payment" from the order list to mark this order paid.
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <span style={labelTextStyle}>Payment &amp; Invoice</span>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                <input type="checkbox" checked={form.markAsPaid}
+                  onChange={e => setForm(f => ({ ...f, markAsPaid: e.target.checked }))} />
+                Mark payment as received
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: form.markAsPaid ? "pointer" : "not-allowed", opacity: form.markAsPaid ? 1 : 0.45 }}>
+                <input type="checkbox" checked={form.generateInvoice}
+                  disabled={!form.markAsPaid}
+                  onChange={e => setForm(f => ({ ...f, generateInvoice: e.target.checked }))} />
+                Generate invoice now
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -661,6 +874,7 @@ export function AddWalkInOrderPage() {
         <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
           {[
             { label: "Items",       value: String(summary.itemCount),                     color: "var(--text)" },
+            ...(summary.discountTotal > 0 ? [{ label: "Discount", value: "-" + formatCurrencyInr(summary.discountTotal), color: "#16a34a" }] : []),
             { label: "Taxable",     value: formatCurrencyInr(summary.taxableValue),        color: "var(--text)" },
             { label: "GST",         value: formatCurrencyInr(summary.gstTotal),            color: "var(--text)" },
             { label: "Grand Total", value: formatCurrencyInr(summary.grandTotal),          color: "var(--brand)" }
@@ -673,12 +887,20 @@ export function AddWalkInOrderPage() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" className="btn btn-secondary" onClick={() => navigate("/walk-in-orders")} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-secondary" onClick={() => submit(true)} disabled={saving}>
-            {saving ? "Saving…" : "Save as Draft"}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={saving}>
-            {saving ? "Saving…" : "Save as Order"}
-          </button>
+          {isEditMode ? (
+            <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={saving}>
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => submit(true)} disabled={saving}>
+                {saving ? "Saving…" : "Save as Draft"}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => submit(false)} disabled={saving}>
+                {saving ? "Saving…" : "Save as Order"}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

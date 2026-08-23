@@ -28,6 +28,8 @@ const {
   resolveDirectPaymentDiscountPercent
 } = require("../payment-gateways/payment-gateways.model");
 const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
+const { getAllSettings } = require("../settings/settings.service");
+const { notifyCustomerEvent } = require("../marketing/marketing.service");
 const {
   WALKIN_PRICE_MODES,
   WALKIN_PAYMENT_METHODS,
@@ -209,6 +211,35 @@ function createWalkInCustomerRecord(authStore, payload) {
   };
 }
 
+// Standalone customer save, independent of creating an order -- covers the
+// case where staff enter a new customer's details but the order itself
+// doesn't get finished/confirmed in the same visit. createWalkInOrder
+// already persists a customer on every order it creates (paid or not) via
+// this same createWalkInCustomerRecord, so this exists purely to let staff
+// save the customer explicitly *before* or *without* placing an order.
+async function saveWalkInCustomer(payload, actor) {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+
+  const result = createWalkInCustomerRecord(authStore, payload);
+  if (result.created) {
+    await writeAuthStore(authStore);
+  }
+
+  await addActivityLog({
+    action: result.created ? "walkin_orders.customer_created" : "walkin_orders.customer_matched",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "customer",
+    resourceId: result.customer.id
+  });
+
+  return {
+    customer: sanitizeWalkInCustomer(result.customer),
+    created: result.created
+  };
+}
+
 function resolveCustomerForOrder(authStore, payload) {
   if (payload.customerId) {
     return {
@@ -304,7 +335,17 @@ function buildWalkInLine(product, input) {
     priceSource = pricing.priceSource || input.priceMode;
   }
 
-  const lineSubtotal = roundMoney(selectedUnitPrice * qty);
+  // Manual, per-line admin discount is applied here, before the line ever
+  // reaches calculateWalkInPricing -- that function's existing proportional
+  // payment-method discount then runs on top of this already-reduced
+  // subtotal unchanged, so the two discount mechanisms stack instead of
+  // needing to be reconciled against each other.
+  const grossLineSubtotal = roundMoney(selectedUnitPrice * qty);
+  const discountPercent = Math.min(100, Math.max(0, Number(input.discountPercent || 0)));
+  const manualDiscountAmount =
+    discountPercent > 0 ? roundMoney(grossLineSubtotal * (discountPercent / 100)) : 0;
+  const lineSubtotal = roundMoney(grossLineSubtotal - manualDiscountAmount);
+
   return {
     productId: product.id,
     title: product.title,
@@ -315,6 +356,8 @@ function buildWalkInLine(product, input) {
     selectedPriceMode: input.priceMode,
     priceSource,
     compareAtUnitPrice,
+    grossLineSubtotal,
+    discountPercent,
     lineSubtotal,
     discountAmount: 0,
     taxableValue: lineSubtotal,
@@ -741,6 +784,13 @@ async function createWalkInOrder(payload, actor) {
       compareAtUnitPrice: line.compareAtUnitPrice,
       bulkApplied: false,
       bulkRule: null,
+      // discountPercent is the admin-entered manual discount; discountAmount
+      // is the TOTAL discount (manual + the proportional auto payment-method
+      // discount computed by calculateWalkInPricing) relative to the gross,
+      // pre-discount subtotal -- matches how discountAmount is shown per-line
+      // on invoices/order-detail elsewhere in the app.
+      discountPercent: line.discountPercent || 0,
+      discountAmount: roundMoney((line.grossLineSubtotal || line.lineSubtotal) - line.taxableValue),
       gstRate: line.gstRate,
       taxableValue: line.taxableValue,
       gstAmount: line.gstAmount,
@@ -785,6 +835,26 @@ async function createWalkInOrder(payload, actor) {
     invoice = result.invoice;
   } else {
     await writeAuthStore(authStore);
+
+    // Unpaid walk-in orders previously got NO invoice at all until payment
+    // was confirmed -- but B2B customers often need a Proforma Invoice up
+    // front to route through their own company's purchase-approval process.
+    // ensureInvoiceForOrder already derives documentType purely from
+    // order.paymentStatus (buildInvoiceDocument in invoices.service.js), so
+    // calling it here with the order still "pending" naturally produces a
+    // Proforma; confirmWalkInPayment's later call to the same function
+    // re-derives "tax_invoice" once paymentStatus flips to "paid" -- no
+    // separate proforma/tax-invoice branching needed here.
+    if (payload.generateInvoice !== false) {
+      const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
+        source: "walkin_order_create_proforma"
+      });
+      order.invoiceId = invoiceResult.invoice?.id || null;
+      order.invoiceNumber = invoiceResult.invoice?.invoiceNumber || "";
+      order.updatedAt = nowIso();
+      await writeAuthStore(authStore);
+      invoice = invoiceResult.invoice;
+    }
   }
 
   await addActivityLog({
@@ -796,6 +866,135 @@ async function createWalkInOrder(payload, actor) {
     metadata: {
       orderNo: order.orderNo,
       customerId: customer.id
+    }
+  });
+
+  return {
+    customer: sanitizeWalkInCustomer(customer),
+    order: sanitizeWalkInOrderSummary(order),
+    invoice
+  };
+}
+
+// Edits an existing walk-in order's customer/items/pricing in place -- only
+// while it's still unpaid (mirrors the "remains a Proforma Invoice until
+// payment is confirmed" rule: the order stays fully editable up to that
+// point, then locks). If a Proforma was already generated, it's superseded
+// with a fresh one reflecting the edited totals so what gets sent/shown to
+// the customer next never goes stale after an edit.
+async function updateWalkInOrder(orderId, payload, actor) {
+  const [authStore, catalogStore, paymentStore] = await Promise.all([
+    readAuthStore(),
+    readCatalogStore(),
+    readPaymentStore()
+  ]);
+  ensureAuthStoreShape(authStore);
+  ensureCatalogStoreShape(catalogStore);
+  ensurePaymentStoreShape(paymentStore);
+
+  const order = findWalkInOrderOrThrow(authStore, orderId);
+
+  if (String(order.paymentStatus || "").toLowerCase() === "paid") {
+    throw new HttpError(409, "Paid orders cannot be edited.");
+  }
+  if (order.orderStatus === WALKIN_ORDER_STATUSES.CANCELLED) {
+    throw new HttpError(409, "Cancelled orders cannot be edited.");
+  }
+
+  const customerResolution = resolveCustomerForOrder(authStore, payload);
+  const customer = customerResolution.customer;
+  const customerPricingContext = buildCustomerPricingContext(customer) || {};
+
+  if (
+    payload.paymentMethod === WALKIN_PAYMENT_METHODS.CREDIT_PAY_LATER &&
+    !customerPricingContext.creditAllowed
+  ) {
+    throw new HttpError(409, "Credit / pay-later is allowed only for approved credit customers.");
+  }
+
+  const billingAddress = resolveCustomerAddressSnapshot(customer, payload.customer);
+  const shippingAddress = { ...billingAddress };
+  const lines = buildWalkInLines(catalogStore, payload.items);
+  const pricing = calculateWalkInPricing(
+    lines,
+    payload.paymentMethod,
+    payload.shippingMethod === SHIPPING_METHODS.SELF_PICKUP ? 0 : payload.shippingCharge,
+    paymentStore
+  );
+
+  order.ownerId = customer.id;
+  order.userId = customer.id;
+  order.customerType = customerPricingContext.customerType || "retail";
+  order.priceGroup = customerPricingContext.priceGroup || "";
+  order.isB2BApproved = Boolean(customerPricingContext.isB2BApproved);
+  order.companyName = billingAddress.companyName || customer.companyName || "";
+  order.gstin = billingAddress.gstin || "";
+  order.creditAllowed = Boolean(customerPricingContext.creditAllowed);
+  order.bankTransferOnly = Boolean(customerPricingContext.bankTransferOnly);
+  order.pickupAllowed = Boolean(customerPricingContext.pickupAllowed);
+  order.items = lines.map((line) => ({
+    productId: line.productId,
+    title: line.title,
+    sku: line.sku,
+    hsnCode: line.hsnCode || "",
+    qty: line.qty,
+    finalUnitPrice: line.finalUnitPriceAfterDiscount,
+    priceSource: line.priceSource,
+    selectedPriceMode: line.selectedPriceMode,
+    compareAtUnitPrice: line.compareAtUnitPrice,
+    bulkApplied: false,
+    bulkRule: null,
+    discountPercent: line.discountPercent || 0,
+    discountAmount: roundMoney((line.grossLineSubtotal || line.lineSubtotal) - line.taxableValue),
+    gstRate: line.gstRate,
+    taxableValue: line.taxableValue,
+    gstAmount: line.gstAmount,
+    lineTotal: line.lineTotal,
+    shippingClass: line.shippingClass || "normal"
+  }));
+  order.productSubtotal = pricing.productSubtotal;
+  order.discountAmount = pricing.discountAmount;
+  order.taxableValue = pricing.taxableValue;
+  order.gstTotal = pricing.gstTotal;
+  order.shippingCharge = pricing.shippingCharge;
+  order.roundOff = pricing.roundOff;
+  order.grandTotal = pricing.grandTotal;
+  order.orderStatus = resolveInitialOrderStatus({
+    markAsPaid: false,
+    paymentMethod: payload.paymentMethod
+  });
+  order.paymentMethod = payload.paymentMethod;
+  order.shippingMethod = payload.shippingMethod;
+  order.billingAddress = billingAddress;
+  order.shippingAddress = shippingAddress;
+  order.gatewayTxnId = payload.paymentReference || "";
+  order.orderNote = payload.orderNote || "";
+  order.updatedAt = nowIso();
+
+  const hadInvoice = Boolean(order.invoiceId);
+  await writeAuthStore(authStore);
+
+  let invoice = null;
+  if (hadInvoice) {
+    const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
+      source: "walkin_order_edit_proforma",
+      forceRegenerate: true
+    });
+    order.invoiceId = invoiceResult.invoice?.id || null;
+    order.invoiceNumber = invoiceResult.invoice?.invoiceNumber || "";
+    order.updatedAt = nowIso();
+    await writeAuthStore(authStore);
+    invoice = invoiceResult.invoice;
+  }
+
+  await addActivityLog({
+    action: "walkin_orders.updated",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "order",
+    resourceId: order.id,
+    metadata: {
+      orderNo: order.orderNo
     }
   });
 
@@ -839,6 +1038,135 @@ async function confirmWalkInPayment(orderId, payload, actor) {
   return {
     order: sanitizeWalkInOrderSummary(result.order),
     invoice: result.invoice
+  };
+}
+
+function escapeHtmlForWalkInEmail(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatInrForWalkInEmail(value) {
+  return `₹${Number(value || 0).toLocaleString("en-IN")}`;
+}
+
+function buildWalkInItemsEmailTable(items) {
+  const rows = ensureArray(items)
+    .map(
+      (item) =>
+        `<tr>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;">${escapeHtmlForWalkInEmail(item.title || item.productId)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:center;">${Number(item.qty || 0)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatInrForWalkInEmail(item.finalUnitPrice)}</td>` +
+        `<td style="padding:8px 6px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;">${formatInrForWalkInEmail(item.lineTotal)}</td>` +
+        `</tr>`
+    )
+    .join("");
+
+  return (
+    `<table style="width:100%;font-size:13px;border-collapse:collapse;margin:12px 0;">` +
+    `<thead><tr style="background:#f9fafb;">` +
+    `<th style="padding:8px 6px;text-align:left;border-bottom:2px solid #e5e7eb;">Product</th>` +
+    `<th style="padding:8px 6px;text-align:center;border-bottom:2px solid #e5e7eb;">Qty</th>` +
+    `<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e5e7eb;">Unit Price</th>` +
+    `<th style="padding:8px 6px;text-align:right;border-bottom:2px solid #e5e7eb;">Amount</th>` +
+    `</tr></thead><tbody>${rows}</tbody></table>`
+  );
+}
+
+// Pulled directly from storeProfile rather than a payment-gateway config --
+// walk-in orders can be on cash/cheque/credit as well as bank/UPI, so this
+// is a simpler, always-available fallback rather than requiring a manual
+// gateway to be configured.
+function buildWalkInPaymentInstructionsText(storeProfile) {
+  const lines = [];
+  if (storeProfile.accountHolderName) lines.push(`Account Holder: ${storeProfile.accountHolderName}`);
+  if (storeProfile.bankName) lines.push(`Bank: ${storeProfile.bankName}`);
+  if (storeProfile.accountNumber) lines.push(`Account No.: ${storeProfile.accountNumber}`);
+  if (storeProfile.ifsc) lines.push(`IFSC: ${storeProfile.ifsc}`);
+  if (storeProfile.upiId) lines.push(`UPI ID: ${storeProfile.upiId}`);
+  return lines.length > 0 ? lines.join("\n") : "Contact us for payment details.";
+}
+
+// Ensures the order has a Proforma Invoice (generating one if it doesn't
+// yet -- e.g. generateInvoice was unchecked at creation) and emails +
+// WhatsApps the customer a payment request referencing it. Distinct from
+// manual-payments.service.js's demandManualPayment: that one is WhatsApp-
+// only and gated to direct_bank_transfer/manual_upi orders specifically;
+// this covers any unpaid walk-in order (cash, cheque, credit/pay-later,
+// online link) and always sends both channels, per the explicit ask for
+// an email with a specific subject line alongside WhatsApp.
+async function sendWalkInPaymentRequest(orderId, actor) {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+  const order = findWalkInOrderOrThrow(authStore, orderId);
+
+  if (String(order.paymentStatus || "").toLowerCase() === "paid") {
+    throw new HttpError(409, "This order is already paid.");
+  }
+
+  let invoice = null;
+  if (!order.invoiceId) {
+    const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
+      source: "walkin_payment_request"
+    });
+    order.invoiceId = invoiceResult.invoice?.id || null;
+    order.invoiceNumber = invoiceResult.invoice?.invoiceNumber || "";
+    order.updatedAt = nowIso();
+    await writeAuthStore(authStore);
+    invoice = invoiceResult.invoice;
+  }
+
+  const toEmail = order.billingAddress?.email || "";
+  const toMobile = order.billingAddress?.mobile || "";
+  if (!toEmail && !toMobile) {
+    throw new HttpError(400, "Customer has no email or mobile number on file to send this to.");
+  }
+
+  const settings = await getAllSettings();
+  const orderTotal = formatInrForWalkInEmail(order.grandTotal);
+  const paymentInstructions = buildWalkInPaymentInstructionsText(settings.storeProfile || {});
+
+  const result = await notifyCustomerEvent({
+    eventKey: "walkin_payment_request",
+    toEmail,
+    toMobile,
+    relatedResourceType: "order",
+    relatedResourceId: order.id,
+    variables: {
+      customerName: order.billingAddress?.name || order.companyName || "Customer",
+      orderNo: order.orderNo || "",
+      invoiceNo: order.invoiceNumber || invoice?.invoiceNumber || "",
+      itemsTable: buildWalkInItemsEmailTable(order.items),
+      orderTotal,
+      paymentInstructions
+    }
+  });
+
+  order.lastPaymentRequestAt = nowIso();
+  order.updatedAt = order.lastPaymentRequestAt;
+  await writeAuthStore(authStore);
+
+  await addActivityLog({
+    action: "walkin_orders.payment_request_sent",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "order",
+    resourceId: order.id,
+    metadata: {
+      orderNo: order.orderNo,
+      toEmail: Boolean(toEmail),
+      toMobile: Boolean(toMobile)
+    }
+  });
+
+  return {
+    order: sanitizeWalkInOrderSummary(order),
+    invoice,
+    emailResult: result?.email || null,
+    whatsappResult: result?.whatsapp || null
   };
 }
 
@@ -951,7 +1279,10 @@ module.exports = {
   listWalkInCategories,
   listWalkInOrders,
   createWalkInOrder,
+  updateWalkInOrder,
   confirmWalkInPayment,
   generateWalkInInvoice,
-  updateWalkInOrderStatus
+  updateWalkInOrderStatus,
+  saveWalkInCustomer,
+  sendWalkInPaymentRequest
 };

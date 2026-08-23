@@ -16,6 +16,8 @@ const TEMPLATE_KEYS = Object.freeze([
   "order_placed",
   "order_placed_admin",
   "payment_captured_unfulfilled_admin",
+  "walkin_payment_request",
+  "walkin_payment_request_whatsapp",
   "awaiting_payment",
   "payment_failed",
   "payment_successful",
@@ -181,6 +183,25 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
       `</table>` +
       `<p style="font-size:13px;color:#6b7280;">Check the gateway dashboard with the transaction ID above to confirm the charge, then either restock and manually create the order, or issue a refund and let the customer know.</p>`
     )
+  },
+  walkin_payment_request: {
+    label: "Proforma Payment Request (Email)",
+    subject: "PROFORMA Invoice for Payment Request",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Please find your Proforma Invoice <strong>{{invoiceNo}}</strong> for order <strong>{{orderNo}}</strong> below. Kindly arrange payment at your earliest convenience so we can proceed with your order.</p>` +
+      `{{itemsTable}}` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:4px 0 16px;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Total Payable</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
+      `</table>` +
+      `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:13px;white-space:pre-line;">{{paymentInstructions}}</div>` +
+      `<p style="font-size:13px;color:#6b7280;">Once payment is received and confirmed, we will issue the final Tax Invoice and proceed with your order.</p>`
+    )
+  },
+  walkin_payment_request_whatsapp: {
+    label: "Proforma Payment Request (WhatsApp)",
+    subject: "",
+    body: "Hi {{customerName}}, your Proforma Invoice *{{invoiceNo}}* for order *{{orderNo}}* is ready. Amount payable: *{{orderTotal}}*.\n{{paymentInstructions}}\nOnce we receive payment, we'll issue your final Tax Invoice and proceed with the order."
   },
   order_processing: {
     label: "Order Processed (Email)",

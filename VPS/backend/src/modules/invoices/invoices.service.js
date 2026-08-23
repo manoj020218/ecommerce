@@ -1062,30 +1062,45 @@ async function ensureInvoiceForOrder(orderId, actor = null, options = {}) {
 
   const isPaid = String(order.paymentStatus || "").toLowerCase() === "paid";
 
-  // A Proforma generated while unpaid must not be handed back once the order is
-  // paid — that case falls through so a real Tax Invoice gets built below instead.
-  if (order.invoiceId) {
-    const existingById = ensureArray(invoiceStore.invoices).find(
-      (invoice) => invoice.id === order.invoiceId
+  // forceRegenerate: an unpaid order's items/pricing were edited after a
+  // Proforma was already issued, so the stale Proforma is dropped and a
+  // fresh one built below with the corrected totals -- rather than leaving
+  // two invoice rows for the same order, where orders.service.js's
+  // buildInvoiceByOrderIdMap (first-match, not latest-match) would keep
+  // surfacing the outdated one on the order list/detail. Only ever removes
+  // proforma_invoice records, never a real tax_invoice.
+  if (options.forceRegenerate) {
+    invoiceStore.invoices = ensureArray(invoiceStore.invoices).filter(
+      (invoice) => !(invoice.orderId === order.id && invoice.documentType === "proforma_invoice")
     );
-    if (existingById && !(isPaid && existingById.documentType === "proforma_invoice")) {
+    order.invoiceId = null;
+    order.invoiceNumber = "";
+  } else {
+    // A Proforma generated while unpaid must not be handed back once the order is
+    // paid — that case falls through so a real Tax Invoice gets built below instead.
+    if (order.invoiceId) {
+      const existingById = ensureArray(invoiceStore.invoices).find(
+        (invoice) => invoice.id === order.invoiceId
+      );
+      if (existingById && !(isPaid && existingById.documentType === "proforma_invoice")) {
+        return {
+          created: false,
+          invoice: sanitizeInvoice(existingById)
+        };
+      }
+    }
+
+    const existingByOrder = findInvoiceByOrderId(invoiceStore, order.id);
+    if (existingByOrder && !(isPaid && existingByOrder.documentType === "proforma_invoice")) {
+      order.invoiceId = existingByOrder.id;
+      order.invoiceNumber = existingByOrder.invoiceNumber;
+      order.invoiceGeneratedAt = existingByOrder.generatedAt;
+      await writeAuthStore(authStore);
       return {
         created: false,
-        invoice: sanitizeInvoice(existingById)
+        invoice: sanitizeInvoice(existingByOrder)
       };
     }
-  }
-
-  const existingByOrder = findInvoiceByOrderId(invoiceStore, order.id);
-  if (existingByOrder && !(isPaid && existingByOrder.documentType === "proforma_invoice")) {
-    order.invoiceId = existingByOrder.id;
-    order.invoiceNumber = existingByOrder.invoiceNumber;
-    order.invoiceGeneratedAt = existingByOrder.generatedAt;
-    await writeAuthStore(authStore);
-    return {
-      created: false,
-      invoice: sanitizeInvoice(existingByOrder)
-    };
   }
 
   const invoice = await buildInvoiceDocument(order, authStore, catalogStore, settings, invoiceStore, {

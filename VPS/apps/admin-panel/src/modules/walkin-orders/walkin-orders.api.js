@@ -42,6 +42,13 @@ export function createWalkInOrder(payload) {
   });
 }
 
+export function updateWalkInOrder(orderId, payload) {
+  return apiFetch(`/admin/walkin-orders/${orderId}`, {
+    method: "PATCH",
+    body: payload
+  });
+}
+
 export function confirmWalkInPayment(orderId, payload) {
   return apiFetch(`/admin/walkin-orders/${orderId}/confirm-payment`, {
     method: "POST",
@@ -60,5 +67,19 @@ export function updateWalkInOrderStatus(orderId, payload) {
   return apiFetch(`/admin/walkin-orders/${orderId}/status`, {
     method: "PATCH",
     body: payload
+  });
+}
+
+export function saveWalkInCustomer(payload) {
+  return apiFetch("/admin/walkin-orders/customers", {
+    method: "POST",
+    body: payload
+  });
+}
+
+export function sendWalkInPaymentRequest(orderId) {
+  return apiFetch(`/admin/walkin-orders/${orderId}/send-payment-request`, {
+    method: "POST",
+    body: {}
   });
 }

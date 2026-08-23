@@ -52,7 +52,11 @@ const createWalkInLineSchema = z
     productId: z.string().trim().min(2).max(160),
     qty: z.coerce.number().int().min(1).max(100000),
     priceMode: z.enum(Object.values(WALKIN_PRICE_MODES)).optional().default("retail"),
-    customUnitPrice: positiveMoneySchema.optional().nullable().default(null)
+    customUnitPrice: positiveMoneySchema.optional().nullable().default(null),
+    // Manual, per-line admin discount -- applied before the automatic
+    // payment-method discount (calculateWalkInPricing), which still runs
+    // proportionally on top of the already-reduced line subtotal.
+    discountPercent: z.coerce.number().min(0).max(100).optional().default(0)
   })
   .superRefine((value, ctx) => {
     if (value.priceMode === WALKIN_PRICE_MODES.CUSTOM && value.customUnitPrice === null) {
@@ -80,6 +84,15 @@ const createWalkInOrderSchema = z.object({
   orderNote: z.string().trim().max(1000).optional().default("")
 });
 
+// Same shape as create, minus markAsPaid/generateInvoice -- editing an
+// existing order never directly marks it paid (that stays the dedicated
+// "Confirm Payment" action), and invoice regeneration for an edited unpaid
+// order is handled unconditionally in the service layer, not gated by a flag.
+const updateWalkInOrderSchema = createWalkInOrderSchema.omit({
+  markAsPaid: true,
+  generateInvoice: true
+});
+
 const confirmPaymentPayloadSchema = z.object({
   paymentReference: z.string().trim().max(200).optional().default(""),
   generateInvoice: z.boolean().optional().default(true)
@@ -98,6 +111,11 @@ const updateWalkInOrderStatusSchema = z.object({
   ]),
   adminNote: z.string().trim().max(600).optional().default("")
 });
+
+function parseSaveCustomerPayload(payload) {
+  ensureObject(payload, "Save walk-in customer");
+  return customerPayloadSchema.parse(payload);
+}
 
 function ensureObject(payload, label) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -122,6 +140,11 @@ function parseCreateWalkInOrderPayload(payload) {
   return createWalkInOrderSchema.parse(payload);
 }
 
+function parseUpdateWalkInOrderPayload(payload) {
+  ensureObject(payload, "Update walk-in order");
+  return updateWalkInOrderSchema.parse(payload);
+}
+
 function parseConfirmPaymentPayload(payload) {
   ensureObject(payload, "Confirm walk-in payment");
   return confirmPaymentPayloadSchema.parse(payload);
@@ -142,7 +165,9 @@ module.exports = {
   parseSearchCustomersQuery,
   parseSearchProductsQuery,
   parseCreateWalkInOrderPayload,
+  parseUpdateWalkInOrderPayload,
   parseConfirmPaymentPayload,
   parseGenerateInvoicePayload,
-  parseUpdateWalkInOrderStatusPayload
+  parseUpdateWalkInOrderStatusPayload,
+  parseSaveCustomerPayload
 };

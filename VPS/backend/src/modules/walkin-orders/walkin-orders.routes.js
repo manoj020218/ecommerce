@@ -50,6 +50,21 @@ function createWalkInOrdersRouter() {
     controller.adminCreateWalkInOrder
   );
   router.post(
+    "/customers",
+    requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.CREATE),
+    controller.adminSaveWalkInCustomer
+  );
+  router.patch(
+    "/:orderId",
+    requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.EDIT),
+    controller.adminUpdateWalkInOrder
+  );
+  router.post(
+    "/:orderId/send-payment-request",
+    requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.EDIT),
+    controller.adminSendWalkInPaymentRequest
+  );
+  router.post(
     "/:orderId/confirm-payment",
     requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.EDIT),
     controller.adminConfirmWalkInPayment

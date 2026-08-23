@@ -193,6 +193,10 @@ function buildOrderDetail(order, shipment, invoice, manualPaymentInstructions) {
       priceSource: item.priceSource || "base",
       selectedPriceMode: item.selectedPriceMode || "",
       bulkApplied: Boolean(item.bulkApplied),
+      // Only present on walk-in orders with a manual per-line discount
+      // entered at creation -- 0 on every other order type/older order.
+      discountPercent: Number(item.discountPercent || 0),
+      discountAmount: Number(item.discountAmount || 0),
       gstRate: Number(item.gstRate || 0),
       taxableValue: Number(item.taxableValue || 0),
       gstAmount: Number(item.gstAmount || 0),

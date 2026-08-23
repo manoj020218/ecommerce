@@ -1,21 +1,147 @@
 # Handoff — read this first
 
-Last updated: **2026-08-20**. `origin/main` HEAD is still **`dc35794`**
-(Aug 18 docs commit) — **everything in the "Aug 19-20" section below is
-uncommitted, local-only.** Round 1 of that section is fixed, verified,
-and deployed to the VPS; Round 2 is fixed and verified but **not yet
-deployed**. Neither round is `git commit`/pushed yet. Working tree also
-has one unrelated stray empty file (`p.images` at repo root, dated Jul 7,
-predates this feature entirely — leave it alone unless the user asks
-about it). Everything in the Aug 18-and-earlier sections below is
-committed, pushed, and deployed to the production VPS, verified live.
+Last updated: **2026-08-23**. `origin/main` HEAD is **`883d71c`**, pushed
+and deployed to the production VPS (backend files synced + `pm2 restart`,
+admin panel rebuilt and swapped into `dist` with `restorecon -Rv`,
+verified live). Working tree also has one unrelated stray empty file
+(`p.images` at repo root, dated Jul 7, predates every feature in this
+file — leave it alone unless the user asks about it). Everything below,
+including the Aug 19-20 cart-abandonment section (which was uncommitted
+at the time it was written), is now committed, pushed, and deployed —
+confirmed via `git log` and live verification.
 
-## Aug 19–20 2026 — cart-abandonment investigation + fixes (UNCOMMITTED)
+## Aug 23 2026 — Walk-in Orders: per-line discounts, Proforma workflow, customer save, payment-request send, full order editing (DEPLOYED)
+
+User's asks, in order: "give option of discount for each product basis"
+on walk-in orders; walk-in orders should "remain in PROFORMA Invoice
+until payment receipt is not confirm[ed]"; a "Save customer" option so
+re-entering the same customer isn't needed if an order doesn't get
+confirmed; an option to "send to customer for payment" once an order is
+saved, by email (subject exactly **"PROFORMA Invoice for Payment
+Request"**) and WhatsApp; and, raised mid-session, a way to edit an
+order that was created/saved earlier but never confirmed.
+
+**Backend** (`backend/src/modules/walkin-orders/`):
+- `buildWalkInLine` (`walkin-orders.service.js`) now takes a per-line
+  `discountPercent`, applied to the gross line subtotal *before* GST and
+  before the existing automatic payment-method discount
+  (`calculateWalkInPricing`) — the two stack rather than needing
+  reconciliation. Validated 0-100 in `walkin-orders.validator.js`.
+- `createWalkInOrder`'s unpaid branch now always generates a Proforma
+  Invoice immediately (previously: no invoice at all until paid) —
+  `ensureInvoiceForOrder`'s existing `documentType` derivation (purely
+  from `order.paymentStatus`) naturally produces `proforma_invoice` while
+  unpaid and re-derives `tax_invoice` once payment is confirmed, so no
+  new branching was needed there.
+- New `saveWalkInCustomer(payload, actor)` — standalone customer save,
+  independent of placing an order, reusing the same dedup-by-email/mobile
+  logic `createWalkInOrder` already used inline. `POST
+  /admin/walkin-orders/customers`.
+- New `sendWalkInPaymentRequest(orderId, actor)` — ensures a Proforma
+  exists (generates one if `generateInvoice` was left off at creation),
+  then calls `notifyCustomerEvent` with a new `walkin_payment_request` /
+  `walkin_payment_request_whatsapp` template pair
+  (`marketing.model.js`, subject **"PROFORMA Invoice for Payment
+  Request"**, exact string per the user's ask), with payment instructions
+  pulled from `settings.storeProfile` (bank/UPI details). `POST
+  /admin/walkin-orders/:orderId/send-payment-request`.
+- New `updateWalkInOrder(orderId, payload, actor)` — full edit (customer,
+  items, discounts, shipping, payment method) for an existing walk-in
+  order, locked with a `409` once `paymentStatus === "paid"` or the order
+  is cancelled (mirrors the "stays a Proforma until confirmed, then
+  locks" rule). `PATCH /admin/walkin-orders/:orderId`.
+  - If the order already had a Proforma, editing regenerates it with the
+    corrected totals rather than leaving a stale PDF referenced. This
+    needed a **new `forceRegenerate` option on
+    `invoices.service.js`'s `ensureInvoiceForOrder`** — it previously
+    always handed back whatever invoice already existed for the order
+    (by design, for its normal callers), which would have kept
+    surfacing the pre-edit total. `forceRegenerate` only ever removes
+    `proforma_invoice` records for that order (never a real
+    `tax_invoice`) before rebuilding — found and fixed via direct
+    end-to-end testing (create → edit → check invoice number actually
+    changed), not just code review; the first version of this change
+    looked correct but silently returned the stale invoice because
+    `ensureInvoiceForOrder` also matches by `orderId` in the invoice
+    store independent of `order.invoiceId`.
+- **Bug fix, found while wiring the edit form's pre-fill**:
+  `orders.service.js`'s shared `buildOrderDetail` (used by the generic
+  `GET /admin/orders/:orderId`, which every order type's admin UI reads)
+  was stripping `discountPercent`/`discountAmount` off order line items
+  entirely — the field existed on the stored order but the response
+  mapping never included it. Fixed; this is what the edit form and any
+  other admin order-detail view now correctly shows.
+
+**Admin panel** (`apps/admin-panel/src/modules/walkin-orders/`):
+- `add-walkin-order-page.jsx` now doubles as the edit form: routed at
+  both `/walk-in-orders/add` and `/walk-in-orders/:orderId/edit`. Edit
+  mode pre-fills from `GET /admin/orders/:orderId`, re-fetches full
+  product records (`fetchProduct`) for accurate live pricing preview
+  (search-result products aren't available for an already-placed order),
+  shows a locked read-only notice instead of the form if the order is
+  already paid/cancelled, and posts to `updateWalkInOrder` instead of
+  `createWalkInOrder` on save (single "Save Changes" button, no
+  draft/paid toggle — payment is confirmed separately from the order
+  list).
+  - New "Discount %" column in the line-items table; new "Discount"
+    line in the summary bar when any line has one.
+  - New "Save Customer" button in the Walk-In/New customer tab.
+- `walkin-orders-page.jsx` (list page): new "Edit" and "Send for
+  Payment" row actions, shown while `paymentStatus !== "paid"` and the
+  order isn't cancelled.
+- New API functions in `walkin-orders.api.js`: `updateWalkInOrder`,
+  `saveWalkInCustomer`, `sendWalkInPaymentRequest`.
+
+**Verification**: full `pnpm run check:backend` regression suite passing
+(twice, before and after the `forceRegenerate` fix); a scratch Node
+script hitting the live dev API end-to-end confirmed customer dedup on
+repeat save, Proforma auto-generation on unpaid creation, the edit
+endpoint's discount math, invoice regeneration on edit (new invoice
+number + id, old Proforma correctly dropped), the 409 lock once paid,
+and that `GET /admin/orders/:id` reflects post-edit items/pricing/latest
+invoice correctly. `pnpm run build:admin` clean (one pre-existing,
+unrelated warning in `dashboard-page.jsx` — a duplicate object key not
+touched by this work).
+
+**Deployed**: backend files synced individually via `pscp` + syntax-
+checked on the VPS + `pm2 restart jenix-backend --update-env`; new routes
+confirmed live (`401` not `404` on unauthenticated hits). Admin panel
+rebuilt, uploaded to a staging dir, swapped into `dist` with a timestamped
+backup (`dist_backup_20260823_085002`) and `restorecon -Rv` (SELinux),
+verified live via bundle-hash check on `admin.jenixindia.com`. Committed
+as `883d71c`, pushed to `origin/main`.
+
+## Aug 21–22 2026 — Job Vacancies module + admin product-save UX fix (DEPLOYED)
+
+- **Job Vacancies / Careers**, full admin-managed feature: backend CRUD
+  module (`backend/src/modules/job-vacancies/`), admin panel management
+  page, public `/careers` list + `/careers/:slug` detail pages on the
+  storefront, `schema.org` `JobPosting` structured data for Google Jobs /
+  AI-search visibility, bot-prerendered via the existing
+  `prerender.service.js` pattern, careers entries added to the sitemap.
+  Nginx updated live (`/careers/:slug` location block mirroring the
+  existing `/guides/:slug` pattern) after `nginx -t` validation. First
+  real posting published: ITI Electrical/Electronics fresher role.
+  Committed `5b79c14`, deployed including the nginx change.
+- **Admin product edit/add pages**: save failures on validation errors
+  (e.g. `PATCH /admin/products/:id` 400) previously showed only a raw,
+  unhelpful error. Added `describeValidationIssue()` + field-level
+  error/ref wiring so the actual invalid field (short/full description,
+  key features, meta title/description/keywords, etc.) is highlighted
+  and named in the error message instead of a generic failure. Committed
+  `f172ae0`.
+- Admin login: user's remembered password had gone stale (account was
+  updated more recently than the `.env` seed fallback). Reset directly
+  on the VPS via `node scripts/seed-admin.js --password '...'` per the
+  user's explicit instruction **not** to commit the new password to git
+  — it wasn't.
+
+## Aug 19–20 2026 — cart-abandonment investigation + fixes (now committed + deployed)
 
 Started from a customer-reported checkout error, expanded into a full
-audit after fixing it. **Nothing in this section has been committed to
-git yet** — ask the user before committing/pushing if picking this back
-up. Deploy status is noted per-item below.
+audit after fixing it. Committed as part of `02bd4fd`/`c98b47f` and
+deployed; deploy status noted per-item below reflects the state at the
+time this section was originally written.
 
 ### Round 1 — the reported bug (root cause + fix, DEPLOYED to VPS)
 Customer hit **"Guest sessionId is required when customer authentication
@@ -147,7 +273,8 @@ auth/identity edge cases). Findings, all fixed:
 
 **Verification**: `node --check` on every edited file, full
 `pnpm run check:backend` regression suite (passing), `pnpm run build`
-on `apps/front` (clean). **Not yet deployed to the VPS, not committed.**
+on `apps/front` (clean). Since committed and deployed — see the
+top-of-file banner.
 
 This file is the project-folder counterpart to Claude's own memory system
 (which also has a fuller version of this under the name

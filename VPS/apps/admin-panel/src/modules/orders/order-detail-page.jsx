@@ -1546,7 +1546,18 @@ export function OrderDetailPage() {
     setPaymentDemandError("");
     try {
       const result = await demandManualPayment(orderId);
-      setPaymentDemandNotice(`Payment demand sent via WhatsApp to ${result.sentTo || "the customer"}.`);
+      const base = `Payment demand sent via WhatsApp to ${result.sentTo || "the customer"}.`;
+      let emailNote;
+      if (!result.emailSentTo) {
+        emailNote = " No email on file for this customer.";
+      } else if (result.emailStatus === "sent") {
+        emailNote = ` Email also sent to ${result.emailSentTo}.`;
+      } else if (result.emailStatus === "simulated_sent") {
+        emailNote = ` Email to ${result.emailSentTo} was logged but not delivered — SMTP isn't configured yet (Setup Wizard → SMTP Email).`;
+      } else {
+        emailNote = ` Email to ${result.emailSentTo} could not be sent.`;
+      }
+      setPaymentDemandNotice(base + emailNote);
     } catch (e) {
       setPaymentDemandError(e.message || "Failed to send payment demand.");
     } finally {

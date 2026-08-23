@@ -605,6 +605,37 @@ function buildUpiPaymentLink({ payeeVpa, payeeName, amount, note }) {
 // account order page as a fallback) that already renders UpiPaymentPanel
 // and the "upload payment screenshot" proof form — no new customer-facing
 // page needed for this feature.
+const DEMAND_PAYMENT_METHOD_LABELS = {
+  direct_bank_transfer: "Bank Transfer",
+  manual_upi: "UPI"
+};
+
+function humanizeDemandPaymentMethod(method) {
+  return DEMAND_PAYMENT_METHOD_LABELS[method] || String(method || "").replace(/_/g, " ");
+}
+
+const DEMAND_PAYMENT_INSTRUCTION_LABELS = {
+  beneficiaryName: "Beneficiary",
+  upiId: "UPI ID",
+  accountHolderName: "Account Holder",
+  bankName: "Bank",
+  accountNumber: "Account No.",
+  ifsc: "IFSC",
+  acceptedMethods: "Accepted Methods",
+  instructions: "Instructions",
+  note: "Note"
+};
+
+function formatDemandPaymentInstructionsText(instructions) {
+  if (!instructions || typeof instructions !== "object") {
+    return "Contact us for payment details.";
+  }
+  const lines = Object.entries(instructions)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${DEMAND_PAYMENT_INSTRUCTION_LABELS[key] || key}: ${value}`);
+  return lines.length > 0 ? lines.join("\n") : "Contact us for payment details.";
+}
+
 async function demandManualPayment(orderId, actor) {
   const authStore = await readAuthStore();
   ensureAuthStoreShape(authStore);
@@ -669,6 +700,28 @@ async function demandManualPayment(orderId, actor) {
     throw new HttpError(502, `Could not send WhatsApp message: ${error.message}`);
   }
 
+  // Also email the same payment reminder, reusing the "payment_pending"
+  // template the customer already got at checkout time -- best-effort and
+  // independent of the WhatsApp send above (no email on file just skips it,
+  // doesn't fail the whole demand like a WhatsApp send failure does).
+  const email = resolveNotificationEmail(order);
+  let emailResult = null;
+  if (email) {
+    emailResult = await safeSendTemplateNotification({
+      templateKey: "payment_pending",
+      toEmail: email,
+      relatedResourceType: "order",
+      relatedResourceId: order.id,
+      variables: {
+        customerName,
+        orderNo: order.orderNo || "",
+        orderTotal: `₹${Number(order.grandTotal || 0).toLocaleString("en-IN")}`,
+        paymentMethod: humanizeDemandPaymentMethod(method),
+        paymentInstructions: formatDemandPaymentInstructionsText(instructions)
+      }
+    });
+  }
+
   order.lastPaymentDemandAt = nowIso();
   await writeAuthStore(authStore);
   await addActivityLog({
@@ -676,10 +729,19 @@ async function demandManualPayment(orderId, actor) {
     resourceType: "order",
     resourceId: order.id,
     actorId: actor?.id,
-    actorRole: actor?.role
+    actorRole: actor?.role,
+    metadata: {
+      emailSentTo: email || null,
+      emailStatus: emailResult?.status || "skipped_no_recipient"
+    }
   });
 
-  return { sent: true, sentTo: mobile };
+  return {
+    sent: true,
+    sentTo: mobile,
+    emailSentTo: email || null,
+    emailStatus: emailResult?.status || "skipped_no_recipient"
+  };
 }
 
 module.exports = {

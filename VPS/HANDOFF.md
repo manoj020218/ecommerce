@@ -1,14 +1,44 @@
 # Handoff — read this first
 
-Last updated: **2026-08-23**. `origin/main` HEAD is **`883d71c`**, pushed
-and deployed to the production VPS (backend files synced + `pm2 restart`,
-admin panel rebuilt and swapped into `dist` with `restorecon -Rv`,
-verified live). Working tree also has one unrelated stray empty file
-(`p.images` at repo root, dated Jul 7, predates every feature in this
-file — leave it alone unless the user asks about it). Everything below,
-including the Aug 19-20 cart-abandonment section (which was uncommitted
-at the time it was written), is now committed, pushed, and deployed —
-confirmed via `git log` and live verification.
+Last updated: **2026-08-25**. `origin/main` HEAD is **`f619bfc`**, pushed
+and deployed to the production VPS (backend restarted via `pm2 restart`;
+admin panel rebuilt and redeployed as of the Aug 23 work below — the
+Aug 25 change was backend-only, no admin-panel rebuild needed). Working
+tree also has one unrelated stray empty file (`p.images` at repo root,
+dated Jul 7, predates every feature in this file — leave it alone unless
+the user asks about it). Everything below is committed, pushed, and
+deployed — confirmed via `git log` and live verification.
+
+## Aug 25 2026 — Demand/payment-request WhatsApp now inlines bank details for bank-transfer orders (DEPLOYED)
+
+User asked: when Direct Bank Transfer is the payment method, does the
+payment-demand/payment-request message actually send the buyer bank
+account number, IFSC, bank name etc. so they can pay by NEFT/RTGS/IMPS?
+Checked: the **email** side of this was already correct for both flows
+(added in the Aug 23 work below) — verified against real production
+gateway config (Union Bank of India, account ending `...0423`, IFSC
+`UBIN0825964`, "Accepted Methods: NEFT, RTGS, IMPS, UPI"). Found one real
+gap: the regular Orders page's **"Demand for Payment"** button's
+**WhatsApp** message (`manual-payments.service.js`,
+`demandManualPayment`) only ever included a link back to the order page
+for bank-transfer orders — the account details themselves weren't in the
+message text, unlike email and unlike the walk-in orders WhatsApp
+flow (which already inlines them). Fixed: when
+`order.paymentMethod === "direct_bank_transfer"`, the WhatsApp message
+now includes a "Please transfer via NEFT/RTGS/IMPS to:" line followed by
+the same formatted instructions block (`formatDemandPaymentInstructionsText`)
+already used in the email — account holder, bank, account number, IFSC,
+accepted methods, beneficiary, and any admin-configured free-text note.
+
+Verified end-to-end with a scratch Node script that mocked
+`whatsappService.sendMessage` to capture the actual outgoing message text
+against real production bank-transfer instructions (test order + payment
+gateway config written to the dev store, cleaned up after) — confirmed
+the rendered WhatsApp text contains the full account block, not just a
+link. `pnpm run check:backend` regression suite passing. Committed
+`f619bfc`, pushed, deployed (backend file synced + `pm2 restart
+jenix-backend --update-env`, health-checked). No admin-panel change
+needed for this one — pure backend message-formatting fix.
 
 ## Aug 23 2026 — Walk-in Orders: per-line discounts, Proforma workflow, customer save, payment-request send, full order editing (DEPLOYED)
 
@@ -135,6 +165,21 @@ as `883d71c`, pushed to `origin/main`.
   on the VPS via `node scripts/seed-admin.js --password '...'` per the
   user's explicit instruction **not** to commit the new password to git
   — it wasn't.
+
+## Aug 23 2026 — regular Orders "Demand for Payment" now also emails, not just WhatsApp (DEPLOYED)
+
+User tested the walk-in orders "Send for Payment" flow above, then asked
+for the same on regular orders: the Orders page's existing **"Demand for
+Payment"** button (`manual-payments.service.js`'s `demandManualPayment`)
+was WhatsApp-only. Added an email send alongside it, reusing the existing
+`payment_pending` template (the same one sent automatically at checkout)
+rather than a new one — same customerName/orderNo/orderTotal/
+paymentMethod/paymentInstructions already being computed for the
+WhatsApp message. Best-effort and independent of the WhatsApp send (no
+email on file, inactive template, or SMTP failure doesn't block or fail
+the WhatsApp side); the admin notice after clicking the button now says
+which channels actually went out. This is also the flow the Aug 25
+bank-details fix above builds on. Committed `20a047f`, deployed.
 
 ## Aug 19–20 2026 — cart-abandonment investigation + fixes (now committed + deployed)
 

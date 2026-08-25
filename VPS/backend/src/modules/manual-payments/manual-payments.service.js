@@ -689,6 +689,14 @@ async function demandManualPayment(orderId, actor) {
   if (upiLink) {
     messageLines.push(`Pay now via UPI (opens your UPI app with the amount already filled in): ${upiLink}`);
   }
+  // Bank transfer has no click-to-pay link (unlike UPI's deep link), so the
+  // account details themselves need to be in the message text -- otherwise
+  // the buyer has to click through to the order page just to see the
+  // account number/IFSC, unlike every other channel (email, walk-in
+  // WhatsApp) which already inlines them.
+  if (method === "direct_bank_transfer") {
+    messageLines.push(`Please transfer via NEFT/RTGS/IMPS to:\n${formatDemandPaymentInstructionsText(instructions)}`);
+  }
   messageLines.push(`View your order & pay: ${actionUrl}`);
   messageLines.push(
     "Once paid, please share a screenshot of the payment on that page (or reply here) so we can confirm and process your order right away."

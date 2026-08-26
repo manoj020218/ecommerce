@@ -1,13 +1,89 @@
 # Handoff — read this first
 
-Last updated: **2026-08-25**. `origin/main` HEAD is **`f619bfc`**, pushed
-and deployed to the production VPS (backend restarted via `pm2 restart`;
-admin panel rebuilt and redeployed as of the Aug 23 work below — the
-Aug 25 change was backend-only, no admin-panel rebuild needed). Working
-tree also has one unrelated stray empty file (`p.images` at repo root,
-dated Jul 7, predates every feature in this file — leave it alone unless
-the user asks about it). Everything below is committed, pushed, and
-deployed — confirmed via `git log` and live verification.
+Last updated: **2026-08-26**. `origin/main` HEAD is **`3153f5f`**, pushed
+and deployed to the production VPS (backend files synced + `pm2 restart`,
+admin panel rebuilt and redeployed with `restorecon -Rv`, verified live).
+Working tree also has one unrelated stray empty file (`p.images` at repo
+root, dated Jul 7, predates every feature in this file — leave it alone
+unless the user asks about it). Everything below is committed, pushed,
+and deployed — confirmed via `git log` and live verification.
+
+## Aug 26 2026 — Proforma invoice preview + GST-on-shipping fix (walk-in orders) + invoice Taxable Value reconciliation fix (DEPLOYED)
+
+User asked for a way to preview the Proforma Invoice from the Walk-in
+Orders list before clicking "Send for Payment" ("so before pressing
+button for send for payment we can also see what exactly we are sending
+to buyer"). While building that, spotted and asked about two real GST
+issues on the resulting invoices.
+
+1. **New "View Proforma" preview** — small link next to the
+   payment-status pill on the Walk-in Orders list (any order not yet
+   paid/cancelled). Opens the exact rendered invoice HTML in a new tab
+   (`window.open("", "_blank")` first, synchronously, then filled in once
+   the fetch resolves — avoids popup-blocker issues). Backend: new
+   `previewWalkInInvoice` service fn + `GET
+   /admin/walkin-orders/:orderId/invoice-preview` — lazily generates the
+   Proforma if the order doesn't have one yet (e.g. older orders, or
+   `generateInvoice` was left off), idempotent (repeated previews reuse
+   the same invoice number, confirmed via test — never duplicates).
+   Shared the invoice-ensuring logic with `sendWalkInPaymentRequest` via a
+   new `ensureWalkInOrderInvoice` helper.
+
+2. **Real revenue gap, not just display**: `calculateWalkInPricing`
+   (`walkin-orders.service.js`) never applied GST to the shipping charge
+   at all — unlike `cart-checkout.service.js`'s `calculatePricing`, which
+   already does this correctly for regular storefront orders. Walk-in
+   buyers were simply never charged the GST due on shipping. Fixed to
+   mirror the same blended, value-weighted GST-rate approach (rate
+   weighted by each line's taxable value, applied to the shipping
+   charge), folded into `order.gstTotal`/`grandTotal` and stored as
+   `order.shippingGstAmount`. **This does actually increase what future
+   walk-in orders with a non-zero shipping charge charge the buyer** —
+   confirmed correct behavior, not a bug, per GST law (freight billed
+   alongside goods is taxable).
+   - Also fixed a real bug found alongside this: the admin-panel "Save as
+     Order" button (unpaid path) was silently forcing
+     `generateInvoice: false` regardless of the checkbox, so a fresh
+     unpaid walk-in order never got its Proforma generated at creation
+     time — only lazily on first "Send for Payment" or "View Proforma".
+     Checkbox now only governs the *paid* path (whether to also generate
+     the Tax Invoice immediately); unpaid non-draft orders always request
+     a Proforma up front again, matching the original design intent.
+   - Frontend on-screen pricing preview (`add-walkin-order-page.jsx`)
+     updated to include the same shipping-GST math, so what admin sees
+     while building an order now matches what gets charged.
+
+3. **Invoice "Taxable Value" row didn't reconcile with Grand Total** —
+   confirmed for BOTH order types, not just walk-in. `invoices.service.js`
+   printed only the goods taxable value in the "Taxable Value" summary
+   row, never folding in the shipping charge — even though shipping's GST
+   *is* already included in the CGST/SGST/IGST totals shown right below
+   it. Result: manually summing "Taxable Value + Tax + Round Off" on a
+   printed invoice came up short by exactly the shipping charge, even
+   though Grand Total itself was always correct (this affected regular
+   storefront/cart-checkout order invoices too, since their
+   `shippingGstAmount` was already being computed and charged correctly —
+   this part was a pure display/reconciliation bug there, not a revenue
+   gap. For walk-in orders it compounded with bug #2 above, which *was* a
+   revenue gap.) Fixed: invoice's `pricing.taxableValue` = goods
+   (post-discount) + shipping, standard GST-invoice convention, now
+   reconciles exactly. **Scoped to `buildInvoiceDocument` only** (runs
+   when generating a NEW invoice) — per explicit instruction, already-
+   generated invoices in `invoice-store.json` are untouched, nothing
+   about past/already-issued invoices was changed or regenerated.
+   Updated one stale regression assertion in `run-regression-checks.js`
+   that had encoded the old (shipping-excluded) reconciliation formula —
+   this is what caught the fix needing a matching test update, the
+   full suite failed once before being corrected.
+
+**Verified end-to-end** against the dev backend: a real walk-in order
+with a ₹200 shipping charge (18% GST product) now shows Taxable Value
+₹10,200 (₹10,000 goods + ₹200 shipping), CGST+SGST ₹1,836 (includes ₹36
+shipping GST), Grand Total ₹12,036 — Taxable Value + Tax + Round Off now
+equals Grand Total exactly. `pnpm run check:backend` passing (after the
+assertion fix). Committed `3153f5f`, pushed, deployed (backend files
+synced individually, admin panel rebuilt/swapped in with
+`restorecon -Rv`, new route confirmed live via `401` not `404`).
 
 ## Aug 25 2026 — Demand/payment-request WhatsApp now inlines bank details for bank-transfer orders (DEPLOYED)
 

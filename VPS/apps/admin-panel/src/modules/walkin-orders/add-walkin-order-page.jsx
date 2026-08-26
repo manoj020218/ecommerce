@@ -72,6 +72,7 @@ function buildLinePreview(product, line) {
     grossSubtotal,
     discountAmount,
     taxableValue,
+    gstRate: Number(product?.gstRate || 0),
     gstAmount,
     lineTotal: normalizeMoney(taxableValue + gstAmount)
   };
@@ -365,13 +366,30 @@ export function AddWalkInOrderPage() {
   const summary = useMemo(() => {
     const lines = form.items.map(line => buildLinePreview(productCache[line.productId], line));
     const taxableValue = lines.reduce((s, l) => s + l.taxableValue, 0);
-    const gstTotal = lines.reduce((s, l) => s + l.gstAmount, 0);
+    const productGstTotal = lines.reduce((s, l) => s + l.gstAmount, 0);
     const discountTotal = lines.reduce((s, l) => s + l.discountAmount, 0);
     const shipCharge = form.shippingMethod === "self_pickup" ? 0 : normalizeMoney(form.shippingCharge);
+
+    // Mirrors calculateWalkInPricing's blended, value-weighted GST rate
+    // applied to the shipping charge -- keeps this on-screen preview in
+    // sync with what the backend actually charges the buyer.
+    let rateWeightNumerator = 0;
+    let rateWeightDenominator = 0;
+    lines.forEach(l => {
+      if (l.taxableValue > 0) {
+        rateWeightNumerator += l.taxableValue * l.gstRate;
+        rateWeightDenominator += l.taxableValue;
+      }
+    });
+    const blendedGstRate = rateWeightDenominator > 0 ? rateWeightNumerator / rateWeightDenominator : 0;
+    const shippingGstAmount = normalizeMoney((shipCharge * blendedGstRate) / 100);
+    const gstTotal = productGstTotal + shippingGstAmount;
+
     return {
       itemCount: lines.reduce((s, l) => s + l.qty, 0),
       taxableValue,
       gstTotal,
+      shippingGstAmount,
       discountTotal,
       shippingCharge: shipCharge,
       grandTotal: normalizeMoney(taxableValue + gstTotal + shipCharge)
@@ -423,10 +441,17 @@ export function AddWalkInOrderPage() {
         return;
       }
 
+      // Unpaid, non-draft orders always request a Proforma up front (matching
+      // the "remains a Proforma Invoice until payment is confirmed" design) --
+      // the "Generate invoice now" checkbox only governs whether a *paid*
+      // order also gets its Tax Invoice generated immediately vs. later.
+      // Previously this collapsed to false for every unpaid order too,
+      // silently skipping Proforma generation at creation time (it would
+      // still get created lazily on first "Send for Payment").
       const payload = {
         ...form,
         markAsPaid: asDraft ? false : form.markAsPaid,
-        generateInvoice: asDraft ? false : (form.markAsPaid ? form.generateInvoice : false),
+        generateInvoice: asDraft ? false : (form.markAsPaid ? form.generateInvoice : true),
         shippingCharge: form.shippingMethod === "self_pickup" ? 0 : normalizeMoney(form.shippingCharge),
         items: itemsPayload
       };

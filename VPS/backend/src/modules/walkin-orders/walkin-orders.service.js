@@ -27,7 +27,7 @@ const {
 const {
   resolveDirectPaymentDiscountPercent
 } = require("../payment-gateways/payment-gateways.model");
-const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
+const { ensureInvoiceForOrder, getInvoiceDownload } = require("../invoices/invoices.service");
 const { getAllSettings } = require("../settings/settings.service");
 const { notifyCustomerEvent } = require("../marketing/marketing.service");
 const {
@@ -415,8 +415,29 @@ function calculateWalkInPricing(lines, paymentMethod, shippingCharge, paymentSto
     gstTotal = roundMoney(gstTotal + line.gstAmount);
   }
 
+  // Freight/shipping billed alongside goods is itself taxable under GST --
+  // mirrors cart-checkout.service.js's calculatePricing exactly (blended,
+  // value-weighted product GST rate applied to the shipping charge, so a
+  // mixed-rate order still taxes shipping proportionally to what's actually
+  // being shipped). Previously this was skipped entirely for walk-in
+  // orders -- shippingCharge was added to grandTotal with no GST on it at
+  // all, meaning the buyer was never actually charged the GST due on
+  // shipping (not just a display gap -- real under-collection).
+  let gstRateWeightNumerator = 0;
+  let gstRateWeightDenominator = 0;
+  for (const line of lines) {
+    if (line.taxableValue > 0) {
+      gstRateWeightNumerator += line.taxableValue * Number(line.gstRate || 0);
+      gstRateWeightDenominator += line.taxableValue;
+    }
+  }
+  const blendedGstRate =
+    gstRateWeightDenominator > 0 ? gstRateWeightNumerator / gstRateWeightDenominator : 0;
   const normalizedShippingCharge = roundMoney(shippingCharge);
-  const preRoundGrand = roundMoney(taxableValue + gstTotal + normalizedShippingCharge);
+  const shippingGstAmount = roundMoney((normalizedShippingCharge * blendedGstRate) / 100);
+  const gstTotalWithShipping = roundMoney(gstTotal + shippingGstAmount);
+
+  const preRoundGrand = roundMoney(taxableValue + gstTotalWithShipping + normalizedShippingCharge);
   const roundedGrand = Math.round(preRoundGrand);
   const roundOff = roundMoney(roundedGrand - preRoundGrand);
   const grandTotal = roundMoney(preRoundGrand + roundOff);
@@ -425,7 +446,9 @@ function calculateWalkInPricing(lines, paymentMethod, shippingCharge, paymentSto
     productSubtotal,
     discountAmount,
     taxableValue,
-    gstTotal,
+    gstTotal: gstTotalWithShipping,
+    productGstAmount: gstTotal,
+    shippingGstAmount,
     shippingCharge: normalizedShippingCharge,
     roundOff,
     grandTotal
@@ -802,6 +825,7 @@ async function createWalkInOrder(payload, actor) {
     taxableValue: pricing.taxableValue,
     gstTotal: pricing.gstTotal,
     shippingCharge: pricing.shippingCharge,
+    shippingGstAmount: pricing.shippingGstAmount,
     roundOff: pricing.roundOff,
     grandTotal: pricing.grandTotal,
     paymentStatus: "pending",
@@ -957,6 +981,7 @@ async function updateWalkInOrder(orderId, payload, actor) {
   order.taxableValue = pricing.taxableValue;
   order.gstTotal = pricing.gstTotal;
   order.shippingCharge = pricing.shippingCharge;
+  order.shippingGstAmount = pricing.shippingGstAmount;
   order.roundOff = pricing.roundOff;
   order.grandTotal = pricing.grandTotal;
   order.orderStatus = resolveInitialOrderStatus({
@@ -1090,6 +1115,24 @@ function buildWalkInPaymentInstructionsText(storeProfile) {
   return lines.length > 0 ? lines.join("\n") : "Contact us for payment details.";
 }
 
+// Shared by sendWalkInPaymentRequest and previewWalkInInvoice: ensures the
+// order has an invoice (generating a Proforma if it doesn't have one yet --
+// e.g. generateInvoice was unchecked at creation, or this is an older order
+// from before that was the default) without touching orderStatus. Caller is
+// responsible for persisting authStore if it made other changes too; this
+// only writes when it actually had to generate something.
+async function ensureWalkInOrderInvoice(authStore, order, actor, source) {
+  if (order.invoiceId) {
+    return null;
+  }
+  const invoiceResult = await ensureInvoiceForOrder(order.id, actor, { source });
+  order.invoiceId = invoiceResult.invoice?.id || null;
+  order.invoiceNumber = invoiceResult.invoice?.invoiceNumber || "";
+  order.updatedAt = nowIso();
+  await writeAuthStore(authStore);
+  return invoiceResult.invoice;
+}
+
 // Ensures the order has a Proforma Invoice (generating one if it doesn't
 // yet -- e.g. generateInvoice was unchecked at creation) and emails +
 // WhatsApps the customer a payment request referencing it. Distinct from
@@ -1107,17 +1150,7 @@ async function sendWalkInPaymentRequest(orderId, actor) {
     throw new HttpError(409, "This order is already paid.");
   }
 
-  let invoice = null;
-  if (!order.invoiceId) {
-    const invoiceResult = await ensureInvoiceForOrder(order.id, actor, {
-      source: "walkin_payment_request"
-    });
-    order.invoiceId = invoiceResult.invoice?.id || null;
-    order.invoiceNumber = invoiceResult.invoice?.invoiceNumber || "";
-    order.updatedAt = nowIso();
-    await writeAuthStore(authStore);
-    invoice = invoiceResult.invoice;
-  }
+  const invoice = await ensureWalkInOrderInvoice(authStore, order, actor, "walkin_payment_request");
 
   const toEmail = order.billingAddress?.email || "";
   const toMobile = order.billingAddress?.mobile || "";
@@ -1168,6 +1201,25 @@ async function sendWalkInPaymentRequest(orderId, actor) {
     emailResult: result?.email || null,
     whatsappResult: result?.whatsapp || null
   };
+}
+
+// Read-only-in-spirit preview so admin can see exactly what "Send for
+// Payment" would generate/send before actually pressing it -- ensures the
+// (Proforma, while unpaid) invoice exists first if it doesn't yet, exactly
+// like sendWalkInPaymentRequest does, but never sends any notification.
+// Doesn't touch orderStatus, matching the other invoice-ensuring call sites.
+async function previewWalkInInvoice(orderId, actor) {
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+  const order = findWalkInOrderOrThrow(authStore, orderId);
+
+  await ensureWalkInOrderInvoice(authStore, order, actor, "walkin_invoice_preview");
+
+  if (!order.invoiceId) {
+    throw new HttpError(409, "Could not generate an invoice preview for this order.");
+  }
+
+  return getInvoiceDownload(order.invoiceId);
 }
 
 async function generateWalkInInvoice(orderId, payload, actor) {
@@ -1284,5 +1336,6 @@ module.exports = {
   generateWalkInInvoice,
   updateWalkInOrderStatus,
   saveWalkInCustomer,
-  sendWalkInPaymentRequest
+  sendWalkInPaymentRequest,
+  previewWalkInInvoice
 };

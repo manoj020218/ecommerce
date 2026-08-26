@@ -973,6 +973,20 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
   const shippingGstAmount = Number(order.shippingGstAmount || 0);
   const shippingTaxSplit = splitTaxAmounts(0, shippingGstAmount, placeOfSupply.isIntraState);
 
+  // The printed "Taxable Value" row must be the FULL value being taxed --
+  // goods (post-discount) plus shipping -- not goods alone. shippingGstAmount
+  // above is already folded into cgst/sgst/igst, so if the displayed
+  // Taxable Value excludes shipping, "Taxable Value + Tax + Round Off" no
+  // longer reconciles to Grand Total (short by exactly the shipping
+  // charge), even though Grand Total itself is correct and the shipping
+  // line is shown separately above it -- reads as a bookkeeping error.
+  // order.taxableValue itself is left untouched (other code reads it as
+  // "goods taxable value" specifically); this combined figure is only used
+  // for the invoice's own totals block below.
+  const totalTaxableValueWithShipping = roundMoney(
+    Number(order.taxableValue || 0) + Number(order.shippingCharge || 0)
+  );
+
   const cgstTotal = roundMoney(
     items.reduce((sum, item) => sum + Number(item.cgstAmount || 0), 0) + shippingTaxSplit.cgstAmount
   );
@@ -1027,7 +1041,7 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
     pricing: {
       productSubtotal: Number(order.productSubtotal || 0),
       discountAmount: Number(order.discountAmount || 0),
-      taxableValue: Number(order.taxableValue || 0),
+      taxableValue: totalTaxableValueWithShipping,
       gstTotal: Number(order.gstTotal || 0),
       cgstTotal,
       sgstTotal,

@@ -8,7 +8,8 @@ import {
   confirmWalkInPayment,
   generateWalkInInvoice,
   updateWalkInOrderStatus,
-  sendWalkInPaymentRequest
+  sendWalkInPaymentRequest,
+  previewWalkInInvoice
 } from "./walkin-orders.api";
 
 // ── Status pill ───────────────────────────────────────────────────────────────
@@ -160,6 +161,31 @@ export function WalkInOrdersPage() {
     finally { setBusyKey(""); }
   };
 
+  const handlePreviewInvoice = async (order) => {
+    // Open the tab synchronously, in direct response to the click, then fill
+    // it in once the (async) fetch resolves -- opening it only after the
+    // await would get blocked as a non-user-gesture popup in most browsers.
+    const win = window.open("", "_blank");
+    if (!win) {
+      setError("Pop-up blocked. Please allow pop-ups for this site to preview the invoice.");
+      return;
+    }
+    win.document.write("<p style=\"font-family:sans-serif;padding:24px;color:#6b7280;\">Loading invoice preview…</p>");
+    const key = `preview:${order.id}`;
+    setBusyKey(key); setError("");
+    try {
+      const data = await previewWalkInInvoice(order.id);
+      win.document.open();
+      win.document.write(data.content);
+      win.document.close();
+    } catch (e) {
+      win.close();
+      setError(e.message || "Failed to load invoice preview.");
+    } finally {
+      setBusyKey("");
+    }
+  };
+
   const handleUpdateStatus = async (order, newStatus) => {
     const key = `${newStatus}:${order.id}`;
     setBusyKey(key); setError(""); setNotice("");
@@ -289,9 +315,17 @@ export function WalkInOrdersPage() {
                     )}
                   </td>
                   <td style={{ padding: "12px 14px" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
                       <StatusPill value={order.orderStatus} />
                       <StatusPill value={order.paymentStatus} />
+                      {order.paymentStatus !== "paid" && order.orderStatus !== "cancelled" && (
+                        <button type="button"
+                          onClick={() => handlePreviewInvoice(order)}
+                          disabled={busyKey === `preview:${order.id}`}
+                          style={{ background: "none", border: "none", padding: 0, marginTop: 2, fontSize: 11, color: "var(--brand)", cursor: "pointer", textDecoration: "underline" }}>
+                          {busyKey === `preview:${order.id}` ? "Loading…" : "View Proforma"}
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td style={{ padding: "12px 14px", fontSize: 12, color: "var(--muted)", whiteSpace: "nowrap" }}>

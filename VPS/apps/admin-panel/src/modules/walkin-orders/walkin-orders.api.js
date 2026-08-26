@@ -83,3 +83,7 @@ export function sendWalkInPaymentRequest(orderId) {
     body: {}
   });
 }
+
+export function previewWalkInInvoice(orderId) {
+  return apiFetch(`/admin/walkin-orders/${orderId}/invoice-preview`);
+}

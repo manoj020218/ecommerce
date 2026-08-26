@@ -59,6 +59,11 @@ function createWalkInOrdersRouter() {
     requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.EDIT),
     controller.adminUpdateWalkInOrder
   );
+  router.get(
+    "/:orderId/invoice-preview",
+    requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.GENERATE_INVOICE),
+    controller.adminPreviewWalkInInvoice
+  );
   router.post(
     "/:orderId/send-payment-request",
     requireAdminPermission(WALKIN_ORDERS_PERMISSIONS.EDIT),

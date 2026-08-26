@@ -1830,12 +1830,15 @@ async function run() {
       true
     );
     assert.notEqual(phase10InvoiceForManualOrder.json.data.pricing.roundOff, 0);
+    // pricing.taxableValue on the invoice is goods + shipping combined (so the
+    // printed "Taxable Value" row actually reconciles with CGST/SGST/IGST,
+    // which already include shipping's GST) -- shippingCharge is NOT added a
+    // second time here, unlike before that fix.
     assert.equal(
       Number(
         (
           phase10InvoiceForManualOrder.json.data.pricing.taxableValue +
           phase10InvoiceForManualOrder.json.data.pricing.gstTotal +
-          phase10InvoiceForManualOrder.json.data.pricing.shippingCharge +
           phase10InvoiceForManualOrder.json.data.pricing.roundOff
         ).toFixed(2)
       ),

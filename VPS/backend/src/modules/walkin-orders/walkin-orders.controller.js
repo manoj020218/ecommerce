@@ -99,6 +99,11 @@ const adminSendWalkInPaymentRequest = asyncHandler(async (req, res) => {
   return ok(res, data, "Payment request sent.");
 });
 
+const adminPreviewWalkInInvoice = asyncHandler(async (req, res) => {
+  const data = await service.previewWalkInInvoice(req.params.orderId, req.actor);
+  return ok(res, data, "Invoice preview generated.");
+});
+
 module.exports = {
   adminListWalkInOrders,
   adminSearchWalkInCustomers,
@@ -110,5 +115,6 @@ module.exports = {
   adminGenerateWalkInInvoice,
   adminUpdateWalkInOrderStatus,
   adminSaveWalkInCustomer,
-  adminSendWalkInPaymentRequest
+  adminSendWalkInPaymentRequest,
+  adminPreviewWalkInInvoice
 };

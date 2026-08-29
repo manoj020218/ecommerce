@@ -1,12 +1,67 @@
 # Handoff — read this first
 
-Last updated: **2026-08-26**. `origin/main` HEAD is **`3153f5f`**, pushed
-and deployed to the production VPS (backend files synced + `pm2 restart`,
-admin panel rebuilt and redeployed with `restorecon -Rv`, verified live).
+Last updated: **2026-08-29**. `origin/main` HEAD is still **`3153f5f`** —
+nothing new committed since Aug 26 (the Aug 29 entry below is a support-
+case investigation only, no code changed). Everything below is committed,
+pushed, and deployed — confirmed via `git log` and live verification.
 Working tree also has one unrelated stray empty file (`p.images` at repo
 root, dated Jul 7, predates every feature in this file — leave it alone
-unless the user asks about it). Everything below is committed, pushed,
-and deployed — confirmed via `git log` and live verification.
+unless the user asks about it).
+
+## Aug 29 2026 — Support case: order `JNX-ORD-20260829-00039` invoice (₹4,214) vs. amount buyer paid (₹4,318) — NOT A BUG, no code changed
+
+User asked why this order's invoice/payment-demand amount (₹4,214) didn't
+match what the buyer actually paid (₹4,318). Investigated at length
+(walked through `walkin-orders.service.js`'s `ensureWalkInOrderInvoice` /
+`forceRegenerate` staleness-on-edit logic, which turned out to be a red
+herring — that logic already works correctly and wasn't the cause here)
+before the user identified the real story from talking to the buyer
+directly:
+
+1. Buyer started checkout via the payment gateway (PG), which correctly
+   quoted **₹4,318 — the full price, no discount** (this order's PG
+   flow doesn't apply the manual-payment-method discount, see below).
+2. PG's **mobile web view** tried to hand off to a UPI app on his phone;
+   he had none installed, and — unlike the **desktop** PG view — mobile
+   doesn't offer a fallback scannable QR code. He got stuck mid-checkout.
+3. He contacted the store directly; admin sent him the store's own manual
+   UPI QR code (out-of-band, not through the PG) and he paid **₹4,318**
+   against that.
+4. Admin manually verified the payment. Since this ended up being paid by
+   a **non-PG method** (direct UPI to the store, not through the
+   gateway), the order correctly got the **PG-fee-passthrough discount**
+   (₹87.48, ≈₹104 after GST) applied when booked/invoiced — landing on
+   **₹4,214**, exactly ₹104 less than what he paid via the PG's own
+   quote.
+
+**Confirmed by the user as working as intended, not a bug**: the
+discount in question only ever applies for non-PG payment methods — it's
+how PG processing-fee costs are passed on as savings to buyers who pay
+by bank/UPI transfer directly instead of through the gateway. The buyer
+was never overcharged; he simply paid the PG's own (correct, undiscounted)
+quoted amount via an alternate channel, and then received the discount
+he was entitled to once verified as a non-PG payment. No refund owed, no
+checkout/pricing code involved, no code changes made.
+
+**If a similar ticket comes up again** ("invoice/demand amount doesn't
+match what the buyer paid" for a `manual_upi`/bank-transfer order that
+started life as an online PG checkout): check whether the buyer paid via
+the PG's own quoted amount (no discount) vs. an out-of-band manual
+transfer that later got the non-PG discount applied on verification —
+that alone explains a gap of roughly the order's `discountAmount` (grossed
+up for GST). Don't re-walk the `walkin-orders.service.js` invoice-
+regeneration code for this pattern — it isn't the cause.
+
+**Separately identified real gap, not yet acted on**: manually-verified
+payments (`manualPaymentStatus: "verified"`) have no field recording the
+*actual amount confirmed* — it's a bare boolean, no amount captured
+separately from `order.grandTotal`. Fine for this case since the numbers
+were understood after the fact via conversation with the buyer, but there
+is currently no way to audit "amount buyer says they paid" vs. "amount
+system says was received" for manual-payment orders after the fact,
+unlike gateway (Razorpay/Cashfree) orders where the captured amount is in
+the payment-store records. Not fixed, not requested — noting it here in
+case a future reconciliation task revisits it.
 
 ## Aug 26 2026 — Proforma invoice preview + GST-on-shipping fix (walk-in orders) + invoice Taxable Value reconciliation fix (DEPLOYED)
 

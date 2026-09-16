@@ -1,12 +1,59 @@
 # Handoff — read this first
 
-Last updated: **2026-08-29**. `origin/main` HEAD is still **`3153f5f`** —
-nothing new committed since Aug 26 (the Aug 29 entry below is a support-
-case investigation only, no code changed). Everything below is committed,
-pushed, and deployed — confirmed via `git log` and live verification.
-Working tree also has one unrelated stray empty file (`p.images` at repo
-root, dated Jul 7, predates every feature in this file — leave it alone
-unless the user asks about it).
+Last updated: **2026-09-16**. `origin/main` HEAD is now **`c936ad8`**
+(committed locally, not yet pushed — ask the user before pushing).
+Everything below is committed and deployed to the new VPS
+(103.118.183.243) — confirmed via `git log` and live `pm2`/log
+verification. Working tree also has one unrelated stray empty file
+(`p.images` at repo root, dated Jul 7, predates every feature in this
+file — leave it alone unless the user asks about it).
+
+## Sep 16 2026 — WhatsApp crash-loop root cause + fix, memory ceiling bump (DEPLOYED)
+
+`jenix-backend` on the new VPS was crash-looping — 328+ pm2 restarts in
+a single day, roughly every 30-90 seconds, taking the *entire* shared
+commerce backend down each time (not just WhatsApp). Root-caused and
+fixed:
+
+1. **Real cause**: Baileys (`@whiskeysockets/baileys`, the WhatsApp
+   library) defaults to decrypting and processing every chat-history
+   sync blob offered on each reconnect
+   (`shouldSyncHistoryMessage` defaults to `() => true`). On the
+   paired number's real chat history, this repeatedly spiked memory
+   past pm2's `max_memory_restart` ceiling (350M at the time). The
+   "Bad MAC" decrypt errors filling the logs were a **symptom**, not
+   the cause — each restart interrupted the sync mid-way, corrupting
+   session state further, so it never once completed cleanly.
+2. **Fix**: `whatsapp.service.js` now passes `syncFullHistory: false`
+   and `shouldSyncHistoryMessage: () => false` to `makeWASocket()` —
+   this account only ever sends order/cart notifications, so it never
+   needs the counterparty's chat history.
+3. **Separate finding while verifying the fix**: even with WhatsApp
+   fully disconnected, a real crawler/bot traffic burst
+   (`/prerender/products/*`, `/api/categories`, `/api/products`
+   hit repeatedly) independently pushed memory to 446M — confirming
+   350M was too tight for this app's own baseline+traffic peaks
+   regardless of WhatsApp. Backend re-reads/re-parses the JSON catalog
+   store on every request with no in-memory caching, so concurrent
+   bursts cause transient spikes. **Not fixed** (would mean adding a
+   caching layer — bigger change, not requested yet); only mitigated
+   by raising `max_memory_restart` from 350M → 600M in
+   `ecosystem.config.cjs` (VPS RAM headroom confirmed fine — whole box
+   was at ~20% usage). If restarts under load resume even at 600M,
+   the catalog-read caching is the real next step, not a further ceiling bump.
+4. **Operational side-effects of the incident response** (both done
+   directly on the VPS, not via code): the corrupted WhatsApp session
+   at `backend/src/database/whatsapp-session` was moved aside to
+   `whatsapp-session.bak-20260916` (not deleted) rather than left in
+   place — **WhatsApp needs a fresh QR re-pair via the admin panel**,
+   user was told and will do this themselves. `pm2 save` was run after
+   the ecosystem config change so the new ceiling survives a VPS reboot.
+5. While investigating, also confirmed via live `pm2 list` on both
+   VPS what other projects actually share each box — see
+   `project_jenix_vps_migration` memory for the full current list;
+   the new VPS (103.118.183.243) is **not** jenix-only as previously
+   assumed — it also runs fireguard-api, floodguard-api, sitemitra-api,
+   smartpos-api.
 
 ## Aug 29 2026 — Support case: order `JNX-ORD-20260829-00039` invoice (₹4,214) vs. amount buyer paid (₹4,318) — NOT A BUG, no code changed
 

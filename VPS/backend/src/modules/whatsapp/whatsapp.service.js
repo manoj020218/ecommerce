@@ -72,7 +72,18 @@ async function startConnection() {
     const sock = makeWASocket({
       version,
       auth: authState,
-      logger: pino({ level: "silent" })
+      logger: pino({ level: "silent" }),
+      // This account only ever sends order/cart notifications — it never
+      // needs the counterparty's chat history. Baileys defaults to
+      // decrypting and processing every history-sync blob WhatsApp offers
+      // on each reconnect (shouldSyncHistoryMessage defaults to () => true),
+      // which on a number with real chat history repeatedly spiked memory
+      // past pm2's max_memory_restart ceiling and killed the whole shared
+      // backend process every 30-90s (2026-09-16 incident) — the "Bad MAC"
+      // decrypt errors in the logs were a symptom of that resync being
+      // interrupted mid-way each time, not the actual crash cause.
+      syncFullHistory: false,
+      shouldSyncHistoryMessage: () => false
     });
     state.sock = sock;
     state.status = "connecting";

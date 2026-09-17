@@ -1,12 +1,99 @@
 # Handoff — read this first
 
-Last updated: **2026-09-16**. `origin/main` HEAD is now **`c936ad8`**
-(committed locally, not yet pushed — ask the user before pushing).
-Everything below is committed and deployed to the new VPS
-(103.118.183.243) — confirmed via `git log` and live `pm2`/log
-verification. Working tree also has one unrelated stray empty file
-(`p.images` at repo root, dated Jul 7, predates every feature in this
-file — leave it alone unless the user asks about it).
+Last updated: **2026-09-17**. `origin/main` HEAD is now **`2bfedd6`**,
+pushed. **NOT yet deployed to the VPS** — committed and verified via an
+isolated local dry run only (see entry below); still needs the
+`test.jenixindia.com` verification pass from the plan before a
+production deploy. Working tree also has one unrelated stray empty
+file (`p.images` at repo root, dated Jul 7, predates every feature in
+this file — leave it alone unless the user asks about it).
+
+## Sep 17 2026 — MDR pass-through pricing, replaces direct-payment discount (COMMITTED + PUSHED, NOT YET DEPLOYED)
+
+Recent MDR-charge changes mean manual UPI collection may no longer be
+free to the merchant, so the old model (silently discount 2% for
+buyers paying by bank transfer/manual UPI, funded by the PG fee the
+merchant saves) no longer reflects reality. Replaced with a
+transparent add-on model at the user's request: Subtotal → GST → Gross
+Total, then **+ MDR for whichever payment method the buyer picks + GST
+on that MDR** = Total Payment. Buyer sees the real add-on cost per
+method and chooses freely; no more silent discount messaging.
+
+**Status**: code complete, committed (`2bfedd6`), pushed to
+`origin/main`. Defaults to fully OFF (`mdrCharges.enabled: false`)
+everywhere — no buyer sees any change until the toggle is switched on.
+**Not yet deployed to either VPS.**
+
+1. **New settings** (`payment-gateways.model.js`/`.service.js`):
+   `mdrCharges` config, 3 buckets — UPI, Payment Gateway (online), Bank
+   Transfer (NEFT/RTGS/IMPS) — each with its own MDR% and GST-on-MDR%,
+   admin-editable (not hardcoded, since this is exactly the kind of
+   rate that changes again). Default rates: UPI 0.4%/18%, Payment
+   Gateway 2.5%/18%, Bank Transfer 0%/18%.
+2. **"Expose Payment MDR to Buyer" toggle** — Admin panel → Discounts &
+   Coupons → Payment Processing Charges (MDR). This is the master
+   switch (`mdrCharges.enabled`) — while off, zero MDR is added
+   anywhere (checkout, invoices, walk-in orders); rates stay
+   pre-configured and ready. **User's plan: flip this on around
+   2026-10-15** — no further dev work needed to do that, just toggle it
+   in the admin UI.
+3. **Pricing math**: `calculatePricing` (storefront,
+   `cart-checkout.service.js`) and `calculateWalkInPricing` (walk-in,
+   `walkin-orders.service.js`) both fold MDR + GST-on-MDR into
+   `grandTotal`, computed on the full pre-MDR gross total (goods + GST
+   + shipping + shipping GST), mirroring exactly how shipping is
+   already folded in. Walk-in's `online_payment_link` method maps to
+   the "online" bucket; `cash`/`cheque`/`credit_pay_later` get no MDR
+   (no electronic processing fee involved). Old
+   `directPaymentDiscount` discount mechanism left fully intact in
+   code (not deleted) — just inert while its own `enabled` flag is off.
+4. **Invoice**: MDR shows as a genuine taxable line item — own SAC code
+   **997158** (confirmed with the business's CA, not a guess), flows
+   into CGST/SGST/IGST automatically via the exact same
+   `buildShippingItemSnapshot`-style mechanism already used for
+   shipping (`invoices.service.js`).
+5. **Frontend**: checkout page, order-detail modal, and admin order
+   detail all show the transparent MDR/GST-on-MDR breakdown when
+   present. Cart page's old hardcoded "save 2%" teaser replaced with a
+   neutral note (cart page doesn't know the payment method yet, so it
+   can't show a real number). Walk-in admin order page's on-screen
+   preview mirrors the exact same MDR math as the backend — this
+   parity was the critical piece given walk-in's payment-method-based
+   pricing already caused a real bug once (see 2026-09-10 discount
+   removal below).
+6. **Found and fixed 3 instances of the same "pricing whitelist" bug
+   class** while wiring this up: `sanitizeCartView`
+   (`cart-checkout.model.js`), the admin orders pricing sanitizer
+   (`orders.service.js`), and the walk-in order summary sanitizer
+   (`walkin-orders.model.js`) all silently drop any pricing field not
+   explicitly listed in their return object — exactly the same pattern
+   that once silently dropped `shippingGstAmount` for 25 of 27 orders
+   in August (see that fix further below). All three now carry the new
+   MDR fields through. **Whenever a new pricing field is added
+   anywhere in this codebase, check for this exact trap** — the field
+   can be computed correctly everywhere upstream and still vanish in
+   an API response because of one of these whitelists.
+7. **Verified via an isolated local dry run** (not the shared
+   `pnpm run check:backend` suite — a separate one-off script): real
+   HTTP checkout with a ₹15,000 test product, all 3 payment methods
+   priced correctly, a full manual-UPI payment verified end-to-end,
+   invoice fetched and reconciled exactly (Taxable Value + Tax + Round
+   Off === Grand Total), walk-in orders for both `online_payment_link`
+   and `cash`, and toggle-off confirmed to zero MDR everywhere. This is
+   what caught bug #6 above — the isolated arithmetic check done first
+   would not have caught it.
+8. **Not done yet**: Tally export (`tally-export.service.js`) doesn't
+   know how to categorize the new MDR invoice line item —
+   deliberately left untouched since that file was already mid-edit
+   from unrelated work in this same session's working tree. It won't
+   miscategorize anything, the line will just be silently absent from
+   GST-books export until this is addressed.
+9. **Next step before production**: the plan's own verification
+   checklist calls for testing on `test.jenixindia.com` (real
+   Razorpay/Cashfree order-creation amount must match the new
+   `grandTotal` exactly, invoice PDF checked under both intra- and
+   inter-state addresses) before deploying to either VPS. Not done yet
+   — only the isolated local dry run above has happened so far.
 
 ## Sep 16 2026 — WhatsApp crash-loop root cause + fix, memory ceiling bump (DEPLOYED)
 

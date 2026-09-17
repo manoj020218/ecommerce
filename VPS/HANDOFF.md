@@ -1,14 +1,13 @@
 # Handoff — read this first
 
-Last updated: **2026-09-17**. `origin/main` HEAD is now **`2bfedd6`**,
-pushed. **NOT yet deployed to the VPS** — committed and verified via an
-isolated local dry run only (see entry below); still needs the
-`test.jenixindia.com` verification pass from the plan before a
-production deploy. Working tree also has one unrelated stray empty
-file (`p.images` at repo root, dated Jul 7, predates every feature in
-this file — leave it alone unless the user asks about it).
+Last updated: **2026-09-17**. `origin/main` HEAD is now **`8d69d14`**,
+pushed and **deployed to the new VPS** (103.118.183.243) — see entry
+below for exactly what's live vs. still pending before the MDR feature
+itself can be switched on. Working tree also has one unrelated stray
+empty file (`p.images` at repo root, dated Jul 7, predates every
+feature in this file — leave it alone unless the user asks about it).
 
-## Sep 17 2026 — MDR pass-through pricing, replaces direct-payment discount (COMMITTED + PUSHED, NOT YET DEPLOYED)
+## Sep 17 2026 — MDR pass-through pricing, replaces direct-payment discount (CODE DEPLOYED, FEATURE STILL OFF — real-order test required before toggling on)
 
 Recent MDR-charge changes mean manual UPI collection may no longer be
 free to the merchant, so the old model (silently discount 2% for
@@ -19,10 +18,24 @@ Total, then **+ MDR for whichever payment method the buyer picks + GST
 on that MDR** = Total Payment. Buyer sees the real add-on cost per
 method and chooses freely; no more silent discount messaging.
 
-**Status**: code complete, committed (`2bfedd6`), pushed to
-`origin/main`. Defaults to fully OFF (`mdrCharges.enabled: false`)
-everywhere — no buyer sees any change until the toggle is switched on.
-**Not yet deployed to either VPS.**
+**Status**: code complete, committed (`2bfedd6`, `8d69d14`), pushed to
+`origin/main`, and **deployed to the new VPS** (103.118.183.243) on
+2026-09-17 — 12 backend files copied individually (md5-verified, no
+`git pull`, since the VPS has its own uncommitted local diffs that must
+not be disturbed), both admin-panel and storefront rebuilt fresh and
+their `dist/` folders atomically swapped in, SELinux context fixed,
+`jenix-backend` restarted clean (no crash, memory normal), smoke-tested
+(storefront/admin/API/SSR product page all 200, real live traffic
+flowing normally after restart). Pre-deploy backups kept on the VPS
+(`dist.bak-20260917-100600` for both apps, `payment-store.json.bak-
+20260917-100600`) and pre-deploy backend file versions reconstructed
+from git — not yet deleted, safe to remove once the team is confident
+nothing needs rolling back.
+
+Defaults to fully OFF (`mdrCharges.enabled: false`) everywhere — no
+buyer sees any change right now, even though the code is live in
+production, because the feature is inert until the toggle is switched
+on.
 
 1. **New settings** (`payment-gateways.model.js`/`.service.js`):
    `mdrCharges` config, 3 buckets — UPI, Payment Gateway (online), Bank
@@ -88,12 +101,35 @@ everywhere — no buyer sees any change until the toggle is switched on.
    from unrelated work in this same session's working tree. It won't
    miscategorize anything, the line will just be silently absent from
    GST-books export until this is addressed.
-9. **Next step before production**: the plan's own verification
-   checklist calls for testing on `test.jenixindia.com` (real
-   Razorpay/Cashfree order-creation amount must match the new
-   `grandTotal` exactly, invoice PDF checked under both intra- and
-   inter-state addresses) before deploying to either VPS. Not done yet
-   — only the isolated local dry run above has happened so far.
+9. **⚠️ BEFORE flipping "Expose Payment MDR to Buyer" ON (planned
+   ~2026-10-15): a real order test is still required**, not yet done.
+   Code is deployed and verified via an isolated local dry run only —
+   that dry run used a mock gateway, not a real one. Specifically still
+   needed, in this order:
+   - Enable the toggle on the **live** VPS (or a controlled test
+     window) and place one real order through the actual configured
+     online gateway (Razorpay/Cashfree, whichever is enabled) with a
+     small real amount, for the "online" MDR bucket.
+   - Confirm the amount **actually charged by the gateway** (what the
+     buyer's card/UPI app shows, and what the gateway's own dashboard
+     records) matches `order.grandTotal` **exactly** — this is the one
+     number that must never silently mismatch, since it's real money
+     leaving the buyer's account. The dry run only confirmed internal
+     consistency (order/invoice math agreeing with itself), not that
+     the gateway is actually told to charge the post-MDR amount.
+   - Also do one real manual UPI order and one real bank-transfer
+     order to see the live checkout page and printed invoice exactly
+     as a real buyer/the admin would.
+   - Check the invoice PDF under both an intra-state and inter-state
+     buyer address (CGST+SGST vs IGST split) — the local dry run tested
+     one buyer address only (Delhi, came out inter-state relative to
+     the seller by chance).
+   - Only after all of the above look correct on a real order, flip
+     the toggle on for real.
+10. **Also not done yet**: Tally export categorization gap (item 8
+    above) — resolve before relying on GST-books export once the
+    feature is switched on, since MDR revenue/tax won't appear there
+    otherwise.
 
 ## Sep 16 2026 — WhatsApp crash-loop root cause + fix, memory ceiling bump (DEPLOYED)
 

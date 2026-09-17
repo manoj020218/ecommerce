@@ -11,6 +11,7 @@ const {
   normalizeGatewayCode,
   sanitizeGateway,
   sanitizeDirectPaymentDiscount,
+  sanitizeMdrCharges,
   selectGatewayForAmount
 } = require("./payment-gateways.model");
 
@@ -111,6 +112,16 @@ function ensurePaymentStoreShape(store) {
     changed = true;
   }
 
+  if (
+    !store.mdrCharges ||
+    typeof store.mdrCharges !== "object" ||
+    Array.isArray(store.mdrCharges) ||
+    !store.mdrCharges.rates
+  ) {
+    store.mdrCharges = clone(defaults.mdrCharges);
+    changed = true;
+  }
+
   if (!Array.isArray(store.manualPaymentSubmissions)) {
     store.manualPaymentSubmissions = [];
     changed = true;
@@ -156,7 +167,8 @@ async function listPaymentGateways(filters = {}) {
 
   return {
     gateways: sortByPriority(gateways).map(sanitizeGateway),
-    directPaymentDiscount: sanitizeDirectPaymentDiscount(paymentStore.directPaymentDiscount)
+    directPaymentDiscount: sanitizeDirectPaymentDiscount(paymentStore.directPaymentDiscount),
+    mdrCharges: sanitizeMdrCharges(paymentStore.mdrCharges)
   };
 }
 
@@ -283,6 +295,47 @@ async function updateDirectPaymentDiscountConfig(patch, actor) {
   return sanitizeDirectPaymentDiscount(current);
 }
 
+const MDR_METHOD_KEYS = Object.freeze(["manual_upi", "online", "direct_bank_transfer"]);
+
+async function updateMdrChargesConfig(patch, actor) {
+  const paymentStore = await readPaymentStore();
+  ensurePaymentStoreShape(paymentStore);
+
+  const current = paymentStore.mdrCharges;
+  if (patch.enabled !== undefined) {
+    current.enabled = Boolean(patch.enabled);
+  }
+  if (patch.rates !== undefined && patch.rates && typeof patch.rates === "object") {
+    for (const key of MDR_METHOD_KEYS) {
+      const rate = patch.rates[key];
+      if (!rate || typeof rate !== "object") {
+        continue;
+      }
+      if (rate.percent !== undefined) {
+        current.rates[key].percent = Number(rate.percent);
+      }
+      if (rate.gstPercent !== undefined) {
+        current.rates[key].gstPercent = Number(rate.gstPercent);
+      }
+    }
+  }
+
+  await writePaymentStore(paymentStore);
+
+  await addActivityLog({
+    action: "payment_gateway.mdr_charges.updated",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "payment_mdr_charges",
+    resourceId: "mdr_charges",
+    metadata: {
+      changedFields: Object.keys(patch || {})
+    }
+  });
+
+  return sanitizeMdrCharges(current);
+}
+
 function resolveGatewayForPaymentAttempt(paymentStore, input) {
   return selectGatewayForAmount(paymentStore, input);
 }
@@ -294,5 +347,6 @@ module.exports = {
   getPaymentGatewayConfig,
   updatePaymentGateway,
   updateDirectPaymentDiscountConfig,
+  updateMdrChargesConfig,
   resolveGatewayForPaymentAttempt
 };

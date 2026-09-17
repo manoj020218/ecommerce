@@ -39,6 +39,22 @@ const updateDirectDiscountPayloadSchema = z.object({
   applicableMethods: z.array(z.string().trim().min(2).max(120)).optional()
 });
 
+const mdrRatePayloadSchema = z.object({
+  percent: z.coerce.number().min(0).max(50).optional(),
+  gstPercent: z.coerce.number().min(0).max(50).optional()
+});
+
+const updateMdrChargesPayloadSchema = z.object({
+  enabled: z.boolean().optional(),
+  rates: z
+    .object({
+      manual_upi: mdrRatePayloadSchema.optional(),
+      online: mdrRatePayloadSchema.optional(),
+      direct_bank_transfer: mdrRatePayloadSchema.optional()
+    })
+    .optional()
+});
+
 function ensureObject(payload, label) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new HttpError(400, `${label} payload must be an object.`);
@@ -59,8 +75,14 @@ function parseUpdateDirectDiscountPayload(payload) {
   return updateDirectDiscountPayloadSchema.parse(payload);
 }
 
+function parseUpdateMdrChargesPayload(payload) {
+  ensureObject(payload, "Update MDR charges");
+  return updateMdrChargesPayloadSchema.parse(payload);
+}
+
 module.exports = {
   parseListGatewaysQuery,
   parseUpdateGatewayPayload,
-  parseUpdateDirectDiscountPayload
+  parseUpdateDirectDiscountPayload,
+  parseUpdateMdrChargesPayload
 };

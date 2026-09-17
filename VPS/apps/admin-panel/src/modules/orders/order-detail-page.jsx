@@ -14,6 +14,7 @@ import {
   fetchInvoiceForOrder,
   fetchInvoiceDownloadData,
   correctInvoiceBuyer,
+  resendInvoice,
   fetchShippingCouriers,
   createShippingCourier,
   createShipment,
@@ -25,7 +26,11 @@ import {
   verifyManualPayment,
   demandManualPayment
 } from "./orders.api";
-import { searchWalkInProducts } from "../walkin-orders/walkin-orders.api";
+import {
+  searchWalkInProducts,
+  confirmWalkInPayment,
+  updateWalkInOrderStatus
+} from "../walkin-orders/walkin-orders.api";
 import { fetchSettings } from "../settings/settings.api";
 import { fetchProduct } from "../products/products.api";
 import { API_BASE_URL } from "../../shared/api/http-client";
@@ -428,6 +433,112 @@ function ManualPaymentSection({ order, submissions, onVerify, onReject, busyKey 
   );
 }
 
+// ── Walk-in order fulfillment panel ──────────────────────────────────────────
+// Walk-in orders (isWalkInOrder) run their own status pipeline
+// (walkin_order_created -> payment_pending -> paid -> invoice_generated ->
+// ready_for_pickup/dispatched -> completed -> cancelled) and their own
+// self-pickup vs courier distinction on shippingMethod. The generic
+// single-pipeline action below this (Mark as Processing -> Packed w/
+// mandatory courier+tracking -> Shipped -> Delivered) is built for the
+// storefront's orderStatus vocabulary (processing/fulfilled/delivered) only
+// -- it doesn't recognize walk-in statuses at all, so a walk-in order always
+// rendered as brand-new ("Mark as Processing"), and clicking that button
+// would have overwritten the walk-in order's real orderStatus with
+// "processing", corrupting it. This panel replaces that block for walk-in
+// orders and drives the same actions already used (and working) on the
+// Walk-in Orders list page, with self-pickup skipping courier/tracking
+// entirely per the shipping method already declared at order creation.
+const WALKIN_STAGE_LABEL = {
+  walkin_order_created: "Order Created",
+  payment_pending: "Awaiting Payment",
+  paid: "Paid",
+  invoice_generated: "Invoice Generated",
+  ready_for_pickup: "Ready for Pickup",
+  dispatched: "Shipped",
+  completed: "Completed",
+  cancelled: "Cancelled"
+};
+
+function WalkInFulfillmentPanel({ order, onReload }) {
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const isSelfPickup = order.shippingMethod === "self_pickup";
+  const status = order.orderStatus;
+
+  const run = async (fn, confirmMsg) => {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      await fn();
+      await onReload();
+    } catch (e) {
+      setActionError(e.message || "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConfirmPayment = () =>
+    run(() => confirmWalkInPayment(order.id, { generateInvoice: true }));
+  const handleReadyForPickup = () =>
+    run(() => updateWalkInOrderStatus(order.id, { orderStatus: "ready_for_pickup" }));
+  const handleDispatch = () =>
+    run(() => updateWalkInOrderStatus(order.id, { orderStatus: "dispatched" }));
+  const handleComplete = () =>
+    run(
+      () => updateWalkInOrderStatus(order.id, { orderStatus: "completed" }),
+      isSelfPickup ? "Confirm this order has been picked up by the customer?" : "Confirm this order has been delivered?"
+    );
+  const handleCancel = () =>
+    run(
+      () => updateWalkInOrderStatus(order.id, { orderStatus: "cancelled" }),
+      "Cancel this walk-in order? This cannot be undone."
+    );
+
+  return (
+    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "16px 20px", marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>Walk-in Order</span>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>
+            {isSelfPickup ? "Self Pickup" : "Courier / Delivery"} · {WALKIN_STAGE_LABEL[status] || status}
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(status === "walkin_order_created" || status === "payment_pending") && (
+            <button type="button" className="btn btn-primary btn-small" disabled={busy} onClick={handleConfirmPayment}>
+              {busy ? "Confirming…" : "Confirm Payment Received"}
+            </button>
+          )}
+          {(status === "paid" || status === "invoice_generated") && isSelfPickup && (
+            <button type="button" className="btn btn-primary btn-small" style={{ background: "#1d4ed8" }} disabled={busy} onClick={handleReadyForPickup}>
+              {busy ? "Saving…" : "Ready for Pickup"}
+            </button>
+          )}
+          {(status === "paid" || status === "invoice_generated") && !isSelfPickup && (
+            <button type="button" className="btn btn-primary btn-small" style={{ background: "#7e22ce" }} disabled={busy} onClick={handleDispatch}>
+              {busy ? "Saving…" : "Mark Dispatched"}
+            </button>
+          )}
+          {(status === "ready_for_pickup" || status === "dispatched") && (
+            <button type="button" className="btn btn-primary btn-small" style={{ background: "#16a34a" }} disabled={busy} onClick={handleComplete}>
+              {busy ? "Saving…" : isSelfPickup ? "Picked Up by Customer" : "Mark Delivered"}
+            </button>
+          )}
+          {!["completed", "cancelled"].includes(status) && (
+            <button type="button" className="btn btn-secondary btn-small" disabled={busy} onClick={handleCancel}
+              style={{ color: "var(--danger)" }}>
+              Cancel Order
+            </button>
+          )}
+        </div>
+      </div>
+      {actionError && <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>{actionError}</p>}
+    </div>
+  );
+}
+
 // ── Mark as Processing modal ─────────────────────────────────────────────────
 
 function ProcessingModal({ order, onClose, onSave, saving, error }) {
@@ -524,6 +635,10 @@ function EditItemsModal({ order, onClose, onSave, saving, error }) {
     }))
   );
   const [discountAmount, setDiscountAmount] = useState(0);
+  const [shippingOverrideEnabled, setShippingOverrideEnabled] = useState(false);
+  const [shippingChargeOverride, setShippingChargeOverride] = useState(
+    Number(order.pricing?.shippingCharge || 0)
+  );
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -657,6 +772,31 @@ function EditItemsModal({ order, onClose, onSave, saving, error }) {
           </span>
         </label>
 
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 260 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+            <input
+              type="checkbox"
+              checked={shippingOverrideEnabled}
+              onChange={(e) => setShippingOverrideEnabled(e.target.checked)}
+            />
+            Override shipping charge
+          </label>
+          {shippingOverrideEnabled && (
+            <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Shipping Charge (₹)</span>
+              <input
+                type="number" min="0" value={shippingChargeOverride}
+                onChange={(e) => setShippingChargeOverride(Math.max(0, Number(e.target.value) || 0))}
+                style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }}
+              />
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                Replaces the standard rate-card amount (0 = free shipping). GST on shipping
+                (18%) is still applied to whatever you enter here.
+              </span>
+            </label>
+          )}
+        </div>
+
         {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: 0 }}>{error}</p>}
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -666,7 +806,8 @@ function EditItemsModal({ order, onClose, onSave, saving, error }) {
             disabled={saving || items.length === 0}
             onClick={() => onSave({
               items: items.map((it) => ({ productId: it.productId, qty: it.qty })),
-              discountAmount
+              discountAmount,
+              shippingChargeOverride: shippingOverrideEnabled ? shippingChargeOverride : null
             })}
           >
             {saving ? "Saving…" : "Save Changes"}
@@ -1257,10 +1398,70 @@ function EditBuyerDetailsModal({ invoice, onClose, onSave, saving, error }) {
 function InvoiceSection({ invoice, onInvoiceUpdated, order, storeProfile }) {
   const [err, setErr] = useState("");
   const [downloading, setDownloading] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const [printingLabelSet, setPrintingLabelSet] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState("");
   const [editModal, setEditModal] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+
+  // window.open must run synchronously off the click, before the await below
+  // -- opening it only after the fetch resolves is what triggers popup
+  // blockers in most browsers. Same pattern already used for the Proforma
+  // invoice preview on the Walk-in Orders list.
+  const viewInvoice = async () => {
+    if (!invoice?.id) return;
+    const win = window.open("", "_blank");
+    setViewing(true);
+    setErr("");
+    try {
+      const data = await fetchInvoiceDownloadData(invoice.id);
+      const content = data?.content || "";
+      if (win) {
+        win.document.open();
+        win.document.write(content);
+        win.document.close();
+      }
+    } catch (e) {
+      win?.close();
+      setErr(e.message || "Failed to open invoice.");
+    } finally {
+      setViewing(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!order?.id) return;
+    setResending(true);
+    setErr("");
+    setResendNotice("");
+    try {
+      const result = await resendInvoice(order.id);
+      const parts = [];
+      if (result.emailSentTo) {
+        parts.push(
+          result.emailStatus === "sent"
+            ? `emailed to ${result.emailSentTo}`
+            : result.emailStatus === "smtp_not_configured"
+              ? `email to ${result.emailSentTo} skipped — SMTP isn't configured yet (Setup Wizard → SMTP Email)`
+              : `email to ${result.emailSentTo} failed`
+        );
+      }
+      if (result.whatsappSentTo) {
+        parts.push(
+          result.whatsappStatus === "sent"
+            ? `sent via WhatsApp to ${result.whatsappSentTo}`
+            : `WhatsApp to ${result.whatsappSentTo} failed`
+        );
+      }
+      setResendNotice(parts.length ? `Invoice ${parts.join(" and ")}.` : "Nothing to send — no contact on file.");
+    } catch (e) {
+      setErr(e.message || "Failed to resend invoice.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSaveBuyerEdit = async (form) => {
     setEditSaving(true);
@@ -1325,8 +1526,14 @@ function InvoiceSection({ invoice, onInvoiceUpdated, order, storeProfile }) {
             <button type="button" className="btn btn-secondary btn-small" onClick={() => { setEditModal(true); setEditError(""); }}>
               Edit Buyer Details
             </button>
+            <button type="button" className="btn btn-secondary btn-small" disabled={viewing} onClick={viewInvoice}>
+              {viewing ? "Opening…" : "View Invoice"}
+            </button>
             <button type="button" className="btn btn-secondary btn-small" disabled={downloading} onClick={download}>
               {downloading ? "Preparing…" : "Download PDF"}
+            </button>
+            <button type="button" className="btn btn-secondary btn-small" disabled={resending} onClick={handleResend}>
+              {resending ? "Sending…" : "Resend to Buyer"}
             </button>
             <button type="button" className="btn btn-secondary btn-small" disabled={printingLabelSet} onClick={printWithLabel}>
               {printingLabelSet ? "Preparing…" : "Print Invoice + Shipping Label"}
@@ -1339,6 +1546,7 @@ function InvoiceSection({ invoice, onInvoiceUpdated, order, storeProfile }) {
           "Mark as Packed".
         </p>
         {err && <p style={{ color: "var(--danger)", fontSize: 12, margin: "8px 0 0" }}>{err}</p>}
+        {resendNotice && <p style={{ color: "#16a34a", fontSize: 12, margin: "8px 0 0" }}>{resendNotice}</p>}
         {editModal && (
           <EditBuyerDetailsModal
             invoice={invoice}
@@ -1826,14 +2034,21 @@ export function OrderDetailPage() {
       <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: "14px 18px", marginBottom: 14 }}>
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
           <StatusChip label="Order Status" value={order.orderStatus} />
-          <StatusChip label="Fulfillment Stage" value={orderStageValue} />
+          {!order.isWalkInOrder && <StatusChip label="Fulfillment Stage" value={orderStageValue} />}
           <StatusChip label="Acceptance Status" value={order.acceptanceStatus} />
           <StatusChip label="Payment Mode" value={order.paymentMethod} />
           <StatusChip label="Payment Status" value={order.paymentStatus} />
         </div>
       </div>
 
+      {/* Walk-in orders run their own status pipeline (see WalkInFulfillmentPanel
+          comment) -- skip the generic manual-payment-proof banners below, which
+          are for the storefront's customer-uploads-a-screenshot flow that
+          walk-in orders never go through. */}
+      {order.isWalkInOrder && <WalkInFulfillmentPanel order={order} onReload={reload} />}
+
       {/* Manual payment action banner */}
+      {!order.isWalkInOrder && (
       <ManualPaymentSection
         order={order}
         submissions={manualPayments}
@@ -1841,7 +2056,8 @@ export function OrderDetailPage() {
         onReject={handleRejectManualPayment}
         busyKey={manualPaymentBusyKey}
       />
-      {manualPayments.length === 0 && (
+      )}
+      {!order.isWalkInOrder && manualPayments.length === 0 && (
         <PaymentActionBanner
           order={order}
           onConfirmPayment={handleConfirmPayment}
@@ -2008,6 +2224,10 @@ export function OrderDetailPage() {
             ["Taxable Amount", order.pricing?.taxableValue],
             [`GST`, order.pricing?.gstTotal],
             ["Shipping Charges", order.pricing?.shippingCharge],
+            ...(order.pricing?.mdrAmount ? [
+              [`Payment Processing Charges${order.pricing?.mdrPercent ? ` (${order.pricing.mdrPercent}%)` : ""}`, order.pricing.mdrAmount],
+              ["GST on Processing Charges", order.pricing?.mdrGstAmount]
+            ] : []),
           ].map(([label, val]) => val !== null && val !== undefined ? (
             <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>
               <span>{label}</span>
@@ -2131,6 +2351,7 @@ export function OrderDetailPage() {
           text link (not a full-size button next to the primary action) — 99% of the
           time no one wants to cancel an order, so it shouldn't be as easy to hit by
           mistake as the button that actually drives the order forward. */}
+      {!order.isWalkInOrder && (
       <div className="order-detail-action-row" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 8 }}>
         <div>
           {orderStage === "new" && (
@@ -2186,6 +2407,7 @@ export function OrderDetailPage() {
           </button>
         )}
       </div>
+      )}
 
       {/* Modals */}
       {processingModal && (

@@ -29,6 +29,11 @@ function createPaymentGatewaysRouter() {
     controller.adminUpdateDirectDiscount
   );
   router.patch(
+    "/mdr-charges",
+    requireAdminPermission(PAYMENT_GATEWAYS_PERMISSIONS.MANAGE),
+    controller.adminUpdateMdrCharges
+  );
+  router.patch(
     "/:gatewayCode",
     requireAdminPermission(PAYMENT_GATEWAYS_PERMISSIONS.MANAGE),
     controller.adminUpdatePaymentGateway

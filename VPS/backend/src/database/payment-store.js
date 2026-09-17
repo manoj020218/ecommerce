@@ -156,6 +156,22 @@ const DEFAULT_PAYMENT_STORE = Object.freeze({
     percent: 2,
     applicableMethods: ["direct_bank_transfer", "manual_upi"]
   },
+  // Merchant discount rate (MDR) the buyer's chosen payment channel actually
+  // costs to process, passed on to the buyer as a transparent add-on (plus
+  // GST on the add-on) instead of the discount above being silently baked
+  // into the price. Keyed by the 3 checkout-facing payment-method buckets --
+  // see the matching comment in payment-gateways.model.js. Defaults to
+  // disabled -- rates are pre-configured but the buyer-facing "Expose
+  // Payment MDR to Buyer" toggle (Settings > Discounts) is left off until
+  // the business turns it on (planned for 2026-10-15).
+  mdrCharges: {
+    enabled: false,
+    rates: {
+      manual_upi: { percent: 0.4, gstPercent: 18 },
+      online: { percent: 2.5, gstPercent: 18 },
+      direct_bank_transfer: { percent: 0, gstPercent: 18 }
+    }
+  },
   manualPaymentSubmissions: [],
   processedWebhooks: []
 });

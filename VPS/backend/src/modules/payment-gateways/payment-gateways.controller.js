@@ -5,7 +5,8 @@ const service = require("./payment-gateways.service");
 const {
   parseListGatewaysQuery,
   parseUpdateGatewayPayload,
-  parseUpdateDirectDiscountPayload
+  parseUpdateDirectDiscountPayload,
+  parseUpdateMdrChargesPayload
 } = require("./payment-gateways.validator");
 
 function mapValidationError(error) {
@@ -48,9 +49,16 @@ const adminUpdateDirectDiscount = asyncHandler(async (req, res) => {
   return ok(res, data, "Direct payment discount updated.");
 });
 
+const adminUpdateMdrCharges = asyncHandler(async (req, res) => {
+  const patch = parseUpdateMdrChargesPayload(req.body);
+  const data = await service.updateMdrChargesConfig(patch, req.actor);
+  return ok(res, data, "MDR charges updated.");
+});
+
 module.exports = {
   adminListPaymentGateways,
   adminGetPaymentGateway,
   adminUpdatePaymentGateway,
-  adminUpdateDirectDiscount
+  adminUpdateDirectDiscount,
+  adminUpdateMdrCharges
 };

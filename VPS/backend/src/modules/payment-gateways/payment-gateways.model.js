@@ -77,6 +77,56 @@ function resolveDirectPaymentDiscountPercent(paymentMethod, paymentStore) {
   return Number(discount.percent || 0);
 }
 
+// MDR (merchant discount rate) is what the buyer's chosen payment channel
+// actually costs to process -- unlike the discount above (a merchant-funded
+// saving passed on to the buyer), this is a real cost passed *on* to the
+// buyer as a transparent add-on, shown alongside GST on that add-on. Keyed
+// by the 3 checkout-facing payment-method buckets (PAYMENT_METHODS.ONLINE /
+// DIRECT_BANK_TRANSFER / MANUAL_UPI in cart-checkout.model.js) rather than
+// per-gateway-code, since the buyer only ever picks one of those 3 buckets
+// at checkout -- which underlying online gateway (Razorpay/Cashfree/etc.)
+// gets used is resolved separately and isn't buyer-visible.
+const DEFAULT_MDR_CHARGES = Object.freeze({
+  enabled: false,
+  rates: {
+    manual_upi: { percent: 0.4, gstPercent: 18 },
+    online: { percent: 2.5, gstPercent: 18 },
+    direct_bank_transfer: { percent: 0, gstPercent: 18 }
+  }
+});
+
+function sanitizeMdrRate(rate) {
+  return {
+    percent: roundMoney(rate?.percent || 0),
+    gstPercent: roundMoney(rate?.gstPercent || 0)
+  };
+}
+
+function sanitizeMdrCharges(mdrCharges) {
+  const defaults = DEFAULT_MDR_CHARGES.rates;
+  return {
+    enabled: Boolean(mdrCharges?.enabled),
+    rates: {
+      manual_upi: sanitizeMdrRate(mdrCharges?.rates?.manual_upi || defaults.manual_upi),
+      online: sanitizeMdrRate(mdrCharges?.rates?.online || defaults.online),
+      direct_bank_transfer: sanitizeMdrRate(
+        mdrCharges?.rates?.direct_bank_transfer || defaults.direct_bank_transfer
+      )
+    }
+  };
+}
+
+// paymentMethod here is one of PAYMENT_METHODS (online/direct_bank_transfer/
+// manual_upi) -- same bucket the buyer actually chose, not a gateway code.
+function resolveMdrRate(paymentMethod, paymentStore) {
+  const normalizedMethod = normalizeGatewayCode(paymentMethod);
+  const mdrCharges = sanitizeMdrCharges(paymentStore?.mdrCharges);
+  if (!mdrCharges.enabled || !mdrCharges.rates[normalizedMethod]) {
+    return { percent: 0, gstPercent: 0 };
+  }
+  return mdrCharges.rates[normalizedMethod];
+}
+
 function getManualPaymentInstructions(paymentMethod, paymentStore) {
   const normalizedMethod = normalizeGatewayCode(paymentMethod);
   const gateway = ensureArray(paymentStore?.gateways).find(
@@ -163,6 +213,9 @@ module.exports = {
   sanitizeGateway,
   sanitizeDirectPaymentDiscount,
   resolveDirectPaymentDiscountPercent,
+  DEFAULT_MDR_CHARGES,
+  sanitizeMdrCharges,
+  resolveMdrRate,
   getManualPaymentInstructions,
   selectGatewayForAmount
 };

@@ -355,6 +355,10 @@ export function CheckoutPage() {
       discountAmount: Number(pricing.discountAmount || 0),
       gstTotal: Number(pricing.gstTotal || 0),
       shippingCharge: Number(pricing.shippingCharge || 0),
+      mdrPercent: Number(pricing.mdrPercent || 0),
+      mdrGstPercent: Number(pricing.mdrGstPercent || 0),
+      mdrAmount: Number(pricing.mdrAmount || 0),
+      mdrGstAmount: Number(pricing.mdrGstAmount || 0),
       grandTotal: Number(pricing.grandTotal || 0)
     };
   }, [cart]);
@@ -1498,11 +1502,18 @@ export function CheckoutPage() {
                       <div>
                         <strong>{option.label}</strong>
                         <p>{PAYMENT_DESCRIPTIONS[option.value] || "Payment method configured in admin."}</p>
-                        {option.value === "direct_bank_transfer" ? (
-                          <span className="proto-discount-chip">Get 2% discount when pay by direct bank transfer</span>
-                        ) : null}
-                        {option.value === "manual_upi" ? (
-                          <span className="proto-discount-chip">Get 2% discount when pay by manual UPI</span>
+                        {/* Replaced 2026-09-17: this used to advertise a flat "2%
+                            discount" for direct_bank_transfer/manual_upi, baked
+                            silently into the price. Recent MDR-charge changes mean
+                            that's no longer accurate for every method, so instead
+                            the real add-on cost (if any) for the CURRENTLY selected
+                            method is shown transparently in the order summary below
+                            (Payment Processing Charges + GST on MDR), computed live
+                            from cart.pricing rather than a hardcoded percentage. */}
+                        {paymentMethod === option.value && Number(totals.mdrAmount || 0) > 0 ? (
+                          <span className="proto-discount-chip proto-mdr-chip">
+                            +{Number(totals.mdrPercent || 0)}% payment processing charge applies (see summary)
+                          </span>
                         ) : null}
                       </div>
                     </label>
@@ -1649,12 +1660,24 @@ export function CheckoutPage() {
               <div><span>Discount</span><strong>{formatCurrency(totals.discountAmount)}</strong></div>
               <div><span>Shipping</span><strong>{formatCurrency(totals.shippingCharge)}</strong></div>
               <div><span>GST</span><strong>{formatCurrency(totals.gstTotal)}</strong></div>
+              {totals.mdrAmount > 0 ? (
+                <>
+                  <div>
+                    <span>Payment Processing Charges{totals.mdrPercent ? ` (${totals.mdrPercent}%)` : ""}</span>
+                    <strong>{formatCurrency(totals.mdrAmount)}</strong>
+                  </div>
+                  <div>
+                    <span>GST on Processing Charges</span>
+                    <strong>{formatCurrency(totals.mdrGstAmount)}</strong>
+                  </div>
+                </>
+              ) : null}
             </div>
 
             <button type="button" className="proto-summary-total proto-summary-total-btn" onClick={() => setOrderDetailModalOpen(true)}>
-              <span>Grand Total</span>
+              <span>Total Payment</span>
               <strong>{formatCurrency(totals.grandTotal)}</strong>
-              <small>inclusive of all taxes · tap to view breakdown</small>
+              <small>inclusive of all taxes{totals.mdrAmount > 0 ? " and payment processing charges" : ""} · tap to view breakdown</small>
             </button>
 
             <div className="proto-inline-actions">

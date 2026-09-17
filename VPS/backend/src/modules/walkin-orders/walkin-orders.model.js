@@ -127,6 +127,15 @@ function sanitizeWalkInOrderSummary(order) {
     taxableValue: Number(order.taxableValue || 0),
     gstTotal: Number(order.gstTotal || 0),
     shippingCharge: Number(order.shippingCharge || 0),
+    roundOff: Number(order.roundOff || 0),
+    // Same whitelist trap documented in cart-checkout.model.js's
+    // sanitizeCartView (and once a real bug there for shippingGstAmount) --
+    // calculateWalkInPricing always computes these correctly, but they'd be
+    // silently dropped from every API response here if not carried through.
+    mdrPercent: Number(order.mdrPercent || 0),
+    mdrGstPercent: Number(order.mdrGstPercent || 0),
+    mdrAmount: Number(order.mdrAmount || 0),
+    mdrGstAmount: Number(order.mdrGstAmount || 0),
     grandTotal: Number(order.grandTotal || 0),
     paymentStatus: order.paymentStatus || "pending",
     orderStatus: order.orderStatus || WALKIN_ORDER_STATUSES.WALKIN_ORDER_CREATED,

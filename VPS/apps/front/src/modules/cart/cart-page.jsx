@@ -23,8 +23,29 @@ import {
   deleteCartItem,
   getCart,
   mergeGuestCart,
+  saveCartContact,
   updateCartItem
 } from "../products/products.api";
+
+const CONTACT_CAPTURED_KEY = "jenix.front.cartContactCaptured";
+const CONTACT_DISMISSED_KEY = "jenix.front.cartContactDismissed";
+
+function readLocalFlag(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeLocalFlag(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (_error) {
+    // Private browsing / storage disabled -- the prompt just reappears next
+    // visit, which is a harmless degradation, not worth surfacing an error.
+  }
+}
 
 export function CartPage() {
   const navigate = useNavigate();
@@ -35,6 +56,12 @@ export function CartPage() {
   const [busyKey, setBusyKey] = useState("");
   const [cart, setCart] = useState(null);
   const [promoCode, setPromoCode] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [contactPromptVisible, setContactPromptVisible] = useState(
+    !readLocalFlag(CONTACT_CAPTURED_KEY) && !readLocalFlag(CONTACT_DISMISSED_KEY)
+  );
 
   const totals = useMemo(() => {
     const pricing = cart?.pricing || {};
@@ -49,7 +76,10 @@ export function CartPage() {
     };
   }, [cart]);
 
-  const estimatedDirectPaySavings = Math.round(totals.productSubtotal * 0.02 * 100) / 100;
+  // Unused as of 2026-09-17 -- was only used by the hardcoded "save an
+  // estimated 2%" hint below, replaced with a neutral note (see comment
+  // there). Kept rather than deleted per repo convention.
+  // const estimatedDirectPaySavings = Math.round(totals.productSubtotal * 0.02 * 100) / 100;
 
   const loadCart = async () => {
     const data = await getCart(buildCartContext(isAuthenticated));
@@ -152,6 +182,38 @@ export function CartPage() {
     }
   };
 
+  // Lightweight, skippable email capture -- NOT a login wall. Guests who add
+  // to cart but never reach checkout currently leave zero contact info
+  // behind, so an abandoned cart can't be followed up with at all; this is
+  // the low-friction alternative to gating Add to Cart behind a full
+  // account, which research (and this store's own funnel data) shows tends
+  // to increase abandonment rather than reduce it.
+  const onSubmitContact = async (event) => {
+    event.preventDefault();
+    const trimmedEmail = contactEmail.trim();
+    if (!trimmedEmail) {
+      return;
+    }
+
+    setContactSaving(true);
+    setContactError("");
+    try {
+      await saveCartContact(trimmedEmail);
+      writeLocalFlag(CONTACT_CAPTURED_KEY, "1");
+      setContactPromptVisible(false);
+      setNotice("Thanks! We'll keep your cart saved and email you if anything changes.");
+    } catch (requestError) {
+      setContactError(requestError.message || "Could not save your email — please try again.");
+    } finally {
+      setContactSaving(false);
+    }
+  };
+
+  const onDismissContact = () => {
+    writeLocalFlag(CONTACT_DISMISSED_KEY, "1");
+    setContactPromptVisible(false);
+  };
+
   if (sessionLoading || loading) {
     return (
       <main className="proto-main-shell">
@@ -172,6 +234,41 @@ export function CartPage() {
 
         {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
         {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
+
+        {!isAuthenticated && items.length > 0 && contactPromptVisible ? (
+          <section className="proto-promo-card" style={{ marginBottom: 16, position: "relative" }}>
+            <button
+              type="button"
+              className="proto-line-remove"
+              aria-label="Dismiss"
+              onClick={onDismissContact}
+              style={{ position: "absolute", top: 12, right: 12 }}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </button>
+            <h2 style={{ margin: "0 0 4px" }}>Don't lose this cart</h2>
+            <p style={{ margin: "0 0 10px", color: "#6b7280", fontSize: 13 }}>
+              Add your email and we'll keep it saved for you — no account needed.
+            </p>
+            <form className="proto-promo-form" onSubmit={onSubmitContact}>
+              <StorefrontInput
+                type="email"
+                value={contactEmail}
+                onChange={(event) => setContactEmail(event.target.value)}
+                placeholder="you@company.com"
+                required
+              />
+              <StorefrontButton type="submit" variant="dark" disabled={contactSaving}>
+                {contactSaving ? "Saving..." : "Save my cart"}
+              </StorefrontButton>
+            </form>
+            {contactError ? (
+              <p style={{ marginTop: 8, color: "#dc2626", fontSize: 13 }}>{contactError}</p>
+            ) : null}
+          </section>
+        ) : null}
 
         {items.length === 0 ? (
           <section className="proto-cart-empty">
@@ -318,13 +415,20 @@ export function CartPage() {
                   <small>inclusive of all taxes</small>
                 </div>
 
+                {/* Replaced 2026-09-17: used to advertise a flat "save an
+                    estimated 2%" for Bank Transfer/UPI, baked silently into
+                    the price. Recent MDR-charge changes mean the cost differs
+                    per method and this page doesn't yet know which one the
+                    buyer will pick, so it's shown as a neutral note here — the
+                    real, live add-on (if any) for whichever method they
+                    choose is shown transparently on the checkout page. */}
                 <div className="proto-summary-hint">
                   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style={{ flexShrink: 0, color: "#16a34a", marginTop: 2 }}>
                     <circle cx="12" cy="12" r="10" stroke="currentColor" fill="none" strokeWidth="2" />
                     <path d="M12 16v-4M12 8h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
-                  <span>Pay via <strong>Bank Transfer / UPI</strong> and save an estimated{" "}
-                  <strong>{formatCurrency(estimatedDirectPaySavings)}</strong> at checkout.</span>
+                  <span>Payment processing charges (if any) depend on the payment method — see the exact
+                  amount on the checkout page before you pay.</span>
                 </div>
 
                 <StorefrontButton

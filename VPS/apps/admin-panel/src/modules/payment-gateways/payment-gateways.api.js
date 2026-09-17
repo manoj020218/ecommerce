@@ -21,3 +21,10 @@ export function updateDirectPaymentDiscount(payload) {
     body: payload
   });
 }
+
+export function updateMdrCharges(payload) {
+  return apiFetch("/admin/payment-gateways/mdr-charges", {
+    method: "PATCH",
+    body: payload
+  });
+}

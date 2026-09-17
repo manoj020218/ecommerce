@@ -25,7 +25,7 @@ const {
   ensurePaymentStoreShape
 } = require("../payment-gateways/payment-gateways.service");
 const {
-  resolveDirectPaymentDiscountPercent
+  resolveMdrRate
 } = require("../payment-gateways/payment-gateways.model");
 const { ensureInvoiceForOrder, getInvoiceDownload } = require("../invoices/invoices.service");
 const { getAllSettings } = require("../settings/settings.service");
@@ -371,22 +371,26 @@ function buildWalkInLines(catalogStore, items) {
   return items.map((item) => buildWalkInLine(findProductOrThrow(catalogStore, item.productId), item));
 }
 
+// paymentMethod/paymentStore are used again as of the MDR pass-through added
+// 2026-09-17 (see mdrBucket below) -- they were unused for a while after the
+// automatic direct-payment discount was removed 2026-09-10 (still explained
+// just below), but the parameters were deliberately kept rather than
+// stripped from every call site for exactly this reason.
 function calculateWalkInPricing(lines, paymentMethod, shippingCharge, paymentStore) {
   const productSubtotal = roundMoney(
     lines.reduce((sum, line) => sum + Number(line.lineSubtotal || 0), 0)
   );
 
-  const directDiscountPercent = resolveDirectPaymentDiscountPercent(
-    paymentMethod,
-    paymentStore || {}
-  );
-  let discountAmount =
-    directDiscountPercent > 0
-      ? roundMoney(productSubtotal * (Number(directDiscountPercent) / 100))
-      : 0;
-  if (discountAmount > productSubtotal) {
-    discountAmount = productSubtotal;
-  }
+  // Walk-in orders never get the storefront's automatic "pay by bank
+  // transfer instead of gateway" discount (see resolveDirectPaymentDiscountPercent) --
+  // every walk-in order is inherently a manual/offline payment already, so
+  // it fired silently on 100% of them with no way for the admin to see or
+  // control it, and stacked invisibly on top of a price the admin had
+  // already negotiated with the customer via the per-line discount/custom
+  // price fields. Removed at the user's explicit request (2026-09-10) after
+  // it caused a walk-in order's confirmed total (₹1804) to come in below the
+  // price shown on the draft screen (₹1850) with no indication why.
+  const discountAmount = 0;
 
   let taxableValue = 0;
   let gstTotal = 0;
@@ -440,7 +444,26 @@ function calculateWalkInPricing(lines, paymentMethod, shippingCharge, paymentSto
   const preRoundGrand = roundMoney(taxableValue + gstTotalWithShipping + normalizedShippingCharge);
   const roundedGrand = Math.round(preRoundGrand);
   const roundOff = roundMoney(roundedGrand - preRoundGrand);
-  const grandTotal = roundMoney(preRoundGrand + roundOff);
+  const preMdrGrandTotal = roundMoney(preRoundGrand + roundOff);
+
+  // MDR pass-through, mirroring cart-checkout.service.js's calculatePricing.
+  // Walk-in has more payment methods than the storefront's 3 MDR buckets
+  // (WALKIN_PAYMENT_METHODS.DIRECT_BANK_TRANSFER/.MANUAL_UPI are literally
+  // the same string values as the storefront's bucket keys, so those two
+  // pass through unmapped; ONLINE_PAYMENT_LINK routes through an actual
+  // online gateway so it maps to the "online" bucket; CASH/CHEQUE/
+  // CREDIT_PAY_LATER have no electronic processing fee at all, so they get
+  // no MDR -- unlike the discount removed above, this is purely additive
+  // and only ever raises the total for the methods that actually cost
+  // something to process, so it can't reproduce the 2026-09-10 bug.
+  const mdrBucket =
+    paymentMethod === WALKIN_PAYMENT_METHODS.ONLINE_PAYMENT_LINK ? "online" : paymentMethod;
+  const mdrRate = resolveMdrRate(mdrBucket, paymentStore || {});
+  const mdrPercent = Number(mdrRate.percent || 0);
+  const mdrGstPercent = Number(mdrRate.gstPercent || 0);
+  const mdrAmount = roundMoney((preMdrGrandTotal * mdrPercent) / 100);
+  const mdrGstAmount = roundMoney((mdrAmount * mdrGstPercent) / 100);
+  const grandTotal = roundMoney(preMdrGrandTotal + mdrAmount + mdrGstAmount);
 
   return {
     productSubtotal,
@@ -451,6 +474,10 @@ function calculateWalkInPricing(lines, paymentMethod, shippingCharge, paymentSto
     shippingGstAmount,
     shippingCharge: normalizedShippingCharge,
     roundOff,
+    mdrPercent,
+    mdrGstPercent,
+    mdrAmount,
+    mdrGstAmount,
     grandTotal
   };
 }
@@ -827,6 +854,10 @@ async function createWalkInOrder(payload, actor) {
     shippingCharge: pricing.shippingCharge,
     shippingGstAmount: pricing.shippingGstAmount,
     roundOff: pricing.roundOff,
+    mdrPercent: pricing.mdrPercent,
+    mdrGstPercent: pricing.mdrGstPercent,
+    mdrAmount: pricing.mdrAmount,
+    mdrGstAmount: pricing.mdrGstAmount,
     grandTotal: pricing.grandTotal,
     paymentStatus: "pending",
     orderStatus: resolveInitialOrderStatus(payload),
@@ -983,6 +1014,10 @@ async function updateWalkInOrder(orderId, payload, actor) {
   order.shippingCharge = pricing.shippingCharge;
   order.shippingGstAmount = pricing.shippingGstAmount;
   order.roundOff = pricing.roundOff;
+  order.mdrPercent = pricing.mdrPercent;
+  order.mdrGstPercent = pricing.mdrGstPercent;
+  order.mdrAmount = pricing.mdrAmount;
+  order.mdrGstAmount = pricing.mdrGstAmount;
   order.grandTotal = pricing.grandTotal;
   order.orderStatus = resolveInitialOrderStatus({
     markAsPaid: false,

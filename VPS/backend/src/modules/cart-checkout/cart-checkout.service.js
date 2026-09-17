@@ -32,6 +32,7 @@ const {
 } = require("../../integrations/shipping-providers/shipping-provider.adapter");
 const {
   resolveDirectPaymentDiscountPercent,
+  resolveMdrRate,
   getManualPaymentInstructions
 } = require("../payment-gateways/payment-gateways.model");
 const {
@@ -44,6 +45,7 @@ const {
 } = require("../invoices/invoices.service");
 const {
   trackCartSaved,
+  trackGuestContactCaptured,
   trackCheckoutStarted,
   trackPaymentAttemptCreated,
   trackPaymentFailed,
@@ -59,6 +61,7 @@ const {
   CART_OWNER_TYPES,
   PAYMENT_METHODS,
   SHIPPING_METHODS,
+  SHIPPING_TAX,
   CHECKOUT_STATUSES,
   RESERVATION_STATUSES,
   PAYMENT_ATTEMPT_STATUSES,
@@ -584,29 +587,43 @@ async function calculatePricing(
     destination,
     shippingStore
   );
-  const shippingCharge = Number(shippingQuote.shippingCharge || 0);
+  // Admin-negotiated shipping (e.g. a bulk-order deal agreed before the
+  // payment demand is sent) overrides the rate-card-computed charge outright
+  // -- everything downstream (its GST, round-off, grand total) is still
+  // derived from this value exactly like the automatic case, so the order
+  // stays internally consistent either way.
+  const hasShippingOverride =
+    options.shippingChargeOverride !== undefined && options.shippingChargeOverride !== null;
+  const shippingCharge = hasShippingOverride
+    ? roundMoney(Math.max(0, Number(options.shippingChargeOverride)))
+    : Number(shippingQuote.shippingCharge || 0);
 
-  // Freight/shipping billed alongside goods is itself taxable under GST — apply
-  // the cart's value-weighted product GST rate to the shipping charge (rather
-  // than a fixed rate) so a mixed-rate cart still taxes shipping proportionally
-  // to what's actually being shipped.
-  let gstRateWeightNumerator = 0;
-  let gstRateWeightDenominator = 0;
-  for (const line of lines) {
-    if (line.taxableValue > 0) {
-      gstRateWeightNumerator += line.taxableValue * Number(line.gstRate || 0);
-      gstRateWeightDenominator += line.taxableValue;
-    }
-  }
-  const blendedGstRate =
-    gstRateWeightDenominator > 0 ? gstRateWeightNumerator / gstRateWeightDenominator : 0;
-  const shippingGstAmount = roundMoney((shippingCharge * blendedGstRate) / 100);
+  // Freight/courier services (SAC 996812) are their own taxable supply under
+  // GST with a fixed rate, unlike goods where the rate depends on the HSN
+  // code of what's being shipped -- so shipping is always taxed at
+  // SHIPPING_TAX.GST_RATE, never a blended rate derived from the cart's
+  // product mix (a mixed-rate cart shipping a 5%-rated item alongside a
+  // 28%-rated one must still tax the courier's own service at its own rate).
+  const shippingGstAmount = roundMoney((shippingCharge * SHIPPING_TAX.GST_RATE) / 100);
   const gstTotalWithShipping = roundMoney(gstTotal + shippingGstAmount);
 
   const preRoundGrand = roundMoney(taxableValue + gstTotalWithShipping + shippingCharge);
   const roundedGrand = Math.round(preRoundGrand);
   const roundOff = roundMoney(roundedGrand - preRoundGrand);
-  const grandTotal = roundMoney(preRoundGrand + roundOff);
+  const preMdrGrandTotal = roundMoney(preRoundGrand + roundOff);
+
+  // MDR (merchant discount rate) pass-through: what the buyer's chosen
+  // payment channel actually costs to process, shown as a transparent
+  // add-on (plus GST on the add-on) rather than baked into a silent
+  // discount for cheaper methods -- see resolveMdrRate. Computed on the
+  // full pre-MDR payable amount (goods + GST + shipping + shipping GST),
+  // matching how the business quotes it to buyers.
+  const mdrRate = resolveMdrRate(paymentMethod, paymentStore || {});
+  const mdrPercent = Number(mdrRate.percent || 0);
+  const mdrGstPercent = Number(mdrRate.gstPercent || 0);
+  const mdrAmount = roundMoney((preMdrGrandTotal * mdrPercent) / 100);
+  const mdrGstAmount = roundMoney((mdrAmount * mdrGstPercent) / 100);
+  const grandTotal = roundMoney(preMdrGrandTotal + mdrAmount + mdrGstAmount);
 
   return {
     itemCount,
@@ -618,6 +635,10 @@ async function calculatePricing(
     shippingGstAmount,
     shippingCharge,
     roundOff,
+    mdrPercent,
+    mdrGstPercent,
+    mdrAmount,
+    mdrGstAmount,
     grandTotal,
     paymentMethod,
     shippingMethod,
@@ -1030,6 +1051,10 @@ function createOrderFromSession(authStore, session, options = {}) {
     shippingGstAmount: Number(session.cart.pricing.shippingGstAmount || 0),
     shippingCharge: Number(session.cart.pricing.shippingCharge || 0),
     roundOff: Number(session.cart.pricing.roundOff || 0),
+    mdrPercent: Number(session.cart.pricing.mdrPercent || 0),
+    mdrGstPercent: Number(session.cart.pricing.mdrGstPercent || 0),
+    mdrAmount: Number(session.cart.pricing.mdrAmount || 0),
+    mdrGstAmount: Number(session.cart.pricing.mdrGstAmount || 0),
     grandTotal: Number(session.cart.pricing.grandTotal || 0),
     paymentStatus,
     orderStatus,
@@ -1056,7 +1081,7 @@ function createOrderFromSession(authStore, session, options = {}) {
 // underlying checkout session's cart (see finalizeSuccessfulPaymentAttempt),
 // NOT from order.items — so this keeps both in sync. Otherwise the invoice
 // would show the new product while stock still gets deducted for the old one.
-async function recalculateOrderItems(orderId, newItems, extraDiscountAmount, actor) {
+async function recalculateOrderItems(orderId, newItems, extraDiscountAmount, actor, options = {}) {
   // Deliberately owns the full read-mutate-write cycle on a single authStore
   // instance — loading order/session/catalog from separate store reads and
   // persisting only one of them back would silently drop whichever mutation
@@ -1095,7 +1120,7 @@ async function recalculateOrderItems(orderId, newItems, extraDiscountAmount, act
     order.shippingAddress,
     shippingStore,
     paymentStore,
-    { extraDiscountAmount }
+    { extraDiscountAmount, shippingChargeOverride: options.shippingChargeOverride }
   );
 
   // Release whatever stock this order was already holding, then reserve fresh
@@ -1151,6 +1176,10 @@ async function recalculateOrderItems(orderId, newItems, extraDiscountAmount, act
   order.shippingGstAmount = pricing.shippingGstAmount;
   order.shippingCharge = pricing.shippingCharge;
   order.roundOff = pricing.roundOff;
+  order.mdrPercent = pricing.mdrPercent;
+  order.mdrGstPercent = pricing.mdrGstPercent;
+  order.mdrAmount = pricing.mdrAmount;
+  order.mdrGstAmount = pricing.mdrGstAmount;
   order.grandTotal = pricing.grandTotal;
   if (order.manualPaymentStatus && order.manualPaymentStatus !== "awaiting_submission") {
     // Any payment proof already submitted was for the old total — reset it so
@@ -1479,6 +1508,71 @@ async function getCart(context, query) {
   const cartView = buildCartView(owner, cart, lines, pricing);
   await trackCartSaved(owner, cartView);
   return cartView;
+}
+
+// Lightweight, non-blocking email capture -- the alternative to gating Add
+// to Cart behind a login. Stores the email on the cart record itself (so a
+// returning guest with the same sessionId doesn't get asked again) and
+// immediately makes the existing abandoned-cart recovery record reachable
+// via trackGuestContactCaptured, rather than waiting for checkout to start.
+async function saveCartContact(context, payload) {
+  const owner = resolveCartOwner({
+    customerId: context.customerId,
+    sessionId: payload.sessionId || context.sessionId || null,
+    authTokenError: context.authTokenError || null
+  });
+
+  return withAuthStoreLock(async () => {
+    const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+      readAuthStore(),
+      readCatalogStore(),
+      readShippingStore(),
+      readPaymentStore()
+    ]);
+    ensurePhase7StoreShape(authStore);
+    ensurePaymentStoreShape(paymentStore);
+    const customerPricingContext = resolveCustomerPricingContextForOwner(authStore, owner);
+
+    const cart = ensureCartRecord(authStore, owner, true);
+    const email = String(payload.email || "").trim().toLowerCase();
+    cart.contactEmail = email;
+    cart.contactEmailCapturedAt = nowIso();
+    cart.updatedAt = nowIso();
+
+    const lines = [];
+    for (const item of ensureArray(cart.items)) {
+      try {
+        lines.push(
+          buildCartLineFromItem(catalogStore, item, {
+            enforceStockCheck: false,
+            customerPricingContext
+          })
+        );
+      } catch (_error) {
+        // Same skip-invalid-line behavior as getCart -- a stale/removed
+        // product shouldn't block saving the email.
+      }
+    }
+
+    const pricing = await calculatePricing(
+      lines,
+      PAYMENT_METHODS.ONLINE,
+      SHIPPING_METHODS.STANDARD,
+      {},
+      shippingStore,
+      paymentStore
+    );
+
+    await persistStores(authStore, catalogStore, {
+      writeAuth: true,
+      writeCatalog: false
+    });
+
+    const cartView = buildCartView(owner, cart, lines, pricing);
+    await trackGuestContactCaptured(owner, cartView, email);
+
+    return { saved: true, email };
+  });
 }
 
 async function addCartItem(context, payload) {
@@ -3337,6 +3431,7 @@ async function addGuestCartItemLegacy(payload) {
 module.exports = {
   getCart,
   getCustomerCartForAdmin,
+  saveCartContact,
   addCartItem,
   updateCartItem,
   deleteCartItem,

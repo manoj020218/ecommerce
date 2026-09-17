@@ -9,6 +9,7 @@ const {
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { notifyCustomerEvent } = require("../marketing/marketing.service");
 const { recalculateOrderItems } = require("../cart-checkout/cart-checkout.service");
+const { ensureInvoiceForOrder } = require("../invoices/invoices.service");
 const partnersService = require("../partners/partners.service");
 
 const MANUAL_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
@@ -19,6 +20,19 @@ function resolveAcceptanceStatus(order) {
 
   const method = String(order.paymentMethod || "").toLowerCase();
   const payStatus = String(order.paymentStatus || "").toLowerCase();
+
+  // Walk-in orders are staff-entered and confirmed in person (at creation or
+  // via the walk-in module's own "Confirm Payment" action) -- they never go
+  // through the storefront's customer-uploads-a-screenshot -> admin-verifies
+  // flow that manualPaymentStatus === "verified" below exists to gate, and
+  // nothing in the walk-in module ever sets it to "verified". Gating on it
+  // anyway left every paid walk-in bank-transfer/UPI order stuck showing
+  // "Proof Required" here forever. Use paymentStatus directly instead.
+  if (order.isWalkInOrder) {
+    if (payStatus === "paid") return "accepted";
+    if (payStatus === "failed") return "rejected";
+    return "pending";
+  }
 
   if (MANUAL_PAYMENT_METHODS.has(method)) {
     const manual = String(order.manualPaymentStatus || "").toLowerCase();
@@ -212,6 +226,14 @@ function buildOrderDetail(order, shipment, invoice, manualPaymentInstructions) {
       gstTotal: Number(order.gstTotal || 0),
       shippingCharge: Number(order.shippingCharge || 0),
       roundOff: Number(order.roundOff || 0),
+      // Whitelist here means a new pricing field is silently 0 in the admin
+      // UI unless explicitly added -- see the identical trap (and real
+      // historical bug, for shippingGstAmount) documented in
+      // cart-checkout.model.js's sanitizeCartView.
+      mdrPercent: Number(order.mdrPercent || 0),
+      mdrGstPercent: Number(order.mdrGstPercent || 0),
+      mdrAmount: Number(order.mdrAmount || 0),
+      mdrGstAmount: Number(order.mdrGstAmount || 0),
       grandTotal: Number(order.grandTotal || 0)
     },
     invoice:
@@ -434,6 +456,26 @@ async function updateOrder(orderId, patch, actor) {
   authStore.orders[idx] = order;
   await writeAuthStore(authStore);
 
+  // Marking payment verified through this generic Edit Order path used to
+  // never re-run invoice generation, unlike the dedicated manual-payment
+  // verification and walk-in payment confirmation flows -- so an order that
+  // already had a Proforma Invoice (generated back when it was still unpaid)
+  // stayed stuck on it forever, even once genuinely paid, and never got
+  // upgraded to a real Tax Invoice. ensureInvoiceForOrder already knows to
+  // upgrade Proforma -> Tax Invoice once paymentStatus is "paid" (see its own
+  // comments) and dates the new invoice from paymentVerifiedAt (just set
+  // above, i.e. today) when no explicit invoiceDate is given -- this must run
+  // AFTER the writeAuthStore above so it reads the now-"paid" order, not the
+  // pre-update one. Non-fatal: payment verification itself must not fail
+  // just because invoice generation hit an issue.
+  if (patch.manualPaymentStatus === "verified") {
+    try {
+      await ensureInvoiceForOrder(order.id, actor, { source: "admin_manual_verify" });
+    } catch (_invoiceError) {
+      // Invoice can still be (re)generated manually from the order detail page.
+    }
+  }
+
   await addActivityLog({
     action: "order.updated",
     actorId: actor?.id,
@@ -500,7 +542,10 @@ async function editOrderItems(orderId, patch, actor) {
   // It re-reads the order itself (rather than reusing the `order` object
   // above) so its read-mutate-write cycle stays on one consistent authStore
   // instance instead of two independently-loaded copies.
-  await recalculateOrderItems(orderId, patch.items, patch.discountAmount || 0, actor);
+  await recalculateOrderItems(orderId, patch.items, patch.discountAmount || 0, actor, {
+    shippingChargeOverride:
+      patch.shippingChargeOverride === undefined ? null : patch.shippingChargeOverride
+  });
 
   return getOrderDetail(orderId);
 }

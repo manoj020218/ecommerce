@@ -16,6 +16,11 @@ const {
   buildInvoiceNumber,
   buildProformaInvoiceNumber
 } = require("./invoices.model");
+const { SHIPPING_TAX, MDR_TAX } = require("../cart-checkout/cart-checkout.model");
+const { env } = require("../../config/env");
+const { getAllSettings } = require("../settings/settings.service");
+const { sendSmtpEmail } = require("../../integrations/email-providers/smtp.provider");
+const whatsappService = require("../whatsapp/whatsapp.service");
 
 function nowIso() {
   return new Date().toISOString();
@@ -209,6 +214,59 @@ function buildOrderItemSnapshot(orderItem, productLookup, placeOfSupply) {
     gstAmount: Number(orderItem.gstAmount || 0),
     lineTotal: Number(orderItem.lineTotal || 0),
     shippingClass: orderItem.shippingClass || "",
+    ...taxSplit
+  };
+}
+
+// Shipping/courier charges are their own taxable supply under GST (SAC
+// 996812) at a fixed rate -- shown from now on as a genuine line item in the
+// invoice's own item table (qty 1, rate = the shipping charge), not just an
+// aggregate figure folded into the totals block. This keeps HSN/SAC-wise
+// reporting (buildHsnSummary) and the printed item table both accounting for
+// it explicitly, exactly like any other taxable line. Built only for the
+// invoice's own item list -- order.items itself is deliberately left alone,
+// since it also drives stock deduction, packing/fulfillment lists, and
+// product sales reporting, none of which should ever see a "Shipping
+// Charges" entry as if it were a real product being picked and packed.
+function buildShippingItemSnapshot(shippingCharge, shippingGstAmount, placeOfSupply) {
+  const taxSplit = splitTaxAmounts(SHIPPING_TAX.GST_RATE, shippingGstAmount, placeOfSupply.isIntraState);
+
+  return {
+    productId: null,
+    title: "Shipping Charges",
+    sku: "",
+    hsnCode: SHIPPING_TAX.HSN_CODE,
+    qty: 1,
+    finalUnitPrice: Number(shippingCharge || 0),
+    taxableValue: Number(shippingCharge || 0),
+    gstRate: SHIPPING_TAX.GST_RATE,
+    gstAmount: Number(shippingGstAmount || 0),
+    lineTotal: roundMoney(Number(shippingCharge || 0) + Number(shippingGstAmount || 0)),
+    shippingClass: "",
+    ...taxSplit
+  };
+}
+
+// Same "genuine taxable line item, not just a totals-block figure" treatment
+// as shipping above -- the MDR pass-through charged to the buyer is itself a
+// taxable supply of service. gstRate here is the order's own mdrGstPercent
+// (admin-configurable per payment method, unlike shipping's fixed rate), not
+// a MDR_TAX constant -- MDR_TAX only supplies the HSN/SAC code.
+function buildMdrItemSnapshot(mdrAmount, mdrGstAmount, mdrGstPercent, placeOfSupply) {
+  const taxSplit = splitTaxAmounts(mdrGstPercent, mdrGstAmount, placeOfSupply.isIntraState);
+
+  return {
+    productId: null,
+    title: "Payment Processing Charges (MDR)",
+    sku: "",
+    hsnCode: MDR_TAX.SAC_CODE,
+    qty: 1,
+    finalUnitPrice: Number(mdrAmount || 0),
+    taxableValue: Number(mdrAmount || 0),
+    gstRate: Number(mdrGstPercent || 0),
+    gstAmount: Number(mdrGstAmount || 0),
+    lineTotal: roundMoney(Number(mdrAmount || 0) + Number(mdrGstAmount || 0)),
+    shippingClass: "",
     ...taxSplit
   };
 }
@@ -813,6 +871,11 @@ function renderInvoiceHtml(invoice) {
                   ? `<tr><td class="t-label">Discount</td><td class="t-value">${Number(pricing.discountAmount || 0) > 0 ? "&minus;" : ""}${escapeHtml(formatCurrencyInr(pricing.discountAmount || 0))}</td></tr>`
                   : ""
               }
+              ${
+                Number(pricing.mdrAmount || 0) !== 0
+                  ? `<tr><td class="t-label">Payment Processing Charges (MDR${pricing.mdrPercent ? ` @ ${escapeHtml(String(pricing.mdrPercent))}%` : ""})</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.mdrAmount || 0))}</td></tr>`
+                  : ""
+              }
               <tr><td class="t-label">Taxable Value</td><td class="t-value">${escapeHtml(formatCurrencyInr(pricing.taxableValue || 0))}</td></tr>
               ${
                 placeOfSupply.isIntraState
@@ -966,36 +1029,29 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
     buildOrderItemSnapshot(item, productLookup, placeOfSupply)
   );
 
-  // Shipping charges are taxed too (see cart-checkout.service.js calculatePricing) —
-  // that amount isn't tied to any single line item's HSN code, so it isn't part of
-  // buildHsnSummary, but it must still land in the same CGST/SGST/IGST split those
-  // totals feed into or the invoice's tax total won't reconcile with its own lines.
+  const shippingCharge = Number(order.shippingCharge || 0);
   const shippingGstAmount = Number(order.shippingGstAmount || 0);
-  const shippingTaxSplit = splitTaxAmounts(0, shippingGstAmount, placeOfSupply.isIntraState);
+  if (shippingCharge > 0) {
+    items.push(buildShippingItemSnapshot(shippingCharge, shippingGstAmount, placeOfSupply));
+  }
 
-  // The printed "Taxable Value" row must be the FULL value being taxed --
-  // goods (post-discount) plus shipping -- not goods alone. shippingGstAmount
-  // above is already folded into cgst/sgst/igst, so if the displayed
-  // Taxable Value excludes shipping, "Taxable Value + Tax + Round Off" no
-  // longer reconciles to Grand Total (short by exactly the shipping
-  // charge), even though Grand Total itself is correct and the shipping
-  // line is shown separately above it -- reads as a bookkeeping error.
-  // order.taxableValue itself is left untouched (other code reads it as
-  // "goods taxable value" specifically); this combined figure is only used
-  // for the invoice's own totals block below.
+  const mdrAmount = Number(order.mdrAmount || 0);
+  const mdrGstAmount = Number(order.mdrGstAmount || 0);
+  const mdrGstPercent = Number(order.mdrGstPercent || 0);
+  if (mdrAmount > 0) {
+    items.push(buildMdrItemSnapshot(mdrAmount, mdrGstAmount, mdrGstPercent, placeOfSupply));
+  }
+
+  // Taxable Value, CGST, SGST and IGST are now plain sums over `items` --
+  // shipping is one of them (pushed above), so it's included automatically
+  // with no separate shipping-specific addition needed, and "Taxable Value +
+  // Tax + Round Off" reconciles to Grand Total by construction.
   const totalTaxableValueWithShipping = roundMoney(
-    Number(order.taxableValue || 0) + Number(order.shippingCharge || 0)
+    items.reduce((sum, item) => sum + Number(item.taxableValue || 0), 0)
   );
-
-  const cgstTotal = roundMoney(
-    items.reduce((sum, item) => sum + Number(item.cgstAmount || 0), 0) + shippingTaxSplit.cgstAmount
-  );
-  const sgstTotal = roundMoney(
-    items.reduce((sum, item) => sum + Number(item.sgstAmount || 0), 0) + shippingTaxSplit.sgstAmount
-  );
-  const igstTotal = roundMoney(
-    items.reduce((sum, item) => sum + Number(item.igstAmount || 0), 0) + shippingTaxSplit.igstAmount
-  );
+  const cgstTotal = roundMoney(items.reduce((sum, item) => sum + Number(item.cgstAmount || 0), 0));
+  const sgstTotal = roundMoney(items.reduce((sum, item) => sum + Number(item.sgstAmount || 0), 0));
+  const igstTotal = roundMoney(items.reduce((sum, item) => sum + Number(item.igstAmount || 0), 0));
   const invoiceId = generateId("invoice");
   const generatedAt = nowIso();
 
@@ -1050,6 +1106,10 @@ async function buildInvoiceDocument(order, authStore, catalogStore, settings, in
       shippingMethod: order.shippingMethod || "",
       shippingGstAmount,
       roundOff: Number(order.roundOff || 0),
+      mdrPercent: Number(order.mdrPercent || 0),
+      mdrGstPercent,
+      mdrAmount,
+      mdrGstAmount,
       grandTotal: Number(order.grandTotal || 0),
       amountInWords: amountToWords(order.grandTotal)
     }
@@ -1291,6 +1351,94 @@ async function getInvoiceDownload(invoiceId) {
   };
 }
 
+// Re-sends an already-issued invoice to the buyer on file -- e.g. they lost
+// the original email, or want it on WhatsApp too. Email carries the actual
+// invoice HTML as an attachment (self-contained, no login needed to open
+// it); WhatsApp can't attach files at all (see whatsapp.service.js), so it
+// gets a text message with a link to the buyer's own account order page,
+// which already has its own "Download Invoice" button for a logged-in
+// customer -- reused as-is rather than building a separate token-auth'd
+// public invoice link just for this. Each channel is independent and
+// best-effort: a customer with only an email on file (or only a mobile)
+// still gets a successful resend on whichever channel is available, and a
+// failure on one channel never blocks the other.
+async function resendInvoiceToCustomer(orderId, actor) {
+  const invoice = await getInvoiceForOrder(orderId);
+  const download = await getInvoiceDownload(invoice.id);
+
+  const buyer = invoice.buyer || {};
+  const email = String(buyer.email || "").trim();
+  const mobile = String(buyer.mobile || "").trim();
+  if (!email && !mobile) {
+    throw new HttpError(400, "No email or mobile number on file for this invoice's buyer.");
+  }
+
+  const customerName = buyer.name || buyer.companyName || "there";
+  const amountText = `₹${Number(invoice.pricing?.grandTotal || 0).toLocaleString("en-IN")}`;
+  const actionUrl = `${env.storefrontBaseUrl}/account/orders/${invoice.orderId}`;
+  const settings = await getAllSettings();
+  const storeName = settings.storeProfile?.storeName || "Jenix India";
+
+  let emailStatus = "skipped_no_recipient";
+  if (email) {
+    const smtp = settings.setupWizard?.smtpEmail;
+    if (smtp?.host && smtp?.username && smtp?.password && smtp?.fromEmail) {
+      try {
+        await sendSmtpEmail({
+          smtpConfig: smtp,
+          to: email,
+          subject: `Your Invoice ${invoice.invoiceNumber} — ${storeName}`,
+          html:
+            `<p>Hi ${customerName},</p>` +
+            `<p>As requested, here is a copy of your invoice <strong>${invoice.invoiceNumber}</strong> ` +
+            `for order ${invoice.orderNo} (${amountText}), attached to this email.</p>` +
+            `<p>You can also view or download it any time from <a href="${actionUrl}">your order page</a>.</p>`,
+          attachments: [
+            { filename: download.fileName, content: download.content, contentType: download.contentType }
+          ]
+        });
+        emailStatus = "sent";
+      } catch (_error) {
+        emailStatus = "failed";
+      }
+    } else {
+      emailStatus = "smtp_not_configured";
+    }
+  }
+
+  let whatsappStatus = "skipped_no_recipient";
+  if (mobile) {
+    try {
+      await whatsappService.sendMessage(
+        mobile,
+        `Hi ${customerName}, here's a copy of your invoice ${invoice.invoiceNumber} for order ` +
+          `${invoice.orderNo} (${amountText}).${email ? " We've also emailed it to you." : ""}\n\n` +
+          `View/download: ${actionUrl}`
+      );
+      whatsappStatus = "sent";
+    } catch (_error) {
+      whatsappStatus = "failed";
+    }
+  }
+
+  await addActivityLog({
+    action: "invoice.resent",
+    actorId: actor?.id || "system",
+    actorRole: actor?.role || "system",
+    resourceType: "invoice",
+    resourceId: invoice.id,
+    metadata: { emailStatus, whatsappStatus, emailSentTo: email || null, whatsappSentTo: mobile || null }
+  });
+
+  return {
+    invoiceNumber: invoice.invoiceNumber,
+    emailSentTo: email || null,
+    emailStatus,
+    whatsappSentTo: mobile || null,
+    whatsappStatus
+  };
+}
+
 module.exports = {
   ensureInvoiceForOrder,
   listInvoices,
@@ -1299,5 +1447,6 @@ module.exports = {
   generateInvoice,
   getInvoiceDownload,
   correctInvoiceBuyerDetails,
-  filterInvoicesByDateRange
+  filterInvoicesByDateRange,
+  resendInvoiceToCustomer
 };

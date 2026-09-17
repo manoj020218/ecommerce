@@ -13,6 +13,21 @@ import {
   searchWalkInCustomers,
   searchWalkInProducts
 } from "./walkin-orders.api";
+import { fetchPaymentGateways } from "../payment-gateways/payment-gateways.api";
+
+// Same 3 buckets calculateWalkInPricing resolves against in
+// walkin-orders.service.js -- WALKIN_PAYMENT_METHODS.DIRECT_BANK_TRANSFER
+// and .MANUAL_UPI are literally the same string values as these bucket
+// keys, so only online_payment_link needs remapping; cash/cheque/
+// credit_pay_later intentionally resolve to no bucket (0% MDR, no
+// electronic processing fee).
+function resolveMdrBucket(paymentMethod) {
+  if (paymentMethod === "online_payment_link") return "online";
+  if (paymentMethod === "direct_bank_transfer" || paymentMethod === "manual_upi") {
+    return paymentMethod;
+  }
+  return null;
+}
 
 // ── Pricing helpers ───────────────────────────────────────────────────────────
 
@@ -54,10 +69,10 @@ function resolveLineUnitPrice(product, line) {
 
 // Mirrors buildWalkInLine's manual-discount math in walkin-orders.service.js
 // (applied before GST) so this on-screen preview matches what the backend
-// actually persists -- doesn't include the separate automatic payment-method
-// discount, which only the backend knows about (depends on paymentMethod +
-// live gateway config), so the real order total may still shift slightly
-// after that's applied server-side.
+// actually persists. The automatic payment-method discount this comment used
+// to describe was removed 2026-09-10 (see calculateWalkInPricing) -- MDR
+// pass-through (added 2026-09-17) is the current payment-method-dependent
+// adjustment, handled separately in the summary useMemo below, not here.
 function buildLinePreview(product, line) {
   const qty = Number(line.qty || 0);
   const unitPrice = resolveLineUnitPrice(product, line);
@@ -153,10 +168,17 @@ export function AddWalkInOrderPage() {
   const [customerSaveNotice, setCustomerSaveNotice] = useState("");
   const [loadingOrder, setLoadingOrder] = useState(isEditMode);
   const [lockedNotice, setLockedNotice] = useState("");
+  const [mdrCharges, setMdrCharges] = useState({ enabled: false, rates: {} });
 
   useEffect(() => {
     fetchWalkInCategories()
       .then(data => setCategories(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchPaymentGateways()
+      .then(data => setMdrCharges(data?.mdrCharges || { enabled: false, rates: {} }))
       .catch(() => {});
   }, []);
 
@@ -384,6 +406,19 @@ export function AddWalkInOrderPage() {
     const blendedGstRate = rateWeightDenominator > 0 ? rateWeightNumerator / rateWeightDenominator : 0;
     const shippingGstAmount = normalizeMoney((shipCharge * blendedGstRate) / 100);
     const gstTotal = productGstTotal + shippingGstAmount;
+    const preMdrGrandTotal = normalizeMoney(taxableValue + gstTotal + shipCharge);
+
+    // Mirrors calculateWalkInPricing's MDR pass-through exactly (same bucket
+    // mapping, same "computed on the pre-MDR grand total" base) -- this is
+    // the parity the 2026-09-10 bug was about: this preview and the backend
+    // must always agree, or the admin sees one total and the saved order
+    // shows another.
+    const mdrBucket = resolveMdrBucket(form.paymentMethod);
+    const mdrRate = mdrCharges.enabled && mdrBucket ? mdrCharges.rates?.[mdrBucket] : null;
+    const mdrPercent = Number(mdrRate?.percent || 0);
+    const mdrGstPercent = Number(mdrRate?.gstPercent || 0);
+    const mdrAmount = normalizeMoney((preMdrGrandTotal * mdrPercent) / 100);
+    const mdrGstAmount = normalizeMoney((mdrAmount * mdrGstPercent) / 100);
 
     return {
       itemCount: lines.reduce((s, l) => s + l.qty, 0),
@@ -392,9 +427,13 @@ export function AddWalkInOrderPage() {
       shippingGstAmount,
       discountTotal,
       shippingCharge: shipCharge,
-      grandTotal: normalizeMoney(taxableValue + gstTotal + shipCharge)
+      mdrPercent,
+      mdrGstPercent,
+      mdrAmount,
+      mdrGstAmount,
+      grandTotal: normalizeMoney(preMdrGrandTotal + mdrAmount + mdrGstAmount)
     };
-  }, [form.items, form.shippingMethod, form.shippingCharge, productCache]);
+  }, [form.items, form.shippingMethod, form.shippingCharge, form.paymentMethod, productCache, mdrCharges]);
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -902,6 +941,10 @@ export function AddWalkInOrderPage() {
             ...(summary.discountTotal > 0 ? [{ label: "Discount", value: "-" + formatCurrencyInr(summary.discountTotal), color: "#16a34a" }] : []),
             { label: "Taxable",     value: formatCurrencyInr(summary.taxableValue),        color: "var(--text)" },
             { label: "GST",         value: formatCurrencyInr(summary.gstTotal),            color: "var(--text)" },
+            ...(summary.mdrAmount > 0 ? [
+              { label: `MDR${summary.mdrPercent ? ` (${summary.mdrPercent}%)` : ""}`, value: formatCurrencyInr(summary.mdrAmount), color: "var(--text)" },
+              { label: "GST on MDR", value: formatCurrencyInr(summary.mdrGstAmount), color: "var(--text)" }
+            ] : []),
             { label: "Grand Total", value: formatCurrencyInr(summary.grandTotal),          color: "var(--brand)" }
           ].map(s => (
             <div key={s.label} style={{ textAlign: "center" }}>

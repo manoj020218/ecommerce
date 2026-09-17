@@ -85,8 +85,17 @@ export function OrderDetailModal({ open, onClose, items = [], pricing = {}, orde
             ) : null}
             <div><span>Shipping</span><strong>{formatCurrency(pricing.shippingCharge)}</strong></div>
             <div><span>GST</span><strong>{formatCurrency(pricing.gstTotal)}</strong></div>
+            {Number(pricing.mdrAmount || 0) > 0 ? (
+              <>
+                <div>
+                  <span>Payment Processing Charges{pricing.mdrPercent ? ` (${pricing.mdrPercent}%)` : ""}</span>
+                  <strong>{formatCurrency(pricing.mdrAmount)}</strong>
+                </div>
+                <div><span>GST on Processing Charges</span><strong>{formatCurrency(pricing.mdrGstAmount)}</strong></div>
+              </>
+            ) : null}
             <div className="proto-order-modal-grand">
-              <span>Grand Total</span>
+              <span>Total Payment</span>
               <strong>{formatCurrency(pricing.grandTotal)}</strong>
             </div>
           </div>

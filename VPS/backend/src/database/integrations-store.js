@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { env } = require("../config/env");
+const { upgradeTrackingUrlFields } = require("./legacy-tracking-urls");
 
 const integrationsStorePath = path.resolve(process.cwd(), env.integrationsStorePath);
 
@@ -12,7 +13,9 @@ const BUILTIN_COURIERS = Object.freeze([
     _builtin: true,
     name: "Shree Maruti Courier",
     phone: "1800-103-0400",
-    trackingUrl: "https://www.shreemaruticourier.com/tracking.php?awb={trackingId}",
+    // Old domain now redirects to their homepage and drops the AWB (Sep 2026):
+    // trackingUrl: "https://www.shreemaruticourier.com/tracking.php?awb={trackingId}",
+    trackingUrl: "https://shreemaruti.com/track-shipment/?awb={trackingId}",
     trackingApiUrl: "https://apis-hubops.innofulfill.com/tracking/v2/{trackingId}",
     apiHeaders: {},
     isActive: false,
@@ -99,7 +102,9 @@ async function readIntegrationsStore() {
 
   // Auto-add any missing builtin couriers (e.g. new entries added in code)
   const dirty = mergeBuiltinCouriers(parsed);
-  if (dirty) {
+  // Saved courier copies keep their old URL forever unless migrated here
+  const urlsUpgraded = upgradeTrackingUrlFields(parsed.customCouriers, "trackingUrl");
+  if (dirty || urlsUpgraded) {
     await fs.writeFile(integrationsStorePath, JSON.stringify(parsed, null, 2), "utf-8");
   }
 

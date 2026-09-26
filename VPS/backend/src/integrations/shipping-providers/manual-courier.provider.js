@@ -4,6 +4,7 @@ const {
 const {
   calculateShippingQuote
 } = require("../../modules/shipping/shipping-calculator");
+const { fillTrackingPlaceholders } = require("../../database/legacy-tracking-urls");
 
 class ManualCourierProvider extends ShippingProviderAdapter {
   async calculateShipping(input) {
@@ -19,10 +20,14 @@ class ManualCourierProvider extends ShippingProviderAdapter {
     const trackingId = String(input.trackingId || "").trim();
     const trackingUrlTemplate = String(input.trackingUrlTemplate || "").trim();
 
+    // Only filled {trackingId}; templates using {awb} leaked a literal "{awb}":
+    // const trackingUrl = trackingUrlTemplate
+    //   ? trackingUrlTemplate
+    //       .replaceAll("{{trackingId}}", encodeURIComponent(trackingId))
+    //       .replaceAll("{trackingId}", encodeURIComponent(trackingId))
+    //   : "";
     const trackingUrl = trackingUrlTemplate
-      ? trackingUrlTemplate
-          .replaceAll("{{trackingId}}", encodeURIComponent(trackingId))
-          .replaceAll("{trackingId}", encodeURIComponent(trackingId))
+      ? fillTrackingPlaceholders(trackingUrlTemplate, trackingId)
       : "";
 
     return {

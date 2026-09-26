@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { env } = require("../config/env");
+const { upgradeTrackingUrlFields, fillShipmentPlaceholders } = require("./legacy-tracking-urls");
 
 const shippingStorePath = path.resolve(process.cwd(), env.shippingStorePath);
 
@@ -215,7 +216,14 @@ async function readShippingStore() {
   const raw = await fs.readFile(shippingStorePath, "utf-8");
 
   try {
-    return JSON.parse(raw);
+    // return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    // Fix moved courier tracking pages in memory (profiles + already-sent
+    // shipments); the next normal write persists it. No write from a read.
+    upgradeTrackingUrlFields(parsed.courierProfiles, "trackingUrlTemplate");
+    upgradeTrackingUrlFields(parsed.shipments, "trackingUrl");
+    fillShipmentPlaceholders(parsed.shipments);
+    return parsed;
   } catch (parseError) {
     const backupPath = shippingStorePath + ".corrupted." + Date.now();
     try { await fs.copyFile(shippingStorePath, backupPath); } catch (_) { /* best effort */ }

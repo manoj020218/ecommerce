@@ -3,6 +3,7 @@ const { HttpError } = require("../../common/http-error");
 const { env } = require("../../config/env");
 const { generateId, hashValue } = require("../../common/identity");
 const { readAuthStore, writeAuthStore, withAuthStoreLock } = require("../../database/auth-store");
+const { withPaymentLock } = require("./payment-finalize-lock");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { readInvoiceStore } = require("../../database/invoice-store");
 const { readPaymentStore, writePaymentStore } = require("../../database/payment-store");
@@ -2839,10 +2840,47 @@ async function processPaymentWebhook(gatewayCode, payload, rawBody, signature) {
 
   const gatewayProvider = createPaymentGateway(normalizedGatewayCode);
   const normalizedPayload = await gatewayProvider.handleWebhook(payload || {}, rawBody, signature);
-  const attemptId = String(normalizedPayload.attemptId || payload.attemptId || "").trim();
+
+  // Signed gateway event we deliberately don't act on (e.g. Razorpay
+  // payment.authorized / order.paid / refund.*). Acknowledge with 200 — a 400
+  // makes the gateway retry it for hours and eventually disable the webhook.
+  if (normalizedPayload.ignored) {
+    return { handled: false, ignored: true, event: normalizedPayload.event || "" };
+  }
+
+  // const attemptId = String(normalizedPayload.attemptId || payload.attemptId || "").trim();
+  let attemptId = String(normalizedPayload.attemptId || payload.attemptId || "").trim();
   const status = String(normalizedPayload.status || payload.status || "")
     .trim()
     .toLowerCase();
+
+  // Razorpay payment entities carry the gateway order_id, not our attemptId
+  // (that lives on the Razorpay *order's* notes), so every real
+  // payment.captured webhook used to 400 here. Match it by the order id we
+  // stored on the attempt at create-attempt time.
+  const webhookGatewayOrderId = String(normalizedPayload.gatewayOrderId || "").trim();
+  if (!attemptId && webhookGatewayOrderId) {
+    const matchedAttempt = authStore.paymentAttempts.find(
+      (row) =>
+        row.gateway === normalizedGatewayCode &&
+        row.gatewayOrderId === webhookGatewayOrderId
+    );
+    if (matchedAttempt) {
+      attemptId = matchedAttempt.id;
+    }
+  }
+
+  // A genuine signed gateway event that isn't one of our checkout attempts
+  // (payment link, standalone QR, another integration on the same account).
+  // Nothing for us to do; acknowledge so the gateway stops retrying it.
+  if (!attemptId && normalizedPayload.event) {
+    return {
+      handled: false,
+      ignored: true,
+      event: normalizedPayload.event,
+      reason: "no_matching_payment_attempt"
+    };
+  }
 
   if (!attemptId || !["success", "failed"].includes(status)) {
     throw new HttpError(400, "Invalid payment webhook payload.");
@@ -3446,11 +3484,18 @@ module.exports = {
   downloadCheckoutInvoice,
   listOnlineGateways,
   createPaymentAttempt,
-  cancelPaymentAttempt,
-  confirmRazorpayCheckout,
-  confirmCashfreeCheckout,
-  processPaymentWebhook,
-  processMockPaymentWebhook,
+  // Payment-state writers take turns (see payment-finalize-lock.js) so a
+  // browser confirm + webhook for the same payment can't both create an order.
+  // cancelPaymentAttempt,
+  // confirmRazorpayCheckout,
+  // confirmCashfreeCheckout,
+  // processPaymentWebhook,
+  // processMockPaymentWebhook,
+  cancelPaymentAttempt: withPaymentLock(cancelPaymentAttempt),
+  confirmRazorpayCheckout: withPaymentLock(confirmRazorpayCheckout),
+  confirmCashfreeCheckout: withPaymentLock(confirmCashfreeCheckout),
+  processPaymentWebhook: withPaymentLock(processPaymentWebhook),
+  processMockPaymentWebhook: withPaymentLock(processMockPaymentWebhook),
   getGuestCartLegacy,
   getCustomerCartLegacy,
   addGuestCartItemLegacy

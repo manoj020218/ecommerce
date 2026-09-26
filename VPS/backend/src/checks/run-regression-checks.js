@@ -1693,6 +1693,132 @@ async function run() {
     assert.equal(phase9WebhookDuplicateEvent.response.status, 200);
     assert.equal(phase9WebhookDuplicateEvent.json.data.duplicate, true);
 
+    // --- Native Razorpay webhook shape (Sep 2026 fix) ---------------------
+    // Real Razorpay payment events carry order_id, not our attemptId; they used
+    // to 400 every time. Also: browser confirm + webhook racing for the same
+    // payment must produce exactly one order.
+    const phase9NativeCartAdd = await requestJson(baseUrl, "/api/cart/items", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionId: "phase9-native", productId: createdProductId, qty: 1 })
+    });
+    assert.equal(phase9NativeCartAdd.response.status, 201);
+
+    const phase9NativeCheckout = await requestJson(baseUrl, "/api/checkout/start", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase9-native",
+        paymentMethod: "online",
+        shippingMethod: "standard",
+        billingAddress: {
+          name: "Jaipur Native Webhook Buyer",
+          email: "native-webhook@jaipurbuyer.example.com",
+          mobile: "+91-9833333333",
+          addressLine1: "7 MI Road",
+          city: "Jaipur",
+          state: "Rajasthan",
+          stateCode: "RJ",
+          pincode: "302001"
+        },
+        shippingAddress: {
+          name: "Jaipur Native Webhook Buyer",
+          email: "native-webhook@jaipurbuyer.example.com",
+          pincode: "302001",
+          state: "Rajasthan",
+          stateCode: "RJ"
+        }
+      })
+    });
+    assert.equal(phase9NativeCheckout.response.status, 200);
+
+    const phase9NativeAttempt = await requestJson(baseUrl, "/api/payments/create-attempt", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "phase9-native",
+        checkoutSessionId: phase9NativeCheckout.json.data.checkoutSession.id,
+        gateway: "razorpay"
+      })
+    });
+    assert.equal(phase9NativeAttempt.response.status, 201);
+    const phase9NativeAttemptId = phase9NativeAttempt.json.data.attemptId;
+    const phase9NativeOrderRef = phase9NativeAttempt.json.data.gatewayOrderId;
+    assert.ok(phase9NativeOrderRef);
+
+    const postRazorpayEvent = (body) =>
+      requestJson(baseUrl, "/api/payments/webhook/razorpay", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+    // Events we don't act on are acknowledged (200), not rejected (400)
+    const phase9NativeOrderPaid = await postRazorpayEvent({
+      id: "evt_native_order_paid",
+      event: "order.paid",
+      payload: { order: { entity: { id: phase9NativeOrderRef } } }
+    });
+    assert.equal(phase9NativeOrderPaid.response.status, 200);
+    assert.equal(phase9NativeOrderPaid.json.data.ignored, true);
+
+    // payment.failed stays client-handled: acknowledged, attempt NOT failed
+    const phase9NativeFailed = await postRazorpayEvent({
+      id: "evt_native_failed",
+      event: "payment.failed",
+      payload: { payment: { entity: { id: "pay_native_try1", order_id: phase9NativeOrderRef } } }
+    });
+    assert.equal(phase9NativeFailed.response.status, 200);
+    assert.equal(phase9NativeFailed.json.data.ignored, true);
+
+    // Captured payment from outside our checkout (standalone QR / payment link)
+    const phase9NativeUnmatched = await postRazorpayEvent({
+      id: "evt_native_unmatched",
+      event: "payment.captured",
+      payload: { payment: { entity: { id: "pay_native_qr", order_id: null } } }
+    });
+    assert.equal(phase9NativeUnmatched.response.status, 200);
+    assert.equal(phase9NativeUnmatched.json.data.ignored, true);
+
+    // Browser confirm and payment.captured webhook arrive at the same moment
+    const [phase9NativeConfirm, phase9NativeCaptured] = await Promise.all([
+      requestJson(baseUrl, "/api/payments/razorpay-confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          attemptId: phase9NativeAttemptId,
+          razorpay_order_id: phase9NativeOrderRef,
+          razorpay_payment_id: "pay_native_ok",
+          razorpay_signature: "sig_regression_no_secret"
+        })
+      }),
+      postRazorpayEvent({
+        id: "evt_native_captured",
+        event: "payment.captured",
+        payload: { payment: { entity: { id: "pay_native_ok", order_id: phase9NativeOrderRef } } }
+      })
+    ]);
+    assert.equal(phase9NativeConfirm.response.status, 200);
+    assert.equal(phase9NativeCaptured.response.status, 200);
+    const phase9NativeConfirmOrderId =
+      phase9NativeConfirm.json.data.order?.id || phase9NativeConfirm.json.data.orderId;
+    const phase9NativeWebhookOrderId =
+      phase9NativeCaptured.json.data.order?.id || phase9NativeCaptured.json.data.orderId;
+    assert.ok(phase9NativeConfirmOrderId);
+    assert.equal(phase9NativeWebhookOrderId, phase9NativeConfirmOrderId);
+
+    const phase9NativeOrders = await requestJson(baseUrl, "/api/admin/orders?limit=500", {
+      headers: authHeaders(superAdminToken)
+    });
+    if (phase9NativeOrders.response.status === 200) {
+      const rows = phase9NativeOrders.json.data.items || phase9NativeOrders.json.data.orders || phase9NativeOrders.json.data || [];
+      const forSession = (Array.isArray(rows) ? rows : []).filter(
+        (row) => row.checkoutSessionId === phase9NativeCheckout.json.data.checkoutSession.id
+      );
+      if (forSession.length) assert.equal(forSession.length, 1);
+    }
+    // ----------------------------------------------------------------------
+
     const phase9ManualCartAdd = await requestJson(baseUrl, "/api/cart/items", {
       method: "POST",
       headers: { "content-type": "application/json" },

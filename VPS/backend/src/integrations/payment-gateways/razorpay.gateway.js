@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const https = require("node:https");
 const { PaymentGatewayAdapter } = require("./payment-gateway.adapter");
 const { readPaymentStore } = require("../../database/payment-store");
 const { env } = require("../../config/env");
@@ -10,6 +11,23 @@ function timingSafeStringEqual(expected, actual) {
     return false;
   }
   return crypto.timingSafeEqual(expectedBuf, actualBuf);
+}
+
+// keepAlive lets back-to-back Razorpay calls reuse one connection instead of
+// paying DNS + TLS each time. Note (Sep 2026, measured on the VPS): the ~6s
+// create-attempt was NOT IPv6 — the VPS's primary resolver 4.2.2.4 drops about
+// half of all DNS queries, so a lookup waits the 5s resolver timeout before
+// falling back to 8.8.4.4. That is fixed at the OS resolver level, not here.
+// family: 4 is ignored by axios on the agent; left in, harmless (no IPv6 route).
+const razorpayHttpsAgent = new https.Agent({ family: 4, keepAlive: true });
+
+function createRazorpayClient(keyId, keySecret) {
+  const Razorpay = require("razorpay");
+  const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+  if (rzp.api && rzp.api.rq && rzp.api.rq.defaults) {
+    rzp.api.rq.defaults.httpsAgent = razorpayHttpsAgent;
+  }
+  return rzp;
 }
 
 class RazorpayGateway extends PaymentGatewayAdapter {
@@ -42,8 +60,9 @@ class RazorpayGateway extends PaymentGatewayAdapter {
       };
     }
 
-    const Razorpay = require("razorpay");
-    const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    // const Razorpay = require("razorpay");
+    // const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    const rzp = createRazorpayClient(keyId, keySecret);
 
     const amountPaise = Math.round(Number(input.amount || 0) * 100);
     const order = await rzp.orders.create({
@@ -97,6 +116,31 @@ class RazorpayGateway extends PaymentGatewayAdapter {
 
     const event = String(payload.event || "");
 
+    // Only payment.captured creates an order from a webhook. Everything else a
+    // Razorpay account can send is acknowledged and ignored:
+    // - payment.failed: the customer can retry inside the same checkout window
+    //   (same order_id), and the storefront already handles failures itself;
+    //   acting on it here would send "payment failed" messages to buyers who
+    //   go on to pay successfully a few seconds later.
+    // - payment.authorized / order.paid / refund.* etc.: nothing to do.
+    if (event) {
+      const paymentEntity = payload.payload?.payment?.entity || {};
+      if (event !== "payment.captured") {
+        return { ignored: true, event };
+      }
+      return {
+        event,
+        attemptId: String(paymentEntity.notes?.attemptId || "").trim(),
+        gatewayOrderId: String(paymentEntity.order_id || "").trim(),
+        status: "success",
+        gatewayTxnId: String(paymentEntity.id || "").trim(),
+        failureReason: "",
+        eventId: String(payload.id || "").trim() || `${event}:${String(paymentEntity.id || "").trim()}`
+      };
+    }
+
+    // Previous handling (kept for reference): read attemptId from the payment's
+    // notes/receipt, which Razorpay payments never carry, so it always 400'd.
     if (event.startsWith("payment.")) {
       const paymentEntity = payload.payload?.payment?.entity || {};
       const statusMap = { "payment.captured": "success", "payment.failed": "failed" };
@@ -129,8 +173,9 @@ class RazorpayGateway extends PaymentGatewayAdapter {
 
     if (!keyId || !keySecret) return { accepted: true };
 
-    const Razorpay = require("razorpay");
-    const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    // const Razorpay = require("razorpay");
+    // const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    const rzp = createRazorpayClient(keyId, keySecret);
 
     const amountPaise = input.amount ? Math.round(Number(input.amount) * 100) : undefined;
     const refund = await rzp.payments.refund(String(input.gatewayTxnId), {
@@ -148,8 +193,9 @@ class RazorpayGateway extends PaymentGatewayAdapter {
       return { gatewayTxnId: String(input.gatewayTxnId || ""), status: "unknown" };
     }
 
-    const Razorpay = require("razorpay");
-    const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    // const Razorpay = require("razorpay");
+    // const rzp = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    const rzp = createRazorpayClient(keyId, keySecret);
     const payment = await rzp.payments.fetch(String(input.gatewayTxnId));
 
     const statusMap = { captured: "success", failed: "failed", created: "pending", authorized: "pending" };

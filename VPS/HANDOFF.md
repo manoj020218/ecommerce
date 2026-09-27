@@ -16,6 +16,32 @@ itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
 
+## Sep 27 2026 — Cart recovery EMAIL redesigned to match the page (DEPLOYED)
+
+- `order_left_in_cart` email (~8/day; 245 sent in the last 30 days, 58 failed historically) now
+  mirrors /recover: dark header + red accent, "Hi <first name>, your cart is waiting", "You left N
+  items … today at 1:37 pm" + step-aware line, the Cart → Address → Payment → Order progress bar,
+  product rows **with photos**, links, "In stock"/"Unavailable", per-unit price incl. GST, items
+  total vs total with GST & delivery, one bulletproof button (label = "Continue to checkout" /
+  "Resume checkout" / "Complete your order" / "Try payment again"), trust badges, WhatsApp help
+  box (falls back to a tel: link if no WhatsApp number). Table layout + inline styles only
+  (Outlook/Gmail safe); the old template used display:flex.
+- New `backend/src/modules/abandoned-cart/recovery-email.builder.js` builds all variables;
+  `runReminderDispatch` uses it (old variables block kept commented). The WhatsApp early-nudge and
+  WhatsApp reminder templates are unchanged and still get the same values.
+- `marketing.model.js`: new default body/subject via its own `recoveryEmailShell` (the shared
+  `emailShell` used by every other email is untouched); new TEMPLATE_VARIABLES firstName,
+  itemsTotal, itemCountText, leftAtText, resumeLine, ctaLabel, progressHtml. Old design kept as
+  `order_left_in_cart_v1_reference` (not in TEMPLATE_KEYS, never sent/listed).
+- **Rollout:** the new subject makes `ensureTemplateCoverage` replace the stored copy because no
+  admin ever edited it (`updatedAt: null`, checked on live). That happens on the next marketing
+  store read — i.e. just before the next reminder email is sent. If an admin later edits the
+  template in Marketing, their version wins (tested).
+- Admin Marketing → Preview for this template now fills realistic sample data (2 real products,
+  progress bar) instead of blank rows (`buildRecoveryEmailPreviewSample` in marketing.service).
+- Backups: `/root/jenix-bak-2026-09-27-recovery-email/backend-files.tgz`. Regression checks pass;
+  the regression-sent email rendered in the new design with 0 unfilled placeholders.
+
 ## Sep 27 2026 — Cart recovery page redesigned (/recover/:token) (DEPLOYED)
 
 User: the page behind the "you left something in your cart" link wasn't convincing. The old page

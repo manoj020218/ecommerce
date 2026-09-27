@@ -20,6 +20,17 @@ const {
   sanitizeRecoveryDetail,
   sanitizeRecoverySummary
 } = require("./abandoned-cart.model");
+const { buildRecoveryEmailVariables } = require("./recovery-email.builder");
+
+// "https://jenixindia.com/recover/abc" -> "https://jenixindia.com" (for
+// product links in the recovery email; same site the recovery link uses).
+function siteOriginOf(url) {
+  try {
+    return new URL(String(url || "")).origin;
+  } catch (_error) {
+    return "https://jenixindia.com";
+  }
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -659,6 +670,20 @@ async function runReminderDispatch(payload, actor) {
   const supportInfo = buildSupportInfo(settingsBundle);
   const reminders = [];
   let changed = false;
+  // Product photos/links for the redesigned email — catalog read once per run.
+  let productsById = null;
+  async function getProductsById() {
+    if (!productsById) {
+      try {
+        const { readCatalogStore } = require("../../database/catalog-store");
+        const catalogStore = await readCatalogStore();
+        productsById = new Map(ensureArray(catalogStore.products).map((p) => [p.id, p]));
+      } catch (_error) {
+        productsById = new Map(); // email still sends, just without photos
+      }
+    }
+    return productsById;
+  }
 
   for (const record of sortNewestFirst(ensureArray(recoveryStore.recoveries))) {
     if (reminders.length >= Number(payload.limit || 50)) {
@@ -706,16 +731,26 @@ async function runReminderDispatch(payload, actor) {
       toMobile: reminderTarget.channel === "whatsapp" ? reminderTarget.target : undefined,
       relatedResourceType: "abandoned_cart_recovery",
       relatedResourceId: record.id,
-      variables: {
-        customerName: record.customerName || "there",
-        itemsTable: buildCartItemsEmailTable(record.cartItems),
-        orderTotal: formatInrForReminderEmail(record.cartValue),
-        recoveryUrl: record.recoveryUrl,
-        whatsappNumber: supportInfo.supportWhatsApp || supportInfo.supportPhone || "",
-        whatsappLink: supportInfo.supportWhatsApp
-          ? `https://wa.me/${String(supportInfo.supportWhatsApp).replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Hi, I'd like help completing my order — cart worth ${formatInrForReminderEmail(record.cartValue)}.`)}`
-          : ""
-      }
+      // Previous variables (plain table, no photos) — kept for reference:
+      // variables: {
+      //   customerName: record.customerName || "there",
+      //   itemsTable: buildCartItemsEmailTable(record.cartItems),
+      //   orderTotal: formatInrForReminderEmail(record.cartValue),
+      //   recoveryUrl: record.recoveryUrl,
+      //   whatsappNumber: supportInfo.supportWhatsApp || supportInfo.supportPhone || "",
+      //   whatsappLink: supportInfo.supportWhatsApp
+      //     ? `https://wa.me/${String(supportInfo.supportWhatsApp).replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Hi, I'd like help completing my order — cart worth ${formatInrForReminderEmail(record.cartValue)}.`)}`
+      //     : ""
+      // }
+      // Redesigned email (2026-09-27): photos, where they stopped, step-aware
+      // button. Same variable names as before plus new ones — see
+      // recovery-email.builder.js. WhatsApp reminders use the same values.
+      variables: buildRecoveryEmailVariables(
+        record,
+        supportInfo,
+        reminderTarget.channel === "email" ? await getProductsById() : new Map(),
+        siteOriginOf(record.recoveryUrl)
+      )
     });
     reminder.sendStatus = sendResult?.status || "skipped_no_recipient";
 

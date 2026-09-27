@@ -395,13 +395,47 @@ async function updateEmailTemplate(templateKey, patch, actor) {
   return sanitizeTemplate(next);
 }
 
+async function buildRecoveryEmailPreviewSample(settings) {
+  try {
+    const { buildRecoveryEmailVariables } = require("../abandoned-cart/recovery-email.builder");
+    const catalogStore = await readCatalogStore();
+    const products = ensureArray(catalogStore.products).filter((p) => p.isActive).slice(0, 2);
+    const record = {
+      stage: "abandoned",
+      customerName: "Preview Buyer",
+      checkoutSessionId: "preview",
+      lastActivityAt: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+      cartItems: products.map((p, i) => {
+        const unit = Number(p.salePrice || p.basePrice || 1000);
+        return { productId: p.id, title: p.title, slug: p.slug, qty: i + 1, unitPrice: unit, lineTotal: Math.round(unit * 1.18 * (i + 1)) };
+      }),
+      recoveryUrl: `${env.storefrontBaseUrl || "https://jenixindia.com"}/recover/preview`
+    };
+    record.cartValue = record.cartItems.reduce((s, i) => s + i.lineTotal, 0) + 100;
+    const support = {
+      supportWhatsApp: settings.storeProfile?.supportWhatsApp || settings.storeProfile?.supportMobile || "",
+      supportPhone: settings.storeProfile?.supportMobile || ""
+    };
+    return buildRecoveryEmailVariables(record, support, new Map(products.map((p) => [p.id, p])), env.storefrontBaseUrl || "https://jenixindia.com");
+  } catch (_error) {
+    return {};
+  }
+}
+
 async function previewEmailTemplate(templateKey, variables) {
   const [store, settings] = await Promise.all([
     readNormalizedMarketingStore(),
     getAllSettings()
   ]);
   const template = findTemplateOrThrow(store, templateKey);
+  // The cart-recovery email's product rows / progress bar are built in code,
+  // so the admin's generic sample values left them blank in Preview. Fill
+  // realistic sample values (2 real products) underneath — anything the
+  // caller passes still wins (2026-09-27).
+  const recoverySample =
+    templateKey === "order_left_in_cart" ? await buildRecoveryEmailPreviewSample(settings) : {};
   const resolvedVariables = buildTemplateVariables({
+    ...recoverySample,
     businessName: settings.storeProfile?.storeName || "Jenix India",
     supportPhone: settings.storeProfile?.supportMobile || "",
     ...variables

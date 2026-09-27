@@ -78,6 +78,30 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
 
 const BRAND_COLOR = "#E8231A";
 
+// Frame for the cart-recovery email only (2026-09-27): dark header like the
+// storefront, red accent, table layout so Outlook/Gmail render it the same.
+// Every other email keeps using emailShell below, unchanged.
+function recoveryEmailShell(bodyHtml) {
+  return [
+    `<div style="background:#f3f4f6;padding:20px 10px;">`,
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-collapse:collapse;font-family:Inter,Arial,Helvetica,sans-serif;color:#1f2937;">`,
+    `<tr><td style="background:#111827;padding:18px 24px;border-radius:14px 14px 0 0;">`,
+    `<span style="color:#ffffff;font-size:18px;font-weight:800;">{{businessName}}</span>`,
+    `<span style="color:#9ca3af;font-size:12px;"> &nbsp;·&nbsp; CCTV, Smart Security &amp; IoT</span>`,
+    `</td></tr>`,
+    `<tr><td style="background:${BRAND_COLOR};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>`,
+    `<tr><td style="background:#ffffff;padding:26px 24px;border-radius:0 0 14px 14px;">`,
+    bodyHtml,
+    `</td></tr>`,
+    `<tr><td style="padding:16px 8px 0;text-align:center;font-size:11px;line-height:1.6;color:#9ca3af;">`,
+    `Need help? Call or WhatsApp us at {{supportPhone}}.<br>`,
+    `You're receiving this because you added items to your cart at {{businessName}}.`,
+    `</td></tr>`,
+    `</table>`,
+    `</div>`
+  ].join("");
+}
+
 function emailShell(bodyHtml) {
   return [
     `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#1f2937;">`,
@@ -324,8 +348,48 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     subject: "",
     body: "🚚 Shipped! Hi {{customerName}}, order *{{orderNo}}* is on its way via {{courierName}}.\nTracking ID: {{trackingId}}\nTrack here: {{trackingUrl}}"
   },
+  // Redesigned 2026-09-27 to match the /recover page. The previous version is
+  // kept below as order_left_in_cart_v1_reference (not a template key, never
+  // sent). A NEW subject makes ensureTemplateCoverage refresh stored copies
+  // that no admin has edited (updatedAt === null); edited ones are left alone.
   order_left_in_cart: {
     label: "Cart Left Behind (Email)",
+    subject: "Your cart is saved — continue where you left off | {{businessName}}",
+    body: recoveryEmailShell(
+      // greeting + context
+      `<p style="margin:0 0 4px;font-size:22px;font-weight:800;line-height:1.3;color:#111827;">Hi {{firstName}}, your cart is waiting</p>` +
+      `<p style="margin:0;font-size:14px;line-height:1.55;color:#4b5563;">You left {{itemCountText}} in your cart {{leftAtText}}. {{resumeLine}}</p>` +
+      `{{progressHtml}}` +
+      // products
+      `<p style="margin:22px 0 4px;font-size:15px;font-weight:700;color:#111827;">Items in your cart</p>` +
+      `{{itemsTable}}` +
+      // totals
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-top:1px solid #eef0f3;margin-top:4px;">` +
+      `<tr><td style="padding:12px 0 4px;font-size:14px;color:#4b5563;">Items total</td><td align="right" style="padding:12px 0 4px;font-size:14px;font-weight:700;color:#111827;">{{itemsTotal}}</td></tr>` +
+      `<tr><td style="padding:4px 0;font-size:14px;color:#4b5563;">Cart total with GST &amp; delivery</td><td align="right" style="padding:4px 0;font-size:16px;font-weight:800;color:#111827;">{{orderTotal}}</td></tr>` +
+      `</table>` +
+      `<p style="margin:6px 0 0;font-size:12px;color:#6b7280;">Final price, delivery and GST are confirmed at checkout before you pay.</p>` +
+      // one clear button (bulletproof: works in Outlook too)
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0 8px;"><tr><td align="center" bgcolor="${BRAND_COLOR}" style="border-radius:12px;">` +
+      `<a href="{{recoveryUrl}}" style="display:block;padding:15px 20px;font-size:16px;font-weight:800;color:#ffffff;text-decoration:none;border-radius:12px;">{{ctaLabel}} &rarr;</a>` +
+      `</td></tr></table>` +
+      // reassurance
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:14px 0;border-collapse:separate;border-spacing:6px 0;"><tr>` +
+      `<td align="center" style="background:#f8fafc;border:1px solid #eef0f3;border-radius:10px;padding:9px 4px;font-size:11px;font-weight:700;color:#374151;">🧾 GST invoice</td>` +
+      `<td align="center" style="background:#f8fafc;border:1px solid #eef0f3;border-radius:10px;padding:9px 4px;font-size:11px;font-weight:700;color:#374151;">✅ 100% genuine</td>` +
+      `<td align="center" style="background:#f8fafc;border:1px solid #eef0f3;border-radius:10px;padding:9px 4px;font-size:11px;font-weight:700;color:#374151;">🚚 Pan-India delivery</td>` +
+      `<td align="center" style="background:#f8fafc;border:1px solid #eef0f3;border-radius:10px;padding:9px 4px;font-size:11px;font-weight:700;color:#374151;">🔒 Secure payment</td>` +
+      `</tr></table>` +
+      // help
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#f0fdf4;border:1px solid #dcfce7;border-radius:12px;"><tr><td style="padding:14px 16px;">` +
+      `<p style="margin:0;font-size:14px;font-weight:700;color:#111827;">Questions before you order?</p>` +
+      `<p style="margin:3px 0 10px;font-size:13px;color:#4b5563;">We can help with bulk prices, GST billing, compatibility or installation.</p>` +
+      `<a href="{{whatsappLink}}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;font-size:13px;font-weight:700;padding:9px 14px;border-radius:9px;">💬 Chat on WhatsApp · {{whatsappNumber}}</a>` +
+      `</td></tr></table>`
+    )
+  },
+  order_left_in_cart_v1_reference: {
+    label: "Cart Left Behind (Email) — previous design, reference only",
     subject: "You left something in your cart — {{businessName}}",
     body: emailShell(
       `<p style="font-size:14px;">Hi {{customerName}},</p>` +
@@ -390,7 +454,15 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "recoveryUrl",
   "whatsappNumber",
   "whatsappLink",
-  "rejectionReason"
+  "rejectionReason",
+  // cart-recovery email redesign (2026-09-27) — see recovery-email.builder.js
+  "firstName",
+  "itemsTotal",
+  "itemCountText",
+  "leftAtText",
+  "resumeLine",
+  "ctaLabel",
+  "progressHtml"
 ]);
 
 const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([

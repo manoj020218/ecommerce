@@ -1,5 +1,54 @@
 # Handoff — read this first
 
+## ▶ CURRENT STATE — end of 2026-09-27 (read this box first)
+
+**Git:** `origin/main` HEAD = **`be6ae26`**. **Git now == live** for all jenix app code: every
+previously "deployed but uncommitted" change was committed on 2026-09-27, grouped by feature (see
+`git log`). Only untracked leftovers remain, deliberately not committed: `p.images` (repo root),
+`VPS/extra-pages/` (parked older VPS copies), `VPS/backend/src/database/console.log('` (empty junk
+file from a mistyped command), `.claude/settings.local.json`.
+
+**Shipped 2026-09-26/27** (each has its own entry below):
+1. Shree Maruti tracking links fixed (`11cc707`)
+2. Razorpay webhooks actually create orders + no-double-order lock (`8f5efc6`)
+3. nginx upload limits: api.jenixindia.com 25m, sitemitra 12m (server config, not in git)
+4. Backend "crashing" = pm2 memory restarts ~20/day → root cause (recovery-store bloat) fixed,
+   store 33 MB → 1.6 MB, ₹0 abandoned-cart rows repaired (`83ca900`). **Verified: pm2
+   "exceeds --max-memory-restart" count still 3842 = zero memory restarts since the fix.**
+5. Admin dashboard: Week/Month/Year trend, clickable tiles, Product Visits vs Sales (`dffc6c1`)
+6. Customer cart-recovery page redesigned (`5b99877`) and matching recovery email (`be6ae26`)
+7. Older live work committed: specs editor, orders/invoices, cart email capture, Cashfree webhook
+   URL fix, SMTP attachments, shipping, storefront fixes, Tally export, walk-in Repeat Order.
+
+**PENDING / TODO (in priority order):**
+- **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound
+  call on the VPS (checkout create-attempt ~6 s, emails, WhatsApp, Cashfree…) randomly waits 5 s.
+  First attempt on 2026-09-26 landed on the wrong server.
+- **Real Razorpay order test** to confirm the webhook path on a live payment, then delete
+  `razorpay.gateway.js.bak-webhook` and `cart-checkout.service.js.bak-webhook`.
+- **Backups to delete after a few days** (user decision: wait, confirm nothing else broke):
+  `apps/admin-panel/dist.bak-20260924-editfix-prev`, `apps/front/dist.bak-20260917-100600`
+  (keep the `-20260927-*-prev` ones as the single rollback point until then), and
+  `/root/{deploy-bak-20260924-repeat, jenix-bak-2026-09-27-*, nginx-bak-2026-09-26,
+  sitemitra-bak-2026-09-26}`. Keep the two `recovery-store.archive-2026-09-27*.json` (archived
+  data, not backups).
+- **Watch** that pm2 memory restarts stay at 0 (`grep -a -c "exceeds --max-memory-restart"
+  /root/.pm2/pm2.log` — should stay 3842) and that the Product Visits panel fills in.
+- **58 of 406 recovery emails ever sent have status "failed"** — not investigated yet (user said
+  leave for now). Separate from the redesign.
+- **MDR feature** (Sep 17 entry) still off, needs its real-order test before switching on.
+- **SSL: the CLAUDE.md "renewal gap" warning is STALE.** nginx uses `/etc/letsencrypt/live/
+  jenixindia.com-0001` and `test.jenixindia.com-0001` (valid to 2026-10-30), both have renewal
+  configs (authenticator = nginx) and `certbot-renew.timer` is active. The non-`-0001` copies
+  (expiring Oct 5 / expired Sep 26) are unused leftovers. Worth one `certbot renew --dry-run` to
+  confirm the nginx authenticator works on this VPS (shared infra — ask first).
+
+**SiteMitra (separate repo `D:\IOT Device\SiteMistri\SiteMitra`, see its HANDOFF.md):** v1.2.4
+(versionCode 6) AAB built for the Play Store at
+`sitework/frontend/android-app/release/build-v1.2.4/sitemitra-v1.2.4.aab` — user to upload; after it
+is live set app-config `latestVersionCode: 6`. PWA already on v1.2.4. Photo upload/display fixed
+server-side. Committed locally (`c406da3`, `b003fc7`) — **that repo has no git remote**.
+
 > **Update 2026-09-27:** backend memory-restart loop (~20/day) root-caused and fixed — abandoned-cart
 > recovery store bloat, see the first entry below (includes "why it happened" + rules so it doesn't
 > repeat). DNS fix below is still pending on the user.

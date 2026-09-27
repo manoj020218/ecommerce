@@ -327,6 +327,28 @@ async function writeTrackedRecovery(owner, cartView, options = {}) {
   ensureAuthStoreShape(authStore);
   ensureRecoveryStoreShape(recoveryStore);
 
+  // getCart() tracks on EVERY page view (the header loads the cart). For an
+  // empty cart with no open record, findOrCreateRecovery used to create a new
+  // record that was immediately "expired" — ~550/day of empty anonymous junk,
+  // which grew recovery-store.json to 32 MB and (re-parsed + rewritten on every
+  // page view) pushed the backend over pm2's 600 MB limit ~20x/day (2026-09-27).
+  // Now: an empty cart never CREATES a record and never rewrites the file; an
+  // existing open record is still found and closed exactly as before.
+  const earlyCartSnapshot = summarizeCartView(cartView);
+  if (earlyCartSnapshot.cartItemCount <= 0) {
+    const existing =
+      (options.paymentAttemptId
+        ? findRecoveryByPaymentAttemptId(recoveryStore, options.paymentAttemptId)
+        : null) ||
+      (options.checkoutSessionId
+        ? findRecoveryByCheckoutSessionId(recoveryStore, options.checkoutSessionId)
+        : null) ||
+      findOpenRecoveryByOwner(recoveryStore, owner);
+    if (!existing) {
+      return null;
+    }
+  }
+
   const record = findOrCreateRecovery(
     recoveryStore,
     owner,
@@ -347,11 +369,32 @@ async function writeTrackedRecovery(owner, cartView, options = {}) {
   record.customerName = contactSnapshot.customerName;
   record.email = contactSnapshot.email;
   record.mobile = contactSnapshot.mobile;
-  record.cartItems = cartSnapshot.cartItems;
-  record.cartItemCount = cartSnapshot.cartItemCount;
-  record.cartValue = cartSnapshot.cartValue;
+  // The live cart is emptied when an order is placed (manual payment at
+  // startCheckout, or after online payment). The next page view's getCart()
+  // then reached this with an empty cart and overwrote the saved items/value,
+  // so real carts — even "recovered" ones with an order — showed 0 items / ₹0
+  // in admin (2026-09-27). Keep the last known cart when the new one is empty;
+  // the record is still closed exactly as before.
+  const keepLastKnownCart =
+    cartSnapshot.cartItemCount <= 0 && Number(record.cartItemCount || 0) > 0;
+  // record.cartItems = cartSnapshot.cartItems;
+  // record.cartItemCount = cartSnapshot.cartItemCount;
+  // record.cartValue = cartSnapshot.cartValue;
+  if (!keepLastKnownCart) {
+    record.cartItems = cartSnapshot.cartItems;
+    record.cartItemCount = cartSnapshot.cartItemCount;
+    record.cartValue = cartSnapshot.cartValue;
+  }
+  const previousStage = record.stage;
   record.stage =
     cartSnapshot.cartItemCount > 0 ? options.stage || RECOVERY_STAGES.CART_ADDED : RECOVERY_STAGES.EXPIRED;
+  // A recovered cart (order placed) must never be downgraded by later activity.
+  if (previousStage === RECOVERY_STAGES.RECOVERED) {
+    record.stage = RECOVERY_STAGES.RECOVERED;
+  }
+  if (record.stage === RECOVERY_STAGES.EXPIRED && !record.expiredAt) {
+    record.expiredAt = timestamp;
+  }
   record.checkoutSessionId = options.checkoutSessionId || record.checkoutSessionId || null;
   record.paymentAttemptId = options.paymentAttemptId || record.paymentAttemptId || "";
   record.gatewayOrderId = options.gatewayOrderId || record.gatewayOrderId || "";

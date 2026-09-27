@@ -1,5 +1,9 @@
 # Handoff — read this first
 
+> **Update 2026-09-27:** backend memory-restart loop (~20/day) root-caused and fixed — abandoned-cart
+> recovery store bloat, see the first entry below (includes "why it happened" + rules so it doesn't
+> repeat). DNS fix below is still pending on the user.
+>
 > **Update 2026-09-26:** `origin/main` HEAD is now **`8f5efc6`** (Razorpay
 > webhook fix) after `11cc707` (Shree Maruti tracking). Both deployed. One
 > **pending VPS DNS fix, to be applied by the user** — see the first entry
@@ -11,6 +15,80 @@ below for exactly what's live vs. still pending before the MDR feature
 itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
+
+## Sep 27 2026 — Backend "crashing again and again": pm2 memory restarts, root cause fixed (DEPLOYED, NOT COMMITTED)
+
+Symptom: `jenix-backend` restarted 15–27×/day (517 total). Not crashes — every exit is `code 0 via SIGINT`
+from pm2: `[PM2][WORKER] Process 4 restarted because it exceeds --max-memory-restart value` (600M; one
+sample 1,066 MB). Each restart = a few seconds of API downtime + any in-flight request (cart, checkout,
+payment confirm) fails.
+
+Root cause: `recovery-store.json` had grown to **32.6 MB / 25,728 records**, 24,602 of them junk (empty
+cart, anonymous, expired, never reached checkout, never reminded). `getCart()` runs on every page view
+(header loads the cart) and calls `trackCartSaved` → `writeTrackedRecovery`, which for an empty cart
+found no *open* record (all prior ones already expired) and so **created a new, instantly-expired record
+every time** (~550/day), then re-parsed + rewrote the whole 32 MB file — ~150–300 MB heap per call;
+two or three concurrent page views blew past 600 MB.
+
+Fix:
+- `abandoned-cart.service.js` `writeTrackedRecovery`: empty cart + no existing record (by payment
+  attempt / checkout session / open-by-owner) → `return null`, no create, no write. An existing open
+  record is still found and closed exactly as before (`deleteCartItem` relies on the next `getCart`
+  to close it). No caller uses the return value (checked).
+- New `VPS/scripts/archive-empty-recoveries.js` (`--dry-run` supported): moves junk records to
+  `recovery-store.archive-<date>.json`, verifies the archive, then atomically rewrites the store. Must
+  run with the backend stopped.
+- Run 2026-09-27: 24,603 archived → `backend/src/database/json/recovery-store.archive-2026-09-27.json`
+  (23 MB, not loaded by the app), 1,126 kept; store 33.4 MB → 2.3 MB. Downtime ~9 s (pm2 stop/start).
+  Backups: `/root/jenix-bak-2026-09-27-memfix/`.
+- Verified: online, API/cart 200, empty guest cart creates no record, memory 166–277 MB over 2 min,
+  no memory restarts. Regression checks pass locally.
+- Side effect: admin "Abandoned Cart Report" `recoveryCount` drops sharply — it was counting the
+  empty junk; recovered/reminder counts unchanged.
+
+**Follow-up same day — ₹0 rows in admin Abandoned Carts (DEPLOYED, NOT COMMITTED):** 533 kept records
+showed 0 items/₹0. (a) 504 were the same getCart junk but for logged-in customers (the first cleanup only
+took anonymous ones). (b) 29 were real carts that reached checkout — 9 of them "recovered" with an order
+(e.g. JNX-ORD-20260731-00006 ₹20,862) — whose saved cart was **overwritten by an empty cart**: the live
+cart is cleared when an order is placed (`clearOwnerCart` in startCheckout for manual payments and after
+online payment), and the next page view's getCart → writeTrackedRecovery replaced items/value with the
+empty snapshot. Fix in `writeTrackedRecovery`: when the new cart is empty and the record has items, keep
+the last known cart (record still closes as before), never downgrade a `recovered` record, and set
+`expiredAt` (was left null). New `VPS/scripts/repair-recovery-store.js` (dry-run by default, `--apply`):
+refilled the 29 from their checkout sessions, archived 489 logged-in created-empty records to
+`recovery-store.archive-2026-09-27-b.json`. Result: 638 records, 60/60 recovered carts with value,
+15 zero-value left (logged-in carts wiped by the old bug with no checkout session to rebuild from).
+Backups: `/root/jenix-bak-2026-09-27-repair/`. Regression checks pass.
+
+**Why it happened — NOT a recent change; latent since the feature was written.** `git log -S` shows every
+piece dates from the original abandoned-cart work on **2026-05-26**: `getCart → trackCartSaved` on every
+cart fetch, `writeTrackedRecovery` creating a record for an empty cart and overwriting the saved cart
+with an empty snapshot (commit `58d7141` "phase 12"), and `clearOwnerCart` at order time (`f5deeab`
+"phase 11"). It stayed invisible while traffic was tiny; after the late-July move to the new VPS real
+traffic arrived (records/month: Jul 1,360 → Aug 12,295 → Sep 12,073) and the file grew ~550 junk
+records/day until memory broke. The Sep 16 memory-ceiling bump (WhatsApp entry below) raised the limit
+and masked the growth for a while — it treated the symptom.
+
+**Rules so it doesn't repeat:**
+1. **Never write to a store from a read path.** `getCart` (called on every page view) must not create
+   or rewrite records. Tracking belongs on real state changes (add/update/remove item, checkout, payment).
+2. **Never create a record for an empty/nothing state.** Check "is there anything to track?" before
+   `findOrCreate`-style helpers.
+3. **Never overwrite a meaningful snapshot with an empty one.** Closing/expiring a record must keep what
+   it recorded; admin reports and recovery depend on it.
+4. **Every append-only JSON store needs a retention/cleanup path** from day one (archive, not delete).
+   Known unbounded ones to watch: recovery-store, marketing-store notificationLogs, payment-store
+   processedWebhooks, activity logs.
+5. **Check store sizes when adding a feature and after traffic grows.** Any JSON store > ~5 MB that is
+   read per request is a memory risk (whole file parsed each time; ~5–10× its size in heap).
+   Quick check: `ls -la --block-size=K /root/projects/jenixindia/VPS/backend/src/database/json/`.
+6. **pm2 restarts are a signal, not noise.** `exited with code [0] via signal [SIGINT]` + "exceeds
+   --max-memory-restart" in `/root/.pm2/pm2.log` = memory problem. Find what grows before raising
+   `max_memory_restart`.
+
+Watch: `grep -a -c "exceeds --max-memory-restart" /root/.pm2/pm2.log` was 3842 at deploy time —
+it should stop climbing. If restarts continue, look at other large stores (auth/marketing/catalog
+~3.5 MB each are fine) and at concurrent read-modify-write of the recovery store (not locked).
 
 ## Sep 26 2026 — ⚠️ PENDING (user will do later): VPS DNS fix — every outbound call randomly stalls 5 s
 

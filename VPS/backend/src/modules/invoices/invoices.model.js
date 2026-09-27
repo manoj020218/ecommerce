@@ -69,11 +69,19 @@ function resolveFinancialYearLabel(dateInput, format = "YYYY-YY") {
   }
 }
 
+// Changed 2026-09 at the user's request: keep the usual "JNX/2026-27/N"
+// slash format on the actual (legal) invoice number -- only the zero-padding
+// goes away, so sequence 1 prints as "JNX/2026-27/1" and sequence 1001 as
+// "JNX/2026-27/1001", not "000001"/"001001". invoiceNumberPadding is
+// intentionally no longer read here. (An earlier version of this function
+// briefly stripped all punctuation for Tally-import purposes -- that need is
+// served separately by the Tally export's own toTallyVoucherNo(), which
+// derives a 16-char alphanumeric-only key from whatever invoiceNumber this
+// produces; it does not require this field itself to drop the slashes.)
 function buildInvoiceNumber(settings, financialYearLabel, sequenceNumber) {
   const prefix = String(settings?.invoicePrefix || "").trim();
   const postfix = String(settings?.invoicePostfix || "").trim();
-  const padding = Math.max(1, Number(settings?.invoiceNumberPadding || 6));
-  const sequence = String(Number(sequenceNumber || 0)).padStart(padding, "0");
+  const sequence = String(Number(sequenceNumber || 0));
 
   return [prefix, financialYearLabel, sequence, postfix].filter(Boolean).join("/");
 }

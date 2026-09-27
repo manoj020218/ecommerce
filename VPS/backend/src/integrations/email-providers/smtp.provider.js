@@ -16,7 +16,7 @@ async function buildAuth(smtpConfig) {
   return { user: smtpConfig.username, pass: smtpConfig.password };
 }
 
-async function sendSmtpEmail({ smtpConfig, to, subject, html }) {
+async function sendSmtpEmail({ smtpConfig, to, subject, html, attachments }) {
   const transporter = nodemailer.createTransport({
     host: smtpConfig.host,
     port: Number(smtpConfig.port || 587),
@@ -35,7 +35,11 @@ async function sendSmtpEmail({ smtpConfig, to, subject, html }) {
     to,
     subject,
     html,
-    text: subject
+    text: subject,
+    // Nodemailer's own attachment shape ({ filename, content, contentType }) --
+    // passed straight through, optional, so every existing template-notification
+    // call site (which never sends one) is unaffected.
+    ...(Array.isArray(attachments) && attachments.length ? { attachments } : {})
   });
 
   return info.messageId;

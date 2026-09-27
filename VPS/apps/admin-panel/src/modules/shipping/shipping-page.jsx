@@ -87,7 +87,17 @@ function QueueTab({ canCreate, couriers }) {
     setError("");
     try {
       const data = await fetchShippingQueue({ limit: 100 });
-      setRows(Array.isArray(data) ? data : []);
+      // fetchShippingQueue returns every paid order regardless of whether a
+      // shipment already exists for it -- without this filter, an order
+      // that already has a shipment (even an incomplete one, e.g. just a
+      // POD upload with no courier/AWB yet) stays in this "awaiting
+      // shipment" queue forever with a "Create Shipment" button that always
+      // 409s. Those belong in the Shipments tab, where tracking can be
+      // added to the existing record instead of trying to create a new one.
+      const awaitingShipment = Array.isArray(data)
+        ? data.filter((row) => !row.shipmentId)
+        : [];
+      setRows(awaitingShipment);
     } catch (err) {
       setError(err.message || "Failed to load shipping queue.");
     } finally {
@@ -311,9 +321,13 @@ function ShipmentsTab({ canUpdateTracking, canMarkDelivered, couriers }) {
     try {
       // Fetch shipments that have been created (all statuses)
       const data = await fetchShippingQueue({ limit: 200 });
-      // The queue returns all orders with shipments attached — filter those with a shipmentId
+      // The queue returns EVERY paid order, shipment or not -- every row
+      // always carries a shipmentStatus (defaulted to pending_packing when
+      // there's no real shipment yet), so that alone can't tell a real
+      // shipment apart from an order that just hasn't had one created. Only
+      // shipmentId reliably means an actual shipment record exists.
       const shipments = Array.isArray(data)
-        ? data.filter((row) => row.shipmentId || row.shipmentStatus)
+        ? data.filter((row) => row.shipmentId)
         : [];
       setRows(shipments);
     } catch (err) {

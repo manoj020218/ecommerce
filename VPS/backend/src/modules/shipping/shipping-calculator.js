@@ -149,7 +149,14 @@ function resolveDestinationZone(destination, settings) {
   return SHIPPING_ZONES.ALL_INDIA;
 }
 
-function billableUnitWeightKg(line) {
+// A product's real recorded weight (dead weight or volumetric) is always
+// used as-is, however light -- it is never bumped up to a floor just
+// because it's a small/light item. The 0.2kg fallback here only fires when
+// NO weight data was ever entered for the product (deadWeightKg is 0/unset
+// AND no dimensions), which is common for products migrated from the old
+// site that haven't had their weight filled in yet -- treating those as
+// literally weightless would be worse than assuming a reasonable default.
+function actualUnitWeightKg(line) {
   const deadWeightKg = Number(line.deadWeightKg || 0);
   const lengthCm = Number(line.lengthCm || 0);
   const widthCm = Number(line.widthCm || 0);
@@ -160,7 +167,15 @@ function billableUnitWeightKg(line) {
       ? (lengthCm * widthCm * heightCm) / 5000
       : 0;
 
-  return Math.max(0.2, deadWeightKg, volumetricWeightKg);
+  const knownWeightKg = Math.max(deadWeightKg, volumetricWeightKg);
+  return knownWeightKg > 0 ? knownWeightKg : 0.2;
+}
+
+// Per-unit rate charges (see calculateLineOverrideCharge's weight_based
+// branch) use the same real-weight-or-missing-data-fallback value -- no
+// additional floor on top of it.
+function billableUnitWeightKg(line) {
+  return actualUnitWeightKg(line);
 }
 
 function resolveBillableWeightKg(lines) {
@@ -171,10 +186,11 @@ function resolveBillableWeightKg(lines) {
     if (qty <= 0) {
       continue;
     }
-    totalWeightKg += billableUnitWeightKg(line) * qty;
+    totalWeightKg += actualUnitWeightKg(line) * qty;
   }
 
-  return roundMoney(totalWeightKg);
+  // Minimum billable weight applies once per shipment, not once per unit.
+  return roundMoney(Math.max(0.2, totalWeightKg));
 }
 
 // Indian courier companies don't bill continuous fractional weight — a
@@ -283,11 +299,14 @@ function calculateOverrideCharges(overrideLines) {
   let total = 0;
   for (const { shippingClass, lines } of groups.values()) {
     if (shippingClass.rateType === "weight_slab") {
+      // Same fix as resolveBillableWeightKg: sum real per-unit weight across
+      // the parcel, then apply the minimum-billable-weight floor once to the
+      // combined total -- not per unit before multiplying by qty.
       const totalWeightKg = lines.reduce((sum, line) => {
         const qty = Number(line.qty || 0);
-        return qty > 0 ? sum + billableUnitWeightKg(line) * qty : sum;
+        return qty > 0 ? sum + actualUnitWeightKg(line) * qty : sum;
       }, 0);
-      total += calculateWeightSlabCharge(totalWeightKg, shippingClass);
+      total += calculateWeightSlabCharge(Math.max(0.2, totalWeightKg), shippingClass);
     } else {
       total += lines.reduce((sum, line) => sum + calculateLineOverrideCharge(line, shippingClass), 0);
     }

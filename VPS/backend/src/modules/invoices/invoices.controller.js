@@ -59,11 +59,17 @@ const adminCorrectInvoiceBuyer = asyncHandler(async (req, res) => {
   return ok(res, data, "Buyer details corrected.");
 });
 
+const adminResendInvoice = asyncHandler(async (req, res) => {
+  const data = await service.resendInvoiceToCustomer(req.params.orderId, req.actor);
+  return ok(res, data, "Invoice resent.");
+});
+
 module.exports = {
   adminListInvoices,
   adminGetInvoice,
   adminGetInvoiceForOrder,
   adminGenerateInvoice,
   adminDownloadInvoice,
-  adminCorrectInvoiceBuyer
+  adminCorrectInvoiceBuyer,
+  adminResendInvoice
 };

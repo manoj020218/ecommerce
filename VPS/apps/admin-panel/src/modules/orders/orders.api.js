@@ -52,6 +52,10 @@ export function correctInvoiceBuyer(invoiceId, payload) {
   return apiFetch(`/admin/invoices/${invoiceId}/buyer-details`, { method: "PATCH", body: payload });
 }
 
+export function resendInvoice(orderId) {
+  return apiFetch(`/admin/invoices/order/${orderId}/resend`, { method: "POST", body: {} });
+}
+
 // Shipping / Couriers
 export function fetchShippingCouriers() {
   return apiFetch("/admin/shipping/couriers");

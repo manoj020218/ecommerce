@@ -84,7 +84,27 @@ function PayBadge({ row }) {
   );
 }
 
+// Walk-in orders use their own orderStatus/shipmentStatus vocabulary
+// (walkin_order_created/payment_pending/paid/invoice_generated/
+// ready_for_pickup/dispatched/completed/cancelled) instead of the storefront
+// pipeline's (order_placed/processing/fulfilled/delivered) -- the generic
+// branches below never matched any of those, so every walk-in order showed a
+// blank "—" here regardless of its real status (including once fully
+// "Completed" in the walk-in module). Handled as its own branch first.
+function walkInShipmentLabel(row) {
+  const ord = String(row.orderStatus || "").toLowerCase();
+  const isSelfPickup = String(row.shippingMethod || "").toLowerCase() === "self_pickup";
+  if (ord === "cancelled")        return { label:"Cancelled",       bg:"rgba(239,68,68,0.10)",  color:"#b91c1c" };
+  if (ord === "completed")        return { label: isSelfPickup ? "Picked Up" : "Delivered", bg:"rgba(22,163,74,0.10)", color:"#15803d" };
+  if (ord === "dispatched")       return { label:"Shipped",         bg:"rgba(147,51,234,0.10)", color:"#7e22ce" };
+  if (ord === "ready_for_pickup") return { label:"Ready for Pickup",bg:"rgba(37,99,235,0.10)",  color:"#1d4ed8" };
+  if (["paid","invoice_generated"].includes(ord)) return { label:"Ready to Ship", bg:"rgba(37,99,235,0.10)", color:"#1d4ed8" };
+  if (ord === "payment_pending")  return { label:"Awaiting Payment",bg:"#f3f4f6",               color:"#6b7280" };
+  return                                 { label:"New",             bg:"#f3f4f6",               color:"#6b7280" };
+}
+
 function shipmentLabel(row) {
+  if (row.isWalkInOrder) return walkInShipmentLabel(row);
   const ord  = String(row.orderStatus   || "").toLowerCase();
   const ship = String(row.shipmentStatus || "").toLowerCase();
   if (ord === "cancelled")                            return { label:"Cancelled",  bg:"rgba(239,68,68,0.10)",  color:"#b91c1c" };
@@ -122,6 +142,16 @@ const TABS = [
 
 const PAGE_SIZE = 20;
 
+// India calendar day (YYYY-MM-DD) of an order timestamp. A plain date string
+// ("2026-09-27", e.g. a walk-in orderDate) is already a day and is returned as-is.
+function istDayOf(value) {
+  const s = String(value || "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return s.slice(0, 10);
+  return new Date(t + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 // ── order detail side panel ───────────────────────────────────────────────────
 
 function addrStr(a) {
@@ -142,16 +172,6 @@ function SidePanelBtn({ children, variant = "default", onClick, disabled }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} style={{
       ...s, width:"100%", padding:"11px 0", borderRadius:12,
-// India calendar day (YYYY-MM-DD) of an order timestamp. A plain date string
-// ("2026-09-27", e.g. a walk-in orderDate) is already a day and is returned as-is.
-function istDayOf(value) {
-  const s = String(value || "");
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const t = Date.parse(s);
-  if (Number.isNaN(t)) return s.slice(0, 10);
-  return new Date(t + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
       fontSize:13, fontWeight:600, cursor: disabled ? "wait" : "pointer",
       opacity: disabled ? 0.6 : 1, transition:"opacity 0.15s"
     }}
@@ -538,7 +558,7 @@ export function OrdersPage() {
     return allRows.filter(row => {
       if (!tabFn(row)) return false;
       if (q) {
-        const hay = [row.orderNo, row.customerName, row.customerMobile, row.customerEmail, row.companyName]
+        const hay = [row.orderNo, row.invoiceNumber, row.customerName, row.customerMobile, row.customerEmail, row.companyName]
           .filter(Boolean).join(" ").toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -643,7 +663,7 @@ export function OrdersPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
           <input type="text" value={search} onChange={onSearch}
-            placeholder="Search order #, customer, phone…"
+            placeholder="Search order #, invoice #, customer, phone…"
             style={{ width:"100%", paddingLeft:34, paddingRight:12, paddingTop:9, paddingBottom:9,
               fontSize:13, border:"1px solid #e5e7eb", borderRadius:10, outline:"none",
               boxSizing:"border-box", transition:"border-color 0.15s" }}
@@ -737,7 +757,12 @@ export function OrdersPage() {
                     <input type="checkbox" style={{ accentColor:BRAND, cursor:"pointer" }}/>
                   </td>
                   <td style={{ padding:"14px 12px", fontFamily:"monospace", fontSize:12, fontWeight:700, color:BRAND, whiteSpace:"nowrap" }}>
-                    {orderNo}
+                    <p style={{ margin:0 }}>{orderNo}</p>
+                    {row.invoiceNumber && (
+                      <p style={{ margin:"2px 0 0", fontSize:10, fontWeight:600, color:"#9ca3af" }}>
+                        Inv: {row.invoiceNumber}
+                      </p>
+                    )}
                   </td>
                   <td style={{ padding:"14px 12px" }}>
                     <p style={{ margin:0, fontWeight:600, color:"#111827" }}>{row.customerName || "—"}</p>
@@ -835,6 +860,11 @@ export function OrdersPage() {
               <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:12 }}>
                 <div>
                   <p style={{ margin:0, fontFamily:"monospace", fontSize:11, fontWeight:700, color:BRAND }}>{orderNo}</p>
+                  {row.invoiceNumber && (
+                    <p style={{ margin:"2px 0 0", fontSize:10, fontWeight:600, color:"#9ca3af" }}>
+                      Inv: {row.invoiceNumber}
+                    </p>
+                  )}
                   <p style={{ margin:"3px 0 0", fontSize:14, fontWeight:700, color:"#111827" }}>{row.customerName}</p>
                   <p style={{ margin:"2px 0 0", fontSize:11, color:"#9ca3af" }}>
                     {[row.customerCity, dt ? `${dt.date} ${dt.time}` : ""].filter(Boolean).join(" · ")}

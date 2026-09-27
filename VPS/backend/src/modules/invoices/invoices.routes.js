@@ -26,6 +26,11 @@ function createInvoicesRouter() {
     requireAdminPermission(INVOICES_PERMISSIONS.GENERATE),
     controller.adminGenerateInvoice
   );
+  router.post(
+    "/order/:orderId/resend",
+    requireAdminPermission(INVOICES_PERMISSIONS.DOWNLOAD),
+    controller.adminResendInvoice
+  );
   router.get(
     "/:invoiceId/download",
     requireAdminPermission(INVOICES_PERMISSIONS.DOWNLOAD),

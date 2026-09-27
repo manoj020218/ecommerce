@@ -296,6 +296,9 @@ export function WalkInOrdersPage() {
                 <tr key={order.id} style={{ borderBottom: idx < rows.length - 1 ? "1px solid var(--border)" : "none" }}>
                   <td style={{ padding: "12px 14px" }}>
                     <div style={{ fontWeight: 700, color: "var(--brand)", fontFamily: "monospace", fontSize: 13 }}>{order.orderNo}</div>
+                    {order.repeatedFromOrderNo && (
+                      <div style={{ fontSize: 11, color: "var(--muted)" }}>Repeat of {order.repeatedFromOrderNo}</div>
+                    )}
                     <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
                       {(order.paymentMethod || "").replace(/_/g, " ")}
                     </div>
@@ -333,6 +336,14 @@ export function WalkInOrdersPage() {
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                      {canCreate && (
+                        <button type="button" className="btn btn-secondary btn-small"
+                          title="Create a new order with the same customer, products and last prices"
+                          onClick={() => navigate(`/walk-in-orders/add?repeatFrom=${encodeURIComponent(order.id)}`)}
+                          disabled={!!busyKey}>
+                          Repeat Order
+                        </button>
+                      )}
                       {canEdit && order.paymentStatus !== "paid" && order.orderStatus !== "cancelled" && (
                         <button type="button" className="btn btn-secondary btn-small"
                           onClick={() => navigate(`/walk-in-orders/${order.id}/edit`)}

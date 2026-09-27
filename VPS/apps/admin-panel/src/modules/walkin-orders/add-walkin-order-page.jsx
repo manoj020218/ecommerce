@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuthSession } from "../auth/use-auth-session";
 import { hasPermission } from "../../shared/utils/permissions";
 import { formatCurrencyInr } from "../../shared/utils/formatters";
@@ -14,6 +14,7 @@ import {
   searchWalkInProducts
 } from "./walkin-orders.api";
 import { fetchPaymentGateways } from "../payment-gateways/payment-gateways.api";
+import { buildRepeatOrderPrefill, resolveLastGrossUnitPrice } from "./walkin-order-prefill";
 
 // Same 3 buckets calculateWalkInPricing resolves against in
 // walkin-orders.service.js -- WALKIN_PAYMENT_METHODS.DIRECT_BANK_TRANSFER
@@ -138,6 +139,9 @@ export function AddWalkInOrderPage() {
   const navigate = useNavigate();
   const { orderId } = useParams();
   const isEditMode = Boolean(orderId);
+  const [searchParams] = useSearchParams();
+  const repeatFromId = isEditMode ? "" : (searchParams.get("repeatFrom") || "");
+  const isRepeatMode = Boolean(repeatFromId);
   const { session } = useAuthSession();
   const canCreate = hasPermission(session, "orders.create");
   const canEditOrder = hasPermission(session, "orders.edit");
@@ -166,7 +170,12 @@ export function AddWalkInOrderPage() {
   const [error, setError] = useState("");
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerSaveNotice, setCustomerSaveNotice] = useState("");
-  const [loadingOrder, setLoadingOrder] = useState(isEditMode);
+  const [loadingOrder, setLoadingOrder] = useState(isEditMode || isRepeatMode);
+  // Repeat Order state: source order, per-line "last time" info, and lines
+  // that couldn't be carried over (deleted/inactive products).
+  const [repeatSource, setRepeatSource] = useState(null);
+  const [repeatLineNotes, setRepeatLineNotes] = useState({});
+  const [repeatSkipped, setRepeatSkipped] = useState([]);
   const [lockedNotice, setLockedNotice] = useState("");
   const [mdrCharges, setMdrCharges] = useState({ enabled: false, rates: {} });
 
@@ -220,7 +229,11 @@ export function AddWalkInOrderPage() {
             productId: item.productId,
             qty: Number(item.qty || 1),
             priceMode: item.selectedPriceMode || "retail",
-            customUnitPrice: item.selectedPriceMode === "custom" ? item.unitPriceUsed : "",
+            // unitPriceUsed is POST-discount (taxableValue / qty); pre-filling
+            // it with discountPercent below applied the discount twice on
+            // save (fixed 2026-09-24). Use the pre-discount price instead.
+            // customUnitPrice: item.selectedPriceMode === "custom" ? item.unitPriceUsed : "",
+            customUnitPrice: item.selectedPriceMode === "custom" ? resolveLastGrossUnitPrice(item) : "",
             discountPercent: Number(item.discountPercent || 0)
           })),
           shippingMethod: detail.shippingMethod || "self_pickup",
@@ -244,6 +257,41 @@ export function AddWalkInOrderPage() {
       .catch(e => setError(e.message || "Failed to load order."))
       .finally(() => setLoadingOrder(false));
   }, [isEditMode, orderId]);
+
+  useEffect(() => {
+    if (!isRepeatMode) return;
+    setLoadingOrder(true);
+    fetchOrderDetail(repeatFromId)
+      .then(async (detail) => {
+        const productIds = [...new Set((detail.items || []).map(i => i.productId))];
+        const products = await Promise.all(productIds.map(id => fetchProduct(id).catch(() => null)));
+        const productsById = {};
+        productIds.forEach((id, idx) => { productsById[id] = products[idx]; });
+
+        const prefill = buildRepeatOrderPrefill(detail, productsById, EMPTY_FORM);
+        setProductCache(prev => {
+          const next = { ...prev };
+          products.forEach(p => { if (p) next[p.id] = toProductCacheEntry(p); });
+          return next;
+        });
+        setForm(prefill.form);
+        setCustomerMode(prefill.customerMode);
+        setCustomerQuery(prefill.form.customer.companyName || prefill.form.customer.name || "");
+        setRepeatLineNotes(prefill.lineNotes);
+        setRepeatSkipped(prefill.skipped);
+        setRepeatSource({ id: detail.id, orderNo: detail.orderNo, createdAt: detail.orderDate || detail.createdAt });
+      })
+      .catch(e => setError(e.message || "Failed to load the order to repeat."))
+      .finally(() => setLoadingOrder(false));
+  }, [isRepeatMode, repeatFromId]);
+
+  // Repeat Order: switch a carried-over line back to today's catalog price
+  // (the price mode it was originally sold under).
+  const applyTodaysPrice = (productId) => {
+    const note = repeatLineNotes[productId];
+    const mode = note?.lastPriceMode && note.lastPriceMode !== "custom" ? note.lastPriceMode : getDefaultPriceMode(form.customer.customerType);
+    updateLine(productId, { priceMode: mode, customUnitPrice: "" });
+  };
 
   // ── Customer search ─────────────────────────────────────────────────────────
 
@@ -494,6 +542,7 @@ export function AddWalkInOrderPage() {
         shippingCharge: form.shippingMethod === "self_pickup" ? 0 : normalizeMoney(form.shippingCharge),
         items: itemsPayload
       };
+      if (isRepeatMode && repeatSource?.id) payload.repeatedFromOrderId = repeatSource.id;
       const data = await createWalkInOrder(payload);
       const notice = data?.invoice?.invoiceNumber
         ? `Order ${data.order?.orderNo} created · Invoice ${data.invoice.invoiceNumber}`
@@ -513,7 +562,7 @@ export function AddWalkInOrderPage() {
     </div>
   );
 
-  if (isEditMode && loadingOrder) return (
+  if ((isEditMode || isRepeatMode) && loadingOrder) return (
     <div style={{ padding: 40, textAlign: "center", color: "var(--muted)", fontSize: 14 }}>
       Loading order…
     </div>
@@ -542,12 +591,12 @@ export function AddWalkInOrderPage() {
       <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>
         <span style={{ cursor: "pointer", color: "var(--brand)" }} onClick={() => navigate("/walk-in-orders")}>Walk-in Orders</span>
         <span style={{ margin: "0 6px" }}>›</span>
-        <span>{isEditMode ? "Edit Order" : "New Order"}</span>
+        <span>{isEditMode ? "Edit Order" : isRepeatMode ? "Repeat Order" : "New Order"}</span>
       </div>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 10 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{isEditMode ? "Edit Order" : "Add Order"}</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--text)" }}>{isEditMode ? "Edit Order" : isRepeatMode ? "Repeat Order" : "Add Order"}</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" className="btn btn-secondary" onClick={() => navigate("/walk-in-orders")} disabled={saving}>Cancel</button>
           {isEditMode ? (
@@ -571,6 +620,20 @@ export function AddWalkInOrderPage() {
       {error && (
         <div style={{ background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.2)", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "#dc2626" }}>
           {error}
+        </div>
+      )}
+
+      {/* Repeat Order banner */}
+      {isRepeatMode && repeatSource && (
+        <div style={{ background: "rgba(37,99,235,0.05)", border: "1px solid rgba(37,99,235,0.2)", borderRadius: 8, padding: "10px 16px", marginBottom: 16, fontSize: 13, color: "var(--text)" }}>
+          Repeating order <strong style={{ fontFamily: "monospace" }}>{repeatSource.orderNo}</strong>
+          {repeatSource.createdAt && <> from {new Date(repeatSource.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</>}
+          {" "}— last prices are carried over and editable. Review quantities &amp; prices, then save.
+          {repeatSkipped.length > 0 && (
+            <div style={{ marginTop: 8, color: "#dc2626", fontSize: 12 }}>
+              Not carried over: {repeatSkipped.map(s => `${s.title} (${s.reason})`).join(", ")}
+            </div>
+          )}
         </div>
       )}
 
@@ -809,6 +872,28 @@ export function AddWalkInOrderPage() {
                       <td style={{ padding: "10px 10px" }}>
                         <div style={{ fontWeight: 600 }}>{product?.title || line.productId}</div>
                         {product?.sku && <div style={{ fontSize: 11, color: "var(--muted)" }}>{product.sku}</div>}
+                        {repeatLineNotes[line.productId] && (() => {
+                          const note = repeatLineNotes[line.productId];
+                          const todayMode = note.lastPriceMode !== "custom" ? note.lastPriceMode : getDefaultPriceMode(form.customer.customerType);
+                          const todayPrice = resolveLineUnitPrice(product, { ...line, priceMode: todayMode });
+                          return (
+                            <div style={{ fontSize: 11, marginTop: 3, color: "var(--muted)" }}>
+                              Last: {formatCurrencyInr(note.lastUnitPrice)} × {note.lastQty}
+                              {note.lastPriceMode !== "custom" && todayPrice > 0 && todayPrice !== note.lastUnitPrice && (
+                                <span style={{ color: "#b45309" }}> · today {formatCurrencyInr(todayPrice)}</span>
+                              )}
+                              {line.priceMode === "custom" && note.lastPriceMode !== "custom" && (
+                                <button type="button" onClick={() => applyTodaysPrice(line.productId)}
+                                  style={{ background: "none", border: "none", padding: 0, marginLeft: 6, fontSize: 11, color: "var(--brand)", cursor: "pointer", textDecoration: "underline" }}>
+                                  Use today's price
+                                </button>
+                              )}
+                              {note.lowStock && (
+                                <div style={{ color: "#dc2626" }}>Only {Math.max(0, note.availableStock)} in stock</div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td style={{ padding: "10px 10px", textAlign: "center" }}>
                         <input type="number" min="1" value={line.qty}

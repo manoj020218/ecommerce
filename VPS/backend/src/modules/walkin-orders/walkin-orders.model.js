@@ -104,6 +104,7 @@ function sanitizeWalkInOrderSummary(order) {
   return {
     id: order.id,
     orderNo: order.orderNo || "",
+    repeatedFromOrderNo: order.repeatedFromOrderNo || "",
     customerId: order.userId || "",
     customerName:
       order.billingAddress?.companyName ||

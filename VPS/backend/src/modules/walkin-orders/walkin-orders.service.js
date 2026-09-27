@@ -800,6 +800,10 @@ async function createWalkInOrder(payload, actor) {
     paymentStore
   );
 
+  const repeatedFromOrder = payload.repeatedFromOrderId
+    ? ensureArray(authStore.orders).find((row) => row.id === payload.repeatedFromOrderId)
+    : null;
+
   const now = nowIso();
   const order = {
     id: generateId("order"),
@@ -872,6 +876,8 @@ async function createWalkInOrder(payload, actor) {
     paymentVerifiedAt: null,
     gatewayTxnId: payload.paymentReference || "",
     orderNote: payload.orderNote || "",
+    repeatedFromOrderId: repeatedFromOrder?.id || "",
+    repeatedFromOrderNo: repeatedFromOrder?.orderNo || "",
     fulfilmentUpdatedAt: null,
     createdAt: now,
     updatedAt: now
@@ -920,7 +926,8 @@ async function createWalkInOrder(payload, actor) {
     resourceId: order.id,
     metadata: {
       orderNo: order.orderNo,
-      customerId: customer.id
+      customerId: customer.id,
+      repeatedFromOrderNo: order.repeatedFromOrderNo || undefined
     }
   });
 

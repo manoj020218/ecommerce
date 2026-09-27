@@ -53,9 +53,9 @@ const createWalkInLineSchema = z
     qty: z.coerce.number().int().min(1).max(100000),
     priceMode: z.enum(Object.values(WALKIN_PRICE_MODES)).optional().default("retail"),
     customUnitPrice: positiveMoneySchema.optional().nullable().default(null),
-    // Manual, per-line admin discount -- applied before the automatic
-    // payment-method discount (calculateWalkInPricing), which still runs
-    // proportionally on top of the already-reduced line subtotal.
+    // Manual, per-line admin discount -- the only discount walk-in pricing
+    // applies (calculateWalkInPricing no longer stacks the storefront's
+    // automatic payment-method discount on top; see that function's comment).
     discountPercent: z.coerce.number().min(0).max(100).optional().default(0)
   })
   .superRefine((value, ctx) => {
@@ -81,7 +81,10 @@ const createWalkInOrderSchema = z.object({
   markAsPaid: z.boolean().optional().default(false),
   generateInvoice: z.boolean().optional().default(true),
   paymentReference: z.string().trim().max(200).optional().default(""),
-  orderNote: z.string().trim().max(1000).optional().default("")
+  orderNote: z.string().trim().max(1000).optional().default(""),
+  // Set by the admin "Repeat Order" button -- traceability only, never
+  // affects pricing (the new order is priced from its own items payload).
+  repeatedFromOrderId: z.string().trim().max(160).optional()
 });
 
 // Same shape as create, minus markAsPaid/generateInvoice -- editing an
@@ -90,7 +93,8 @@ const createWalkInOrderSchema = z.object({
 // order is handled unconditionally in the service layer, not gated by a flag.
 const updateWalkInOrderSchema = createWalkInOrderSchema.omit({
   markAsPaid: true,
-  generateInvoice: true
+  generateInvoice: true,
+  repeatedFromOrderId: true
 });
 
 const confirmPaymentPayloadSchema = z.object({

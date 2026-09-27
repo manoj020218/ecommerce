@@ -14,6 +14,20 @@ function timingSafeStringEqual(expected, actual) {
 
 const CF_API_VERSION = "2023-08-01";
 
+// API_BASE_URL already ends in "/api" (e.g. "https://api.jenixindia.com/api",
+// used elsewhere for building full API urls), so naively appending
+// "/api/payments/webhook/cashfree" to it produces a doubled "/api/api/..."
+// path that 404s -- confirmed live against a real Cashfree order
+// (pay_attempt_cb2559ca...) whose stored notify_url had exactly this
+// double segment, meaning Cashfree could never have delivered a payment
+// webhook for any order. Strip a trailing "/api" (and any trailing slash)
+// before appending the actual route.
+function resolveApiOrigin() {
+  return String(process.env.API_BASE_URL || "http://localhost:4100")
+    .replace(/\/api\/?$/, "")
+    .replace(/\/$/, "");
+}
+
 class CashfreeGateway extends PaymentGatewayAdapter {
   async _getConfig() {
     const store = await readPaymentStore();
@@ -79,7 +93,7 @@ class CashfreeGateway extends PaymentGatewayAdapter {
         customer_phone: "9000000000"
       },
       order_meta: {
-        notify_url: `${process.env.API_BASE_URL || "http://localhost:4100"}/api/payments/webhook/cashfree`
+        notify_url: `${resolveApiOrigin()}/api/payments/webhook/cashfree`
       }
     }, config);
 

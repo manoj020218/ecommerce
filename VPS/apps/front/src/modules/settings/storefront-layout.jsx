@@ -601,6 +601,18 @@ export function StorefrontLayout() {
               event.preventDefault();
               const trimmed = searchText.trim();
               navigate(trimmed ? `/products?q=${encodeURIComponent(trimmed)}` : "/products");
+              // Tapping Search normally blurs the input first (focus moves to
+              // the button), which on mobile collapses the expanded search
+              // bar (proto-header-main-search-active) mid-tap -- the button
+              // shifts out from under the finger before the click completes,
+              // so the first tap misses and needs a second one to land on
+              // its new, collapsed position. onMouseDown below prevents that
+              // premature blur; this explicit blur+collapse instead happens
+              // once, cleanly, after the search has actually been submitted.
+              event.currentTarget
+                .querySelector("#storefront-search-input")
+                ?.blur();
+              setIsSearchFocused(false);
             }}
           >
             {/* Search (submit) and Clear are both always shown now — not
@@ -634,7 +646,16 @@ export function StorefrontLayout() {
               ) : null}
             </div>
             <div className="proto-header-search-actions">
-              <button type="submit" aria-label="Search storefront">
+              <button
+                type="submit"
+                aria-label="Search storefront"
+                onMouseDown={(event) => {
+                  // Keeps the input focused (and the mobile bar expanded)
+                  // through the click itself -- see the onSubmit comment for
+                  // why the premature-blur-collapse otherwise breaks the tap.
+                  event.preventDefault();
+                }}
+              >
                 <SearchIcon />
               </button>
             </div>

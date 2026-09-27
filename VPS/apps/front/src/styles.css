@@ -2207,7 +2207,13 @@ textarea {
   flex-shrink: 0;
 }
 
-.proto-header-search button {
+/* Scoped to .proto-header-search-actions (the submit button's own wrapper),
+   not the whole .proto-header-search bar -- that broader selector used to
+   also match the Clear button (also a <button>, nested inside the sibling
+   .proto-header-search-input-wrap) and, being more specific than
+   .proto-search-inline-clear's own rule, silently overrode its intended
+   grey/26px styling with this brand-red/60px one. */
+.proto-header-search-actions button {
   border: 0;
   background: var(--brand);
   color: #fff;
@@ -2218,7 +2224,7 @@ textarea {
   transition: background-color 0.2s ease;
 }
 
-.proto-header-search button:hover {
+.proto-header-search-actions button:hover {
   background: var(--brand-dark);
 }
 
@@ -2249,7 +2255,12 @@ textarea {
   }
 }
 
-.proto-header-search svg,
+/* Scoped to -actions (the submit button), not the whole search bar -- see
+   the matching comment above .proto-header-search-actions button. Equal
+   specificity with .proto-search-inline-clear svg meant source order alone
+   decided the winner here, and this rule came later in the file, so it was
+   silently forcing the Clear icon to 18px instead of its intended 14px. */
+.proto-header-search-actions svg,
 .proto-header-action svg,
 .proto-icon-action svg,
 .proto-mobile-link svg,
@@ -6972,7 +6983,7 @@ textarea {
   font-size: 13px !important;
 }
 
-.proto-header-search button {
+.proto-header-search-actions button {
   width: 38px !important;
 }
 

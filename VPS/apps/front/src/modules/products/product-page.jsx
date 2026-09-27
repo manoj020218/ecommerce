@@ -802,7 +802,7 @@ export function ProductPage() {
 
     try {
       watchdog.trackAddToCartClick(product.id);
-      await addCartItem({
+      const cartResult = await addCartItem({
         ...buildCartContext(isAuthenticated),
         productId: product.id,
         qty: quantity
@@ -813,7 +813,22 @@ export function ProductPage() {
       if (mode === "buy") {
         navigate("/checkout");
       } else {
-        setCartActionNotice("Added to cart. Review it before checkout.");
+        // Add-to-cart stacks onto whatever's already in the cart for this
+        // product rather than replacing it -- surfacing the resulting total
+        // (instead of a generic "Added" message) and resetting the stepper
+        // back to MOQ stops a confused repeat click from silently stacking
+        // again on top of what's already there.
+        const updatedLine = Array.isArray(cartResult?.items)
+          ? cartResult.items.find((item) => item.productId === product.id)
+          : null;
+        const updatedQty = updatedLine ? Number(updatedLine.qty || 0) : quantity;
+
+        setCartActionNotice(
+          updatedQty > quantity
+            ? `Added. Your cart now has ${updatedQty} of this item.`
+            : "Added to cart. Review it before checkout."
+        );
+        setQuantity(Math.max(1, Number(product.moq || 1)));
       }
     } catch (requestError) {
       setCartActionError(requestError.message || "Unable to update cart.");
@@ -1511,10 +1526,14 @@ export function ProductPage() {
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
-          ) : product.fullDescription || product.shortDescription ? (
+          ) : product.shortDescription || product.fullDescription ? (
+            // No keyFeatures entered -- short description substitutes for it
+            // (it's the closer match, a short highlight rather than the full
+            // write-up), falling back to full description only if that's
+            // also empty.
             <div
               className="proto-tab-copy"
-              dangerouslySetInnerHTML={{ __html: product.fullDescription || product.shortDescription }}
+              dangerouslySetInnerHTML={{ __html: product.shortDescription || product.fullDescription }}
             />
           ) : (
             <p className="proto-tab-copy">
@@ -1524,11 +1543,21 @@ export function ProductPage() {
         ) : null}
 
         {tab === "description" ? (
-          product.fullDescription ? (
-            <div
-              className="proto-tab-copy"
-              dangerouslySetInnerHTML={{ __html: product.fullDescription }}
-            />
+          product.shortDescription || product.fullDescription ? (
+            <div className="proto-tab-copy">
+              {/* Short description is never dropped just because a full
+                  description also exists -- both render together (short
+                  first, as the summary) whenever each has data. */}
+              {product.shortDescription ? (
+                <div dangerouslySetInnerHTML={{ __html: product.shortDescription }} />
+              ) : null}
+              {product.fullDescription ? (
+                <div
+                  style={product.shortDescription ? { marginTop: 16 } : undefined}
+                  dangerouslySetInnerHTML={{ __html: product.fullDescription }}
+                />
+              ) : null}
+            </div>
           ) : (
             <p className="proto-tab-copy">
               A detailed product description is being prepared. Contact the store if you need help validating fit, specs, or installation needs.

@@ -44,7 +44,11 @@ const editOrderItemsSchema = z.object({
     )
     .min(1, "Order must have at least one item.")
     .max(50),
-  discountAmount: z.coerce.number().min(0).max(10000000).optional().default(0)
+  discountAmount: z.coerce.number().min(0).max(10000000).optional().default(0),
+  // Negotiated shipping (e.g. a bulk-order deal agreed before the payment
+  // demand is sent) -- null/omitted keeps the normal rate-card calculation;
+  // any other number overrides it outright.
+  shippingChargeOverride: z.coerce.number().min(0).max(10000000).nullable().optional()
 }).strict();
 
 function parseListOrdersQuery(query) {

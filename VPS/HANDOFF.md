@@ -16,7 +16,35 @@ itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
 
-## Sep 27 2026 — Dashboard: trend toggle, clickable tiles, product visits vs sales (DEPLOYED, NOT COMMITTED)
+## Sep 27 2026 — Cart recovery page redesigned (/recover/:token) (DEPLOYED)
+
+User: the page behind the "you left something in your cart" link wasn't convincing. The old page
+used internal wording ("Recovery link", "Stage: Cart Added", "Restore to This Device", "Snapshot from
+the last tracked cart activity"), no product photos, a ₹ total that didn't match the items, and a
+"What Stopped You?" survey in the middle.
+
+- New `apps/front/src/modules/recovery/recovery-resume-page.jsx` + `recovery-parts.jsx`; the router
+  points `/recover/:recoveryToken` at `RecoveryResumePage` (old import kept commented; old
+  `recovery-page.jsx` unchanged — switching back is a one-line router change).
+- Page: "Welcome back, <first name>", "You left N items … earlier today at 12:35 pm", a 4-step
+  progress bar (Cart → Address & delivery → Payment → Order placed) marking **where they stopped**,
+  product photos + links + "In stock"/"Currently unavailable", price per unit **incl. GST** (the old
+  "1 × ₹11 = ₹12.98" looked wrong), items total vs "cart total with GST & delivery", one sticky
+  CTA whose label depends on the step ("Continue to checkout" / "Resume checkout" / "Complete your
+  order" / "Try payment again"), trust badges, WhatsApp/call help (WhatsApp prefilled with the
+  items), and the feedback survey collapsed at the bottom with friendlier reasons. Friendly screens
+  for expired (410) / invalid (404) links and for already-ordered carts.
+- Restore flow unchanged: `restoreRecoveryCart` then navigate to `/checkout` (resuming the checkout
+  session when there was one).
+- Backend (`getPublicRecoveryPreview`, additive): `itemDetails` {imageUrl (same first-image rule as
+  the cart), slug, available, stockStatus} and `resumePoint` (cart/checkout/payment/payment_failed/
+  ordered — derived from checkoutSessionId/paymentAttemptId/failureReason, because the
+  "abandoned" stage overwrites where they stopped).
+- Deployed: backend backup `/root/jenix-bak-2026-09-27-recovery-page/`; storefront
+  `apps/front/dist.bak-20260927-recovery-prev` (pre-redesign). Older `dist.bak-20260917-100600`
+  still there — delete later per one-backup rule once the user confirms.
+
+## Sep 27 2026 — Dashboard: trend toggle, clickable tiles, product visits vs sales (DEPLOYED, commit `dffc6c1`)
 
 - **Order Trend** (`dashboard/order-trend-chart.jsx`, `GET /admin/dashboard/trend?range=week|month|year`):
   7 daily / 30 daily / 12 monthly bars (IST), Orders ↔ Sales ₹ toggle. "Sales" = all non-cancelled
@@ -45,7 +73,7 @@ feature in this file — leave it alone unless the user asks about it).
   `apps/admin-panel/dist.bak-20260927-dashboard-prev` (older `dist.bak-20260924-editfix-prev` to be
   deleted once the new dashboard is confirmed — one-backup rule).
 
-## Sep 27 2026 — Backend "crashing again and again": pm2 memory restarts, root cause fixed (DEPLOYED, NOT COMMITTED)
+## Sep 27 2026 — Backend "crashing again and again": pm2 memory restarts, root cause fixed (DEPLOYED, commit `83ca900`)
 
 Symptom: `jenix-backend` restarted 15–27×/day (517 total). Not crashes — every exit is `code 0 via SIGINT`
 from pm2: `[PM2][WORKER] Process 4 restarted because it exceeds --max-memory-restart value` (600M; one
@@ -75,7 +103,7 @@ Fix:
 - Side effect: admin "Abandoned Cart Report" `recoveryCount` drops sharply — it was counting the
   empty junk; recovered/reminder counts unchanged.
 
-**Follow-up same day — ₹0 rows in admin Abandoned Carts (DEPLOYED, NOT COMMITTED):** 533 kept records
+**Follow-up same day — ₹0 rows in admin Abandoned Carts (DEPLOYED, commit `83ca900`):** 533 kept records
 showed 0 items/₹0. (a) 504 were the same getCart junk but for logged-in customers (the first cleanup only
 took anonymous ones). (b) 29 were real carts that reached checkout — 9 of them "recovered" with an order
 (e.g. JNX-ORD-20260731-00006 ₹20,862) — whose saved cart was **overwritten by an empty cart**: the live
@@ -255,7 +283,7 @@ AWB (37 live Shree Maruti shipments verified). User confirmed tracking works.
 Backups deleted. Customers who got the old broken link need the shipping
 notification resent.
 
-## Sep 24 2026 — Walk-in "Repeat Order" button (DEPLOYED, NOT COMMITTED)
+## Sep 24 2026 — Walk-in "Repeat Order" button (DEPLOYED, committed 2026-09-27 `7b22b4a`)
 
 Ask: a repeat walk-in customer (Binary Infom) meant re-entering the whole
 order by hand. Added a **Repeat Order** button on every Walk-in Orders

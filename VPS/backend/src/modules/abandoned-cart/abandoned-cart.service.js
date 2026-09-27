@@ -803,8 +803,51 @@ async function getPublicRecoveryPreview(recoveryToken) {
     recovery: sanitizeRecoveryDetail(record),
     feedbackOptions: RECOVERY_FEEDBACK_REASONS,
     support: buildSupportInfo(settingsBundle),
-    canRestore: record.stage !== RECOVERY_STAGES.RECOVERED
+    canRestore: record.stage !== RECOVERY_STAGES.RECOVERED,
+    // Added 2026-09-27 for the redesigned recovery page (additive fields):
+    // current photo/link/availability per product, and where the buyer
+    // actually stopped (the "abandoned" stage overwrites that on its own).
+    itemDetails: await buildRecoveryItemDetails(record),
+    resumePoint: resolveResumePoint(record)
   };
+}
+
+function resolveResumePoint(record) {
+  if (record.stage === RECOVERY_STAGES.RECOVERED) return "ordered";
+  if (record.stage === RECOVERY_STAGES.PAYMENT_FAILED || record.failureReason) return "payment_failed";
+  if (record.paymentAttemptId || record.stage === RECOVERY_STAGES.PAYMENT_PENDING) return "payment";
+  if (record.checkoutSessionId || record.stage === RECOVERY_STAGES.CHECKOUT_STARTED) return "checkout";
+  return "cart";
+}
+
+async function buildRecoveryItemDetails(record) {
+  const details = {};
+  try {
+    const { readCatalogStore } = require("../../database/catalog-store");
+    const catalogStore = await readCatalogStore();
+    const byId = new Map(ensureArray(catalogStore.products).map((p) => [p.id, p]));
+    for (const item of ensureArray(record.cartItems)) {
+      const product = byId.get(item.productId);
+      if (!product) {
+        details[item.productId] = { available: false, imageUrl: "", slug: "" };
+        continue;
+      }
+      // same first-image rule as the cart (cart-checkout.service.js)
+      const firstImage = Array.isArray(product.images) && product.images[0];
+      const imageUrl = firstImage
+        ? (typeof firstImage === "string" ? firstImage : firstImage.thumbnail || firstImage.url || "")
+        : "";
+      details[item.productId] = {
+        imageUrl,
+        slug: product.slug || "",
+        available: Boolean(product.isActive) && product.stockStatus !== "out_of_stock",
+        stockStatus: product.stockStatus || ""
+      };
+    }
+  } catch (_error) {
+    // photos are a nice-to-have; the page still works from the saved snapshot
+  }
+  return details;
 }
 
 function resolveRestoreOwner(context, payload) {

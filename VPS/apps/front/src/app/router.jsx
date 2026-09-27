@@ -80,9 +80,16 @@ const ProductsListPage = lazy(() =>
     default: m.ProductsListPage
   }))
 );
+// const RecoveryPage = lazy(() =>
+//   import("../modules/recovery/recovery-page").then((m) => ({
+//     default: m.RecoveryPage
+//   }))
+// );
+// Redesigned customer recovery page (2026-09-27). To switch back, restore
+// the block above and remove this one — the old page file is unchanged.
 const RecoveryPage = lazy(() =>
-  import("../modules/recovery/recovery-page").then((m) => ({
-    default: m.RecoveryPage
+  import("../modules/recovery/recovery-resume-page").then((m) => ({
+    default: m.RecoveryResumePage
   }))
 );
 const NotFoundPage = lazy(() =>

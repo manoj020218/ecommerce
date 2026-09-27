@@ -5,6 +5,7 @@ const service = require("./cart-checkout.service");
 const {
   parseGetCartQuery,
   parseAddItemPayload,
+  parseCartContactPayload,
   parseUpdateItemPayload,
   parseDeleteItemQuery,
   parseMergeGuestPayload,
@@ -54,6 +55,12 @@ const addCartItem = asyncHandler(async (req, res) => {
   const payload = parseAddItemPayload(req.body);
   const data = await service.addCartItem(cartContext(req, payload.sessionId), payload);
   return created(res, data, "Cart item added.");
+});
+
+const saveCartContact = asyncHandler(async (req, res) => {
+  const payload = parseCartContactPayload(req.body);
+  const data = await service.saveCartContact(cartContext(req, payload.sessionId), payload);
+  return ok(res, data, "Contact saved.");
 });
 
 const updateCartItem = asyncHandler(async (req, res) => {
@@ -204,6 +211,7 @@ const paymentsWebhookGateway = asyncHandler(async (req, res) => {
 module.exports = {
   getCart,
   addCartItem,
+  saveCartContact,
   updateCartItem,
   deleteCartItem,
   mergeGuestCart,

@@ -967,6 +967,22 @@ async function trackCartSaved(owner, cartView) {
   });
 }
 
+// A guest who has only added items to cart (no checkout started yet) has no
+// billingAddress/shippingAddress on their recovery record, so
+// resolveContactSnapshot has nothing to read an email from -- the record
+// exists but resolveReminderTarget() returns null and it can never actually
+// be reminded. This is the lightweight, non-blocking email capture asked for
+// instead of gating Add to Cart behind a full login: passing the captured
+// email in as billingAddress.email reuses resolveContactSnapshot's existing
+// priority order (billing > shipping > customer > existing) to fill that gap
+// immediately, without waiting for the buyer to ever reach checkout.
+async function trackGuestContactCaptured(owner, cartView, email) {
+  return writeTrackedRecovery(owner, cartView, {
+    stage: RECOVERY_STAGES.CART_ADDED,
+    billingAddress: { email }
+  });
+}
+
 async function trackCheckoutStarted(owner, checkoutSession, order = null) {
   return writeTrackedRecovery(owner, checkoutSession.cart, {
     stage:
@@ -1040,6 +1056,7 @@ module.exports = {
   restoreRecoveryCart,
   saveRecoveryFeedback,
   trackCartSaved,
+  trackGuestContactCaptured,
   trackCheckoutStarted,
   trackPaymentAttemptCreated,
   trackPaymentFailed,

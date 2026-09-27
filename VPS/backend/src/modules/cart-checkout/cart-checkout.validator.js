@@ -47,6 +47,11 @@ const addItemSchema = z.object({
   designUploadIds: z.array(z.string().trim().min(1).max(120)).max(500).optional()
 });
 
+const cartContactSchema = z.object({
+  sessionId: sessionIdSchema.optional(),
+  email: z.string().trim().toLowerCase().email().max(180)
+});
+
 const updateItemSchema = z.object({
   sessionId: sessionIdSchema.optional(),
   qty: z.coerce.number().int().min(1).max(100000),
@@ -164,6 +169,11 @@ function parseAddItemPayload(payload) {
   return addItemSchema.parse(payload);
 }
 
+function parseCartContactPayload(payload) {
+  ensureObject(payload, "Cart contact");
+  return cartContactSchema.parse(payload);
+}
+
 function parseUpdateItemPayload(payload) {
   ensureObject(payload, "Update cart item");
   return updateItemSchema.parse(payload);
@@ -225,6 +235,7 @@ function parseConfirmCashfreePaymentPayload(payload) {
 module.exports = {
   parseGetCartQuery,
   parseAddItemPayload,
+  parseCartContactPayload,
   parseUpdateItemPayload,
   parseDeleteItemQuery,
   parseMergeGuestPayload,

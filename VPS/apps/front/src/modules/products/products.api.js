@@ -100,6 +100,14 @@ export function addCartItem(payload) {
   });
 }
 
+export function saveCartContact(email) {
+  return apiFetch("/cart/contact", {
+    method: "POST",
+    auth: true,
+    body: { sessionId: getOrCreateGuestSessionId(), email }
+  });
+}
+
 export function updateCartItem(productId, payload) {
   return apiFetch(`/cart/items/${productId}`, {
     method: "PATCH",

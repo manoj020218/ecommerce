@@ -7,6 +7,7 @@ function createCartRouter() {
 
   router.get("/", controller.getCart);
   router.post("/items", controller.addCartItem);
+  router.post("/contact", controller.saveCartContact);
   router.patch("/items/:productId", controller.updateCartItem);
   router.delete("/items/:productId", controller.deleteCartItem);
   router.post("/merge", requireCustomerAuth, controller.mergeGuestCart);

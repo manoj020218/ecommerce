@@ -21,6 +21,7 @@ import {
 } from "./products-column-selector";
 
 import { fetchShippingClasses } from "../shipping/shipping.api";
+import { SpecificationsEditor } from "./specifications-editor";
 import {
   archiveProduct,
   deleteProduct,
@@ -403,7 +404,7 @@ const EMPTY_FORM = {
   title: "", slug: "", oldUrl: "", categoryId: "", subcategoryId: "",
   brand: "", modelNumber: "", hsnCode: "",
   basePrice: "", salePrice: "", shortDescription: "", fullDescription: "",
-  specificationsText: "{}", technicalKeywordsText: "", customerKeywordsText: "",
+  specifications: {}, technicalKeywordsText: "", customerKeywordsText: "",
   useCasesText: "", problemStatementsText: "", moq: 1,
   bulkPricingEnabled: false, bulkPriceSlabsText: "", priceGroupPricesText: "",
   customerSpecificPricesText: "", quoteRequiredAboveQty: "", deadWeightKg: 0,
@@ -424,7 +425,9 @@ function formFromProduct(product) {
     hsnCode: product.hsnCode || "",
     basePrice: product.basePrice ?? "", salePrice: product.salePrice ?? "",
     shortDescription: product.shortDescription || "", fullDescription: product.fullDescription || "",
-    specificationsText: JSON.stringify(product.specifications || {}, null, 2),
+    specifications: product.specifications && typeof product.specifications === "object"
+      ? product.specifications
+      : {},
     technicalKeywordsText: toCsvInput(product.technicalKeywords),
     customerKeywordsText: toCsvInput(product.customerKeywords),
     useCasesText: toCsvInput(product.useCases),
@@ -490,8 +493,6 @@ function autoGenerateSeo(form) {
 }
 
 function buildPayload(form) {
-  let specifications = {};
-  if (form.specificationsText.trim()) specifications = JSON.parse(form.specificationsText);
   return {
     title: form.title, slug: form.slug.trim() || undefined, oldUrl: form.oldUrl,
     categoryId: form.categoryId || null, subcategoryId: form.subcategoryId || null,
@@ -499,7 +500,7 @@ function buildPayload(form) {
     hsnCode: form.hsnCode || undefined, basePrice: Number(form.basePrice),
     salePrice: form.salePrice === "" ? undefined : Number(form.salePrice),
     shortDescription: form.shortDescription, fullDescription: form.fullDescription,
-    specifications, technicalKeywords: splitCsvInput(form.technicalKeywordsText),
+    specifications: form.specifications, technicalKeywords: splitCsvInput(form.technicalKeywordsText),
     customerKeywords: splitCsvInput(form.customerKeywordsText),
     useCases: splitCsvInput(form.useCasesText),
     problemStatements: splitCsvInput(form.problemStatementsText),
@@ -1748,8 +1749,8 @@ export function ProductsPage() {
                 <option value="in_stock">In Stock</option>
                 <option value="low_stock">Low Stock</option>
                 <option value="out_of_stock">Out of Stock</option>
-              </select>
                 <option value="attention">Low + Out of Stock</option>
+              </select>
               <button
                 type="submit"
                 style={{ fontSize: 13, fontWeight: 500, padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", color: "#374151" }}
@@ -2649,17 +2650,26 @@ export function ProductsPage() {
           <h4 className="form-section">Descriptions</h4>
           <div className="field field-full">
             <span style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
-              Short Description <span style={{ color: "var(--muted)", fontWeight: 400 }}>({stripHtml(form.shortDescription).length}/400 chars)</span>
+              Short Description{" "}
+              <span style={{ color: "var(--muted)", fontWeight: 400 }}>
+                ({stripHtml(form.shortDescription).length}/400 chars — shown in the buyer's "Description" tab,
+                and used in the "Key Features" tab if no Key Features are listed)
+              </span>
             </span>
             <RichTextEditor
               value={form.shortDescription}
               onChange={(html) => setForm(cur => ({ ...cur, shortDescription: html }))}
               minRows={3}
-              placeholder="Brief product summary shown in listing cards…"
+              placeholder="Brief product summary shown in the buyer's Description tab…"
             />
           </div>
           <div className="field field-full">
-            <span style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>Full Description</span>
+            <span style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
+              Full Description{" "}
+              <span style={{ color: "var(--muted)", fontWeight: 400 }}>
+                (shown in the buyer's "Description" tab, below Short Description)
+              </span>
+            </span>
             <RichTextEditor
               value={form.fullDescription}
               onChange={(html) => setForm(cur => ({ ...cur, fullDescription: html }))}
@@ -2671,7 +2681,18 @@ export function ProductsPage() {
           <label className="field field-full"><span>Customer Keywords (comma separated)</span><input name="customerKeywordsText" value={form.customerKeywordsText} onChange={onFormChange} placeholder="industrial relay, panel relay" /></label>
           <label className="field field-full"><span>Use Cases (comma separated)</span><input name="useCasesText" value={form.useCasesText} onChange={onFormChange} /></label>
           <label className="field field-full"><span>Problem Statements (comma separated)</span><input name="problemStatementsText" value={form.problemStatementsText} onChange={onFormChange} /></label>
-          <label className="field field-full"><span>Specifications (JSON)</span><textarea rows="5" name="specificationsText" value={form.specificationsText} onChange={onFormChange} style={{ fontFamily: "monospace", fontSize: 12 }} /></label>
+          <div className="field field-full">
+            <span style={{ display: "block", marginBottom: 6, fontSize: 13, fontWeight: 500 }}>
+              Specifications{" "}
+              <span style={{ color: "var(--muted)", fontWeight: 400 }}>
+                (shown as a table in the buyer's "Specifications" tab)
+              </span>
+            </span>
+            <SpecificationsEditor
+              value={form.specifications}
+              onChange={(next) => setForm((cur) => ({ ...cur, specifications: next }))}
+            />
+          </div>
 
           {/* ── MEDIA ── */}
           <h4 className="form-section">Media</h4>

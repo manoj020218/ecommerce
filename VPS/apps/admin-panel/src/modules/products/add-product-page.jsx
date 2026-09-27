@@ -4,6 +4,7 @@ import { useAuthSession } from "../auth/use-auth-session";
 import { hasPermission } from "../../shared/utils/permissions";
 import { formatCurrencyInr, splitCsvInput, toCsvInput } from "../../shared/utils/formatters";
 import { RichTextEditor } from "../../shared/components/rich-text-editor";
+import { SpecificationsEditor } from "./specifications-editor";
 import { API_BASE_URL } from "../../shared/api/http-client";
 import { fetchCategories, createCategory } from "../categories/categories.api";
 import { fetchHsnTaxRecords, createHsnTaxRecord } from "../hsn-tax/hsn-tax.api";
@@ -507,7 +508,7 @@ const EMPTY_FORM = {
   title: "", slug: "", oldUrl: "", categoryId: "", subcategoryId: "",
   brand: "", modelNumber: "", hsnCode: "",
   basePrice: "", salePrice: "", shortDescription: "", fullDescription: "",
-  specificationsText: "{}", keyFeaturesText: "", technicalKeywordsText: "", customerKeywordsText: "",
+  specifications: {}, keyFeaturesText: "", technicalKeywordsText: "", customerKeywordsText: "",
   useCasesText: "", problemStatementsText: "",
   moq: 1, bulkPricingEnabled: false, bulkPriceSlabsText: "", priceGroupPricesText: "",
   customerSpecificPricesText: "", quoteRequiredAboveQty: "",
@@ -646,17 +647,6 @@ export function AddProductPage() {
     setError("");
     setFieldErrors({});
 
-    let specs = {};
-    try {
-      if (form.specificationsText.trim()) specs = JSON.parse(form.specificationsText);
-    } catch {
-      const fe = { specificationsText: "Invalid JSON in specifications." };
-      setFieldErrors(fe);
-      focusFirstError("specifications", fe);
-      setSaving(false);
-      return;
-    }
-
     let bulkPriceSlabs, priceGroupPrices, customerSpecificPrices;
     try {
       bulkPriceSlabs = parseBulkPriceSlabs(form.bulkPriceSlabsText);
@@ -681,7 +671,7 @@ export function AddProductPage() {
       salePrice: form.salePrice === "" ? undefined : Number(form.salePrice),
       shortDescription: form.shortDescription,
       fullDescription: form.fullDescription,
-      specifications: specs,
+      specifications: form.specifications,
       keyFeatures: form.keyFeaturesText.split("\n").map(s => s.trim()).filter(Boolean),
       technicalKeywords: splitCsvInput(form.technicalKeywordsText),
       customerKeywords: splitCsvInput(form.customerKeywordsText),
@@ -1070,15 +1060,30 @@ export function AddProductPage() {
               </Field>
             </Section>
 
-            {/* Descriptions */}
+            {/* Descriptions -- field labels/hints below name the exact buyer-facing
+                tab or element each one feeds (from product-page.jsx on the
+                storefront), so it's never a guess which field controls what a
+                buyer actually sees. */}
             <Section title="Descriptions">
-              <Field label="Short Description" hint={`(${stripHtml(form.shortDescription).length}/400)`} error={fieldErrors.shortDescription} full noLabel>
+              <Field
+                label="Short Description"
+                hint={`(${stripHtml(form.shortDescription).length}/400 — shown in the buyer's "Description" tab, and used in the "Key Features" tab if no Key Features are listed below)`}
+                error={fieldErrors.shortDescription}
+                full
+                noLabel
+              >
                 <RichTextEditor value={form.shortDescription}
                   onChange={html => set("shortDescription", html)} minRows={3}
-                  placeholder="Brief product summary shown in listing cards…" />
+                  placeholder="Brief product summary shown in the buyer's Description tab…" />
               </Field>
               <div style={{ marginTop: 12 }}>
-                <Field label="Full Description" error={fieldErrors.fullDescription} full noLabel>
+                <Field
+                  label="Full Description"
+                  hint='Shown in the buyer&rsquo;s "Description" tab, below Short Description'
+                  error={fieldErrors.fullDescription}
+                  full
+                  noLabel
+                >
                   <RichTextEditor value={form.fullDescription}
                     onChange={html => set("fullDescription", html)} minRows={6}
                     placeholder="Detailed product description…" />
@@ -1103,13 +1108,19 @@ export function AddProductPage() {
                     <input name="problemStatementsText" value={form.problemStatementsText} onChange={onFC} style={inputStyle()} />
                   </Field>
                 </FieldRow>
-                <Field label="Key Features" hint="(one bullet per line, 240 characters max each — shown as highlight chips and the default product-page tab)" error={fieldErrors.keyFeaturesText} full>
+                <Field
+                  label="Key Features"
+                  hint='(one bullet per line, 240 characters max each — shown as highlight chips near the top, and fills the buyer&rsquo;s "Key Features" tab, the default tab shown)'
+                  error={fieldErrors.keyFeaturesText}
+                  full
+                >
                   <textarea ref={registerRef("keyFeaturesText")} name="keyFeaturesText" value={form.keyFeaturesText} onChange={onFC} rows={4} style={inputStyle(fieldErrors.keyFeaturesText)} placeholder={"IP66 waterproof housing\n2-year replacement warranty\nWorks with existing 12V wiring"} />
                 </Field>
-                <Field label="Specifications (JSON)" error={fieldErrors.specificationsText} full>
-                  <textarea ref={registerRef("specificationsText")} name="specificationsText"
-                    value={form.specificationsText} onChange={onFC} rows={5}
-                    style={{ ...inputStyle(fieldErrors.specificationsText), fontFamily: "monospace", fontSize: 12 }} />
+                <Field label="Specifications" hint='Shown as a table in the buyer&rsquo;s "Specifications" tab' full>
+                  <SpecificationsEditor
+                    value={form.specifications}
+                    onChange={(next) => setForm((cur) => ({ ...cur, specifications: next }))}
+                  />
                 </Field>
               </div>
             </Section>

@@ -19,3 +19,12 @@ export function fetchTallyExport(params = {}) {
   const suffix = query ? `?${query}` : "";
   return apiFetch(`/admin/tally-export${suffix}`);
 }
+
+export function fetchTallyExportHistory() {
+  return apiFetch("/admin/tally-export/history");
+}
+
+export async function fetchTallyExportDownload(exportId) {
+  const result = await apiFetch(`/admin/tally-export/${exportId}/download`);
+  return result?.raw ?? "";
+}

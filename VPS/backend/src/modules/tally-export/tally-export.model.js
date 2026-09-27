@@ -11,7 +11,9 @@ function sanitizeTallyExportLog(entry) {
     period: entry.period,
     rowCount: Number(entry.rowCount || 0),
     generatedAt: entry.generatedAt || null,
-    generatedBy: entry.generatedBy || "system"
+    generatedBy: entry.generatedBy || "system",
+    totalGrandTotal: Number(entry.totalGrandTotal || 0),
+    fileName: entry.fileName || ""
   };
 }
 

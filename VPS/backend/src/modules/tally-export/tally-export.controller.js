@@ -27,4 +27,16 @@ const adminExportTallyCsv = asyncHandler(async (req, res) => {
   return ok(res, data, "Tally export generated.");
 });
 
-module.exports = { adminExportTallyCsv };
+const adminListTallyExportHistory = asyncHandler(async (req, res) => {
+  const data = await service.listTallyExportHistory();
+  return ok(res, data, "Tally export history loaded.");
+});
+
+const adminDownloadTallyExport = asyncHandler(async (req, res) => {
+  const { fileName, csv } = await service.getTallyExportDownload(req.params.exportId);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  return res.status(200).send(csv);
+});
+
+module.exports = { adminExportTallyCsv, adminListTallyExportHistory, adminDownloadTallyExport };

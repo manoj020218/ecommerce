@@ -650,6 +650,9 @@ async function listStuckPaymentSessions() {
 }
 
 module.exports = {
+  // exported so the dashboard "Pending Payments" tile uses the exact rule the
+  // Orders page "Payment Pending" tab uses (2026-09-27)
+  resolveAcceptanceStatus,
   listOrders,
   getOrderDetail,
   updateOrder,

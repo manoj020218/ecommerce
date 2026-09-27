@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchDashboardStats } from "./dashboard.api";
+import { OrderTrendChart } from "./order-trend-chart";
+import { ProductPerformancePanel } from "./product-performance-panel";
 
 const BRAND = "#E8231A";
 const BRAND_DARK = "#C41D15";
@@ -102,11 +104,26 @@ function DonutChart({ segments }) {
 }
 
 // ─── stat card ────────────────────────────────────────────────────────────────
-function StatCard({ emoji, iconBg, value, label, badge, badgeBg, badgeColor }) {
+// `to` (optional, added 2026-09-27): makes the whole card a link to the page
+// where the admin can act on it. Omitted → plain card, exactly as before.
+function StatCard({ to, ...props }) {
+  if (!to) return <StatCardBody {...props} />;
+  return (
+    <Link to={to} title="Open" style={{ textDecoration: "none", display: "block", borderRadius: 16 }}
+      onMouseEnter={(e) => { e.currentTarget.firstChild.style.borderColor = BRAND; e.currentTarget.firstChild.style.boxShadow = "0 2px 10px rgba(232,35,26,0.14)"; }}
+      onMouseLeave={(e) => { e.currentTarget.firstChild.style.borderColor = "#f3f4f6"; e.currentTarget.firstChild.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)"; }}
+    >
+      <StatCardBody {...props} clickable />
+    </Link>
+  );
+}
+
+function StatCardBody({ emoji, iconBg, value, label, badge, badgeBg, badgeColor, clickable }) {
   return (
     <div style={{
       background: "#fff", borderRadius: 16, border: "1px solid #f3f4f6",
-      padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)"
+      padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+      cursor: clickable ? "pointer" : "default", transition: "border-color 0.15s, box-shadow 0.15s", height: "100%", boxSizing: "border-box"
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <div style={{
@@ -126,7 +143,9 @@ function StatCard({ emoji, iconBg, value, label, badge, badgeBg, badgeColor }) {
         )}
       </div>
       <p style={{ fontSize: 26, fontWeight: 800, color: "#111827", lineHeight: 1, margin: 0 }}>{value}</p>
-      <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, margin: "4px 0 0" }}>{label}</p>
+      <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 4, margin: "4px 0 0" }}>
+        {label}{clickable ? <span style={{ color: BRAND, fontWeight: 600 }}> →</span> : null}
+      </p>
     </div>
   );
 }
@@ -358,21 +377,25 @@ export function DashboardPage() {
         marginBottom: 20
       }}>
         <StatCard emoji="📦" iconBg="#dbeafe" value={stats?.todayOrderCount ?? 0}
+          to={stats?.todayOrderCount > 0 && stats?.todayIstDate ? `/orders?date=${stats.todayIstDate}` : undefined}
           label="Today's Orders"
           badge={stats?.todayOrderCount > 0 ? "Live" : undefined}
           badgeBg="#dcfce7" badgeColor="#15803d"
         />
         <StatCard emoji="₹" iconBg="#dcfce7" value={fmtMoney(stats?.todayRevenue ?? 0)}
+          to={stats?.todayOrderCount > 0 && stats?.todayIstDate ? `/orders?date=${stats.todayIstDate}` : undefined}
           label="Today's Revenue"
           badge={stats?.todayRevenue > 0 ? "+Today" : undefined}
           badgeBg="#dcfce7" badgeColor="#15803d"
         />
         <StatCard emoji="⏳" iconBg="#fef3c7" value={stats?.pendingPayments ?? 0}
+          to={stats?.pendingPayments > 0 ? "/orders?tab=pending" : undefined}
           label="Pending Payments"
           badge={stats?.pendingPayments > 0 ? "Action" : undefined}
           badgeBg="#fef3c7" badgeColor="#b45309"
         />
         <StatCard emoji="⚠️" iconBg="#fee2e2" value={stats?.lowStockCount ?? 0}
+          to={stats?.lowStockCount > 0 ? "/products?stock=attention" : undefined}
           label="Low / Out of Stock"
           badge={stats?.lowStockCount > 0 ? "Alert" : undefined}
           badgeBg="#fee2e2" badgeColor={BRAND}
@@ -388,7 +411,8 @@ export function DashboardPage() {
       }}>
         {[
           { label: "Process Orders", emoji: "📋", bg: "#dbeafe", to: "/orders" },
-          { label: "Verify Payments", emoji: "✅", bg: "#fef3c7", to: "/orders" },
+          // { label: "Verify Payments", emoji: "✅", bg: "#fef3c7", to: "/orders" },
+          { label: "Verify Payments", emoji: "✅", bg: "#fef3c7", to: "/orders?tab=pending" },
           { label: "Add Product",     emoji: "➕", bg: "#dcfce7", to: "/products/add" },
           { label: "View Reports",    emoji: "📊", bg: "#f3e8ff", to: "/reports" }
         ].map((a) => (
@@ -428,9 +452,13 @@ export function DashboardPage() {
         gap: 16,
         marginBottom: 20
       }}>
-        <BarChart trend={trend} />
+        {/* <BarChart trend={trend} /> — replaced by the Week/Month/Year chart (2026-09-27) */}
+        <OrderTrendChart weekFallback={trend} />
         <PaymentDonut breakdown={breakdown} />
       </div>
+
+      {/* ── product page visits vs sales (2026-09-27) ── */}
+      <ProductPerformancePanel isMobile={isMobile} />
 
       {/* ── recent orders ── */}
       <div style={{

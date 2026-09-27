@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthSession } from "../auth/use-auth-session";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
@@ -142,6 +142,16 @@ function SidePanelBtn({ children, variant = "default", onClick, disabled }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} style={{
       ...s, width:"100%", padding:"11px 0", borderRadius:12,
+// India calendar day (YYYY-MM-DD) of an order timestamp. A plain date string
+// ("2026-09-27", e.g. a walk-in orderDate) is already a day and is returned as-is.
+function istDayOf(value) {
+  const s = String(value || "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return s.slice(0, 10);
+  return new Date(t + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
       fontSize:13, fontWeight:600, cursor: disabled ? "wait" : "pointer",
       opacity: disabled ? 0.6 : 1, transition:"opacity 0.15s"
     }}
@@ -469,9 +479,21 @@ export function OrdersPage() {
   const [allRows, setAllRows]     = useState([]);
   const [stuckPayments, setStuckPayments] = useState([]);
 
-  const [activeTab, setActiveTab] = useState("all");
+  // Dashboard tiles/chart link here with ?tab=pending or ?date=YYYY-MM-DD
+  // (IST day) so the list opens already filtered (2026-09-27).
+  const location = useLocation();
+  const initialQuery = useMemo(() => new URLSearchParams(location.search), []);
+  // const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = initialQuery.get("tab");
+    return TABS.some((x) => x.key === t) ? t : "all";
+  });
   const [search, setSearch]       = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  // const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState(() => {
+    const d = initialQuery.get("date") || "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "";
+  });
   const [payFilter, setPayFilter]   = useState("");
   const [page, setPage]             = useState(1);
 
@@ -521,7 +543,10 @@ export function OrdersPage() {
         if (!hay.includes(q)) return false;
       }
       if (dateFilter) {
-        const rowDay = (row.orderDate || row.createdAt || "").slice(0, 10);
+        // const rowDay = (row.orderDate || row.createdAt || "").slice(0, 10);
+        // slice(0,10) of a UTC timestamp is the UTC day: orders placed
+        // 00:00–05:29 IST landed on the previous date. Compare India days.
+        const rowDay = istDayOf(row.orderDate || row.createdAt || "");
         if (rowDay !== dateFilter) return false;
       }
       if (payFilter) {

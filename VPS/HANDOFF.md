@@ -16,6 +16,35 @@ itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
 
+## Sep 27 2026 — Dashboard: trend toggle, clickable tiles, product visits vs sales (DEPLOYED, NOT COMMITTED)
+
+- **Order Trend** (`dashboard/order-trend-chart.jsx`, `GET /admin/dashboard/trend?range=week|month|year`):
+  7 daily / 30 daily / 12 monthly bars (IST), Orders ↔ Sales ₹ toggle. "Sales" = all non-cancelled
+  orders; "Paid" = paymentStatus paid (the old chart's meaning). Week/Month bars link to
+  `/orders?date=<IST day>`. Old `BarChart` kept in dashboard-page.jsx, unused.
+- **Clickable tiles** (only when count > 0): Today's Orders/Revenue → `/orders?date=<todayIstDate>`,
+  Pending Payments → `/orders?tab=pending`, Low/Out of Stock → `/products?stock=attention` (new
+  "Low + Out of Stock" filter option). Orders page reads `?tab`/`?date` on load; its date filter now
+  compares the **IST** day (was UTC slice → 00:00–05:29 IST orders showed under the previous date).
+- **Pending Payments tile** now counts with `resolveAcceptanceStatus` (exported from orders.service)
+  = exactly the Orders "Payment Pending" tab. Old `isPendingPayment` also counted failed online
+  payments, so tile and tab disagreed. The number can drop after this change — that's the fix.
+- **Product Page Visits vs Sales** (`dashboard/product-performance-panel.jsx`,
+  `GET /admin/dashboard/product-performance?range=7d|30d|90d|365d`): views, unique visitors,
+  website orders/units/revenue (walk-in + cancelled excluded), conversion = orders ÷ visitors,
+  flags ("High visits, low sales", "Converting well").
+  - Counting: `recordProductView` in `products.controller.publicGetProductBySlug` (storefront calls it
+    once per product page view). Bots filtered by UA; unique visitor ≈ hash(ip+UA) per product per
+    IST day, in memory (resets on restart → slight overcount).
+  - Store `database/product-views-store.js` → `json/product-views-store.json`, designed per the rules
+    below: `{days:{"YYYY-MM-DD":{productId:{v,u}}}}`, in-memory, flushed every 30 s, 400-day
+    retention. A page view never touches disk. A restart can lose ≤30 s of counts.
+  - Tracking started 2026-09-27 (one deploy-check view on that day came from the deploy script).
+    The panel says so until a full period has passed.
+- Backups: `/root/jenix-bak-2026-09-27-dashboard/backend-files.tgz`; admin
+  `apps/admin-panel/dist.bak-20260927-dashboard-prev` (older `dist.bak-20260924-editfix-prev` to be
+  deleted once the new dashboard is confirmed — one-backup rule).
+
 ## Sep 27 2026 — Backend "crashing again and again": pm2 memory restarts, root cause fixed (DEPLOYED, NOT COMMITTED)
 
 Symptom: `jenix-backend` restarted 15–27×/day (517 total). Not crashes — every exit is `code 0 via SIGINT`

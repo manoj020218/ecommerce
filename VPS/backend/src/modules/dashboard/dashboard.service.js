@@ -2,6 +2,7 @@ const { readAuthStore } = require("../../database/auth-store");
 const { readCatalogStore } = require("../../database/catalog-store");
 const { readShippingStore } = require("../../database/shipping-store");
 const { calculateAvailableQty } = require("../products/products.model");
+const { resolveAcceptanceStatus } = require("../orders/orders.service");
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MANUAL_PAYMENT_METHODS = new Set(["direct_bank_transfer", "manual_upi"]);
@@ -70,7 +71,13 @@ async function getDashboardStats() {
     .filter((o) => String(o.paymentStatus || "").toLowerCase() === "paid")
     .reduce((sum, o) => sum + Number(o.grandTotal || 0), 0);
 
-  const pendingPayments = orders.filter(isPendingPayment).length;
+  // const pendingPayments = orders.filter(isPendingPayment).length;
+  // The tile now links to Orders → "Payment Pending", so it must count with
+  // that tab's rule (resolveAcceptanceStatus). The old isPendingPayment also
+  // counted failed online payments and walk-ins differently, so the tile and
+  // the tab showed different numbers (2026-09-27).
+  const pendingPayments = orders.filter((o) => resolveAcceptanceStatus(o) === "pending").length;
+  void isPendingPayment;
 
   // Low + out of stock
   const lowStockCount = products.filter((p) => {
@@ -170,6 +177,9 @@ async function getDashboardStats() {
     });
 
   return {
+    // IST calendar date of "today", so the dashboard can link to
+    // Orders filtered to exactly the day the tile counted.
+    todayIstDate: new Date(istDayStartMs(Date.now()) + IST_OFFSET_MS).toISOString().slice(0, 10),
     todayOrderCount: todayOrders.length,
     todayRevenue,
     pendingPayments,

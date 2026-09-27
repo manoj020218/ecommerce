@@ -934,7 +934,13 @@ export function ProductsPage() {
   // list-view selection + display filters
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [statusFilter, setStatusFilter] = useState("all");
-  const [stockFilter, setStockFilter] = useState("all");
+  // const [stockFilter, setStockFilter] = useState("all");
+  // Dashboard "Low / Out of Stock" tile links here with ?stock=attention
+  // (low + out of stock); ?stock=low_stock etc. also work (2026-09-27).
+  const [stockFilter, setStockFilter] = useState(() => {
+    const s = new URLSearchParams(location.search).get("stock") || "";
+    return ["in_stock", "low_stock", "out_of_stock", "attention"].includes(s) ? s : "all";
+  });
 
   // mass-action panel
   const [massAction, setMassAction] = useState(null); // null | "category" | "hsn" | "price" | "qty"
@@ -1534,7 +1540,9 @@ export function ProductsPage() {
     let result = rows;
     if (statusFilter === "active")   result = result.filter((r) => r.isActive);
     if (statusFilter === "inactive") result = result.filter((r) => !r.isActive);
-    if (stockFilter !== "all")       result = result.filter((r) => r.stockStatus === stockFilter);
+    // if (stockFilter !== "all")       result = result.filter((r) => r.stockStatus === stockFilter);
+    if (stockFilter === "attention") result = result.filter((r) => r.stockStatus === "low_stock" || r.stockStatus === "out_of_stock");
+    else if (stockFilter !== "all")  result = result.filter((r) => r.stockStatus === stockFilter);
     if (noCategoryOnly)              result = result.filter((r) => !r.categoryId);
     if (sortCol) {
       result = [...result].sort((a, b) => {
@@ -1741,6 +1749,7 @@ export function ProductsPage() {
                 <option value="low_stock">Low Stock</option>
                 <option value="out_of_stock">Out of Stock</option>
               </select>
+                <option value="attention">Low + Out of Stock</option>
               <button
                 type="submit"
                 style={{ fontSize: 13, fontWeight: 500, padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", color: "#374151" }}

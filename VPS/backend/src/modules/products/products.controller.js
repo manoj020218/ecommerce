@@ -3,6 +3,7 @@ const { HttpError } = require("../../common/http-error");
 const { ok, created } = require("../../common/http-response");
 const service = require("./products.service");
 const { generateProductContentDraft } = require("./product-content-ai.service");
+const { recordProductView } = require("../dashboard/product-views.service");
 const {
   parseListAdminProductsQuery,
   parseListPublicProductsQuery,
@@ -243,6 +244,9 @@ const publicGetProductBySlug = asyncHandler(async (req, res) => {
   const data = await service.getPublicProductBySlug(req.params.slug, {
     customerId: req.customer?.id || null
   });
+  // Dashboard "Product page visits" — the storefront product page calls this
+  // endpoint exactly once per view. In-memory counter, never blocks/throws.
+  recordProductView(data?.id, req);
   return ok(res, data, "Public product fetched.");
 });
 

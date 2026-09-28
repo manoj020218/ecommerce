@@ -8,12 +8,20 @@ import { Link } from "react-router-dom";
 const POLICY_URL = "/refund-policy";
 
 export function ReturnPolicyBadge({ eligible, compact = false }) {
+  // const style = eligible
+  //   ? { background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0" }
+  //   : { background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" };
+  // const text = eligible
+  //   ? compact ? "✅ Replacement if defective (5 days)" : "✅ Return eligible — replacement if defective on arrival (5 days)"
+  //   : compact ? "⚠️ Sold as is — no return" : "⚠️ Sold as is — not returnable";
+  // 2026-09-28: user asked not to highlight "not returnable" — "Sold as is"
+  // is now a quiet neutral label; the full terms stay on /refund-policy.
   const style = eligible
     ? { background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0" }
-    : { background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" };
+    : { background: "#f3f4f6", color: "#4b5563", border: "1px solid #e5e7eb" };
   const text = eligible
     ? compact ? "✅ Replacement if defective (5 days)" : "✅ Return eligible — replacement if defective on arrival (5 days)"
-    : compact ? "⚠️ Sold as is — no return" : "⚠️ Sold as is — not returnable";
+    : "Sold as is";
   return (
     <Link
       to={POLICY_URL}
@@ -46,13 +54,22 @@ export function ReturnPolicyCheckoutNotice({ items }) {
   return (
     <div style={{
       margin: "12px 0", padding: "10px 12px", borderRadius: 10, fontSize: 12, lineHeight: 1.5,
-      background: asIs ? "#fff7ed" : "#f0fdf4", border: `1px solid ${asIs ? "#fed7aa" : "#bbf7d0"}`,
-      color: asIs ? "#9a3412" : "#166534"
+      // background: asIs ? "#fff7ed" : "#f0fdf4", border: `1px solid ${asIs ? "#fed7aa" : "#bbf7d0"}`,
+      // color: asIs ? "#9a3412" : "#166534"
+      background: asIs ? "#f9fafb" : "#f0fdf4", border: `1px solid ${asIs ? "#e5e7eb" : "#bbf7d0"}`,
+      color: asIs ? "#4b5563" : "#166534"
     }}>
+      {/* old wording (highlighted "not returnable"), replaced 2026-09-28:
       {asIs === list.length
         ? "All items in this order are sold as is at wholesale price and are not returnable. "
         : asIs > 0
           ? `${asIs} of ${list.length} items in this order ${asIs === 1 ? "is" : "are"} sold as is and not returnable. Items marked return-eligible can be replaced if defective on arrival (report within 5 days with an unboxing video). `
+          : "Items in this order can be replaced if defective on arrival — report within 5 days with an unboxing video. Replacement only; return shipping is paid by the buyer. "}
+      */}
+      {asIs === list.length
+        ? "Items are sold as is at wholesale price. "
+        : asIs > 0
+          ? "Items marked return-eligible can be replaced if defective on arrival (report within 5 days with an unboxing video); other items are sold as is. "
           : "Items in this order can be replaced if defective on arrival — report within 5 days with an unboxing video. Replacement only; return shipping is paid by the buyer. "}
       By placing this order you agree to our{" "}
       <Link to={POLICY_URL} target="_blank" style={{ color: "#E8231A", fontWeight: 700 }}>Return Policy</Link>.
@@ -66,7 +83,8 @@ export function ReturnPolicyNote({ eligible }) {
     <p style={{ fontSize: 12, color: "#6b7280", margin: "6px 0 0", lineHeight: 1.5 }}>
       {eligible
         ? "Report a manufacturing defect within 5 days of delivery with an unboxing video. Replacement only; return shipping is paid by the buyer. "
-        : "Sold at wholesale price as supplied by the manufacturer — not covered by returns or replacement. "}
+        // : "Sold at wholesale price as supplied by the manufacturer — not covered by returns or replacement. "}
+        : "Supplied as is at wholesale price, as packed by the manufacturer. "}
       <Link to={POLICY_URL} style={{ color: "#E8231A", fontWeight: 600 }}>Return policy</Link>
     </p>
   );

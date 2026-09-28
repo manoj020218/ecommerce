@@ -2,7 +2,7 @@
 
 ## ▶ CURRENT STATE — end of 2026-09-28 (read this box first)
 
-**Git:** `origin/main` HEAD = **`3bbb16f`**. **Git == live** for all jenix app code: every
+**Git:** see `git log` (Projects work pushed 2026-09-28). **Git == live** for all jenix app code: every
 previously "deployed but uncommitted" change was committed on 2026-09-27, grouped by feature (see
 `git log`). Only untracked leftovers remain, deliberately not committed: `p.images` (repo root),
 `VPS/extra-pages/` (parked older VPS copies), `VPS/backend/src/database/console.log('` (empty junk
@@ -34,6 +34,12 @@ file from a mistyped command), `.claude/settings.local.json`.
 12. **Project Series** — custom IoT projects sold on quotation (no prices): `/projects` +
    `/projects/:slug`, admin "Projects & Enquiries", enquiry alerts by email + WhatsApp. First
    project live: Smart Parking Space Calculation for Basement Parking. See the entry below.
+13. Two more projects: **FloodGuard** (underpass water logging alarm) and **FireGuard** (fire alarm &
+   fire-fighting system monitoring), seeded by `scripts/seed-projects-flood-fire.js`; new optional
+   "product website" link per project (externalUrl/externalLabel). Commit `757bd71`.
+14. "Sold as is" badge made a quiet grey label; "not returnable" wording removed from the badge,
+   product-page note and checkout notice (user request — don't highlight it). Full terms still on
+   /refund-policy. All 423 products are already "Sold as is" (0 marked return eligible).
 
 **PENDING / TODO (in priority order):**
 - **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound

@@ -43,6 +43,9 @@ file from a mistyped command), `.claude/settings.local.json`.
 15. Fourth project: **Smart Farm Pump Control System** (`/projects/smart-farm-pump-control-system`),
    seeded by `scripts/seed-project-farm-pump.js`; built on the FireGuard platform's farm/agri use case.
    Store backup before it: `/root/jenix-bak-2026-09-28-projects2/projects-store.before-farm.json`.
+16. Fifth project: **Solar Plant Perimeter Intrusion Detection System** (beam sensors → LoRaWAN →
+   site office gateway → cloud → head office + patrol app, zone-wise), seeded by
+   `scripts/seed-project-solar-perimeter.js`. Store backup: `.../projects-store.before-solar.json`.
 
 **PENDING / TODO (in priority order):**
 - **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound

@@ -35,6 +35,7 @@ import {
 import { watchdog } from "../../shared/watchdog-client";
 import { ProductReviewsSection } from "./product-reviews-section";
 import { CustomPrintConfigurator } from "./custom-print-configurator";
+import { ReturnPolicyBadge, ReturnPolicyNote } from "./return-policy-badge";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -1104,6 +1105,11 @@ export function ProductPage() {
                 </p>
               )}
               <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
+              {/* Return policy (2026-09-27): shown before purchase, per product */}
+              <div style={{ marginTop: 8 }}>
+                <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} />
+                <ReturnPolicyNote eligible={Boolean(product.returnEligible)} />
+              </div>
             </>
           )}
           {product.shippingIncluded ? (

@@ -525,6 +525,7 @@ function createProductRecordFromPayload(store, payload) {
       }),
     stockVisibility: "hide_quantity",
     allowBackorder: Boolean(payload.allowBackorder),
+    returnEligible: Boolean(payload.returnEligible),
     maxOrderQty: Number(payload.maxOrderQty || 1000),
     lowStockThreshold: Number(payload.lowStockThreshold || 0),
     priceIncludesGst: Boolean(payload.priceIncludesGst),
@@ -1311,6 +1312,8 @@ async function bulkPatchProducts(updates, actor) {
     if (update.basePrice !== undefined) patch.basePrice = Number(update.basePrice);
     if (update.salePrice !== undefined) patch.salePrice = Number(update.salePrice);
     if (update.isActive !== undefined) patch.isActive = Boolean(update.isActive);
+    // Return policy bulk action (2026-09-28): true = return eligible, false = sold as is
+    if (update.returnEligible !== undefined) patch.returnEligible = Boolean(update.returnEligible);
 
     // Quantity changed but status wasn't explicitly set in this same call —
     // re-derive it so the storefront (which only ever reads stockStatus,

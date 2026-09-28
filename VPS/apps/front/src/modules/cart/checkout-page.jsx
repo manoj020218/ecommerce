@@ -87,6 +87,7 @@ import {
 import { watchdog } from "../../shared/watchdog-client";
 import { OrderDetailModal } from "./order-detail-modal";
 import { CheckoutItemEditor } from "./checkout-item-editor";
+import { ReturnPolicyBadge, ReturnPolicyCheckoutNotice } from "../products/return-policy-badge";
 
 const PAYMENT_DESCRIPTIONS = {
   online: "Credit/Debit card, UPI, and net banking through the online gateway.",
@@ -1067,6 +1068,7 @@ export function CheckoutPage() {
                     </div>
                     <div className="proto-checkout-item-copy">
                       <p>{item.title}</p>
+                      <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div>
                       <span>Qty {Number(item.qty || 0)}</span>
                       <strong>{formatCurrency(item.lineTotal)}</strong>
                     </div>
@@ -1611,6 +1613,7 @@ export function CheckoutPage() {
                     <span>Grand Total · {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}</span>
                     <strong>{formatCurrency(totals.grandTotal)} <span className="proto-review-total-caret">View details ›</span></strong>
                   </button>
+                  <ReturnPolicyCheckoutNotice items={items} />
                   <div className="proto-inline-actions">
                     <StorefrontButton type="submit" disabled={submitting}>
                       {submitting ? "Submitting..." : paymentMethod === "online" ? "Pay Now" : "Place Order"}
@@ -1646,6 +1649,7 @@ export function CheckoutPage() {
                   </div>
                   <div className="proto-checkout-item-copy">
                     <p>{item.title}</p>
+                    <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div>
                     <span>
                       Qty {Number(item.qty || 0)} · {humanizeStatus(item.availabilityStatus)}
                     </span>

@@ -519,6 +519,7 @@ const EMPTY_FORM = {
   priceIncludesGst: false, shippingIncluded: false,
   isActive: true, stockQty: 0, reservedQty: 0,
   stockStatus: "in_stock", allowBackorder: false, maxOrderQty: 1000, lowStockThreshold: 0,
+  returnEligible: false,
   // Sidebar fields
   relatedProductIds: [],
   tags: [],
@@ -705,6 +706,7 @@ export function AddProductPage() {
       reservedQty: Number(form.reservedQty || 0),
       stockStatus: form.stockStatus,
       allowBackorder: Boolean(form.allowBackorder),
+      returnEligible: Boolean(form.returnEligible),
       maxOrderQty: Number(form.maxOrderQty || 1000),
       lowStockThreshold: Number(form.lowStockThreshold || 0),
       tags: form.tags,
@@ -1009,6 +1011,12 @@ export function AddProductPage() {
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                   <input type="checkbox" name="allowBackorder" checked={form.allowBackorder} onChange={onFC} />
                   Allow backorder
+                </label>
+                {/* Return policy (2026-09-27): off = "Sold as is — no return" */}
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
+                  title="Tick only for products you test/trust: buyer can get a replacement if defective on arrival (report within 5 days). Unticked = sold as is, not returnable.">
+                  <input type="checkbox" name="returnEligible" checked={Boolean(form.returnEligible)} onChange={onFC} />
+                  Return eligible (defective on arrival, 5 days)
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                   <input type="checkbox" name="isActive" checked={form.isActive} onChange={onFC} />

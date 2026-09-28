@@ -181,6 +181,7 @@ function formFromProduct(product) {
     reservedQty: Number(product.reservedQty || 0),
     stockStatus: product.stockStatus || "in_stock",
     allowBackorder: Boolean(product.allowBackorder),
+    returnEligible: Boolean(product.returnEligible),
     maxOrderQty: Number(product.maxOrderQty || 1000),
     lowStockThreshold: Number(product.lowStockThreshold || 0),
     tags: Array.isArray(product.tags) ? product.tags : [],
@@ -814,6 +815,7 @@ export function EditProductPage() {
       stockQty: Number(form.stockQty || 0),
       reservedQty: Number(form.reservedQty || 0),
       stockStatus: form.stockStatus, allowBackorder: Boolean(form.allowBackorder),
+      returnEligible: Boolean(form.returnEligible),
       maxOrderQty: Number(form.maxOrderQty || 1000),
       lowStockThreshold: Number(form.lowStockThreshold || 0),
       tags: form.tags, productLabel: form.productLabel,
@@ -1039,6 +1041,11 @@ export function EditProductPage() {
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                   <input type="checkbox" name="allowBackorder" checked={form.allowBackorder} onChange={onFC} /> Allow backorder
+                </label>
+                {/* Return policy (2026-09-27): off = "Sold as is — no return" */}
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
+                  title="Tick only for products you test/trust: buyer can get a replacement if defective on arrival (report within 5 days). Unticked = sold as is, not returnable.">
+                  <input type="checkbox" name="returnEligible" checked={Boolean(form.returnEligible)} onChange={onFC} /> Return eligible (defective on arrival, 5 days)
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                   <input type="checkbox" name="isActive" checked={form.isActive} onChange={onFC} /> Active

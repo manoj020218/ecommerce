@@ -130,8 +130,33 @@ function buildReturnPolicyJsonLd(settings) {
   };
 }
 
+// Per-product return policy for Google (2026-09-27). Replaces the old
+// invoice-terms text sniffing (buildReturnPolicyJsonLd above, kept unused):
+// only products marked returnEligible are returnable — defective on arrival,
+// 5 days, by courier, buyer pays return shipping, replacement only.
+function buildProductReturnPolicyJsonLd(product) {
+  if (product && product.returnEligible) {
+    return {
+      "@type": "MerchantReturnPolicy",
+      applicableCountry: "IN",
+      returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+      merchantReturnDays: 5,
+      returnMethod: "https://schema.org/ReturnByMail",
+      returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+      refundType: "https://schema.org/ExchangeRefund"
+    };
+  }
+  return {
+    "@type": "MerchantReturnPolicy",
+    applicableCountry: "IN",
+    returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted"
+  };
+}
+
 function buildOfferJsonLd(product, meta, settings) {
-  const returnPolicy = buildReturnPolicyJsonLd(settings);
+  // const returnPolicy = buildReturnPolicyJsonLd(settings);
+  void buildReturnPolicyJsonLd;
+  const returnPolicy = buildProductReturnPolicyJsonLd(product);
   return {
     "@context": "https://schema.org",
     "@type": "Offer",

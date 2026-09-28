@@ -38,6 +38,10 @@ file from a mistyped command), `.claude/settings.local.json`.
   259–297 MB (JS heap ~82 MB) vs the 600 MB limit — healthy. The pm2 "restarts" column (was 520)
   is a lifetime counter incl. deploys; it was **reset to 0 with `pm2 reset jenix-backend`**
   (counter only, no restart). From now on any increase that isn't a deploy is a real signal.
+- **Return policy (2026-09-28):** user to (a) tick "Return eligible" on trusted products (Products
+  list → Return Policy bulk action), (b) set the matching return policy in Google Merchant Center
+  (5 days, customer pays return shipping, eligible items only). Extra backups from this deploy:
+  `/root/jenix-bak-2026-09-28-return-policy/`, `apps/{admin-panel,front}/dist.bak-20260928-returnpolicy-prev`.
 - **58 of 406 recovery emails ever sent have status "failed"** — not investigated yet (user said
   leave for now). Separate from the redesign.
 - **MDR feature** (Sep 17 entry) still off, needs its real-order test before switching on.
@@ -68,6 +72,44 @@ below for exactly what's live vs. still pending before the MDR feature
 itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
+
+## Sep 28 2026 — Return & Replacement Policy: per-product "Return eligible" / "Sold as is" (DEPLOYED)
+
+User-approved policy: returns ONLY for products explicitly marked return-eligible, only for a
+manufacturing defect on arrival, reported within **5 days** of delivery **with an unboxing video
+(required)**, **replacement only (no cash refunds)**, **return shipping paid by the buyer**.
+Everything not marked is **"Sold as is — not returnable"** (wholesale / untested trading items).
+Two defaults chosen by Claude (user didn't answer; change if needed): every product starts as NOT
+returnable; if WE ship the wrong item, WE pay its return shipping (policy section 7).
+
+- **Product field `returnEligible`** (default false): validator (create default false, update
+  optional), createProduct, `toPublicProduct`, and the bulk-patch whitelist.
+- **Admin:** "Return eligible (defective on arrival, 5 days)" tick box on Add/Edit Product;
+  Products list → select → **"Return Policy"** bulk action (✅ Mark return eligible / ⚠️ Mark sold
+  as is) and an **"All Returns / Return eligible / Sold as is"** filter.
+- **Cart/order snapshot:** cart lines carry `returnEligible` (line builder + `sanitizeCartLine`);
+  orders store `items: lines`, so each order keeps the status **as it was at purchase**.
+- **Storefront:** shared `apps/front/src/modules/products/return-policy-badge.jsx` — green
+  "✅ Return eligible — replacement if defective on arrival (5 days)" / orange "⚠️ Sold as is — not
+  returnable", linking to /refund-policy. On product page (under the GST-invoice line + one-line
+  explanation), cart items, checkout items, and a notice directly above Pay Now / Place Order
+  ("N of M items are sold as is… By placing this order you agree to our Return Policy").
+- **Google:** `seo.service.buildProductReturnPolicyJsonLd(product)` — eligible → 5-day window, by
+  mail, customer pays return fees, exchange only; otherwise MerchantReturnNotPermitted. Replaces
+  the old invoice-wording sniffing (kept, unused). **User must set the matching account-level
+  return policy in Merchant Center.**
+- **Policy text:** `VPS/scripts/content/return-policy-2026-09.html` applied by
+  `VPS/scripts/apply-return-policy.js` (dry run by default, `--apply` with backend stopped) to the
+  existing **/refund-policy** page (title now "Return & Replacement Policy") and to **invoice
+  terms**. The OLD texts contradicted each other (page: "15-day warranty, we reimburse return
+  shipping, 100% refund"; invoice: "10-day warranty") — saved to
+  `json/return-policy-previous-2026-09-28T07-08-29-090Z.json`.
+- Deployed 2026-09-28 (~9 s downtime): backups `/root/jenix-bak-2026-09-28-return-policy/`
+  (6 backend files + static-pages-store + settings), admin/front `dist.bak-20260928-returnpolicy-prev`.
+  Verified live: policy page, "Sold as is" badge above Add to Cart, API `returnEligible:false`.
+  Regression checks + both builds pass; bulk patch tested locally.
+- Cosmetic TODO: the policy page shows its title twice (page banner + the content's own `<h2>`).
+  Remove the `<h2>` from the page content in admin Static Pages if it bothers the user.
 
 ## Sep 27 2026 — Cart recovery EMAIL redesigned to match the page (DEPLOYED)
 

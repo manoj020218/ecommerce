@@ -942,6 +942,8 @@ export function ProductsPage() {
     const s = new URLSearchParams(location.search).get("stock") || "";
     return ["in_stock", "low_stock", "out_of_stock", "attention"].includes(s) ? s : "all";
   });
+  // Return policy filter (2026-09-28): all | eligible | as_is
+  const [returnFilter, setReturnFilter] = useState("all");
 
   // mass-action panel
   const [massAction, setMassAction] = useState(null); // null | "category" | "hsn" | "price" | "qty"
@@ -1506,6 +1508,19 @@ export function ProductsPage() {
     } catch (err) { setError(err.message || "Bulk price update failed."); }
   };
 
+  // Return policy bulk action (2026-09-28): true = return eligible, false = sold as is
+  const onApplyMassReturnPolicy = async (eligible) => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    try {
+      const result = await bulkPatchProducts(ids.map((id) => ({ id, returnEligible: eligible })));
+      setSelectedIds(new Set());
+      setMassAction(null);
+      setNotice(`${result.updated} product${result.updated !== 1 ? "s" : ""} marked ${eligible ? "return eligible" : "sold as is (not returnable)"}.`);
+      await loadProducts(filters);
+    } catch (err) { setError(err.message || "Bulk return-policy update failed."); }
+  };
+
   const onApplyMassQty = async () => {
     const ids = [...selectedIds];
     const amt = parseInt(massValue.qtyAmount, 10);
@@ -1544,6 +1559,8 @@ export function ProductsPage() {
     // if (stockFilter !== "all")       result = result.filter((r) => r.stockStatus === stockFilter);
     if (stockFilter === "attention") result = result.filter((r) => r.stockStatus === "low_stock" || r.stockStatus === "out_of_stock");
     else if (stockFilter !== "all")  result = result.filter((r) => r.stockStatus === stockFilter);
+    if (returnFilter === "eligible") result = result.filter((r) => Boolean(r.returnEligible));
+    if (returnFilter === "as_is")    result = result.filter((r) => !r.returnEligible);
     if (noCategoryOnly)              result = result.filter((r) => !r.categoryId);
     if (sortCol) {
       result = [...result].sort((a, b) => {
@@ -1562,7 +1579,7 @@ export function ProductsPage() {
       });
     }
     return result;
-  }, [rows, statusFilter, stockFilter, noCategoryOnly, sortCol, sortDir]);
+  }, [rows, statusFilter, stockFilter, returnFilter, noCategoryOnly, sortCol, sortDir]);
 
   const toggleSort = (col) => {
     if (sortCol === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -1751,6 +1768,16 @@ export function ProductsPage() {
                 <option value="out_of_stock">Out of Stock</option>
                 <option value="attention">Low + Out of Stock</option>
               </select>
+              <select
+                value={returnFilter}
+                onChange={(e) => setReturnFilter(e.target.value)}
+                title="Return policy"
+                style={{ fontSize: 13, border: "1px solid #e5e7eb", borderRadius: 10, padding: "9px 12px", background: "#fff", outline: "none", cursor: "pointer" }}
+              >
+                <option value="all">All Returns</option>
+                <option value="eligible">Return eligible</option>
+                <option value="as_is">Sold as is</option>
+              </select>
               <button
                 type="submit"
                 style={{ fontSize: 13, fontWeight: 500, padding: "9px 16px", border: "1px solid #e5e7eb", borderRadius: 10, background: "#fff", cursor: "pointer", color: "#374151" }}
@@ -1811,7 +1838,8 @@ export function ProductsPage() {
                   { key: "category", label: "Set Category" },
                   { key: "hsn",      label: "Set HSN" },
                   { key: "price",    label: "Adjust Price" },
-                  { key: "qty",      label: "Set Qty" }
+                  { key: "qty",      label: "Set Qty" },
+                  { key: "returns",  label: "Return Policy" }
                 ].map(({ key, label }) => (
                   <button key={key} type="button"
                     onClick={() => setMassAction(massAction === key ? null : key)}
@@ -1853,6 +1881,26 @@ export function ProductsPage() {
                   <button type="button" onClick={onApplyMassCategory} disabled={!massValue.categoryId}
                     style={{ fontSize: 13, fontWeight: 700, background: "#E8231A", color: "#fff", border: "none", padding: "7px 18px", borderRadius: 8, cursor: "pointer", opacity: massValue.categoryId ? 1 : 0.45 }}>
                     Apply to {selectedIds.size} products
+                  </button>
+                </div>
+              )}
+
+              {/* Return policy bulk action (2026-09-28) */}
+              {massAction === "returns" && (
+                <div style={{ background: "#fff", border: "1px solid rgba(232,35,26,0.2)", borderTop: "none", borderRadius: "0 0 12px 12px", padding: "14px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, color: "#374151", flex: "1 1 260px" }}>
+                    Set the return policy for the {selectedIds.size} selected product{selectedIds.size !== 1 ? "s" : ""}.
+                    <span style={{ display: "block", fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      Return eligible = replacement if defective on arrival (5 days, unboxing video). Sold as is = not returnable.
+                    </span>
+                  </span>
+                  <button type="button" onClick={() => onApplyMassReturnPolicy(true)}
+                    style={{ fontSize: 13, fontWeight: 700, background: "#16a34a", color: "#fff", border: "none", padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>
+                    ✅ Mark return eligible
+                  </button>
+                  <button type="button" onClick={() => onApplyMassReturnPolicy(false)}
+                    style={{ fontSize: 13, fontWeight: 700, background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa", padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>
+                    ⚠️ Mark sold as is
                   </button>
                 </div>
               )}

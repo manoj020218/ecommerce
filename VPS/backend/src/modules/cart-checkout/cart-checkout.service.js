@@ -443,6 +443,9 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     sku: product.sku,
     imageUrl,
     hsnCode: product.hsnCode || "",
+    // Return policy snapshot (2026-09-27): stored on the line, so the order
+    // keeps the product's return status as it was at the time of purchase.
+    returnEligible: Boolean(product.returnEligible),
     qty,
     moq,
     customization: customOptionsSelection.resolved,

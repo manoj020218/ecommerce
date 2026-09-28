@@ -187,6 +187,9 @@ const createProductSchema = z.object({
     .optional()
     .default("in_stock"),
   allowBackorder: z.boolean().optional().default(false),
+  // Return policy (2026-09-27): only products explicitly marked are returnable
+  // (defective on arrival, 5 days, replacement only). Default = sold as is.
+  returnEligible: z.boolean().optional().default(false),
   priceIncludesGst: z.boolean().optional().default(false),
   shippingIncluded: z.boolean().optional().default(false),
   maxOrderQty: z.coerce.number().int().min(1).max(100000).optional().default(1000),
@@ -253,6 +256,7 @@ const updateProductSchema = z.object({
   reservedQty: qtySchema.optional(),
   stockStatus: z.enum(["in_stock", "low_stock", "out_of_stock", "backorder"]).optional(),
   allowBackorder: z.boolean().optional(),
+  returnEligible: z.boolean().optional(),
   maxOrderQty: z.coerce.number().int().min(1).max(100000).optional(),
   lowStockThreshold: z.coerce.number().int().min(0).max(100000).optional(),
 

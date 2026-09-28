@@ -85,6 +85,7 @@ function sanitizeCartLine(line) {
     slug: line.slug,
     sku: line.sku,
     imageUrl: line.imageUrl || "",
+    returnEligible: Boolean(line.returnEligible),
     customization: Array.isArray(line.customization) ? line.customization : [],
     designUploadIds: Array.isArray(line.designUploadIds) ? line.designUploadIds : [],
     hsnCode: line.hsnCode || "",

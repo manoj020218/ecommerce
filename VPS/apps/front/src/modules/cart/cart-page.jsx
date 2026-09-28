@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
+import { ReturnPolicyBadge } from "../products/return-policy-badge";
 import { resetGuestSessionId } from "../../shared/cart/guest-session";
 import {
   StorefrontAlert,
@@ -299,6 +300,7 @@ export function CartPage() {
                           {item.title}
                         </Link>
                         <small>SKU: {item.sku || item.productId}</small>
+                        <div style={{ marginTop: 4 }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div>
                         {item.customization?.length ? (
                           <small style={{ display: "block", marginTop: 2 }}>
                             {item.customization.map((opt) => opt.choiceLabel).join(" · ")}

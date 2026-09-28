@@ -40,6 +40,9 @@ file from a mistyped command), `.claude/settings.local.json`.
 14. "Sold as is" badge made a quiet grey label; "not returnable" wording removed from the badge,
    product-page note and checkout notice (user request — don't highlight it). Full terms still on
    /refund-policy. All 423 products are already "Sold as is" (0 marked return eligible).
+15. Fourth project: **Smart Farm Pump Control System** (`/projects/smart-farm-pump-control-system`),
+   seeded by `scripts/seed-project-farm-pump.js`; built on the FireGuard platform's farm/agri use case.
+   Store backup before it: `/root/jenix-bak-2026-09-28-projects2/projects-store.before-farm.json`.
 
 **PENDING / TODO (in priority order):**
 - **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound

@@ -34,6 +34,10 @@ file from a mistyped command), `.claude/settings.local.json`.
   data, not backups).
 - **Watch** that pm2 memory restarts stay at 0 (`grep -a -c "exceeds --max-memory-restart"
   /root/.pm2/pm2.log` — should stay 3842) and that the Product Visits panel fills in.
+  **2026-09-28 check:** no restart for 21 h, zero memory restarts since the fix, RSS steady
+  259–297 MB (JS heap ~82 MB) vs the 600 MB limit — healthy. The pm2 "restarts" column (was 520)
+  is a lifetime counter incl. deploys; it was **reset to 0 with `pm2 reset jenix-backend`**
+  (counter only, no restart). From now on any increase that isn't a deploy is a real signal.
 - **58 of 406 recovery emails ever sent have status "failed"** — not investigated yet (user said
   leave for now). Separate from the redesign.
 - **MDR feature** (Sep 17 entry) still off, needs its real-order test before switching on.

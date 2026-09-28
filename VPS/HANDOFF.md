@@ -1,8 +1,8 @@
 # Handoff — read this first
 
-## ▶ CURRENT STATE — end of 2026-09-27 (read this box first)
+## ▶ CURRENT STATE — end of 2026-09-28 (read this box first)
 
-**Git:** `origin/main` HEAD = **`be6ae26`**. **Git now == live** for all jenix app code: every
+**Git:** `origin/main` HEAD = **`3bbb16f`**. **Git == live** for all jenix app code: every
 previously "deployed but uncommitted" change was committed on 2026-09-27, grouped by feature (see
 `git log`). Only untracked leftovers remain, deliberately not committed: `p.images` (repo root),
 `VPS/extra-pages/` (parked older VPS copies), `VPS/backend/src/database/console.log('` (empty junk
@@ -19,6 +19,18 @@ file from a mistyped command), `.claude/settings.local.json`.
 6. Customer cart-recovery page redesigned (`5b99877`) and matching recovery email (`be6ae26`)
 7. Older live work committed: specs editor, orders/invoices, cart email capture, Cashfree webhook
    URL fix, SMTP attachments, shipping, storefront fixes, Tally export, walk-in Repeat Order.
+
+**Shipped 2026-09-28:**
+8. Backend health check: stable, zero memory restarts; pm2 restart counter reset to 0 (`df71b93`).
+9. Google Shopping check: feed read automatically twice a day by Merchant Center 246583266, all
+   active products included, feed and page prices/stock consistent (20-product sample). Optional
+   feed clean-up offered, not done: 338 descriptions contain HTML, 96 titles > 150 chars,
+   2 products without an image (JNX-000331, JNX-000398 → disapproved until a photo is added).
+10. Return & Replacement Policy: per-product "Return eligible" / "Sold as is", admin tick box +
+   bulk action + filter, badges on product page/cart/checkout, new /refund-policy text and invoice
+   terms, per-product Google return data (`35cf2f6`).
+11. og:image / Product JSON-LD image were "[object Object]" on 414 of 417 product pages → fixed
+   (`3bbb16f`); duplicate heading removed from the policy page.
 
 **PENDING / TODO (in priority order):**
 - **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound
@@ -38,10 +50,17 @@ file from a mistyped command), `.claude/settings.local.json`.
   259–297 MB (JS heap ~82 MB) vs the 600 MB limit — healthy. The pm2 "restarts" column (was 520)
   is a lifetime counter incl. deploys; it was **reset to 0 with `pm2 reset jenix-backend`**
   (counter only, no restart). From now on any increase that isn't a deploy is a real signal.
-- **Return policy (2026-09-28):** user to (a) tick "Return eligible" on trusted products (Products
-  list → Return Policy bulk action), (b) set the matching return policy in Google Merchant Center
-  (5 days, customer pays return shipping, eligible items only). Extra backups from this deploy:
-  `/root/jenix-bak-2026-09-28-return-policy/`, `apps/{admin-panel,front}/dist.bak-20260928-returnpolicy-prev`.
+- **Return policy — user actions:** tick "Return eligible" on trusted products (Products list →
+  select → Return Policy bulk action; until then EVERY product shows "Sold as is"). Backups from
+  this deploy: `/root/jenix-bak-2026-09-28-return-policy/`,
+  `apps/{admin-panel,front}/dist.bak-20260928-returnpolicy-prev`.
+- **Google Merchant Center 246583266 (the active account) — user actions:**
+  (a) JNX-000135 "Product page unavailable" → click Request review / Revalidate (page is fixed);
+  (b) fill the return-policy form: India, https://jenixindia.com/refund-policy, 5 days, by mail,
+  customer pays return shipping, no restocking fee, exchange/replacement only — Claude could not:
+  the Claude-in-Chrome Google login only has access to a SECOND account 128835410 "Jenix";
+  (c) decide whether to close the unused account 128835410 (duplicate/conflict risk);
+  (d) check Diagnostics, Shipping settings (feed has no shipping costs) and Free listings.
 - **58 of 406 recovery emails ever sent have status "failed"** — not investigated yet (user said
   leave for now). Separate from the redesign.
 - **MDR feature** (Sep 17 entry) still off, needs its real-order test before switching on.

@@ -305,13 +305,31 @@ async function collectSitemapEntries() {
     lastmod: job.updatedAt || job.createdAt || settings.meta.updatedAt
   }));
 
+  // Project Series (2026-09-28): /projects plus each published project page.
+  // Best-effort: a problem reading projects must never break the sitemap.
+  let projectEntries = [];
+  try {
+    const { readProjectsStore } = require("../../database/projects-store");
+    const projectsStore = await readProjectsStore();
+    const published = projectsStore.projects.filter((p) => p.isPublished);
+    projectEntries = published.length
+      ? [
+          { loc: `${baseUrl}/projects`, lastmod: settings.meta.updatedAt },
+          ...published.map((p) => ({ loc: `${baseUrl}/projects/${p.slug}`, lastmod: p.updatedAt || p.createdAt || settings.meta.updatedAt }))
+        ]
+      : [];
+  } catch (_error) {
+    projectEntries = [];
+  }
+
   return {
     baseUrl,
     updatedAt: settings.meta.updatedAt,
     products: productEntries,
     categories: categoryEntries,
     blogs: blogEntries,
-    careers: careerEntries
+    careers: careerEntries,
+    projects: projectEntries
   };
 }
 
@@ -332,6 +350,10 @@ async function generateSitemapIndexXml() {
     },
     {
       loc: `${entries.baseUrl}/sitemaps/careers.xml`,
+      lastmod: entries.updatedAt
+    },
+    {
+      loc: `${entries.baseUrl}/sitemaps/projects.xml`,
       lastmod: entries.updatedAt
     }
   ]);

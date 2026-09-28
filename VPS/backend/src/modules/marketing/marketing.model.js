@@ -16,6 +16,10 @@ const TEMPLATE_KEYS = Object.freeze([
   "order_placed",
   "order_placed_admin",
   "payment_captured_unfulfilled_admin",
+  // Projects / Solutions enquiries (2026-09-28)
+  "project_enquiry_admin",
+  "project_enquiry_admin_whatsapp",
+  "project_enquiry_received",
   "walkin_payment_request",
   "walkin_payment_request_whatsapp",
   "awaiting_payment",
@@ -73,7 +77,8 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
   { key: "review_approved", whatsappKey: "review_approved_whatsapp", group: "Reviews", label: "Review Approved" },
   { key: "review_rejected", whatsappKey: "review_rejected_whatsapp", group: "Reviews", label: "Review Rejected" },
   { key: "print_job_approved", whatsappKey: "print_job_approved_whatsapp", group: "Print Jobs", label: "Print Design Approved" },
-  { key: "print_job_rejected", whatsappKey: "print_job_rejected_whatsapp", group: "Print Jobs", label: "Print Design Rejected" }
+  { key: "print_job_rejected", whatsappKey: "print_job_rejected_whatsapp", group: "Print Jobs", label: "Print Design Rejected" },
+  { key: "project_enquiry_admin", whatsappKey: "project_enquiry_admin_whatsapp", group: "Projects", label: "New Project Enquiry (to you)" }
 ]);
 
 const BRAND_COLOR = "#E8231A";
@@ -187,6 +192,37 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
       `<tr><td style="padding:6px 0;color:#6b7280;">Order Total</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
       `</table>` +
       `<p style="font-size:13px;color:#6b7280;">Open the admin panel to view full order and shipping details.</p>`
+    )
+  },
+  project_enquiry_admin: {
+    label: "New Project Enquiry (Admin Email)",
+    subject: "New project enquiry: {{productName}} — {{customerName}}",
+    body: emailShell(
+      `<p style="font-size:15px;font-weight:700;color:${BRAND_COLOR};margin:0 0 6px;">New quotation request</p>` +
+      `<p style="font-size:14px;margin:0 0 10px;">A visitor asked for a quote for <strong>{{productName}}</strong>. Call them back soon — project enquiries go cold fast.</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:8px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{customerName}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Mobile</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{customerMobile}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;text-align:right;">{{customerEmail}}</td></tr>` +
+      `</table>` +
+      `{{itemsTable}}` +
+      `<p style="font-size:12px;color:#6b7280;">All enquiries: Admin → Projects → Enquiries.</p>`
+    )
+  },
+  project_enquiry_admin_whatsapp: {
+    label: "New Project Enquiry (Admin WhatsApp)",
+    subject: "",
+    body: "🆕 *New project enquiry*\n*{{productName}}*\n\n👤 {{customerName}}\n📞 {{customerMobile}}\n✉️ {{customerEmail}}\n\n{{cartItems}}\n\nAdmin → Projects → Enquiries"
+  },
+  project_enquiry_received: {
+    label: "Project Enquiry Received (Customer Email)",
+    subject: "We received your enquiry — {{productName}}",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Thank you for your interest in <strong>{{productName}}</strong>. Our project team will review your requirement and contact you shortly to understand your site and prepare a quotation.</p>` +
+      `<p style="font-size:13px;color:#6b7280;margin-bottom:4px;">Your details:</p>` +
+      `{{itemsTable}}` +
+      `<p style="font-size:14px;">If you have site photos, a parking layout or drawings, reply to this email or send them on WhatsApp — it helps us quote faster.</p>`
     )
   },
   payment_captured_unfulfilled_admin: {

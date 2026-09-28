@@ -92,6 +92,13 @@ const RecoveryPage = lazy(() =>
     default: m.RecoveryResumePage
   }))
 );
+// Project Series: custom IoT projects sold on quotation (2026-09-28)
+const ProjectsListPage = lazy(() =>
+  import("../modules/projects/projects-list-page").then((m) => ({ default: m.ProjectsListPage }))
+);
+const ProjectPage = lazy(() =>
+  import("../modules/projects/project-page").then((m) => ({ default: m.ProjectPage }))
+);
 const NotFoundPage = lazy(() =>
   import("../modules/settings/not-found-page").then((m) => ({
     default: m.NotFoundPage
@@ -162,6 +169,8 @@ export function AppRouter() {
           <Route path="/" element={<StorefrontHomePage />} />
           <Route path="/products" element={<ProductsListPage />} />
           <Route path="/categories/:slug" element={<ProductsListPage />} />
+          <Route path="/projects" element={<ProjectsListPage />} />
+          <Route path="/projects/:slug" element={<ProjectPage />} />
           <Route path="/guides" element={<BlogsListPage />} />
           <Route path="/guides/:slug" element={<BlogPage />} />
           <Route path="/careers" element={<CareersListPage />} />

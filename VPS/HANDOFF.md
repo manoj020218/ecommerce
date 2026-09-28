@@ -31,6 +31,9 @@ file from a mistyped command), `.claude/settings.local.json`.
    terms, per-product Google return data (`35cf2f6`).
 11. og:image / Product JSON-LD image were "[object Object]" on 414 of 417 product pages → fixed
    (`3bbb16f`); duplicate heading removed from the policy page.
+12. **Project Series** — custom IoT projects sold on quotation (no prices): `/projects` +
+   `/projects/:slug`, admin "Projects & Enquiries", enquiry alerts by email + WhatsApp. First
+   project live: Smart Parking Space Calculation for Basement Parking. See the entry below.
 
 **PENDING / TODO (in priority order):**
 - **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound
@@ -91,6 +94,41 @@ below for exactly what's live vs. still pending before the MDR feature
 itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
+
+## Sep 28 2026 — Project Series: custom IoT projects sold on quotation (DEPLOYED)
+
+**Why:** user wants to sell complete projects (hardware + software, customised per site) rather
+than boxed products — buyer must understand the intent/use and contact us for a quotation.
+Decisions: **no prices anywhere**; enquiry collects name, mobile/WhatsApp, email (+ optional
+company, city, package, per-project questions).
+
+**What's live:**
+- Storefront: `/projects` (list) and `/projects/:slug` (hero, problem/solution, how-it-works
+  steps, packages with "Get quote for X", gallery w/ lightbox, software features, use cases,
+  why us, FAQs, quote form). "IoT Projects" link in header nav + footer. Service JSON-LD.
+- Backend: `modules/projects/*`, store `database/json/projects-store.json`
+  (`{projects, enquiries}`, atomic write + queue). Public `GET /api/projects`,
+  `GET /api/projects/:slug`, `POST /api/projects/:slug/enquiry` (honeypot, 10-min same-mobile
+  duplicate guard). Admin `/api/admin/projects/*` guarded by the **blogs** permissions (reused so
+  the roles model is untouched).
+- Alerts (best-effort, never block the enquiry): `project_enquiry_admin` email →
+  storeProfile.supportEmail (jenixjain@gmail.com), `project_enquiry_admin_whatsapp` →
+  supportWhatsApp/supportMobile (07240226566), `project_enquiry_received` ack to the customer's
+  email if given. Editable in Marketing templates (group "Projects").
+  WhatsApp session creds were refreshed 2026-09-28 11:48 → looks paired; if alerts don't arrive,
+  re-pair via admin panel.
+- Sitemap: `/sitemaps/projects.xml` (in the index) lists `/projects` + each published project.
+- Admin: **Projects & Enquiries** (`/projects`) — create/edit projects (lists one per line,
+  steps/FAQs as `Title | text`, image upload to `uploads/projects/`), Enquiries tab with status
+  new → contacted → quoted → won/lost + notes, tel/WhatsApp links.
+- First project seeded with `scripts/seed-project-smart-parking.js --apply` (idempotent; dry-run
+  without the flag): slug `smart-parking-space-calculation-basement-parking`, packages Basic /
+  Advanced (boom barrier) / More Advanced (sensor per slot + mobile app). 4 WebP images from the
+  user's ChatGPT drafts in `uploads/projects/` (the "project package" image aimed at students was
+  deliberately left out).
+
+**Backups:** `/root/jenix-bak-2026-09-28-projects/backend-files.tgz`; previous dists moved to
+`/tmp/{admin-panel,front}-dist-superseded` (tmp — gone on reboot, no dist.bak made).
 
 ## Sep 28 2026 — Google "Product page unavailable": broken og:image + Product image on 414 pages (FIXED, DEPLOYED)
 

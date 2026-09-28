@@ -10,7 +10,9 @@ const listInvoicesQuerySchema = z.object({
   orderId: z.string().trim().max(160).optional().default(""),
   dateFrom: isoDateSchema.optional(),
   dateTo: isoDateSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(100)
+  // limit: z.coerce.number().int().min(1).max(200).optional().default(100)
+  // max raised 2026-09-28 for the Tally page's "download all invoice PDFs" (a year can exceed 200)
+  limit: z.coerce.number().int().min(1).max(5000).optional().default(100)
 });
 
 const generateInvoicePayloadSchema = z.object({

@@ -13,6 +13,7 @@ import {
   fetchTallyExportDownload,
   fetchTallyExportHistory
 } from "./tally-export.api";
+import { InvoicePdfDownloadCard } from "./invoice-pdf-download-card";
 
 const DEFAULT_FILTERS = {
   period: "monthly",
@@ -171,6 +172,8 @@ export function TallyExportPage() {
           </div>
         </form>
       </section>
+
+      <InvoicePdfDownloadCard />
 
       {notice ? <p className="alert-info">{notice}</p> : null}
       {error ? <p className="form-error">{error}</p> : null}

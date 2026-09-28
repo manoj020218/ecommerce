@@ -46,6 +46,15 @@ file from a mistyped command), `.claude/settings.local.json`.
 16. Fifth project: **Solar Plant Perimeter Intrusion Detection System** (beam sensors → LoRaWAN →
    site office gateway → cloud → head office + patrol app, zone-wise), seeded by
    `scripts/seed-project-solar-perimeter.js`. Store backup: `.../projects-store.before-solar.json`.
+17. **Tally Export → "Download all invoices as PDF"**: pick a date range, choose a folder (Chrome/Edge
+   folder picker; other browsers get one ZIP) → every invoice saved as `<invoice number>.pdf` (slashes →
+   dashes, e.g. `JNX-2026-27-128-26.pdf`) in a sub-folder "Invoices <from> to <to>". PDFs are made
+   in the admin's browser (html2canvas + jsPDF from the same invoice HTML), NOT on the VPS — no
+   server load. ~1 s per invoice, ~300 KB each (image-based PDF, text not selectable). Proforma
+   excluded unless ticked. Backend: invoice list `limit` max 200 → 5000. Backup:
+   `/root/jenix-bak-2026-09-28-invoicepdf/`, previous admin dist `/tmp/admin-panel-dist-prev2`.
+   Rendering verified locally on a real invoice (1-page A4); the folder-save itself not yet
+   exercised by the user.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

@@ -21,6 +21,7 @@ function formFrom(project) {
   return {
     title: p.title || "", slug: p.slug || "", tagline: p.tagline || "", summary: p.summary || "",
     heroImageUrl: p.heroImageUrl || "",
+    externalUrl: p.externalUrl || "", externalLabel: p.externalLabel || "",
     problemTitle: p.problemTitle || "", problemText: p.problemText || "",
     solutionTitle: p.solutionTitle || "", solutionText: p.solutionText || "",
     stepsText: toPairs(p.steps, "title", "text"),
@@ -37,6 +38,7 @@ function formFrom(project) {
 function payloadFrom(f) {
   return {
     title: f.title.trim(), slug: f.slug.trim(), tagline: f.tagline, summary: f.summary, heroImageUrl: f.heroImageUrl,
+    externalUrl: f.externalUrl.trim(), externalLabel: f.externalLabel.trim(),
     problemTitle: f.problemTitle, problemText: f.problemText, solutionTitle: f.solutionTitle, solutionText: f.solutionText,
     steps: pairs(f.stepsText, "title", "text"),
     packages: f.packages.filter((pk) => pk.name.trim()).map((pk) => ({ name: pk.name.trim(), tagline: pk.tagline || "", bestFor: pk.bestFor || "", features: lines(pk.featuresText) })),
@@ -110,6 +112,8 @@ export function ProjectEditor({ project, onSaved, onCancel }) {
           {f.heroImageUrl && <img src={f.heroImageUrl} alt="" style={{ height: 70, borderRadius: 8, border: "1px solid #eef0f3" }} />}
           <ImageUploadButton onUploaded={(url) => set("heroImageUrl", url)} text={f.heroImageUrl ? "Replace" : "Upload"} />
         </div>
+        {field("externalUrl", "Product website (optional)", { hint: "e.g. https://floodguard.jenix.in — shown as a link on the page", placeholder: "https://" })}
+        {field("externalLabel", "Website link text (optional)", { placeholder: "Visit the product website" })}
       </div>
 
       <div style={card}>

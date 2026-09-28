@@ -13,6 +13,8 @@ const projectFields = {
   tagline: text(300).optional(),
   summary: text(600).optional(),
   heroImageUrl: text(2000).optional(),
+  externalUrl: z.union([z.string().trim().max(500).regex(/^https?:\/\/\S+$/i, "Website link must start with http:// or https://"), z.literal("")]).optional(),
+  externalLabel: text(80).optional(),
   problemTitle: text(200).optional(),
   problemText: text(3000).optional(),
   solutionTitle: text(200).optional(),

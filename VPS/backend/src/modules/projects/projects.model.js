@@ -21,6 +21,9 @@ function sanitizeProject(project) {
     tagline: str(p.tagline),
     summary: str(p.summary),
     heroImageUrl: str(p.heroImageUrl),
+    // optional link to the product's own website / live demo (2026-09-28)
+    externalUrl: str(p.externalUrl),
+    externalLabel: str(p.externalLabel),
     problemTitle: str(p.problemTitle),
     problemText: str(p.problemText),
     solutionTitle: str(p.solutionTitle),

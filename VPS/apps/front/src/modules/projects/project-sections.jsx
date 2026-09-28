@@ -42,6 +42,11 @@ export function Hero({ project, onQuote, whatsappHref }) {
             )}
           </div>
           <p style={{ fontSize: 12, color: "#9ca3af", margin: "16px 0 0" }}>Hardware + software designed in-house · Customised for your site · Pan-India</p>
+          {/^https?:\/\//i.test(project.externalUrl || "") && (
+            <a href={project.externalUrl} target="_blank" rel="noopener" style={{ display: "inline-block", marginTop: 12, color: "#93c5fd", fontSize: 14, fontWeight: 700, textDecoration: "none" }}>
+              {project.externalLabel || "Visit the product website"} ↗
+            </a>
+          )}
         </div>
         {project.heroImageUrl && (
           <img src={project.heroImageUrl} alt={project.title} style={{ width: "100%", borderRadius: 16, boxShadow: "0 20px 50px rgba(0,0,0,0.45)" }} />

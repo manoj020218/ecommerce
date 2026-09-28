@@ -73,6 +73,29 @@ itself can be switched on. Working tree also has one unrelated stray
 empty file (`p.images` at repo root, dated Jul 7, predates every
 feature in this file — leave it alone unless the user asks about it).
 
+## Sep 28 2026 — Google "Product page unavailable": broken og:image + Product image on 414 pages (FIXED, DEPLOYED)
+
+- Merchant Center 246583266 (**this is the active account** — data source "jenixndia"; a second
+  account 128835410 "Jenix" also exists and is the one the Claude-in-Chrome Google login can see)
+  flagged JNX-000135 "Product page unavailable". The page itself returned 200 to every Google
+  crawler (incl. Storebot-Google) in the available logs (from 25 Sep); the likely trigger was an
+  older crawl during the pre-fix memory-restart period.
+- Real bug found while checking: 414 of 417 active products store images as
+  `{url, thumbnail, medium, large, alt}` (migration format). `seo.service.buildProductPageMeta`
+  put that object into og:image → `content="[object Object]"` (broken WhatsApp/Facebook/Google
+  previews; crawlers then requested `/products/[object Object]` → 404s in nginx logs), and
+  `buildProductJsonLd` put objects into Product `image` (invalid structured data). Fixed with
+  `resolveImageUrl()` (large → url → medium → thumbnail). Google/Facebook feeds and sitemaps were
+  already fine. Verified live: og:image and Product.image[0] are real URLs, 0 "[object" on page.
+- Other Google-crawler 404s in logs (78) are deleted/renamed (11) or inactive (3) product URLs —
+  correct behaviour, none are active products.
+- Also: removed the duplicate `<h2>` heading from the /refund-policy page content (live data +
+  `scripts/content/return-policy-2026-09.html`); backup
+  `/root/jenix-bak-2026-09-28-return-policy/static-pages-store.before-h2fix.json`.
+- Merchant Center return-policy form: not filled — Chrome's Google account has no access to
+  246583266. User to fill it (URL https://jenixindia.com/refund-policy, India, 5 days, by mail,
+  customer pays return shipping, replacement/exchange) or sign Chrome into that account.
+
 ## Sep 28 2026 — Return & Replacement Policy: per-product "Return eligible" / "Sold as is" (DEPLOYED)
 
 User-approved policy: returns ONLY for products explicitly marked return-eligible, only for a

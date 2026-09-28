@@ -34,6 +34,18 @@ function buildCanonicalBaseUrl(settings) {
   return normalizeBaseUrl(settings.seoDefaults.canonicalDomain, env.publicBaseUrl);
 }
 
+// Product images are stored either as a URL string or (414 of 417 live
+// products, migration format) as { url, thumbnail, medium, large, alt }.
+// Passing the object straight through produced og:image="[object Object]"
+// (broken WhatsApp/Facebook previews; crawlers then requested
+// /products/[object Object]) and an invalid Product JSON-LD "image" —
+// Merchant Center flagged "Product page unavailable" (2026-09-28).
+function resolveImageUrl(image) {
+  if (!image) return "";
+  if (typeof image === "string") return image;
+  return image.large || image.url || image.medium || image.thumbnail || "";
+}
+
 function buildProductPageMeta(product, settings) {
   const baseUrl = buildCanonicalBaseUrl(settings);
   return {
@@ -45,8 +57,12 @@ function buildProductPageMeta(product, settings) {
       collapseText(product.fullDescription) ||
       product.title,
     canonicalUrl: `${baseUrl}/products/${product.slug}`,
+    // ogImageUrl:
+    //   (Array.isArray(product.images) && product.images[0]) ||
+    //   settings.seoDefaults.defaultOgImageUrl ||
+    //   ""
     ogImageUrl:
-      (Array.isArray(product.images) && product.images[0]) ||
+      (Array.isArray(product.images) && resolveImageUrl(product.images[0])) ||
       settings.seoDefaults.defaultOgImageUrl ||
       ""
   };
@@ -80,7 +96,10 @@ function buildAggregateRatingJsonLd(product) {
 }
 
 function buildProductJsonLd(product, meta, settings, categoryPathNames) {
-  const imageList = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+  // const imageList = Array.isArray(product.images) ? product.images.filter(Boolean) : [];
+  const imageList = Array.isArray(product.images)
+    ? product.images.map(resolveImageUrl).filter(Boolean)
+    : [];
 
   return {
     "@context": "https://schema.org",

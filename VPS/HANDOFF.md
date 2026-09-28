@@ -48,6 +48,13 @@ file from a mistyped command), `.claude/settings.local.json`.
    `scripts/seed-project-solar-perimeter.js`. Store backup: `.../projects-store.before-solar.json`.
 
 **PENDING / TODO (in priority order):**
+- **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which
+  one gets buyer interest).** Baseline 2026-09-28 = ~0 real visits (the 23/1/1/1/1 hits on
+  `/api/projects/<slug>` in nginx logs were Claude's own testing). Quick count from nginx (every page
+  view calls the API): `zcat -f /var/log/nginx/*access*.log* | grep -E 'GET /api/projects/[a-z0-9-]+ '
+  | grep -viE 'bot|crawl|spider|curl' | awk '{print $7}' | sort | uniq -c | sort -rn` — **logs only
+  keep 10 days**. Proposed (not built, user said "OK for today"): persistent per-project view
+  counter (like product-views-store) + Views / Enquiries / conversion columns in Admin → Projects.
 - **VPS DNS fix — user will run it** (see "PENDING: VPS DNS fix" entry). Until then every outbound
   call on the VPS (checkout create-attempt ~6 s, emails, WhatsApp, Cashfree…) randomly waits 5 s.
   First attempt on 2026-09-26 landed on the wrong server.

@@ -84,7 +84,10 @@ export function ReturnPolicyNote({ eligible }) {
       {eligible
         ? "Report a manufacturing defect within 5 days of delivery with an unboxing video. Replacement only; return shipping is paid by the buyer. "
         // : "Sold at wholesale price as supplied by the manufacturer — not covered by returns or replacement. "}
-        : "Supplied as is at wholesale price, as packed by the manufacturer. "}
+        // : "Supplied as is at wholesale price, as packed by the manufacturer. "}
+        // 2026-09-29: user asked to hide this line on product pages (gave buyers
+        // the wrong message) — only the "Return policy" link remains.
+        : ""}
       <Link to={POLICY_URL} style={{ color: "#E8231A", fontWeight: 600 }}>Return policy</Link>
     </p>
   );

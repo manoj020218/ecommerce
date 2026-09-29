@@ -54,6 +54,9 @@ file from a mistyped command), `.claude/settings.local.json`.
    excluded unless ticked. Backend: invoice list `limit` max 200 → 5000. Backup:
    `/root/jenix-bak-2026-09-28-invoicepdf/`, previous admin dist `/tmp/admin-panel-dist-prev2`.
    **User-confirmed working on 2026-09-29** (downloaded into a folder, PDFs fine).
+18. 2026-09-29: product page no longer shows "Supplied as is at wholesale price, as packed by the
+   manufacturer." (user: wrong message to buyers) — only the "Sold as is" badge + "Return policy" link.
+   Checkout notice still says "Items are sold as is at wholesale price." (not changed, product page only).
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

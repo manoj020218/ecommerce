@@ -53,8 +53,7 @@ file from a mistyped command), `.claude/settings.local.json`.
    server load. ~1 s per invoice, ~300 KB each (image-based PDF, text not selectable). Proforma
    excluded unless ticked. Backend: invoice list `limit` max 200 → 5000. Backup:
    `/root/jenix-bak-2026-09-28-invoicepdf/`, previous admin dist `/tmp/admin-panel-dist-prev2`.
-   Rendering verified locally on a real invoice (1-page A4); the folder-save itself not yet
-   exercised by the user.
+   **User-confirmed working on 2026-09-29** (downloaded into a folder, PDFs fine).
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

@@ -1107,8 +1107,11 @@ export function ProductPage() {
               <p className="proto-gst-invoice-line">&#10003; GST Invoice will be generated after payment</p>
               {/* Return policy (2026-09-27): shown before purchase, per product */}
               <div style={{ marginTop: 8 }}>
-                <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} />
-                <ReturnPolicyNote eligible={Boolean(product.returnEligible)} />
+                {/* <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} />
+                <ReturnPolicyNote eligible={Boolean(product.returnEligible)} /> */}
+                {/* 2026-09-30: no policy link on product pages — it's in the footer (Legal) */}
+                <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} linked={false} />
+                <ReturnPolicyNote eligible={Boolean(product.returnEligible)} showLink={false} />
               </div>
             </>
           )}

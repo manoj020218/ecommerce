@@ -57,6 +57,9 @@ file from a mistyped command), `.claude/settings.local.json`.
 18. 2026-09-29: product page no longer shows "Supplied as is at wholesale price, as packed by the
    manufacturer." (user: wrong message to buyers) — only the "Sold as is" badge + "Return policy" link.
    Checkout notice still says "Items are sold as is at wholesale price." (not changed, product page only).
+19. 2026-09-30: footer Legal link renamed "Refund Policy" → **"Return Policy"** (same /refund-policy page).
+   Product pages have NO policy link now: "Sold as is" is a plain label (`linked={false}`), note link
+   hidden (`showLink={false}`). Cart/checkout badges + checkout notice still link to the policy.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

@@ -7,7 +7,9 @@ import { Link } from "react-router-dom";
 
 const POLICY_URL = "/refund-policy";
 
-export function ReturnPolicyBadge({ eligible, compact = false }) {
+// linked=false renders a plain label (product page, 2026-09-30 — the policy
+// link now lives in the footer under Legal).
+export function ReturnPolicyBadge({ eligible, compact = false, linked = true }) {
   // const style = eligible
   //   ? { background: "#dcfce7", color: "#15803d", border: "1px solid #bbf7d0" }
   //   : { background: "#fff7ed", color: "#9a3412", border: "1px solid #fed7aa" };
@@ -22,24 +24,22 @@ export function ReturnPolicyBadge({ eligible, compact = false }) {
   const text = eligible
     ? compact ? "✅ Replacement if defective (5 days)" : "✅ Return eligible — replacement if defective on arrival (5 days)"
     : "Sold as is";
+  const badgeStyle = {
+    ...style,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: compact ? 11 : 12,
+    fontWeight: 700,
+    padding: compact ? "2px 8px" : "4px 10px",
+    borderRadius: 20,
+    textDecoration: "none",
+    lineHeight: 1.4,
+    whiteSpace: "normal"
+  };
+  if (!linked) return <span style={badgeStyle}>{text}</span>;
   return (
-    <Link
-      to={POLICY_URL}
-      title="View return policy"
-      style={{
-        ...style,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        fontSize: compact ? 11 : 12,
-        fontWeight: 700,
-        padding: compact ? "2px 8px" : "4px 10px",
-        borderRadius: 20,
-        textDecoration: "none",
-        lineHeight: 1.4,
-        whiteSpace: "normal"
-      }}
-    >
+    <Link to={POLICY_URL} title="View return policy" style={badgeStyle}>
       {text}
     </Link>
   );
@@ -78,7 +78,8 @@ export function ReturnPolicyCheckoutNotice({ items }) {
 }
 
 // Short explanation under the badge on the product page.
-export function ReturnPolicyNote({ eligible }) {
+export function ReturnPolicyNote({ eligible, showLink = true }) {
+  if (!eligible && !showLink) return null; // nothing left to say (2026-09-30)
   return (
     <p style={{ fontSize: 12, color: "#6b7280", margin: "6px 0 0", lineHeight: 1.5 }}>
       {eligible
@@ -88,7 +89,7 @@ export function ReturnPolicyNote({ eligible }) {
         // 2026-09-29: user asked to hide this line on product pages (gave buyers
         // the wrong message) — only the "Return policy" link remains.
         : ""}
-      <Link to={POLICY_URL} style={{ color: "#E8231A", fontWeight: 600 }}>Return policy</Link>
+      {showLink ? <Link to={POLICY_URL} style={{ color: "#E8231A", fontWeight: 600 }}>Return policy</Link> : null}
     </p>
   );
 }

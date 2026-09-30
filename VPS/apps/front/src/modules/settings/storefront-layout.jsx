@@ -839,7 +839,9 @@ export function StorefrontLayout() {
             <Link to="/contact-us">Contact Us</Link>
             <Link to="/privacy-policy">Privacy Policy</Link>
             <Link to="/terms-and-conditions">Terms &amp; Conditions</Link>
-            <Link to="/refund-policy">Refund Policy</Link>
+            {/* <Link to="/refund-policy">Refund Policy</Link> */}
+            {/* 2026-09-30: renamed; same page. Product pages no longer link to it. */}
+            <Link to="/refund-policy">Return Policy</Link>
             <Link to="/shipping-policy">Shipping Policy</Link>
           </div>
         </div>

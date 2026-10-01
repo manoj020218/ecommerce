@@ -78,6 +78,10 @@ file from a mistyped command), `.claude/settings.local.json`.
    for dealers the prefill uses the dealer registration (firm, GSTIN, registered address) instead of
    the customer's older default address. Selected-customer pill shows "Dealer 08001" + address.
    Backup: `/root/jenix-bak-2026-10-02-dealer-autofill/`.
+22. 2026-10-02: Walk-in Orders line table has a new **"Net Unit (ex-GST)"** column = price after discount,
+   before GST (shows incl.-GST price + "% off retail" under it). Typing an agreed price there switches the
+   line to Custom price with 0% discount (exact, no rounding drift). Admin-panel only, no backend change.
+   Verified live: 2350 → GST ₹423 → line ₹2,773, "16% off retail".
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

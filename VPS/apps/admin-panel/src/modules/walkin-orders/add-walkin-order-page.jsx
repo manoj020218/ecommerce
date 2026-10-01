@@ -37,6 +37,31 @@ function normalizeMoney(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// "Net Unit (ex-GST)" cell (2026-10-02): the unit price after discount and
+// before GST. Typing an agreed price here switches the line to a Custom price
+// with 0% discount, so the invoice rate is exactly the agreed price (working
+// back to a discount % would leave paise-level rounding differences).
+function NetUnitPriceCell({ product, line, preview, updateLine }) {
+  const qty = Number(line.qty || 0);
+  const isDirect = line.priceMode === "custom" && !Number(line.discountPercent || 0);
+  const net = qty > 0 ? normalizeMoney(preview.taxableValue / qty) : 0;
+  const value = isDirect ? line.customUnitPrice : (net ? String(net) : "");
+  const retail = resolveLineUnitPrice(product, { ...line, priceMode: "retail" });
+  const offRetail = retail > 0 && net > 0 && net < retail ? Math.round((1 - net / retail) * 1000) / 10 : 0;
+  const withGst = normalizeMoney(net * (1 + Number(product?.gstRate || 0) / 100));
+  return (
+    <div>
+      <input type="number" min="0" step="0.01" value={value}
+        title="Type the agreed price per unit (after discount, before GST)"
+        onChange={e => updateLine(line.productId, { priceMode: "custom", customUnitPrice: e.target.value, discountPercent: 0 })}
+        style={{ width: 90, padding: "5px 6px", fontSize: 13, fontWeight: 700, border: "1px solid #E8231A", borderRadius: 6, textAlign: "right" }} />
+      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, whiteSpace: "nowrap" }}>
+        incl. GST {formatCurrencyInr(withGst)}{offRetail ? ` · ${offRetail}% off retail` : ""}
+      </div>
+    </div>
+  );
+}
+
 function getDefaultPriceMode(customerType) {
   if (customerType === "dealer") return "dealer";
   if (customerType === "stockist") return "stockist";
@@ -877,7 +902,9 @@ export function AddWalkInOrderPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
-                  {["Product", "Qty", "Price Mode", "Unit Price", "Disc %", "GST", "Line Total", ""].map((h, i) => (
+                  {/* {["Product", "Qty", "Price Mode", "Unit Price", "Disc %", "GST", "Line Total", ""].map((h, i) => ( */}
+                  {/* 2026-10-02: + "Net Unit (ex-GST)" — price after discount, before GST, directly editable */}
+                  {["Product", "Qty", "Price Mode", "Unit Price", "Disc %", "Net Unit (ex-GST)", "GST", "Line Total", ""].map((h, i) => (
                     <th key={i} style={{ padding: "8px 10px", textAlign: i >= 3 ? "right" : i === 0 ? "left" : "center", fontWeight: 700, fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -942,6 +969,9 @@ export function AddWalkInOrderPage() {
                         <input type="number" min="0" max="100" step="0.01" value={line.discountPercent}
                           onChange={e => updateLine(line.productId, { discountPercent: Math.min(100, Math.max(0, Number(e.target.value || 0))) })}
                           style={{ width: 60, padding: "5px 6px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 6, textAlign: "right" }} />
+                      </td>
+                      <td style={{ padding: "10px 10px", textAlign: "right" }}>
+                        <NetUnitPriceCell product={product} line={line} preview={preview} updateLine={updateLine} />
                       </td>
                       <td style={{ padding: "10px 10px", textAlign: "right", color: "var(--muted)" }}>
                         {formatCurrencyInr(preview.gstAmount)}

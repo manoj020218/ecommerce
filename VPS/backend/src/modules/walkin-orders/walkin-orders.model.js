@@ -60,6 +60,7 @@ function sanitizeWalkInCustomer(customer) {
     isB2BApproved: Boolean(customer?.isB2BApproved),
     creditAllowed: Boolean(customer?.creditAllowed),
     gstin: customer?.gstin || customer?.gstDetails?.gstin || "",
+    dealerCode: customer?.dealer?.code || "",
     address: {
       addressLine1: address.addressLine1 || "",
       addressLine2: address.addressLine2 || "",

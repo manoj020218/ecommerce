@@ -810,6 +810,7 @@ export function StorefrontLayout() {
           <div className="proto-footer-column">
             <h3>Company</h3>
             <Link to="/projects">IoT Projects</Link>
+            <Link to="/dealer-registration">Dealer Registration</Link>
             <Link to="/guides">Guides &amp; Blog</Link>
             <Link to="/careers">Careers</Link>
             {supportEmail ? <a href={`mailto:${supportEmail}`}>Contact Us</a> : null}

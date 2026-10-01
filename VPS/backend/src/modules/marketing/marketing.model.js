@@ -20,6 +20,11 @@ const TEMPLATE_KEYS = Object.freeze([
   "project_enquiry_admin",
   "project_enquiry_admin_whatsapp",
   "project_enquiry_received",
+  // Dealer registration (2026-10-01)
+  "dealer_registered_admin",
+  "dealer_registered_admin_whatsapp",
+  "dealer_registered",
+  "dealer_registered_whatsapp",
   "walkin_payment_request",
   "walkin_payment_request_whatsapp",
   "awaiting_payment",
@@ -78,7 +83,9 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
   { key: "review_rejected", whatsappKey: "review_rejected_whatsapp", group: "Reviews", label: "Review Rejected" },
   { key: "print_job_approved", whatsappKey: "print_job_approved_whatsapp", group: "Print Jobs", label: "Print Design Approved" },
   { key: "print_job_rejected", whatsappKey: "print_job_rejected_whatsapp", group: "Print Jobs", label: "Print Design Rejected" },
-  { key: "project_enquiry_admin", whatsappKey: "project_enquiry_admin_whatsapp", group: "Projects", label: "New Project Enquiry (to you)" }
+  { key: "project_enquiry_admin", whatsappKey: "project_enquiry_admin_whatsapp", group: "Projects", label: "New Project Enquiry (to you)" },
+  { key: "dealer_registered_admin", whatsappKey: "dealer_registered_admin_whatsapp", group: "Dealers", label: "New Dealer Registration (to you)" },
+  { key: "dealer_registered", whatsappKey: "dealer_registered_whatsapp", group: "Dealers", label: "Dealer Welcome + Code" }
 ]);
 
 const BRAND_COLOR = "#E8231A";
@@ -224,6 +231,41 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
       `{{itemsTable}}` +
       `<p style="font-size:14px;">If you have site photos, a parking layout or drawings, reply to this email or send them on WhatsApp — it helps us quote faster.</p>`
     )
+  },
+  dealer_registered_admin: {
+    label: "New Dealer Registration (Admin Email)",
+    subject: "New dealer registered: {{productName}} — code {{dealerCode}}",
+    body: emailShell(
+      `<p style="font-size:15px;font-weight:700;color:${BRAND_COLOR};margin:0 0 6px;">New dealer registration</p>` +
+      `<p style="font-size:14px;margin:0 0 10px;"><strong>{{productName}}</strong> registered as a dealer and got code <strong>{{dealerCode}}</strong>. Their details are now saved — search the code, firm or mobile in Walk-in Orders.</p>` +
+      `{{itemsTable}}` +
+      `<p style="font-size:12px;color:#6b7280;">Verify them in Admin → Dealers. Pricing is not changed by registration.</p>`
+    )
+  },
+  dealer_registered_admin_whatsapp: {
+    label: "New Dealer Registration (Admin WhatsApp)",
+    subject: "",
+    body: "🤝 *New dealer registered* — code *{{dealerCode}}*\n\n{{cartItems}}\n\nAdmin → Dealers"
+  },
+  dealer_registered: {
+    label: "Dealer Welcome + Code (Email)",
+    subject: "Welcome to {{businessName}} — your dealer code is {{dealerCode}}",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Thank you for registering <strong>{{productName}}</strong> as a dealer with {{businessName}}.</p>` +
+      `<div style="background:#f9fafb;border:1.5px dashed ${BRAND_COLOR};border-radius:8px;padding:16px;text-align:center;margin:16px 0;">` +
+      `<div style="font-size:12px;color:#6b7280;margin-bottom:4px;">Your dealer code</div>` +
+      `<span style="font-size:28px;font-weight:800;letter-spacing:6px;color:${BRAND_COLOR};">{{dealerCode}}</span></div>` +
+      `<p style="font-size:14px;">Please mention this code whenever you place an order — your firm, GST and delivery details are already saved, so ordering is quicker. We'll also keep you posted on new products and dealer offers.</p>` +
+      `<p style="font-size:13px;color:#6b7280;margin-bottom:4px;">Details we saved:</p>` +
+      `{{itemsTable}}` +
+      `<p style="font-size:13px;color:#6b7280;">Anything wrong? Just reply to this email or WhatsApp us.</p>`
+    )
+  },
+  dealer_registered_whatsapp: {
+    label: "Dealer Welcome + Code (WhatsApp)",
+    subject: "",
+    body: "🤝 Welcome to {{businessName}}, {{customerName}}!\n\n*{{productName}}* is now registered as our dealer.\nYour dealer code: *{{dealerCode}}*\n\nMention this code when you order — your firm, GST and delivery details are already saved. We'll share new products and dealer offers here. Save this number!"
   },
   payment_captured_unfulfilled_admin: {
     label: "URGENT: Payment Captured, Order Not Created (Admin Email)",
@@ -498,7 +540,9 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "leftAtText",
   "resumeLine",
   "ctaLabel",
-  "progressHtml"
+  "progressHtml",
+  // dealer registration (2026-10-01)
+  "dealerCode"
 ]);
 
 const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([

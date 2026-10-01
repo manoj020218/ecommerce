@@ -33,6 +33,7 @@ function titleFromPath(pathname) {
   if (pathname.startsWith("/facebook-feed"))   return "Facebook Feed";
   if (pathname.startsWith("/blogs"))           return "Blogs / Knowledge Base";
   if (pathname.startsWith("/projects"))        return "Projects & Enquiries";
+  if (pathname.startsWith("/dealers"))         return "Dealers";
   if (pathname.startsWith("/staff"))           return "Staff";
   if (pathname.startsWith("/audit-logs"))      return "Audit Logs";
   if (pathname.startsWith("/permission-groups"))return "Permission Groups";

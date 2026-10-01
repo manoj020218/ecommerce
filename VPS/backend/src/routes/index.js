@@ -73,6 +73,10 @@ const {
   createPublicProjectsRouter
 } = require("../modules/projects/projects.routes");
 const {
+  createAdminDealersRouter,
+  createPublicDealersRouter
+} = require("../modules/dealers/dealers.routes");
+const {
   createAdminJobVacanciesRouter,
   createPublicJobVacanciesRouter
 } = require("../modules/job-vacancies/job-vacancies.routes");
@@ -146,6 +150,7 @@ function createApiRouter() {
   router.use("/admin/shipping", createAdminShippingRouter());
   router.use("/admin/blogs", createAdminBlogsRouter());
   router.use("/admin/projects", createAdminProjectsRouter());
+  router.use("/admin/dealers", createAdminDealersRouter());
   router.use("/admin/job-vacancies", createAdminJobVacanciesRouter());
   router.use("/admin/website-leads", createAdminWebsiteLeadsRouter());
   router.use("/admin/marketing", createAdminMarketingRouter());
@@ -158,6 +163,7 @@ function createApiRouter() {
   router.use("/recovery", createPublicRecoveryRouter());
   router.use("/blogs", createPublicBlogsRouter());
   router.use("/projects", createPublicProjectsRouter());
+  router.use("/dealers", createPublicDealersRouter());
   router.use("/job-vacancies", createPublicJobVacanciesRouter());
   router.use("/website-leads", createPublicWebsiteLeadsRouter());
   router.use("/marketing", createPublicMarketingRouter());

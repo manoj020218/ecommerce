@@ -52,7 +52,8 @@ export const ADMIN_NAV_ITEMS = [
         path: "/customers",
         permission: "customers.view",
         children: [
-          { key: "discounts", label: "Discounts & Coupons", path: "/discounts", permission: "payments.view" }
+          { key: "discounts", label: "Discounts & Coupons", path: "/discounts", permission: "payments.view" },
+          { key: "dealers", label: "Dealers", path: "/dealers", permission: "customers.view" }
         ]
       }
     ]

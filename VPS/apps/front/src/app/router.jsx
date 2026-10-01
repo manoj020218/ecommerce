@@ -99,6 +99,10 @@ const ProjectsListPage = lazy(() =>
 const ProjectPage = lazy(() =>
   import("../modules/projects/project-page").then((m) => ({ default: m.ProjectPage }))
 );
+// Dealer registration (2026-10-01)
+const DealerRegistrationPage = lazy(() =>
+  import("../modules/dealers/dealer-registration-page").then((m) => ({ default: m.DealerRegistrationPage }))
+);
 const NotFoundPage = lazy(() =>
   import("../modules/settings/not-found-page").then((m) => ({
     default: m.NotFoundPage
@@ -171,6 +175,7 @@ export function AppRouter() {
           <Route path="/categories/:slug" element={<ProductsListPage />} />
           <Route path="/projects" element={<ProjectsListPage />} />
           <Route path="/projects/:slug" element={<ProjectPage />} />
+          <Route path="/dealer-registration" element={<DealerRegistrationPage />} />
           <Route path="/guides" element={<BlogsListPage />} />
           <Route path="/guides/:slug" element={<BlogPage />} />
           <Route path="/careers" element={<CareersListPage />} />

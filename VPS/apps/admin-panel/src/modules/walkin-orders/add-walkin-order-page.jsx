@@ -671,7 +671,7 @@ export function AddWalkInOrderPage() {
                   onChange={e => onCustomerQueryChange(e.target.value)}
                   onFocus={() => customerResults.length > 0 && setCustomerDropOpen(true)}
                   onBlur={() => setTimeout(() => setCustomerDropOpen(false), 150)}
-                  placeholder="Search by name, mobile, email, GSTIN..."
+                  placeholder="Search by name, mobile, email, GSTIN, dealer code..."
                   style={{ ...inputStyle, paddingLeft: 32 }}
                 />
               </div>
@@ -700,7 +700,10 @@ export function AddWalkInOrderPage() {
                     onMouseEnter={e => e.currentTarget.style.background = "var(--bg)"}
                     onMouseLeave={e => e.currentTarget.style.background = "none"}
                   >
-                    <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>{c.companyName || c.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>
+                      {c.companyName || c.name}
+                      {c.dealerCode ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 800, color: "#E8231A", background: "#fee2e2", padding: "1px 7px", borderRadius: 10 }}>Dealer {c.dealerCode}</span> : null}
+                    </span>
                     <span style={{ fontSize: 11, color: "var(--muted)" }}>
                       {[c.mobile, c.email, c.customerType].filter(Boolean).join(" · ")}
                     </span>

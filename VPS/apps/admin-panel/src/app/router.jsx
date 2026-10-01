@@ -6,6 +6,7 @@ import { ActivityLogsPage } from "../modules/activity-logs/activity-logs-page";
 import { AbandonedCartsPage } from "../modules/abandoned-carts/abandoned-carts-page";
 import { BlogsPage } from "../modules/blogs/blogs-page";
 import { ProjectsPage } from "../modules/projects/projects-page";
+import { DealersPage } from "../modules/dealers/dealers-page";
 import { JobVacanciesPage } from "../modules/job-vacancies/job-vacancies-page";
 import { LoginPage } from "../modules/auth/login-page";
 import { CataloguePage } from "../modules/catalogue/catalogue-page";
@@ -85,6 +86,7 @@ export function AppRouter() {
           <Route path="payment-gateways" element={<PaymentGatewaysPage />} />
           <Route path="blogs" element={<BlogsPage />} />
           <Route path="projects" element={<ProjectsPage />} />
+          <Route path="dealers" element={<DealersPage />} />
           <Route path="job-vacancies" element={<JobVacanciesPage />} />
           <Route path="marketing" element={<MarketingPage />} />
           <Route path="notifications" element={<NotificationsPage />} />

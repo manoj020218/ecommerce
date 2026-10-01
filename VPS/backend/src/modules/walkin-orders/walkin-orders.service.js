@@ -669,7 +669,9 @@ async function searchWalkInCustomers(filters) {
         user.mobile,
         user.companyName,
         user.gstin,
-        user.gstDetails?.gstin
+        user.gstDetails?.gstin,
+        user.dealer?.code, // dealer code search (2026-10-01)
+        user.dealer?.firmName
       ]
         .filter(Boolean)
         .some((value) => normalizeText(value).includes(query))

@@ -60,6 +60,20 @@ file from a mistyped command), `.claude/settings.local.json`.
 19. 2026-09-30: footer Legal link renamed "Refund Policy" → **"Return Policy"** (same /refund-policy page).
    Product pages have NO policy link now: "Sold as is" is a plain label (`linked={false}`), note link
    hidden (`showLink={false}`). Cart/checkout badges + checkout notice still link to the policy.
+20. **Dealer registration (2026-10-01)** — public form https://jenixindia.com/dealer-registration
+   (footer → Company → "Dealer Registration"). Dealer = normal customer record (auth-store users) with
+   a `dealer` profile; code = 2-digit GST state code + 3-digit running no. per state (08001…).
+   Existing customer matched by mobile/email: only EMPTY fields filled, nothing overwritten; same
+   mobile again → returns the existing code. **Never changes pricing** (user: dealers are priced per
+   order like walk-in) — "Verified" is only a label. Alerts: `dealer_registered_admin(+_whatsapp)` to
+   you, `dealer_registered(+_whatsapp)` welcome+code to the dealer (Marketing → templates, group
+   "Dealers"). Admin → Customers → **Dealers**: list w/ orders+value this month / this FY (Apr–Mar,
+   IST, cancelled excluded) / all time, verify/reject, edit details (flows to the customer record),
+   12-month chart, CSV contact export, copy/share link. Walk-in Orders customer search now finds dealer
+   code / firm and shows a "Dealer 08001" badge. `/api/dealers/register` uses the login rate limiter
+   (20/15 min). Backup: `/root/jenix-bak-2026-10-01-dealers/` (incl. auth-store.before-dealers.json),
+   prev dists `/tmp/{admin-panel,front}-dist-prev3`. NOT built yet: bulk promotion sending (export CSV
+   for now).
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

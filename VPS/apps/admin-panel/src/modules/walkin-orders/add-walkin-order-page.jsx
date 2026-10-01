@@ -170,6 +170,7 @@ export function AddWalkInOrderPage() {
   const [error, setError] = useState("");
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [customerSaveNotice, setCustomerSaveNotice] = useState("");
+  const [selectedDealerCode, setSelectedDealerCode] = useState(""); // shown in the selected-customer pill (2026-10-02)
   const [loadingOrder, setLoadingOrder] = useState(isEditMode || isRepeatMode);
   // Repeat Order state: source order, per-line "last time" info, and lines
   // that couldn't be carried over (deleted/inactive products).
@@ -301,6 +302,13 @@ export function AddWalkInOrderPage() {
     if (val.trim().length >= 2) {
       custDebounce.current = setTimeout(async () => {
         const results = await searchWalkInCustomers({ q: val, limit: 8 }).catch(() => []);
+        // Full dealer code typed (e.g. 08001) → pick that dealer straight away (2026-10-02)
+        const code = val.trim();
+        const dealerHit = /^\d{5}$/.test(code) && Array.isArray(results) ? results.find((r) => r.dealerCode === code) : null;
+        if (dealerHit) {
+          selectCustomer(dealerHit);
+          return;
+        }
         setCustomerResults(Array.isArray(results) ? results : []);
         setCustomerDropOpen(true);
       }, 300);
@@ -311,6 +319,7 @@ export function AddWalkInOrderPage() {
   };
 
   const selectCustomer = (customer) => {
+    setSelectedDealerCode(customer.dealerCode || "");
     setForm(f => ({
       ...f,
       customerId: customer.id,
@@ -338,6 +347,7 @@ export function AddWalkInOrderPage() {
   };
 
   const clearCustomer = () => {
+    setSelectedDealerCode("");
     setForm(f => ({ ...f, customerId: "", customer: EMPTY_CUSTOMER }));
     setCustomerQuery("");
   };
@@ -671,7 +681,7 @@ export function AddWalkInOrderPage() {
                   onChange={e => onCustomerQueryChange(e.target.value)}
                   onFocus={() => customerResults.length > 0 && setCustomerDropOpen(true)}
                   onBlur={() => setTimeout(() => setCustomerDropOpen(false), 150)}
-                  placeholder="Search by name, mobile, email, GSTIN, dealer code..."
+                  placeholder="Dealer code (e.g. 08001), name, mobile, email, GSTIN..."
                   style={{ ...inputStyle, paddingLeft: 32 }}
                 />
               </div>
@@ -724,6 +734,12 @@ export function AddWalkInOrderPage() {
                   {form.customer.mobile && <span style={{ color: "var(--muted)", marginLeft: 10 }}>{form.customer.mobile}</span>}
                   <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 8 }}>· {form.customer.customerType}</span>
                   {form.customer.gstin && <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 8 }}>· {form.customer.gstin}</span>}
+                  {selectedDealerCode ? <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 800, color: "#E8231A", background: "#fee2e2", padding: "1px 7px", borderRadius: 10 }}>Dealer {selectedDealerCode}</span> : null}
+                  {(form.customer.addressLine1 || form.customer.city) && (
+                    <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 3 }}>
+                      📍 {[form.customer.addressLine1, form.customer.addressLine2, form.customer.city, form.customer.state, form.customer.pincode].filter(Boolean).join(", ")}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

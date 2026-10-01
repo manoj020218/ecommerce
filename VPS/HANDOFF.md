@@ -74,6 +74,10 @@ file from a mistyped command), `.claude/settings.local.json`.
    (20/15 min). Backup: `/root/jenix-bak-2026-10-01-dealers/` (incl. auth-store.before-dealers.json),
    prev dists `/tmp/{admin-panel,front}-dist-prev3`. NOT built yet: bulk promotion sending (export CSV
    for now).
+21. 2026-10-02: Walk-in Orders — typing a full 5-digit dealer code (e.g. 08001) auto-selects that dealer;
+   for dealers the prefill uses the dealer registration (firm, GSTIN, registered address) instead of
+   the customer's older default address. Selected-customer pill shows "Dealer 08001" + address.
+   Backup: `/root/jenix-bak-2026-10-02-dealer-autofill/`.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

@@ -45,21 +45,28 @@ function ensureArray(value) {
 }
 
 function sanitizeWalkInCustomer(customer) {
-  const address = ensureArray(customer?.savedAddresses).find(
+  // const address = ensureArray(customer?.savedAddresses).find(
+  //   (row) => row.isDefaultBilling || row.isDefaultShipping
+  // ) || ensureArray(customer?.savedAddresses)[0] || {};
+  // Registered dealers (2026-10-02): prefill from what they filled in the
+  // dealer registration form — firm, GSTIN and registered address.
+  const dealer = customer?.dealer?.code ? customer.dealer : null;
+  const defaultAddress = ensureArray(customer?.savedAddresses).find(
     (row) => row.isDefaultBilling || row.isDefaultShipping
   ) || ensureArray(customer?.savedAddresses)[0] || {};
+  const address = dealer?.address?.addressLine1 ? { ...dealer.address, country: "India" } : defaultAddress;
 
   return {
     id: customer?.id || "",
     name: customer?.name || "",
     email: customer?.email || "",
     mobile: customer?.mobile || "",
-    companyName: customer?.companyName || "",
+    companyName: dealer?.firmName || customer?.companyName || "",
     customerType: customer?.customerType || "retail",
     priceGroup: customer?.priceGroup || "",
     isB2BApproved: Boolean(customer?.isB2BApproved),
     creditAllowed: Boolean(customer?.creditAllowed),
-    gstin: customer?.gstin || customer?.gstDetails?.gstin || "",
+    gstin: dealer?.gstin || customer?.gstin || customer?.gstDetails?.gstin || "",
     dealerCode: customer?.dealer?.code || "",
     address: {
       addressLine1: address.addressLine1 || "",

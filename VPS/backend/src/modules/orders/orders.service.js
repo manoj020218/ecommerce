@@ -263,6 +263,7 @@ function buildOrderDetail(order, shipment, invoice, manualPaymentInstructions) {
     manualPaymentInstructions: manualPaymentInstructions || null,
     adminNote: order.adminNote || "",
     customerNote: order.customerNote || order.orderNote || "",
+    checkoutNote: order.checkoutNote || "", // buyer's own note at checkout (2026-10-02)
     tags: Array.isArray(order.tags) ? order.tags : [],
     fulfillmentItems: Array.isArray(order.fulfillmentItems) ? order.fulfillmentItems : []
   };

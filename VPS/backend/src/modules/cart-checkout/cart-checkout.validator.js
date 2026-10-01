@@ -117,8 +117,23 @@ const checkoutStartSchema = z.object({
   // them, and an expired/unknown code is resolved to "no attribution" by
   // the backend, never rejected here.
   sourcePartnerCode: z.string().trim().max(24).optional(),
-  sourcePartnerCapturedAt: z.string().trim().max(40).optional()
+  sourcePartnerCapturedAt: z.string().trim().max(40).optional(),
+  // Buyer's note at checkout (2026-10-02): plain text only, max 500 chars.
+  customerNote: z.string().max(5000).optional().default("").transform(toPlainTextNote)
 });
+
+// Plain text only: strips HTML tags, < > characters and control characters
+// (keeps line breaks), collapses blank lines, max 500 characters.
+function toPlainTextNote(value) {
+  return String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[<>]/g, "")
+    .replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, 500);
+}
 
 const checkoutViewQuerySchema = z.object({
   sessionId: sessionIdSchema.optional()

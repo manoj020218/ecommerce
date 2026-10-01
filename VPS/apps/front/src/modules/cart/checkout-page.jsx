@@ -88,6 +88,7 @@ import { watchdog } from "../../shared/watchdog-client";
 import { OrderDetailModal } from "./order-detail-modal";
 import { CheckoutItemEditor } from "./checkout-item-editor";
 import { ReturnPolicyBadge, ReturnPolicyCheckoutNotice } from "../products/return-policy-badge";
+import { CheckoutOrderNote } from "./checkout-order-note";
 
 const PAYMENT_DESCRIPTIONS = {
   online: "Credit/Debit card, UPI, and net banking through the online gateway.",
@@ -329,6 +330,7 @@ export function CheckoutPage() {
   const [shippingMethod, setShippingMethod] = useState("standard");
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
+  const [customerNote, setCustomerNote] = useState(""); // buyer note (2026-10-02)
   const [billingForm, setBillingForm] = useState(() => createAddressForm());
   const [shippingForm, setShippingForm] = useState(() => createAddressForm());
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -797,6 +799,7 @@ export function CheckoutPage() {
         // get ordered instead of what was reviewed and confirmed here.
         expectedCartUpdatedAt: cart?.updatedAt || null,
         newsletterSubscribed,
+        customerNote,
         // Partner-referral attribution captured on landing (see
         // storefront-layout.jsx + shared/marketing/partner-attribution.js).
         // The backend is the sole authority on whether this is still within
@@ -1613,6 +1616,7 @@ export function CheckoutPage() {
                     <span>Grand Total · {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}</span>
                     <strong>{formatCurrency(totals.grandTotal)} <span className="proto-review-total-caret">View details ›</span></strong>
                   </button>
+                  <CheckoutOrderNote value={customerNote} onChange={setCustomerNote} />
                   <ReturnPolicyCheckoutNotice items={items} />
                   <div className="proto-inline-actions">
                     <StorefrontButton type="submit" disabled={submitting}>

@@ -94,6 +94,13 @@ file from a mistyped command), `.claude/settings.local.json`.
    words. Tested end-to-end on store copies with stubbed sends + regression suite passed. NOT yet seen by
    the user on a real order. Backup: `/root/jenix-bak-2026-10-02-walkin-messages/`, prev admin dist
    `/tmp/admin-panel-dist-prev3`.
+24. 2026-10-02: **Checkout "Note for us" box** (optional, review step above Pay Now / Place Order,
+   `checkout-order-note.jsx`). Plain text only — backend `toPlainTextNote` strips HTML tags, < >, control
+   chars, collapses blank lines, max 500 chars. Stored on checkout session → order.customerNote (the admin
+   "Customer Note (for dispatch)" field) + order.checkoutNote (untouched original). Admin order page shows a
+   yellow "NOTE FROM CUSTOMER AT CHECKOUT" box. Note: customerNote was never actually sent to buyers (the
+   old "(sent with dispatch)" label was wrong; the Fulfill modal still says "sent via WhatsApp & email" —
+   also not true). Backup `/root/jenix-bak-2026-10-02-checkout-note/`, prev dists `/tmp/*-dist-prev4`.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

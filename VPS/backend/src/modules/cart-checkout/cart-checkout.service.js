@@ -1074,6 +1074,9 @@ function createOrderFromSession(authStore, session, options = {}) {
     paymentVerifiedAt: null,
     sourcePartnerCode: session.sourcePartnerCode || "",
     sourcePartnerId: session.sourcePartnerId || "",
+    // Buyer's checkout note → shown as "Customer note" on the admin order page
+    customerNote: session.customerNote || "",
+    checkoutNote: session.customerNote || "", // untouched original, even if admin edits customerNote
     createdAt: nowIso()
   };
 }
@@ -2320,6 +2323,7 @@ async function startCheckout(context, payload) {
         customerPricingContext
       ),
       newsletterSubscribed: Boolean(payload.newsletterSubscribed),
+      customerNote: payload.customerNote || "", // buyer's checkout note (2026-10-02)
       sourcePartnerCode: partnerAttribution?.partnerCode || "",
       sourcePartnerId: partnerAttribution?.partnerId || "",
       createdAt: now,
@@ -2375,6 +2379,7 @@ async function startCheckout(context, payload) {
       customerPricingContext
     ),
     newsletterSubscribed: Boolean(payload.newsletterSubscribed),
+    customerNote: payload.customerNote || "", // buyer's checkout note (2026-10-02)
     sourcePartnerCode: partnerAttribution?.partnerCode || "",
     sourcePartnerId: partnerAttribution?.partnerId || "",
     createdAt: now,

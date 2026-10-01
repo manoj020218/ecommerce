@@ -1281,11 +1281,12 @@ function NotesEditor({ order, onSave, saving }) {
         />
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Customer Note (sent with dispatch)</span>
+        {/* <span ...>Customer Note (sent with dispatch)</span> — it is not actually sent anywhere */}
+        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase" }}>Customer Note (for dispatch)</span>
         <textarea
           value={customerNote}
           onChange={(e) => { setCustomerNote(e.target.value); setDirty(true); }}
-          rows={3} placeholder="Message sent to customer via WhatsApp & email on dispatch..."
+          rows={3} placeholder="Buyer's checkout note appears here — add dispatch instructions..."
           style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7, resize: "vertical", fontFamily: "inherit" }}
         />
       </label>
@@ -2066,6 +2067,12 @@ export function OrderDetailPage() {
           comment) -- skip the generic manual-payment-proof banners below, which
           are for the storefront's customer-uploads-a-screenshot flow that
           walk-in orders never go through. */}
+      {order.checkoutNote ? (
+        <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#92400e", marginBottom: 4 }}>📝 NOTE FROM CUSTOMER AT CHECKOUT</div>
+          <div style={{ fontSize: 14, color: "#1f2937", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{order.checkoutNote}</div>
+        </div>
+      ) : null}
       {order.isWalkInOrder && <WalkInFulfillmentPanel order={order} onReload={reload} />}
 
       {/* Manual payment action banner */}

@@ -344,6 +344,21 @@ function applyOrderShipmentStatus(order, shipmentStatus) {
 
   order.shipmentStatus = shipmentStatus;
 
+  // Walk-in orders have their own status words (2026-10-02) — writing the
+  // storefront's "fulfilled"/"delivered" here left them in a status the
+  // Walk-in Orders page doesn't know.
+  if (order.isWalkInOrder) {
+    const current = String(order.orderStatus || "");
+    if ([SHIPMENT_STATUSES.SHIPPED, SHIPMENT_STATUSES.IN_TRANSIT, SHIPMENT_STATUSES.OUT_FOR_DELIVERY].includes(shipmentStatus)) {
+      if (!["completed", "cancelled"].includes(current)) order.orderStatus = "dispatched";
+    } else if (shipmentStatus === SHIPMENT_STATUSES.DELIVERED) {
+      if (current !== "cancelled") order.orderStatus = "completed";
+    } else if (shipmentStatus === SHIPMENT_STATUSES.PACKED) {
+      if (["paid", "invoice_generated"].includes(current)) order.orderStatus = "packed";
+    }
+    return;
+  }
+
   if (shipmentStatus === SHIPMENT_STATUSES.DELIVERED) {
     order.orderStatus = "delivered";
   } else if (shipmentStatus === SHIPMENT_STATUSES.CANCELLED) {
@@ -1006,7 +1021,7 @@ async function updateShipmentTracking(shipmentId, payload, actor) {
 
   // Only tell the customer "your order has shipped" once it genuinely has —
   // packed/ready_to_dispatch just record courier + AWB ahead of pickup.
-  if (nextStatus === SHIPMENT_STATUSES.SHIPPED) {
+  if (nextStatus === SHIPMENT_STATUSES.SHIPPED && payload.notifyCustomer !== false) {
     await notifyCustomerEvent({
       eventKey: "tracking_detail_update",
       toEmail: resolveOrderContactEmail(order, authStore),

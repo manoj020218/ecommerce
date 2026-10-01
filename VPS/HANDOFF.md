@@ -82,6 +82,18 @@ file from a mistyped command), `.claude/settings.local.json`.
    before GST (shows incl.-GST price + "% off retail" under it). Typing an agreed price there switches the
    line to Custom price with 0% discount (exact, no rounding drift). Admin-panel only, no backend change.
    Verified live: 2350 → GST ₹423 → line ₹2,773, "16% off retail".
+23. 2026-10-02: **Walk-in buyer messages (email + WhatsApp) at every stage** — `walkin-notifications.js`.
+   Confirm Payment → `walkin_payment_confirmed`; self pickup: Ready for Pickup → `ready_for_pickup` (pickup
+   address, timings, Google Maps link from settings + admin note) → Picked up → `self_pickup_completed`;
+   courier: new **Packed** stage → `order_packed` → **Mark Shipped** popup with courier + AWB goes through
+   the Shipping module (creates shipment, `tracking_detail_update` with tracking link, auto-tracking works)
+   or, without courier (own delivery/transport), `order_dispatched` with the typed delivery details →
+   Delivered → `order_delivered` (+ shipment marked delivered). Every popup has "Send message to buyer"
+   (default ON). Templates group "Walk-in Orders" in Marketing. Shipping `applyOrderShipmentStatus` is now
+   walk-in aware (shipped→dispatched, delivered→completed, packed→packed) instead of writing storefront
+   words. Tested end-to-end on store copies with stubbed sends + regression suite passed. NOT yet seen by
+   the user on a real order. Backup: `/root/jenix-bak-2026-10-02-walkin-messages/`, prev admin dist
+   `/tmp/admin-panel-dist-prev3`.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

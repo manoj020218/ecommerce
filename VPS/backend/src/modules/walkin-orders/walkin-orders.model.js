@@ -22,6 +22,7 @@ const WALKIN_ORDER_STATUSES = Object.freeze({
   PAYMENT_PENDING: "payment_pending",
   PAID: "paid",
   INVOICE_GENERATED: "invoice_generated",
+  PACKED: "packed", // courier orders only (2026-10-02)
   READY_FOR_PICKUP: "ready_for_pickup",
   DISPATCHED: "dispatched",
   COMPLETED: "completed",

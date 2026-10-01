@@ -99,7 +99,9 @@ const updateWalkInOrderSchema = createWalkInOrderSchema.omit({
 
 const confirmPaymentPayloadSchema = z.object({
   paymentReference: z.string().trim().max(200).optional().default(""),
-  generateInvoice: z.boolean().optional().default(true)
+  generateInvoice: z.boolean().optional().default(true),
+  // send the buyer a "payment received" message (2026-10-02)
+  notifyCustomer: z.boolean().optional().default(true)
 });
 
 const generateInvoicePayloadSchema = z.object({
@@ -108,12 +110,20 @@ const generateInvoicePayloadSchema = z.object({
 
 const updateWalkInOrderStatusSchema = z.object({
   orderStatus: z.enum([
+    WALKIN_ORDER_STATUSES.PACKED,
     WALKIN_ORDER_STATUSES.READY_FOR_PICKUP,
     WALKIN_ORDER_STATUSES.DISPATCHED,
     WALKIN_ORDER_STATUSES.COMPLETED,
     WALKIN_ORDER_STATUSES.CANCELLED
   ]),
-  adminNote: z.string().trim().max(600).optional().default("")
+  adminNote: z.string().trim().max(600).optional().default(""),
+  // 2026-10-02: buyer messages + courier tracking when shipping
+  notifyCustomer: z.boolean().optional().default(true),
+  courierProfileId: z.string().trim().max(120).optional().default(""),
+  trackingId: z.string().trim().max(120).optional().default(""),
+  expectedDeliveryDate: z.union([z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected delivery date must be YYYY-MM-DD"), z.literal("")]).optional().default("")
+}).refine((p) => !p.trackingId || p.courierProfileId, {
+  message: "Select the courier for this tracking number."
 });
 
 function parseSaveCustomerPayload(payload) {

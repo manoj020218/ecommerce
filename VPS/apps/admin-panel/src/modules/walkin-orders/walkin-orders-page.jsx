@@ -11,6 +11,7 @@ import {
   sendWalkInPaymentRequest,
   previewWalkInInvoice
 } from "./walkin-orders.api";
+import { WalkInStageModal } from "./walkin-stage-modal";
 
 // ── Status pill ───────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ const STATUS_STYLES = {
   payment_pending:      { bg: "rgba(234,179,8,0.10)", color: "#92400e", border: "rgba(234,179,8,0.35)" },
   paid:                 { bg: "rgba(22,163,74,0.10)",  color: "#16a34a", border: "rgba(22,163,74,0.25)" },
   invoice_generated:    { bg: "rgba(37,99,235,0.08)",  color: "#1d4ed8", border: "rgba(37,99,235,0.25)" },
+  packed:               { bg: "rgba(14,116,144,0.08)", color: "#0e7490", border: "rgba(14,116,144,0.25)" },
   ready_for_pickup:     { bg: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "rgba(124,58,237,0.25)" },
   dispatched:           { bg: "rgba(124,58,237,0.08)", color: "#7c3aed", border: "rgba(124,58,237,0.25)" },
   completed:            { bg: "rgba(22,163,74,0.10)",  color: "#16a34a", border: "rgba(22,163,74,0.25)" },
@@ -44,6 +46,7 @@ function StatusPill({ value }) {
 function ConfirmPaymentModal({ order, onClose, onConfirm, saving, error }) {
   const [ref, setRef] = useState(order.paymentReference || "");
   const [genInvoice, setGenInvoice] = useState(true);
+  const [notify, setNotify] = useState(true);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ background: "var(--surface)", borderRadius: 12, padding: "24px 28px", width: "100%", maxWidth: 420, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
@@ -62,10 +65,14 @@ function ConfirmPaymentModal({ order, onClose, onConfirm, saving, error }) {
           <input type="checkbox" checked={genInvoice} onChange={e => setGenInvoice(e.target.checked)} />
           Generate invoice on confirmation
         </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, margin: "-8px 0 18px", cursor: "pointer" }}>
+          <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} />
+          Send "payment received" message to buyer (email + WhatsApp)
+        </label>
         {error && <p style={{ color: "var(--danger)", fontSize: 13, margin: "0 0 12px" }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={() => onConfirm(ref, genInvoice)} disabled={saving}>
+          <button type="button" className="btn btn-primary" onClick={() => onConfirm(ref, genInvoice, notify)} disabled={saving}>
             {saving ? "Confirming…" : "Confirm Payment"}
           </button>
         </div>
@@ -97,6 +104,7 @@ export function WalkInOrdersPage() {
   const [confirmModal, setConfirmModal] = useState(null);
   const [confirmErr, setConfirmErr] = useState("");
   const [confirmSaving, setConfirmSaving] = useState(false);
+  const [stageModal, setStageModal] = useState(null); // { order, stage } — 2026-10-02
 
   const loadOrders = async (filters = {}) => {
     const data = await fetchWalkInOrders({ q: filters.q || "", status: filters.status || "", limit: 100 });
@@ -118,11 +126,11 @@ export function WalkInOrdersPage() {
     catch (e) { setError(e.message || "Failed to filter."); }
   };
 
-  const handleConfirmPayment = async (ref, genInvoice) => {
+  const handleConfirmPayment = async (ref, genInvoice, notify = true) => {
     setConfirmSaving(true);
     setConfirmErr("");
     try {
-      const data = await confirmWalkInPayment(confirmModal.id, { paymentReference: ref, generateInvoice: genInvoice });
+      const data = await confirmWalkInPayment(confirmModal.id, { paymentReference: ref, generateInvoice: genInvoice, notifyCustomer: notify });
       await loadOrders({ q, status: statusFilter });
       setConfirmModal(null);
       setNotice(data?.invoice?.invoiceNumber ? `Payment confirmed · Invoice ${data.invoice.invoiceNumber} generated.` : "Payment confirmed.");
@@ -187,6 +195,11 @@ export function WalkInOrdersPage() {
   };
 
   const handleUpdateStatus = async (order, newStatus) => {
+    // Fulfilment steps open the popup (note, courier/tracking, message to buyer).
+    if (["packed", "dispatched", "ready_for_pickup", "completed"].includes(newStatus)) {
+      setStageModal({ order, stage: newStatus });
+      return;
+    }
     const key = `${newStatus}:${order.id}`;
     setBusyKey(key); setError(""); setNotice("");
     try {
@@ -261,6 +274,7 @@ export function WalkInOrdersPage() {
           <option value="payment_pending">Payment Pending</option>
           <option value="paid">Paid</option>
           <option value="invoice_generated">Invoice Generated</option>
+          <option value="packed">Packed</option>
           <option value="ready_for_pickup">Ready for Pickup</option>
           <option value="dispatched">Dispatched</option>
           <option value="completed">Completed</option>
@@ -383,11 +397,20 @@ export function WalkInOrdersPage() {
                       )}
                       {canEdit && order.paymentStatus === "paid" && order.invoiceId &&
                         order.shippingMethod !== "self_pickup" &&
+                        ["paid", "invoice_generated"].includes(order.orderStatus) && (
+                        <button type="button" className="btn btn-secondary btn-small"
+                          onClick={() => handleUpdateStatus(order, "packed")}
+                          disabled={!!busyKey}>
+                          Mark Packed
+                        </button>
+                      )}
+                      {canEdit && order.paymentStatus === "paid" && order.invoiceId &&
+                        order.shippingMethod !== "self_pickup" &&
                         !["dispatched", "completed", "cancelled"].includes(order.orderStatus) && (
                         <button type="button" className="btn btn-secondary btn-small"
                           onClick={() => handleUpdateStatus(order, "dispatched")}
                           disabled={!!busyKey}>
-                          Mark Dispatched
+                          Mark Shipped
                         </button>
                       )}
                       {canEdit && order.paymentStatus === "paid" && order.invoiceId &&
@@ -423,6 +446,20 @@ export function WalkInOrdersPage() {
           onConfirm={handleConfirmPayment}
           saving={confirmSaving}
           error={confirmErr}
+        />
+      )}
+
+      {stageModal && (
+        <WalkInStageModal
+          order={stageModal.order}
+          stage={stageModal.stage}
+          onClose={() => setStageModal(null)}
+          onDone={async (_data, { notified }) => {
+            const { order, stage } = stageModal;
+            setStageModal(null);
+            await loadOrders({ q, status: statusFilter }).catch(() => {});
+            setNotice(`${order.orderNo} → ${stage.replace(/_/g, " ")}${notified ? " · message sent to buyer" : ""}`);
+          }}
         />
       )}
     </div>

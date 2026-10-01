@@ -98,6 +98,7 @@ function walkInShipmentLabel(row) {
   if (ord === "completed")        return { label: isSelfPickup ? "Picked Up" : "Delivered", bg:"rgba(22,163,74,0.10)", color:"#15803d" };
   if (ord === "dispatched")       return { label:"Shipped",         bg:"rgba(147,51,234,0.10)", color:"#7e22ce" };
   if (ord === "ready_for_pickup") return { label:"Ready for Pickup",bg:"rgba(37,99,235,0.10)",  color:"#1d4ed8" };
+  if (ord === "packed")           return { label:"Packed",          bg:"rgba(14,116,144,0.10)", color:"#0e7490" };
   if (["paid","invoice_generated"].includes(ord)) return { label:"Ready to Ship", bg:"rgba(37,99,235,0.10)", color:"#1d4ed8" };
   if (ord === "payment_pending")  return { label:"Awaiting Payment",bg:"#f3f4f6",               color:"#6b7280" };
   return                                 { label:"New",             bg:"#f3f4f6",               color:"#6b7280" };

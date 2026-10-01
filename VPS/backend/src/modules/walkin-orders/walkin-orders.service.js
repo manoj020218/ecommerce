@@ -3,6 +3,7 @@ const { generateId } = require("../../common/identity");
 const { readAuthStore, writeAuthStore } = require("../../database/auth-store");
 const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
 const { readPaymentStore } = require("../../database/payment-store");
+const { readShippingStore } = require("../../database/shipping-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const partnersService = require("../partners/partners.service");
 const {
@@ -30,6 +31,7 @@ const {
 const { ensureInvoiceForOrder, getInvoiceDownload } = require("../invoices/invoices.service");
 const { getAllSettings } = require("../settings/settings.service");
 const { notifyCustomerEvent } = require("../marketing/marketing.service");
+const { notifyWalkInEvent } = require("./walkin-notifications");
 const {
   WALKIN_PRICE_MODES,
   WALKIN_PAYMENT_METHODS,
@@ -545,6 +547,8 @@ function resolveInitialOrderStatus(payload) {
 
 function resolveShipmentStatusForOrderStatus(order, orderStatus) {
   switch (orderStatus) {
+    case WALKIN_ORDER_STATUSES.PACKED:
+      return "packed";
     case WALKIN_ORDER_STATUSES.READY_FOR_PICKUP:
       return "ready_for_pickup";
     case WALKIN_ORDER_STATUSES.DISPATCHED:
@@ -1104,6 +1108,13 @@ async function confirmWalkInPayment(orderId, payload, actor) {
     }
   });
 
+  if (payload.notifyCustomer !== false) {
+    await notifyWalkInEvent(
+      { ...result.order, invoiceNumber: result.invoice?.invoiceNumber || result.order?.invoiceNumber || "" },
+      "paymentConfirmed"
+    );
+  }
+
   return {
     order: sanitizeWalkInOrderSummary(result.order),
     invoice: result.invoice
@@ -1338,6 +1349,20 @@ async function updateWalkInOrderStatus(orderId, payload, actor) {
   }
 
   if (
+    payload.orderStatus === WALKIN_ORDER_STATUSES.PACKED &&
+    order.shippingMethod === SHIPPING_METHODS.SELF_PICKUP
+  ) {
+    throw new HttpError(409, "Self-pickup orders don't need packing — use Ready for Pickup.");
+  }
+
+  // Shipped with a courier + tracking number (2026-10-02): goes through the
+  // Shipping module so it shows in the Shipping queue, auto-tracking works,
+  // and the buyer gets the usual "Shipped — track here" message.
+  if (payload.orderStatus === WALKIN_ORDER_STATUSES.DISPATCHED && payload.trackingId) {
+    return dispatchWalkInWithTracking(order, payload, actor);
+  }
+
+  if (
     payload.orderStatus === WALKIN_ORDER_STATUSES.CANCELLED &&
     order.orderStatus === WALKIN_ORDER_STATUSES.COMPLETED
   ) {
@@ -1364,9 +1389,91 @@ async function updateWalkInOrderStatus(orderId, payload, actor) {
     }
   });
 
+  // Keep an existing courier shipment in step when the order is completed.
+  if (payload.orderStatus === WALKIN_ORDER_STATUSES.COMPLETED && order.shippingMethod !== SHIPPING_METHODS.SELF_PICKUP) {
+    await markWalkInShipmentDelivered(order, actor);
+  }
+
+  if (payload.notifyCustomer !== false) {
+    const isSelfPickup = order.shippingMethod === SHIPPING_METHODS.SELF_PICKUP;
+    const event = {
+      [WALKIN_ORDER_STATUSES.PACKED]: "packed",
+      [WALKIN_ORDER_STATUSES.READY_FOR_PICKUP]: "readyForPickup",
+      [WALKIN_ORDER_STATUSES.DISPATCHED]: "dispatched",
+      [WALKIN_ORDER_STATUSES.COMPLETED]: isSelfPickup ? "pickedUp" : "delivered"
+    }[payload.orderStatus];
+    if (event) await notifyWalkInEvent(order, event, { note: payload.adminNote || "" });
+  }
+
   return {
     order: sanitizeWalkInOrderSummary(order)
   };
+}
+
+// Lazy require: shipping.service is only needed for courier dispatch.
+function shippingService() {
+  return require("../shipping/shipping.service");
+}
+
+async function dispatchWalkInWithTracking(order, payload, actor) {
+  const shipping = shippingService();
+  const shippingStore = await readShippingStore();
+  let shipment = ensureArray(shippingStore.shipments).find(
+    (row) => row.orderId === order.id && row.shipmentStatus !== "cancelled"
+  );
+  if (!shipment) {
+    shipment = (await shipping.createShipment({ orderId: order.id, courierProfileId: payload.courierProfileId }, actor)).shipment;
+  }
+  await shipping.updateShipmentTracking(
+    shipment.id,
+    {
+      courierProfileId: payload.courierProfileId,
+      trackingId: payload.trackingId,
+      dispatchDate: new Date().toISOString().slice(0, 10),
+      expectedDeliveryDate: payload.expectedDeliveryDate || "",
+      targetStatus: "shipped",
+      notifyCustomer: payload.notifyCustomer !== false
+    },
+    actor
+  );
+
+  // The shipping module has already moved the order to "dispatched"; record
+  // the walk-in specifics on top of that.
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
+  const fresh = findWalkInOrderOrThrow(authStore, order.id);
+  fresh.orderStatus = WALKIN_ORDER_STATUSES.DISPATCHED;
+  fresh.shipmentStatus = "shipped";
+  fresh.adminStatusNote = payload.adminNote || "";
+  fresh.fulfilmentUpdatedAt = nowIso();
+  fresh.updatedAt = fresh.fulfilmentUpdatedAt;
+  await writeAuthStore(authStore);
+
+  await addActivityLog({
+    action: "walkin_orders.status_updated",
+    actorId: actor.id,
+    actorRole: actor.role,
+    resourceType: "order",
+    resourceId: fresh.id,
+    metadata: { orderNo: fresh.orderNo, orderStatus: fresh.orderStatus, trackingId: payload.trackingId }
+  });
+
+  return { order: sanitizeWalkInOrderSummary(fresh) };
+}
+
+async function markWalkInShipmentDelivered(order, actor) {
+  try {
+    const shippingStore = await readShippingStore();
+    const shipment = ensureArray(shippingStore.shipments).find(
+      (row) => row.orderId === order.id && !["cancelled", "delivered"].includes(row.shipmentStatus)
+    );
+    if (shipment) {
+      await shippingService().updateShipmentStatus(shipment.id, { shipmentStatus: "delivered" }, actor);
+    }
+  } catch (_error) {
+    // The walk-in order itself is already completed; the shipment can be
+    // updated from the Shipping page if this failed.
+  }
 }
 
 module.exports = {

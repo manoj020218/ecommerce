@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { WalkInStageModal } from "../walkin-orders/walkin-stage-modal";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuthSession } from "../auth/use-auth-session";
 import { ErrorBlock } from "../../shared/components/error-block";
@@ -453,6 +454,7 @@ const WALKIN_STAGE_LABEL = {
   payment_pending: "Awaiting Payment",
   paid: "Paid",
   invoice_generated: "Invoice Generated",
+  packed: "Packed",
   ready_for_pickup: "Ready for Pickup",
   dispatched: "Shipped",
   completed: "Completed",
@@ -462,6 +464,7 @@ const WALKIN_STAGE_LABEL = {
 function WalkInFulfillmentPanel({ order, onReload }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [stage, setStage] = useState(""); // fulfilment popup (2026-10-02)
   const isSelfPickup = order.shippingMethod === "self_pickup";
   const status = order.orderStatus;
 
@@ -481,15 +484,20 @@ function WalkInFulfillmentPanel({ order, onReload }) {
 
   const handleConfirmPayment = () =>
     run(() => confirmWalkInPayment(order.id, { generateInvoice: true }));
-  const handleReadyForPickup = () =>
-    run(() => updateWalkInOrderStatus(order.id, { orderStatus: "ready_for_pickup" }));
-  const handleDispatch = () =>
-    run(() => updateWalkInOrderStatus(order.id, { orderStatus: "dispatched" }));
-  const handleComplete = () =>
-    run(
-      () => updateWalkInOrderStatus(order.id, { orderStatus: "completed" }),
-      isSelfPickup ? "Confirm this order has been picked up by the customer?" : "Confirm this order has been delivered?"
-    );
+  // const handleReadyForPickup = () =>
+  //   run(() => updateWalkInOrderStatus(order.id, { orderStatus: "ready_for_pickup" }));
+  // const handleDispatch = () =>
+  //   run(() => updateWalkInOrderStatus(order.id, { orderStatus: "dispatched" }));
+  // const handleComplete = () =>
+  //   run(
+  //     () => updateWalkInOrderStatus(order.id, { orderStatus: "completed" }),
+  //     isSelfPickup ? "Confirm this order has been picked up by the customer?" : "Confirm this order has been delivered?"
+  //   );
+  // 2026-10-02: these open the popup (note, courier/tracking, message to buyer)
+  const handleReadyForPickup = () => setStage("ready_for_pickup");
+  const handlePacked = () => setStage("packed");
+  const handleDispatch = () => setStage("dispatched");
+  const handleComplete = () => setStage("completed");
   const handleCancel = () =>
     run(
       () => updateWalkInOrderStatus(order.id, { orderStatus: "cancelled" }),
@@ -517,8 +525,13 @@ function WalkInFulfillmentPanel({ order, onReload }) {
             </button>
           )}
           {(status === "paid" || status === "invoice_generated") && !isSelfPickup && (
+            <button type="button" className="btn btn-secondary btn-small" disabled={busy} onClick={handlePacked}>
+              Mark Packed
+            </button>
+          )}
+          {(status === "paid" || status === "invoice_generated" || status === "packed") && !isSelfPickup && (
             <button type="button" className="btn btn-primary btn-small" style={{ background: "#7e22ce" }} disabled={busy} onClick={handleDispatch}>
-              {busy ? "Saving…" : "Mark Dispatched"}
+              {busy ? "Saving…" : "Mark Shipped"}
             </button>
           )}
           {(status === "ready_for_pickup" || status === "dispatched") && (
@@ -535,6 +548,14 @@ function WalkInFulfillmentPanel({ order, onReload }) {
         </div>
       </div>
       {actionError && <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--danger)", fontWeight: 600 }}>{actionError}</p>}
+      {stage && (
+        <WalkInStageModal
+          order={order}
+          stage={stage}
+          onClose={() => setStage("")}
+          onDone={async () => { setStage(""); await onReload(); }}
+        />
+      )}
     </div>
   );
 }

@@ -27,6 +27,15 @@ const TEMPLATE_KEYS = Object.freeze([
   "dealer_registered_whatsapp",
   "walkin_payment_request",
   "walkin_payment_request_whatsapp",
+  // Walk-in order stage messages (2026-10-02)
+  "walkin_payment_confirmed",
+  "walkin_payment_confirmed_whatsapp",
+  "order_packed",
+  "order_packed_whatsapp",
+  "order_dispatched_whatsapp",
+  "ready_for_pickup_whatsapp",
+  "self_pickup_completed_whatsapp",
+  "order_delivered_whatsapp",
   "awaiting_payment",
   "payment_failed",
   "payment_successful",
@@ -85,7 +94,13 @@ const LIFECYCLE_NOTIFICATION_EVENTS = Object.freeze([
   { key: "print_job_rejected", whatsappKey: "print_job_rejected_whatsapp", group: "Print Jobs", label: "Print Design Rejected" },
   { key: "project_enquiry_admin", whatsappKey: "project_enquiry_admin_whatsapp", group: "Projects", label: "New Project Enquiry (to you)" },
   { key: "dealer_registered_admin", whatsappKey: "dealer_registered_admin_whatsapp", group: "Dealers", label: "New Dealer Registration (to you)" },
-  { key: "dealer_registered", whatsappKey: "dealer_registered_whatsapp", group: "Dealers", label: "Dealer Welcome + Code" }
+  { key: "dealer_registered", whatsappKey: "dealer_registered_whatsapp", group: "Dealers", label: "Dealer Welcome + Code" },
+  { key: "walkin_payment_confirmed", whatsappKey: "walkin_payment_confirmed_whatsapp", group: "Walk-in Orders", label: "Payment Received" },
+  { key: "order_packed", whatsappKey: "order_packed_whatsapp", group: "Walk-in Orders", label: "Order Packed" },
+  { key: "order_dispatched", whatsappKey: "order_dispatched_whatsapp", group: "Walk-in Orders", label: "Shipped (no courier tracking)" },
+  { key: "ready_for_pickup", whatsappKey: "ready_for_pickup_whatsapp", group: "Walk-in Orders", label: "Ready for Pickup" },
+  { key: "self_pickup_completed", whatsappKey: "self_pickup_completed_whatsapp", group: "Walk-in Orders", label: "Picked Up - Thank You" },
+  { key: "order_delivered", whatsappKey: "order_delivered_whatsapp", group: "Walk-in Orders", label: "Delivered - Thank You" }
 ]);
 
 const BRAND_COLOR = "#E8231A";
@@ -266,6 +281,102 @@ const SPECIAL_TEMPLATE_CONTENT = Object.freeze({
     label: "Dealer Welcome + Code (WhatsApp)",
     subject: "",
     body: "🤝 Welcome to {{businessName}}, {{customerName}}!\n\n*{{productName}}* is now registered as our dealer.\nYour dealer code: *{{dealerCode}}*\n\nMention this code when you order — your firm, GST and delivery details are already saved. We'll share new products and dealer offers here. Save this number!"
+  },
+  walkin_payment_confirmed: {
+    label: "Payment Received (Email)",
+    subject: "Payment received for order {{orderNo}} — thank you!",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">We have received your payment. Your order is confirmed.</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Order No.</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderNo}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Amount received</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{orderTotal}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Invoice</td><td style="padding:6px 0;text-align:right;font-weight:700;">{{invoiceNo}}</td></tr>` +
+      `</table>` +
+      `<p style="font-size:14px;">{{nextStep}}</p>`
+    )
+  },
+  walkin_payment_confirmed_whatsapp: {
+    label: "Payment Received (WhatsApp)",
+    subject: "",
+    body: "✅ Payment received! Hi {{customerName}}, we have received {{orderTotal}} for order *{{orderNo}}*. Invoice: {{invoiceNo}}.\n{{nextStep}}\nThank you — {{businessName}}"
+  },
+  order_packed: {
+    label: "Order Packed (Email)",
+    subject: "Your order {{orderNo}} is packed",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Good news — your order <strong>{{orderNo}}</strong> has been packed and will be handed to the courier shortly. We'll send you the tracking details as soon as it ships.</p>` +
+      `<p style="font-size:13px;color:#6b7280;">{{pickupInstructions}}</p>`
+    )
+  },
+  order_packed_whatsapp: {
+    label: "Order Packed (WhatsApp)",
+    subject: "",
+    body: "📦 Hi {{customerName}}, your order *{{orderNo}}* is packed and will be shipped shortly. We'll send the tracking details as soon as it leaves. — {{businessName}}"
+  },
+  order_dispatched: {
+    label: "Order Shipped — no courier tracking (Email)",
+    subject: "Your order {{orderNo}} has been shipped",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Your order <strong>{{orderNo}}</strong> has been shipped.</p>` +
+      `<p style="font-size:14px;background:#f9fafb;border-radius:8px;padding:12px;">{{pickupInstructions}}</p>` +
+      `<p style="font-size:13px;color:#6b7280;">For any delivery update, just reply to this email or WhatsApp us.</p>`
+    )
+  },
+  order_dispatched_whatsapp: {
+    label: "Order Shipped — no courier tracking (WhatsApp)",
+    subject: "",
+    body: "🚚 Hi {{customerName}}, your order *{{orderNo}}* has been shipped.\n{{pickupInstructions}}\nFor any update, reply here. — {{businessName}}"
+  },
+  ready_for_pickup: {
+    label: "Ready for Pickup (Email)",
+    subject: "Your order {{orderNo}} is ready for pickup",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:15px;font-weight:700;color:${BRAND_COLOR};">Your order {{orderNo}} is ready — you can collect it now.</p>` +
+      `<table style="width:100%;font-size:14px;border-collapse:collapse;margin:12px 0;">` +
+      `<tr><td style="padding:6px 0;color:#6b7280;vertical-align:top;">Pickup from</td><td style="padding:6px 0;text-align:right;">{{pickupLocation}}</td></tr>` +
+      `<tr><td style="padding:6px 0;color:#6b7280;">Timings</td><td style="padding:6px 0;text-align:right;">{{pickupTimings}}</td></tr>` +
+      `</table>` +
+      `<p style="font-size:14px;"><a href="{{mapLink}}" style="color:${BRAND_COLOR};font-weight:700;">Open in Google Maps</a></p>` +
+      `<p style="font-size:14px;">{{pickupInstructions}}</p>` +
+      `<p style="font-size:13px;color:#6b7280;">Please mention order number {{orderNo}} at the counter.</p>`
+    )
+  },
+  ready_for_pickup_whatsapp: {
+    label: "Ready for Pickup (WhatsApp)",
+    subject: "",
+    body: "🛍️ Hi {{customerName}}, your order *{{orderNo}}* is ready for pickup!\n\n📍 {{pickupLocation}}\n🕒 {{pickupTimings}}\n🗺️ {{mapLink}}\n{{pickupInstructions}}\n\nPlease mention order no. {{orderNo}} at the counter. — {{businessName}}"
+  },
+  self_pickup_completed: {
+    label: "Picked Up — Thank You (Email)",
+    subject: "Thank you for collecting order {{orderNo}}",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Thank you for collecting your order <strong>{{orderNo}}</strong>. We hope everything is perfect.</p>` +
+      `<p style="font-size:14px;">Need help with installation or a product question? Just reply to this email or WhatsApp us — we're happy to help.</p>`
+    )
+  },
+  self_pickup_completed_whatsapp: {
+    label: "Picked Up — Thank You (WhatsApp)",
+    subject: "",
+    body: "🙏 Thank you {{customerName}} for collecting order *{{orderNo}}*. Any question about the products? Just message us here. — {{businessName}}"
+  },
+  order_delivered: {
+    label: "Delivered — Thank You (Email)",
+    subject: "Your order {{orderNo}} has been delivered",
+    body: emailShell(
+      `<p style="font-size:14px;">Hi {{customerName}},</p>` +
+      `<p style="font-size:14px;">Your order <strong>{{orderNo}}</strong> has been delivered. Thank you for buying from us!</p>` +
+      `<p style="font-size:14px;">Need help with installation or a product question? Just reply to this email or WhatsApp us.</p>`
+    )
+  },
+  order_delivered_whatsapp: {
+    label: "Delivered — Thank You (WhatsApp)",
+    subject: "",
+    body: "✅ Hi {{customerName}}, your order *{{orderNo}}* has been delivered. Thank you for buying from {{businessName}}! Any question? Just message us here."
   },
   payment_captured_unfulfilled_admin: {
     label: "URGENT: Payment Captured, Order Not Created (Admin Email)",
@@ -542,7 +653,11 @@ const TEMPLATE_VARIABLES = Object.freeze([
   "ctaLabel",
   "progressHtml",
   // dealer registration (2026-10-01)
-  "dealerCode"
+  "dealerCode",
+  // walk-in stage messages (2026-10-02)
+  "nextStep",
+  "pickupTimings",
+  "mapLink"
 ]);
 
 const NOTIFY_SUBSCRIPTION_STATUSES = Object.freeze([

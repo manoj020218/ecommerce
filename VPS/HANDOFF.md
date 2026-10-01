@@ -101,6 +101,11 @@ file from a mistyped command), `.claude/settings.local.json`.
    yellow "NOTE FROM CUSTOMER AT CHECKOUT" box. Note: customerNote was never actually sent to buyers (the
    old "(sent with dispatch)" label was wrong; the Fulfill modal still says "sent via WhatsApp & email" —
    also not true). Backup `/root/jenix-bak-2026-10-02-checkout-note/`, prev dists `/tmp/*-dist-prev4`.
+25. 2026-10-02: **"Sold as is" chip hidden by default on product pages.** New product field
+   `showSoldAsIsBadge` (default false; checkbox "Show 'Sold as is' tag on product page" in Add/Edit Product,
+   disabled when Return eligible is ticked). Product page shows the badge only if returnEligible (green) or
+   showSoldAsIsBadge. Cart/checkout badges + checkout notice unchanged. Backup
+   `/root/jenix-bak-2026-10-02-soldasis/`.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

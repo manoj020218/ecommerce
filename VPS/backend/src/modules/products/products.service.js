@@ -526,6 +526,7 @@ function createProductRecordFromPayload(store, payload) {
     stockVisibility: "hide_quantity",
     allowBackorder: Boolean(payload.allowBackorder),
     returnEligible: Boolean(payload.returnEligible),
+    showSoldAsIsBadge: Boolean(payload.showSoldAsIsBadge),
     maxOrderQty: Number(payload.maxOrderQty || 1000),
     lowStockThreshold: Number(payload.lowStockThreshold || 0),
     priceIncludesGst: Boolean(payload.priceIncludesGst),

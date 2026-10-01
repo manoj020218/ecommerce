@@ -520,6 +520,7 @@ const EMPTY_FORM = {
   isActive: true, stockQty: 0, reservedQty: 0,
   stockStatus: "in_stock", allowBackorder: false, maxOrderQty: 1000, lowStockThreshold: 0,
   returnEligible: false,
+  showSoldAsIsBadge: false,
   // Sidebar fields
   relatedProductIds: [],
   tags: [],
@@ -707,6 +708,7 @@ export function AddProductPage() {
       stockStatus: form.stockStatus,
       allowBackorder: Boolean(form.allowBackorder),
       returnEligible: Boolean(form.returnEligible),
+      showSoldAsIsBadge: Boolean(form.showSoldAsIsBadge),
       maxOrderQty: Number(form.maxOrderQty || 1000),
       lowStockThreshold: Number(form.lowStockThreshold || 0),
       tags: form.tags,
@@ -1017,6 +1019,10 @@ export function AddProductPage() {
                   title="Tick only for products you test/trust: buyer can get a replacement if defective on arrival (report within 5 days). Unticked = sold as is, not returnable.">
                   <input type="checkbox" name="returnEligible" checked={Boolean(form.returnEligible)} onChange={onFC} />
                   Return eligible (defective on arrival, 5 days)
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, opacity: form.returnEligible ? 0.5 : 1 }}
+                  title="Shows a small 'Sold as is' tag on this product's page. Off by default — no tag is shown.">
+                  <input type="checkbox" name="showSoldAsIsBadge" checked={Boolean(form.showSoldAsIsBadge)} onChange={onFC} disabled={Boolean(form.returnEligible)} /> Show "Sold as is" tag on product page
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                   <input type="checkbox" name="isActive" checked={form.isActive} onChange={onFC} />

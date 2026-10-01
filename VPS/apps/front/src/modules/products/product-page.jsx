@@ -1110,7 +1110,11 @@ export function ProductPage() {
                 {/* <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} />
                 <ReturnPolicyNote eligible={Boolean(product.returnEligible)} /> */}
                 {/* 2026-09-30: no policy link on product pages — it's in the footer (Legal) */}
-                <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} linked={false} />
+                {/* <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} linked={false} /> */}
+                {/* 2026-10-02: "Sold as is" only when ticked on the product (showSoldAsIsBadge) */}
+                {product.returnEligible || product.showSoldAsIsBadge ? (
+                  <ReturnPolicyBadge eligible={Boolean(product.returnEligible)} linked={false} />
+                ) : null}
                 <ReturnPolicyNote eligible={Boolean(product.returnEligible)} showLink={false} />
               </div>
             </>

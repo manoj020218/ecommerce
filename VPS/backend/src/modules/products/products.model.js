@@ -435,6 +435,7 @@ function toPublicProduct(product, options = {}) {
       : Math.max(0, Math.min(calculateAvailableQty(product), Number(product.maxOrderQty || 1000))),
     isActive: Boolean(product.isActive),
     returnEligible: Boolean(product.returnEligible),
+    showSoldAsIsBadge: Boolean(product.showSoldAsIsBadge),
     productLabel: product.productLabel || "",
     tags: Array.isArray(product.tags) ? [...product.tags] : [],
     avgRating: Number(product.avgRating || 0),

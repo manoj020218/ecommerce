@@ -180,6 +180,15 @@ file from a mistyped command), `.claude/settings.local.json`.
    - `web-push@3.6.7` installed on VPS with `pnpm add -w` (backup of package.json/lock in
      `/root/jenix-bak-2026-10-03-push/`). Tested end-to-end on store copies (stubbed sender). Not yet seen on a
      real phone (user must log in on the phone and turn notifications on). Prev dists `/tmp/*-dist-prev8`.
+30. 2026-10-03: **WhatsApp "Waiting for this message. This may take a while"** on resent invoices — NOT file
+   size (PDF ~10 KB). Baileys' default `getMessage` returns undefined, so when the buyer's phone asks for a
+   re-send (decryption retry) nothing could be re-sent. `whatsapp.service.js` now keeps sent messages in
+   memory (1 h, max 500, message record only) and passes `getMessage` + a `msgRetryCounterCache`. Messages sent
+   before a backend restart can't be re-sent (memory cleared). Backup `/root/jenix-bak-2026-10-03-wa-retry/`.
+   - The same afternoon SSH (port 22) to the VPS timed out from the office for a while while HTTPS worked;
+     later port 22 worked to the VPS, old VPS and github.com. fail2ban on the VPS never banned the office IP
+     (49.36.236.229) — its bans are random internet attackers — so the block was on the office/ISP side
+     (same pattern as the Aug 5 incident; a router restart fixed it then).
    Backup `/root/jenix-bak-2026-10-03-app-step2/`, prev storefront dist `/tmp/front-dist-prev6`.
 
 **PENDING / TODO (in priority order):**

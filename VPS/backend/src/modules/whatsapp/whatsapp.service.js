@@ -22,6 +22,46 @@ const state = {
 
 let reconnectTimer = null;
 
+// Recently sent messages, so WhatsApp can re-deliver one when the buyer's phone
+// asks for a retry (2026-10-03). Without this Baileys can't answer the retry
+// and the buyer sees "Waiting for this message. This may take a while."
+// Only the small message record is kept (media is already uploaded — no file
+// bytes), for 1 hour, max 500 messages.
+const SENT_TTL_MS = 60 * 60 * 1000;
+const SENT_MAX = 500;
+const sentMessages = new Map();
+
+function rememberSent(sent) {
+  if (!sent?.key?.id || !sent.message) return;
+  sentMessages.set(sent.key.id, { message: sent.message, at: Date.now() });
+  if (sentMessages.size > SENT_MAX) {
+    const oldest = sentMessages.keys().next().value;
+    sentMessages.delete(oldest);
+  }
+}
+
+function getSentMessage(key) {
+  const row = key?.id ? sentMessages.get(key.id) : null;
+  if (!row) return undefined;
+  if (Date.now() - row.at > SENT_TTL_MS) {
+    sentMessages.delete(key.id);
+    return undefined;
+  }
+  return row.message;
+}
+
+// Minimal cache Baileys uses to count delivery retries per message.
+function createRetryCounterCache() {
+  const map = new Map();
+  return {
+    get: (k) => map.get(k),
+    set: (k, v) => { map.set(k, v); if (map.size > 2000) map.delete(map.keys().next().value); return true; },
+    del: (k) => map.delete(k),
+    flushAll: () => map.clear()
+  };
+}
+const msgRetryCounterCache = createRetryCounterCache();
+
 // Customer mobile numbers are stored as plain 10-digit Indian numbers with
 // no country code (checkout never asks for one) — the previous version only
 // stripped a leading trunk "0" and left a bare 10-digit number as-is, which
@@ -83,7 +123,10 @@ async function startConnection() {
       // decrypt errors in the logs were a symptom of that resync being
       // interrupted mid-way each time, not the actual crash cause.
       syncFullHistory: false,
-      shouldSyncHistoryMessage: () => false
+      shouldSyncHistoryMessage: () => false,
+      // Answer the buyer phone's "please resend" requests (2026-10-03)
+      getMessage: async (key) => getSentMessage(key),
+      msgRetryCounterCache
     });
     state.sock = sock;
     state.status = "connecting";
@@ -169,7 +212,9 @@ async function sendMessage(phone, message) {
   if (state.status !== "connected" || !state.sock) {
     throw new Error("WhatsApp is not connected.");
   }
-  await state.sock.sendMessage(toJid(phone), { text: message });
+  // await state.sock.sendMessage(toJid(phone), { text: message });
+  const sent = await state.sock.sendMessage(toJid(phone), { text: message });
+  rememberSent(sent);
 }
 
 // Sends a file (e.g. invoice PDF) as a WhatsApp document (2026-10-03).
@@ -177,7 +222,9 @@ async function sendDocument(phone, { buffer, fileName, mimetype = "application/p
   if (state.status !== "connected" || !state.sock) {
     throw new Error("WhatsApp is not connected.");
   }
-  await state.sock.sendMessage(toJid(phone), { document: buffer, mimetype, fileName, caption });
+  // await state.sock.sendMessage(toJid(phone), { document: buffer, mimetype, fileName, caption });
+  const sent = await state.sock.sendMessage(toJid(phone), { document: buffer, mimetype, fileName, caption });
+  rememberSent(sent);
 }
 
 // A pm2 restart / deploy wipes the in-memory connection state, but the

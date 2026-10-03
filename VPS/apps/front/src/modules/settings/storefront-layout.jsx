@@ -344,7 +344,10 @@ export function StorefrontLayout() {
   const { customer, isAuthenticated } = useCustomerSession();
   const { settings } = usePublicSettings();
   const { canInstall, promptInstall } = useInstallPrompt();
-  const isInstalledApp = useIsInstalledApp(); // installed app → 4 bottom tabs (2026-10-03)
+  // const isInstalledApp = useIsInstalledApp(); // installed app → 4 bottom tabs (2026-10-03)
+  // 2026-10-03: user wants the same 5 tabs (incl. Categories) in the installed app as on the website
+  const isInstalledApp = false;
+  void useIsInstalledApp;
   const [categories, setCategories] = useState([]);
   const [cartCount, setCartCount] = useState(0);
   const [searchText, setSearchText] = useState("");

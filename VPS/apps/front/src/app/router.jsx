@@ -1,4 +1,24 @@
-import { lazy, Suspense } from "react";
+// import { lazy, Suspense } from "react";
+import { lazy as reactLazy, Suspense } from "react";
+
+// 2026-10-03: if a page's code file can't be loaded (an installed app or an
+// old tab still running the previous version after a deploy), reload once to
+// pick up the current version instead of sitting on "Loading..." forever.
+const CHUNK_RELOAD_KEY = "jenix.front.chunkReloadAt";
+function lazy(factory) {
+  return reactLazy(() =>
+    factory().catch((error) => {
+      let last = 0;
+      try { last = Number(window.sessionStorage.getItem(CHUNK_RELOAD_KEY) || 0); } catch (_e) { /* ignore */ }
+      if (Date.now() - last > 30000) {
+        try { window.sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now())); } catch (_e) { /* ignore */ }
+        window.location.reload();
+        return new Promise(() => {}); // keep showing the fallback until the reload happens
+      }
+      throw error;
+    })
+  );
+}
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { StorefrontLayout } from "../modules/settings/storefront-layout";
 import { StorefrontLoadingState } from "../shared/storefront/storefront-ui";

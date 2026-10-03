@@ -11,6 +11,8 @@ export default defineConfig({
       // 2026-10-03: real Jenix logo icons (PNG) replace the placeholder "N" SVGs
       includeAssets: ["icon-192.svg", "icon-512.svg", "icons/apple-touch-icon.png", "icons/favicon-32.png"],
       workbox: {
+        // App push notifications handler (2026-10-03) — public/push-sw.js
+        importScripts: ["/push-sw.js"],
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,

@@ -145,6 +145,27 @@ file from a mistyped command), `.claude/settings.local.json`.
      index.html has apple-touch-icon + favicon. Old SVGs left in /public (unused). Phones that already
      installed the app may keep the old icon until reinstall. Note: nginx serves manifest.webmanifest as
      application/octet-stream (browsers accept it; was the same before).
+28. 2026-10-03: **Installed app "Loading…" / Cart & Account not opening — investigated on the user's phone
+   over USB (adb + Chrome DevTools protocol).**
+   - Real cause at the time of testing: the phone's Chrome couldn't resolve/reach api.jenixindia.com on the
+     office Wi-Fi "jenix123" (ERR_NAME_NOT_RESOLVED / requests stuck PENDING, also for Google Analytics &
+     Facebook), while the phone OS (ping) and the PC on the same router resolved fine → Chrome's network
+     service on the phone got stuck; not a server/app bug. Same page worked minutes earlier.
+   - Also fixed a real risk found on the way: every deploy deleted old `/assets/*.js` chunks, so an installed
+     app / old tab still running the previous version (service worker serves a cached index when the network
+     is slow, NetworkFirst 5 s) asks for chunks that no longer exist → lazy pages (Products list, Cart,
+     Account) hang. Fixes: (1) restored all old chunks from backups into the live dist (33 → 206 files);
+     (2) **storefront deploys now copy the previous `dist/assets/*` into the new dist (`cp -n`) — keep doing
+     this**; (3) `router.jsx` wraps React.lazy: a failed chunk load reloads the page once (30 s guard).
+   - User asked for the **same 5 bottom tabs in the installed app** (Home/Categories/Search/Cart/Account):
+     4-tab mode switched off (`const isInstalledApp = false` in storefront-layout, old line commented).
+   - Search tab tested on the phone (Chrome tab): focuses the box and typing works.
+   - Live: `apps/front/public/push-sw.js` + workbox `importScripts` (push handler, harmless until Step 3).
+   **Step 3 (push notifications) is IN PROGRESS, NOT deployed:** local uncommitted backend
+   `backend/src/modules/push/*`, `backend/src/database/push-store.js`, env `pushStorePath`, routes in
+   routes/index.js, push hook in marketing.service notifyCustomerEvent, `web-push` in package.json (not yet
+   installed on VPS), `apps/front/src/shared/push/push-client.js`. Still to do: My Account notifications
+   card + enable button, admin "App Notifications" page, tests, deploy.
    Backup `/root/jenix-bak-2026-10-03-app-step2/`, prev storefront dist `/tmp/front-dist-prev6`.
 
 **PENDING / TODO (in priority order):**

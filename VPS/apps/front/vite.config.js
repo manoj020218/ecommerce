@@ -7,7 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon-192.svg", "icon-512.svg"],
+      // includeAssets: ["icon-192.svg", "icon-512.svg"],
+      // 2026-10-03: real Jenix logo icons (PNG) replace the placeholder "N" SVGs
+      includeAssets: ["icon-192.svg", "icon-512.svg", "icons/apple-touch-icon.png", "icons/favicon-32.png"],
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
@@ -44,24 +46,24 @@ export default defineConfig({
         ]
       },
       manifest: {
-        name: "Jenix India Store",
-        short_name: "JenixStore",
-        description: "Jenix customer storefront progressive web app",
+        // name: "Jenix India Store",
+        // short_name: "JenixStore",
+        // description: "Jenix customer storefront progressive web app",
+        name: "Jenix India",
+        short_name: "Jenix",
+        description: "CCTV, smart security & IoT products — order, track and download invoices.",
         start_url: "/",
         display: "standalone",
-        background_color: "#f7f8fb",
-        theme_color: "#ff4d4d",
+        // background_color: "#f7f8fb",
+        // theme_color: "#ff4d4d",
+        background_color: "#ffffff",
+        theme_color: "#E8231A",
+        // icons: [{ src: "/icon-192.svg", ... }, { src: "/icon-512.svg", ... }] — placeholder "N"
         icons: [
-          {
-            src: "/icon-192.svg",
-            sizes: "192x192",
-            type: "image/svg+xml"
-          },
-          {
-            src: "/icon-512.svg",
-            sizes: "512x512",
-            type: "image/svg+xml"
-          }
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+          { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
         ]
       }
     })

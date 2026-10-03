@@ -138,8 +138,13 @@ file from a mistyped command), `.claude/settings.local.json`.
    - **Installed app → 4 bottom tabs** Products / Search / Cart / My Account (`useIsInstalledApp`).
    - **My Account → "Current order(s)"** timeline (`current-orders-card.jsx`; storefront + walk-in statuses,
      courier + AWB + Track link once shipped). Order summaries now include shippingMethod + isWalkInOrder.
-   - **TODO:** PWA icon is still a placeholder red "N" (`apps/front/public/icon-192.svg`/`icon-512.svg`,
-     manifest name "JenixStore") — replace with the real Jenix logo (+ PNG + apple-touch-icon for iPhone).
+   - ~~TODO: PWA icon placeholder "N"~~ **done 2026-10-03:** icons made from the user's logo
+     (`E:\Download 0.2\Logo-Jenix.png`, red "Jenix®" wordmark on white) → `apps/front/public/icons/`
+     (icon-192/512 "any", maskable-192/512 with smaller logo for the safe zone, apple-touch-icon 180,
+     favicon-32). Manifest name "Jenix India", short_name "Jenix", theme #E8231A, white background;
+     index.html has apple-touch-icon + favicon. Old SVGs left in /public (unused). Phones that already
+     installed the app may keep the old icon until reinstall. Note: nginx serves manifest.webmanifest as
+     application/octet-stream (browsers accept it; was the same before).
    Backup `/root/jenix-bak-2026-10-03-app-step2/`, prev storefront dist `/tmp/front-dist-prev6`.
 
 **PENDING / TODO (in priority order):**

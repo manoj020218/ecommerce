@@ -58,7 +58,7 @@ export function InstallAppCard({ context = "order", allowDismiss = true }) {
 
   return (
     <div style={{ display: "flex", gap: 14, alignItems: "flex-start", background: "#111827", color: "#fff", borderRadius: 16, padding: "16px 18px", margin: "14px 0" }}>
-      <img src="/icon-192.svg" alt="" width={48} height={48} style={{ borderRadius: 12, flex: "0 0 auto", background: "#fff" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+      <img src="/icons/icon-192.png" alt="" width={48} height={48} style={{ borderRadius: 12, flex: "0 0 auto", background: "#fff" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 800 }}>📲 Install the Jenix app</div>
         <div style={{ fontSize: 13, color: "#d1d5db", margin: "4px 0 10px", lineHeight: 1.5 }}>

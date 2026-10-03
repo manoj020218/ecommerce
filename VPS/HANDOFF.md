@@ -106,6 +106,23 @@ file from a mistyped command), `.claude/settings.local.json`.
    disabled when Return eligible is ticked). Product page shows the badge only if returnEligible (green) or
    showSoldAsIsBadge. Cart/checkout badges + checkout notice unchanged. Backup
    `/root/jenix-bak-2026-10-02-soldasis/`.
+26. 2026-10-03: **Invoice as real A4 PDF for buyers** (complaint: HTML attachment wouldn't open/print on
+   phones). `invoice-pdf.renderer.js` (pdfkit; same layout as the HTML invoice; Helvetica for speed +
+   embedded Inter .woff only for strings with ₹ — Inter woff2 rendered invisible, full Inter was ~20s/PDF;
+   now ~0.5 s warm, ~10 KB, multi-page with repeated table header). `getInvoicePdf()` in invoices.service.
+   **Signed public link** `GET /api/invoice-pdf/:invoiceId/:sig[?download=1]` (`invoice-links.js`, HMAC of
+   the id with JWT_REFRESH_SECRET — nothing stored; changing the secret breaks old links). PDF now goes:
+   Resend Invoice (email attachment + WhatsApp document + link), online Order Placed message (email
+   attachment + WhatsApp document), walk-in Payment received (attachment + document + link in {{nextStep}}).
+   Storefront invoice downloads (account + order page) open the PDF link (`pdfUrl` added to the existing
+   responses; HTML kept as fallback). Template emails accept `emailAttachments`, WhatsApp
+   `whatsappDocument` (new `whatsapp.service.sendDocument`). Admin preview/print and Tally bulk PDF unchanged.
+   VPS: `pnpm add -w pdfkit@0.15.2 inter-ui@3.19.3` run on the server (VPS package.json/lock got those two
+   added; its lock still differs from git as before). Backup `/root/jenix-bak-2026-10-03-invoice-pdf/`
+   (incl. old package.json + lock), prev storefront dist `/tmp/front-dist-prev5`.
+   **Plan agreed, not built yet:** Step 2 = PWA install popup after checkout/status messages, 4-tab app nav
+   (Products/Search/Cart/My Account) in installed app, auto-login after checkout (user said yes), order
+   timeline in My Account; Step 3 = web push (order updates + admin "Send Notification" for offers).
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

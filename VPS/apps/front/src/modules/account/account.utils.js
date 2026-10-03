@@ -54,6 +54,12 @@ export function formatAddress(address = {}) {
 }
 
 export function downloadInvoicePayload(payload) {
+  // 2026-10-03: the server now gives a signed PDF link — open that (downloads
+  // the A4 PDF). The old HTML download below stays as the fallback.
+  if (payload?.pdfUrl) {
+    window.location.href = payload.pdfUrl;
+    return;
+  }
   const blob = new Blob(
     [
       payload?.content ||

@@ -50,14 +50,22 @@ async function notifyWalkInEvent(order, event, extra = {}) {
     if (!contact.email && !contact.mobile) return null;
     const isSelfPickup = order.shippingMethod === "self_pickup";
     const pickup = event === "readyForPickup" || event === "paymentConfirmed" ? await pickupDetails() : {};
+    // Payment received → invoice PDF attached / sent as WhatsApp document + link (2026-10-03)
+    let invoiceFiles = {};
+    if (event === "paymentConfirmed" && order.invoiceId) {
+      const { buildInvoiceForMessages } = require("../invoices/invoice-delivery");
+      invoiceFiles = await buildInvoiceForMessages(order.invoiceId);
+    }
+    const nextStepText = isSelfPickup
+      ? "We'll message you as soon as your order is ready for pickup."
+      : "We'll send you the courier and tracking details as soon as it ships.";
     const variables = {
       customerName: contact.name,
       orderNo: order.orderNo || "",
       orderTotal: formatInr(order.grandTotal),
       invoiceNo: order.invoiceNumber || "",
-      nextStep: isSelfPickup
-        ? "We'll message you as soon as your order is ready for pickup."
-        : "We'll send you the courier and tracking details as soon as it ships.",
+      invoiceDownloadUrl: invoiceFiles.url || "",
+      nextStep: invoiceFiles.url ? `Invoice (PDF): ${invoiceFiles.url}\n${nextStepText}` : nextStepText,
       pickupInstructions: extra.note || "",
       ...pickup,
       ...extra.variables
@@ -68,7 +76,9 @@ async function notifyWalkInEvent(order, event, extra = {}) {
       toMobile: contact.mobile,
       relatedResourceType: "order",
       relatedResourceId: order.id,
-      variables
+      variables,
+      emailAttachments: invoiceFiles.emailAttachments,
+      whatsappDocument: invoiceFiles.whatsappDocument
     });
   } catch (_error) {
     return null;

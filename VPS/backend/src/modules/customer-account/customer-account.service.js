@@ -699,7 +699,10 @@ async function downloadCustomerInvoice(customerId, invoiceId) {
   }
 
   findAccessibleOrderOrThrow(authStore, customerId, invoice.orderId);
-  return getInvoiceDownload(invoiceId);
+  // return getInvoiceDownload(invoiceId);
+  // 2026-10-03: + pdfUrl — the storefront downloads the PDF; HTML kept as fallback
+  const { buildInvoicePdfUrl } = require("../invoices/invoice-links");
+  return { ...(await getInvoiceDownload(invoiceId)), pdfUrl: buildInvoicePdfUrl(invoiceId, { download: true }) };
 }
 
 async function listCustomerTracking(customerId, filters) {

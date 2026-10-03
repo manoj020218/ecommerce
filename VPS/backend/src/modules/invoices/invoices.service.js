@@ -1351,6 +1351,28 @@ async function getInvoiceDownload(invoiceId) {
   };
 }
 
+// A4 PDF of the same invoice (2026-10-03) — for buyers (email attachment,
+// WhatsApp document, public download link, account downloads). The HTML
+// version above stays for admin preview/print.
+async function getInvoicePdf(invoiceId) {
+  const invoice = await getInvoiceById(invoiceId);
+  const { renderInvoicePdf } = require("./invoice-pdf.renderer");
+  const buffer = await renderInvoicePdf(invoice, {
+    formatInvoiceDateLabel,
+    humanizePaymentMethodLabel,
+    humanizeShippingMethodLabel,
+    humanizeLabel,
+    uploadDir: env.uploadDir
+  });
+  const safeBaseName = String(invoice.invoiceNumber || "invoice").replace(/[^a-zA-Z0-9_-]+/g, "-");
+  return {
+    fileName: `${safeBaseName}.pdf`,
+    contentType: "application/pdf",
+    buffer,
+    invoiceNumber: invoice.invoiceNumber
+  };
+}
+
 // Re-sends an already-issued invoice to the buyer on file -- e.g. they lost
 // the original email, or want it on WhatsApp too. Email carries the actual
 // invoice HTML as an attachment (self-contained, no login needed to open
@@ -1364,7 +1386,10 @@ async function getInvoiceDownload(invoiceId) {
 // failure on one channel never blocks the other.
 async function resendInvoiceToCustomer(orderId, actor) {
   const invoice = await getInvoiceForOrder(orderId);
-  const download = await getInvoiceDownload(invoice.id);
+  // const download = await getInvoiceDownload(invoice.id);
+  // 2026-10-03: buyers get a PDF (the HTML attachment didn't open/print on many phones)
+  const pdf = await getInvoicePdf(invoice.id);
+  const { buildInvoicePdfUrl } = require("./invoice-links");
 
   const buyer = invoice.buyer || {};
   const email = String(buyer.email || "").trim();
@@ -1375,7 +1400,8 @@ async function resendInvoiceToCustomer(orderId, actor) {
 
   const customerName = buyer.name || buyer.companyName || "there";
   const amountText = `₹${Number(invoice.pricing?.grandTotal || 0).toLocaleString("en-IN")}`;
-  const actionUrl = `${env.storefrontBaseUrl}/account/orders/${invoice.orderId}`;
+  // const actionUrl = `${env.storefrontBaseUrl}/account/orders/${invoice.orderId}`;
+  const actionUrl = buildInvoicePdfUrl(invoice.id); // opens the PDF, no login needed
   const settings = await getAllSettings();
   const storeName = settings.storeProfile?.storeName || "Jenix India";
 
@@ -1392,10 +1418,11 @@ async function resendInvoiceToCustomer(orderId, actor) {
             `<p>Hi ${customerName},</p>` +
             `<p>As requested, here is a copy of your invoice <strong>${invoice.invoiceNumber}</strong> ` +
             `for order ${invoice.orderNo} (${amountText}), attached to this email.</p>` +
-            `<p>You can also view or download it any time from <a href="${actionUrl}">your order page</a>.</p>`,
-          attachments: [
-            { filename: download.fileName, content: download.content, contentType: download.contentType }
-          ]
+            `<p>You can also download it any time from <a href="${actionUrl}">this link</a>.</p>`,
+          // attachments: [
+          //   { filename: download.fileName, content: download.content, contentType: download.contentType }
+          // ]
+          attachments: [{ filename: pdf.fileName, content: pdf.buffer, contentType: pdf.contentType }]
         });
         emailStatus = "sent";
       } catch (_error) {
@@ -1416,6 +1443,11 @@ async function resendInvoiceToCustomer(orderId, actor) {
           `View/download: ${actionUrl}`
       );
       whatsappStatus = "sent";
+      try {
+        await whatsappService.sendDocument(mobile, { buffer: pdf.buffer, fileName: pdf.fileName, mimetype: pdf.contentType });
+      } catch (_docError) {
+        // the text with the download link already went out
+      }
     } catch (_error) {
       whatsappStatus = "failed";
     }
@@ -1446,6 +1478,7 @@ module.exports = {
   getInvoiceForOrder,
   generateInvoice,
   getInvoiceDownload,
+  getInvoicePdf,
   correctInvoiceBuyerDetails,
   filterInvoicesByDateRange,
   resendInvoiceToCustomer

@@ -1291,12 +1291,17 @@ async function notifyOrderPlaced(order, invoice) {
   const customerMobile = resolveNotificationMobile(order.billingAddress, order.shippingAddress);
   const orderTotal = `₹${Number(order.grandTotal || 0).toLocaleString("en-IN")}`;
   const paymentMethod = humanizePaymentMethod(order.paymentMethod);
+  // Invoice PDF attached to the email + sent as a WhatsApp document (2026-10-03)
+  const { buildInvoiceForMessages } = require("../invoices/invoice-delivery");
+  const invoiceFiles = await buildInvoiceForMessages(invoice?.id || order.invoiceId || null);
 
   const customerResult = await notifyCustomerEvent({
     eventKey: "order_placed",
     toEmail: customerEmail,
     toMobile: customerMobile,
     invoiceId: invoice?.id || order.invoiceId || null,
+    emailAttachments: invoiceFiles.emailAttachments,
+    whatsappDocument: invoiceFiles.whatsappDocument,
     relatedResourceType: "order",
     relatedResourceId: order.id,
     variables: {
@@ -2601,7 +2606,10 @@ async function downloadCheckoutInvoice(context, checkoutSessionId, query) {
     throw new HttpError(404, "Invoice is not generated for this order yet.");
   }
 
-  return getInvoiceDownload(invoice.id);
+  // return getInvoiceDownload(invoice.id);
+  // 2026-10-03: + pdfUrl — the storefront downloads the PDF; HTML kept as fallback
+  const { buildInvoicePdfUrl } = require("../invoices/invoice-links");
+  return { ...(await getInvoiceDownload(invoice.id)), pdfUrl: buildInvoicePdfUrl(invoice.id, { download: true }) };
 }
 
 async function listOnlineGateways() {

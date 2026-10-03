@@ -714,6 +714,14 @@ async function sendTemplateNotification(input) {
       try {
         await whatsappService.sendMessage(log.toMobile, stripHtmlForWhatsApp(log.body));
         log.status = "sent";
+        // Optional file after the text, e.g. the invoice PDF (2026-10-03)
+        if (input.whatsappDocument?.buffer) {
+          try {
+            await whatsappService.sendDocument(log.toMobile, input.whatsappDocument);
+          } catch (_docError) {
+            log.failureReason = "Message sent, document failed";
+          }
+        }
       } catch (whatsappError) {
         // Not connected / QR needs re-scanning is an expected, recoverable state —
         // fail this one message, don't let it block the email side of the same event.
@@ -728,7 +736,9 @@ async function sendTemplateNotification(input) {
             smtpConfig: smtp,
             to: log.toEmail,
             subject: log.subject,
-            html: log.body
+            html: log.body,
+            // optional, e.g. invoice PDF (2026-10-03)
+            attachments: Array.isArray(input.emailAttachments) ? input.emailAttachments : undefined
           });
           log.status = "sent";
         } catch (emailError) {
@@ -763,7 +773,9 @@ async function notifyCustomerEvent({
   toMobile,
   variables,
   relatedResourceType,
-  relatedResourceId
+  relatedResourceId,
+  emailAttachments,
+  whatsappDocument
 }) {
   // Sequential, not Promise.all — each send does its own read-modify-write of the
   // same flat-file marketing store (notificationLogs). Running them concurrently
@@ -773,14 +785,16 @@ async function notifyCustomerEvent({
     toEmail,
     variables,
     relatedResourceType,
-    relatedResourceId
+    relatedResourceId,
+    emailAttachments
   });
   const whatsappResult = await safeSendTemplateNotification({
     templateKey: `${eventKey}_whatsapp`,
     toMobile,
     variables,
     relatedResourceType,
-    relatedResourceId
+    relatedResourceId,
+    whatsappDocument
   });
   return { email: emailResult, whatsapp: whatsappResult };
 }

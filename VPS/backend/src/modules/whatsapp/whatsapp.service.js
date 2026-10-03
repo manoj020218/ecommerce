@@ -172,6 +172,14 @@ async function sendMessage(phone, message) {
   await state.sock.sendMessage(toJid(phone), { text: message });
 }
 
+// Sends a file (e.g. invoice PDF) as a WhatsApp document (2026-10-03).
+async function sendDocument(phone, { buffer, fileName, mimetype = "application/pdf", caption = "" }) {
+  if (state.status !== "connected" || !state.sock) {
+    throw new Error("WhatsApp is not connected.");
+  }
+  await state.sock.sendMessage(toJid(phone), { document: buffer, mimetype, fileName, caption });
+}
+
 // A pm2 restart / deploy wipes the in-memory connection state, but the
 // paired session on disk is still valid — without this the admin had to
 // manually click Connect after every single restart even though nothing
@@ -188,6 +196,7 @@ module.exports = {
   startConnection,
   disconnect,
   sendMessage,
+  sendDocument,
   getStatus: publicStatus,
   resumeIfSessionExists
 };

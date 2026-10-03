@@ -72,6 +72,7 @@ const {
   createAdminProjectsRouter,
   createPublicProjectsRouter
 } = require("../modules/projects/projects.routes");
+const { createPublicInvoicePdfRouter } = require("../modules/invoices/invoice-public.routes");
 const {
   createAdminDealersRouter,
   createPublicDealersRouter
@@ -164,6 +165,7 @@ function createApiRouter() {
   router.use("/blogs", createPublicBlogsRouter());
   router.use("/projects", createPublicProjectsRouter());
   router.use("/dealers", createPublicDealersRouter());
+  router.use("/invoice-pdf", createPublicInvoicePdfRouter());
   router.use("/job-vacancies", createPublicJobVacanciesRouter());
   router.use("/website-leads", createPublicWebsiteLeadsRouter());
   router.use("/marketing", createPublicMarketingRouter());

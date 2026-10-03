@@ -13,7 +13,7 @@ import {
   buildCartContext
 } from "../cart/cart.utils";
 import { usePublicSettings } from "./public-settings-context";
-import { useInstallPrompt } from "../../shared/hooks/use-install-prompt";
+import { useInstallPrompt, useIsInstalledApp } from "../../shared/hooks/use-install-prompt";
 import { apiFetch } from "../../shared/api/http-client";
 import { capturePartnerAttribution } from "../../shared/marketing/partner-attribution";
 
@@ -344,6 +344,7 @@ export function StorefrontLayout() {
   const { customer, isAuthenticated } = useCustomerSession();
   const { settings } = usePublicSettings();
   const { canInstall, promptInstall } = useInstallPrompt();
+  const isInstalledApp = useIsInstalledApp(); // installed app → 4 bottom tabs (2026-10-03)
   const [categories, setCategories] = useState([]);
   const [cartCount, setCartCount] = useState(0);
   const [searchText, setSearchText] = useState("");
@@ -851,19 +852,22 @@ export function StorefrontLayout() {
         </div>
       </footer>
 
-      <nav className="proto-mobile-nav">
-        <NavLink to="/" className={({ isActive }) => `proto-mobile-link${isActive ? " active" : ""}`}>
-          <HomeIcon />
-          <span>Home</span>
-        </NavLink>
+      <nav className="proto-mobile-nav" style={isInstalledApp ? { gridTemplateColumns: "repeat(4, minmax(0, 1fr))" } : undefined}>
+        {/* Installed app: 4 tabs — Products, Search, Cart, My Account (2026-10-03) */}
+        {!isInstalledApp ? (
+          <NavLink to="/" className={({ isActive }) => `proto-mobile-link${isActive ? " active" : ""}`}>
+            <HomeIcon />
+            <span>Home</span>
+          </NavLink>
+        ) : null}
         <NavLink
           to="/products"
           className={({ isActive }) =>
-            `proto-mobile-link${isActive || location.pathname.startsWith("/categories") ? " active" : ""}`
+            `proto-mobile-link${isActive || location.pathname.startsWith("/categories") || (isInstalledApp && location.pathname === "/") ? " active" : ""}`
           }
         >
           <GridIcon />
-          <span>Categories</span>
+          <span>{isInstalledApp ? "Products" : "Categories"}</span>
         </NavLink>
         <button
           type="button"
@@ -897,7 +901,7 @@ export function StorefrontLayout() {
           className={({ isActive }) => `proto-mobile-link${isActive ? " active" : ""}`}
         >
           <UserIcon />
-          <span>Account</span>
+          <span>{isInstalledApp ? "My Account" : "Account"}</span>
         </NavLink>
       </nav>
     </>

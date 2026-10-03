@@ -65,7 +65,10 @@ async function notifyWalkInEvent(order, event, extra = {}) {
       orderTotal: formatInr(order.grandTotal),
       invoiceNo: order.invoiceNumber || "",
       invoiceDownloadUrl: invoiceFiles.url || "",
-      nextStep: invoiceFiles.url ? `Invoice (PDF): ${invoiceFiles.url}\n${nextStepText}` : nextStepText,
+      // + "install our app" link (2026-10-03)
+      nextStep: invoiceFiles.url
+        ? `Invoice (PDF): ${invoiceFiles.url}\n${nextStepText}\n📲 Track your orders in our app: ${require("../invoices/invoice-delivery").appLink()}`
+        : nextStepText,
       pickupInstructions: extra.note || "",
       ...pickup,
       ...extra.variables

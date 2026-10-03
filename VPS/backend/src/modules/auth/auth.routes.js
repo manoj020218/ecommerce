@@ -37,6 +37,7 @@ function createAuthRouter() {
   router.post("/customer/email-otp/request", controller.customerRequestEmailOtp);
   router.post("/customer/email-otp/verify", controller.customerVerifyEmailOtp);
   router.post("/customer/link-guest-checkout", requireCustomerAuth, controller.customerLinkGuestCheckout);
+  router.post("/customer/checkout-login", controller.customerCheckoutAutoLogin);
 
   return router;
 }

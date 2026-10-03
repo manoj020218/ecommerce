@@ -330,7 +330,10 @@ function buildOrderSummary(order, shipment, invoice) {
     paymentMethod: order.paymentMethod || "",
     customerType: order.customerType || "retail",
     priceGroup: order.priceGroup || "",
-    isB2BOrderRequest: Boolean(order.isB2BOrderRequest)
+    isB2BOrderRequest: Boolean(order.isB2BOrderRequest),
+    // for the "Current order" timeline in My Account (2026-10-03)
+    shippingMethod: order.shippingMethod || "",
+    isWalkInOrder: Boolean(order.isWalkInOrder)
   };
 }
 

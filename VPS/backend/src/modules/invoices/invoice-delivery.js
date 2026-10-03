@@ -3,6 +3,12 @@
 // message still goes out without it.
 
 const { buildInvoicePdfUrl } = require("./invoice-links");
+const { env } = require("../../config/env");
+
+// "Install our app" link added to the WhatsApp caption (2026-10-03)
+function appLink() {
+  return `${String(env.storefrontBaseUrl || "https://jenixindia.com").replace(/\/$/, "")}/app`;
+}
 
 async function buildInvoiceForMessages(invoiceId) {
   if (!invoiceId) return { url: "", emailAttachments: undefined, whatsappDocument: undefined };
@@ -18,7 +24,8 @@ async function buildInvoiceForMessages(invoiceId) {
         buffer: pdf.buffer,
         fileName: pdf.fileName,
         mimetype: pdf.contentType,
-        caption: `Invoice ${pdf.invoiceNumber || ""} — download any time: ${url}`.trim()
+        caption: `Invoice ${pdf.invoiceNumber || ""} — download any time: ${url}
+📲 Track your orders in our app: ${appLink()}`.trim()
       }
     };
   } catch (_error) {
@@ -26,4 +33,4 @@ async function buildInvoiceForMessages(invoiceId) {
   }
 }
 
-module.exports = { buildInvoiceForMessages };
+module.exports = { buildInvoiceForMessages, appLink };

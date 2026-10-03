@@ -26,6 +26,8 @@ import {
   getCheckoutOrderFollowup
 } from "../products/products.api";
 import { getExistingGuestSessionId } from "./cart.utils";
+import { checkoutAutoLogin } from "../account/account.api";
+import { InstallAppCard } from "../app-install/install-app-card";
 import { OrderDetailModal } from "./order-detail-modal";
 import { watchdog } from "../../shared/watchdog-client";
 import {
@@ -372,7 +374,8 @@ export function OrderSuccessPage() {
   const { checkoutSessionId: routeCheckoutSessionId = "" } = useParams();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { isAuthenticated } = useCustomerSession();
+  const { isAuthenticated, setSession } = useCustomerSession();
+  const autoLoginTried = useRef(false); // one-tap login after checkout (2026-10-03)
   const { settings: publicSettings } = usePublicSettings();
   const [checkoutSession, setCheckoutSession] = useState(null);
   const [order, setOrder] = useState(null);
@@ -398,6 +401,26 @@ export function OrderSuccessPage() {
   });
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
   const [orderDetailModalOpen, setOrderDetailModalOpen] = useState(false);
+
+  // One-tap login right after checkout (2026-10-03). The backend only allows
+  // it for a buyer whose account was created by this very checkout, from this
+  // browser; otherwise it says no and the "Get order updates" OTP card stays.
+  useEffect(() => {
+    if (isAuthenticated || autoLoginTried.current || !checkoutSession?.id || !order?.id) return;
+    const guestSessionId = getExistingGuestSessionId();
+    if (!guestSessionId) return;
+    autoLoginTried.current = true;
+    checkoutAutoLogin({ checkoutSessionId: checkoutSession.id, guestSessionId })
+      .then((payload) => {
+        if (payload?.accessToken) {
+          setSession(createCustomerSession(payload));
+          setNotice("You're logged in — this order is saved in My Account, where you can track it any time.");
+        }
+      })
+      .catch(() => {
+        // not eligible (returning buyer etc.) — the OTP card below still works
+      });
+  }, [isAuthenticated, checkoutSession?.id, order?.id]);
   const [snapshotExpanded, setSnapshotExpanded] = useState(false);
 
   useEffect(() => {
@@ -747,6 +770,8 @@ export function OrderSuccessPage() {
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
+
+      <InstallAppCard context="order" />
 
       {!isAuthenticated && checkoutSession?.id ? (
         <CheckoutAccountLink

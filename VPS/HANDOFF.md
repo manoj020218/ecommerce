@@ -123,6 +123,24 @@ file from a mistyped command), `.claude/settings.local.json`.
    **Plan agreed, not built yet:** Step 2 = PWA install popup after checkout/status messages, 4-tab app nav
    (Products/Search/Cart/My Account) in installed app, auto-login after checkout (user said yes), order
    timeline in My Account; Step 3 = web push (order updates + admin "Send Notification" for offers).
+27. 2026-10-03: **Step 2 (app) shipped.**
+   - **Auto-login after checkout:** `POST /api/auth/customer/checkout-login` (`customerCheckoutAutoLogin`
+     in auth.service, login rate limiter). Only for the same browser (guest session id owns the checkout),
+     within 24 h, once (`session.autoLoginAt`), and only if the customer record was created by THIS checkout
+     (no password, no auth providers, createdAt ≥ checkout start − 60 s, no other linked orders). Then links
+     the order (`order.userId`, `linkedByField: checkout_auto_login`) and issues normal tokens. Returning
+     buyers → 409 `login_required` → existing OTP "Get order updates" card. Tested: wrong browser 404,
+     second try 409 already_used, someone else's mobile 409 login_required.
+   - Login lasts while used: refresh tokens rotate with a fresh 30 d on every refresh (unchanged).
+   - **Install card** (`app-install/install-app-card.jsx`) on the order success page (Android → native
+     prompt; iPhone → Share → Add to Home Screen guide; hidden in the installed app; "×" hides it 7 days)
+     + **/app** page. WhatsApp invoice caption and walk-in "Payment received" now include the /app link.
+   - **Installed app → 4 bottom tabs** Products / Search / Cart / My Account (`useIsInstalledApp`).
+   - **My Account → "Current order(s)"** timeline (`current-orders-card.jsx`; storefront + walk-in statuses,
+     courier + AWB + Track link once shipped). Order summaries now include shippingMethod + isWalkInOrder.
+   - **TODO:** PWA icon is still a placeholder red "N" (`apps/front/public/icon-192.svg`/`icon-512.svg`,
+     manifest name "JenixStore") — replace with the real Jenix logo (+ PNG + apple-touch-icon for iPhone).
+   Backup `/root/jenix-bak-2026-10-03-app-step2/`, prev storefront dist `/tmp/front-dist-prev6`.
 
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which

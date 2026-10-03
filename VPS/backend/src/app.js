@@ -148,6 +148,7 @@ function createApp() {
   // Dealer registration (2026-10-01): returns an existing dealer code for a known mobile,
   // so keep it as tight as login to stop anyone fishing for codes.
   app.use("/api/dealers/register", loginLimiter);
+  app.use("/api/auth/customer/checkout-login", loginLimiter);
   app.use("/api/auth/customer/otp", otpLimiter);
   app.use("/api/checkout", loginLimiter);
   app.use("/api", apiLimiter);

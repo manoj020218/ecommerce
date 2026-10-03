@@ -45,3 +45,24 @@ export function useInstallPrompt() {
 
   return { canInstall: Boolean(deferredPrompt) && !installed, promptInstall };
 }
+
+// True when the storefront is running as the installed app (Home Screen),
+// not in a normal browser tab (2026-10-03).
+export function useIsInstalledApp() {
+  const [installed, setInstalled] = useState(isStandaloneDisplay);
+  useEffect(() => {
+    const media = window.matchMedia?.("(display-mode: standalone)");
+    if (!media) return undefined;
+    const onChange = () => setInstalled(isStandaloneDisplay());
+    media.addEventListener?.("change", onChange);
+    return () => media.removeEventListener?.("change", onChange);
+  }, []);
+  return installed;
+}
+
+// iPhone / iPad Safari: no install button exists there — show "Share → Add to
+// Home Screen" instructions instead.
+export function isIosDevice() {
+  const ua = window.navigator.userAgent || "";
+  return /iphone|ipad|ipod/i.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1);
+}

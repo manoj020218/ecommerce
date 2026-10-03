@@ -186,7 +186,18 @@ const customerLinkGuestCheckout = asyncHandler(async (req, res) => {
   return ok(res, data, "Order linked to account.");
 });
 
+// One-tap login right after checkout (2026-10-03) — see auth.service
+const customerCheckoutAutoLogin = asyncHandler(async (req, res) => {
+  const { checkoutSessionId, guestSessionId } = req.body || {};
+  const data = await service.customerCheckoutAutoLogin({
+    checkoutSessionId: String(checkoutSessionId || "").trim(),
+    guestSessionId: String(guestSessionId || "").trim()
+  });
+  return ok(res, data, "Logged in.");
+});
+
 module.exports = {
+  customerCheckoutAutoLogin,
   adminLogin,
   adminRefresh,
   adminLogout,

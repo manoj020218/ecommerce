@@ -68,6 +68,14 @@ export function verifyEmailOtp(payload) {
   });
 }
 
+// One-tap login right after checkout (2026-10-03)
+export function checkoutAutoLogin(payload) {
+  return apiFetch("/auth/customer/checkout-login", {
+    method: "POST",
+    body: payload
+  });
+}
+
 export function linkGuestCheckout(payload) {
   return apiFetch("/auth/customer/link-guest-checkout", {
     method: "POST",

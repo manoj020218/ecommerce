@@ -99,6 +99,10 @@ const ProjectsListPage = lazy(() =>
 const ProjectPage = lazy(() =>
   import("../modules/projects/project-page").then((m) => ({ default: m.ProjectPage }))
 );
+// Install-the-app page (2026-10-03)
+const AppInstallPage = lazy(() =>
+  import("../modules/app-install/app-install-page").then((m) => ({ default: m.AppInstallPage }))
+);
 // Dealer registration (2026-10-01)
 const DealerRegistrationPage = lazy(() =>
   import("../modules/dealers/dealer-registration-page").then((m) => ({ default: m.DealerRegistrationPage }))
@@ -176,6 +180,7 @@ export function AppRouter() {
           <Route path="/projects" element={<ProjectsListPage />} />
           <Route path="/projects/:slug" element={<ProjectPage />} />
           <Route path="/dealer-registration" element={<DealerRegistrationPage />} />
+          <Route path="/app" element={<AppInstallPage />} />
           <Route path="/guides" element={<BlogsListPage />} />
           <Route path="/guides/:slug" element={<BlogPage />} />
           <Route path="/careers" element={<CareersListPage />} />

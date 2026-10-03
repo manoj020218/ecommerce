@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CurrentOrdersCard } from "./current-orders-card";
 import { Link, useNavigate } from "react-router-dom";
 import { useCustomerSession } from "../../shared/auth/customer-session";
 import {
@@ -554,6 +555,9 @@ export function CustomerAccountPage() {
 
       {error ? <StorefrontAlert tone="error">{error}</StorefrontAlert> : null}
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
+
+      {/* Current order timeline (2026-10-03) */}
+      <CurrentOrdersCard orders={orders} />
 
       <section className="account-grid">
         <StorefrontCard as="article" className="section-card" elevated>

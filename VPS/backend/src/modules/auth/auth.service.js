@@ -1096,7 +1096,84 @@ async function linkGuestCheckoutToCustomer(customerId, checkoutSessionId, guestS
   return { linked: true, alreadyLinked: false, ordersLinked };
 }
 
+// One-tap login on the order success page (2026-10-03). A guest who just
+// checked out is logged in automatically — but ONLY when it's safe:
+// - the request comes from the same browser that owns the checkout (guest
+//   session id), within 24 h of the order, once;
+// - the customer record was created by THIS checkout (no password, no Google /
+//   OTP login, no other orders). Otherwise anyone typing someone else's
+//   email/mobile at checkout could open that person's account, so returning
+//   buyers still verify with OTP (the existing "Get order updates" card).
+const AUTO_LOGIN_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+async function customerCheckoutAutoLogin({ checkoutSessionId, guestSessionId }) {
+  if (!checkoutSessionId || !guestSessionId) {
+    throw new HttpError(400, "checkoutSessionId and guest session are required.");
+  }
+  const notAvailable = (reason) =>
+    new HttpError(409, "Please verify with OTP to see this order in your account.", { reason });
+
+  const store = await ensureAuthBootstrap();
+  const session = ensureArray(store.checkoutSessions).find((s) => s.id === checkoutSessionId);
+  if (!session || session.ownerType !== "guest" || session.ownerId !== guestSessionId) {
+    throw new HttpError(404, "Checkout session not found.");
+  }
+  if (session.autoLoginAt) throw notAvailable("already_used");
+
+  const order = ensureArray(store.orders).find((o) => o.checkoutSessionId === session.id);
+  if (!order) throw notAvailable("order_not_ready");
+  if (Date.now() - Date.parse(order.createdAt || 0) > AUTO_LOGIN_WINDOW_MS) throw notAvailable("expired");
+  if (order.userId) throw notAvailable("already_linked");
+
+  // Same matching rule checkout used to find/create this buyer's record.
+  const email = String(order.billingAddress?.email || order.shippingAddress?.email || "").trim().toLowerCase();
+  const mobile = String(order.billingAddress?.mobile || order.shippingAddress?.mobile || "").trim();
+  const user = ensureArray(store.users).find(
+    (u) =>
+      (email && String(u.email || "").trim().toLowerCase() === email) ||
+      (mobile && String(u.mobile || "").trim() === mobile)
+  );
+  if (!user) throw notAvailable("no_customer");
+
+  const createdByThisCheckout =
+    !user.passwordHash &&
+    ensureArray(user.authProviders).length === 0 &&
+    Date.parse(user.createdAt || 0) >= Date.parse(session.createdAt || 0) - 60 * 1000 &&
+    !ensureArray(store.orders).some((o) => o.userId === user.id);
+  if (!createdByThisCheckout || user.accountStatus === "blocked") throw notAvailable("login_required");
+
+  const now = new Date().toISOString();
+  session.autoLoginAt = now;
+  session.linkedUserId = user.id;
+  session.accountLinkedAt = now;
+  for (const row of ensureArray(store.orders)) {
+    if (row.checkoutSessionId === session.id && !row.userId) {
+      row.userId = user.id;
+      row.accountLinkedAt = now;
+      row.linkedByField = "checkout_auto_login";
+    }
+  }
+  user.accountCreatedAtCheckout = true;
+
+  const result = await issueCustomerTokens(store, user, guestSessionId); // writes the store
+
+  try {
+    await addActivityLog({
+      action: "auth.customer.checkout_auto_login",
+      actorId: user.id,
+      actorRole: "customer",
+      resourceType: "checkout_session",
+      resourceId: session.id,
+      metadata: { orderNo: order.orderNo || "" }
+    });
+  } catch (_error) {
+    // best-effort
+  }
+  return result;
+}
+
 module.exports = {
+  customerCheckoutAutoLogin,
   ensureAuthBootstrap,
   adminLogin,
   refreshSession,

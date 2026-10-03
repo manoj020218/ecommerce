@@ -28,6 +28,7 @@ import {
 import { getExistingGuestSessionId } from "./cart.utils";
 import { checkoutAutoLogin } from "../account/account.api";
 import { InstallAppCard } from "../app-install/install-app-card";
+import { NotificationsCard } from "../account/notifications-card";
 import { OrderDetailModal } from "./order-detail-modal";
 import { watchdog } from "../../shared/watchdog-client";
 import {
@@ -772,6 +773,7 @@ export function OrderSuccessPage() {
       {notice ? <StorefrontAlert>{notice}</StorefrontAlert> : null}
 
       <InstallAppCard context="order" />
+      {isAuthenticated ? <NotificationsCard /> : null}
 
       {!isAuthenticated && checkoutSession?.id ? (
         <CheckoutAccountLink

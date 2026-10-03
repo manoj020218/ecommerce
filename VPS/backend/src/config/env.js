@@ -60,6 +60,9 @@ const env = {
     process.env.PRODUCT_VIEWS_STORE_PATH || "backend/src/database/json/product-views-store.json",
   projectsStorePath:
     process.env.PROJECTS_STORE_PATH || "backend/src/database/json/projects-store.json",
+  // App push notifications: VAPID keys, phone subscriptions, sent notifications (2026-10-03)
+  pushStorePath:
+    process.env.PUSH_STORE_PATH || "backend/src/database/json/push-store.json",
   contentStorePath:
     process.env.CONTENT_STORE_PATH || "backend/src/database/json/content-store.json",
   jobVacanciesStorePath:

@@ -93,7 +93,9 @@ export const ADMIN_NAV_ITEMS = [
         label: "Notifications",
         path: "/notifications",
         permission: "marketing.view"
-      }
+      },
+      // Phone push notifications for offers / new products (2026-10-03)
+      { key: "app-notifications", label: "App Notifications", path: "/app-notifications", permission: "marketing.view" }
     ]
   },
   {

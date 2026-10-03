@@ -7,6 +7,7 @@ import { AbandonedCartsPage } from "../modules/abandoned-carts/abandoned-carts-p
 import { BlogsPage } from "../modules/blogs/blogs-page";
 import { ProjectsPage } from "../modules/projects/projects-page";
 import { DealersPage } from "../modules/dealers/dealers-page";
+import { AppNotificationsPage } from "../modules/app-notifications/app-notifications-page";
 import { JobVacanciesPage } from "../modules/job-vacancies/job-vacancies-page";
 import { LoginPage } from "../modules/auth/login-page";
 import { CataloguePage } from "../modules/catalogue/catalogue-page";
@@ -87,6 +88,7 @@ export function AppRouter() {
           <Route path="blogs" element={<BlogsPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="dealers" element={<DealersPage />} />
+          <Route path="app-notifications" element={<AppNotificationsPage />} />
           <Route path="job-vacancies" element={<JobVacanciesPage />} />
           <Route path="marketing" element={<MarketingPage />} />
           <Route path="notifications" element={<NotificationsPage />} />

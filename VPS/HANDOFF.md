@@ -161,11 +161,25 @@ file from a mistyped command), `.claude/settings.local.json`.
      4-tab mode switched off (`const isInstalledApp = false` in storefront-layout, old line commented).
    - Search tab tested on the phone (Chrome tab): focuses the box and typing works.
    - Live: `apps/front/public/push-sw.js` + workbox `importScripts` (push handler, harmless until Step 3).
-   **Step 3 (push notifications) is IN PROGRESS, NOT deployed:** local uncommitted backend
-   `backend/src/modules/push/*`, `backend/src/database/push-store.js`, env `pushStorePath`, routes in
-   routes/index.js, push hook in marketing.service notifyCustomerEvent, `web-push` in package.json (not yet
-   installed on VPS), `apps/front/src/shared/push/push-client.js`. Still to do: My Account notifications
-   card + enable button, admin "App Notifications" page, tests, deploy.
+   Step 3 shipped later the same day — see 29.
+29. 2026-10-03: **Step 3 — phone push notifications (web push, free, no third party).**
+   - Backend `modules/push/*` + `database/push-store.js` (`push-store.json`: VAPID key pair made on first use —
+     **back it up; losing it means every phone must re-subscribe**, subscriptions max 10/customer, last 3000
+     notifications). Routes: `GET /api/push/public-key`; customer `/api/customer/push/{status,subscribe,
+     unsubscribe,notifications}`; admin `/api/admin/push` (summary) + `/send` (marketing.edit_offers).
+   - **Order updates automatic:** `marketing.notifyCustomerEvent` calls `push.pushForEvent` (not awaited) for
+     order_placed, walkin_payment_confirmed, manual_payment_verified, order_processing, order_packed,
+     tracking_detail_update, order_dispatched, ready_for_pickup, order_delivered, self_pickup_completed → push to
+     `order.userId`'s phones (guest orders only after login/auto-login links them). Dead phones (404/410) removed.
+   - Storefront: `public/push-sw.js` (workbox importScripts) shows the notification + opens the page;
+     `shared/push/push-client.js`; **My Account → 🔔 Notifications** card (turn on/off + last updates & offers),
+     also on the order success page when logged in. iPhone: only inside the installed app (iOS 16.4+).
+   - Admin **Marketing → App Notifications**: title/message/link/image, audience (everyone / customers who
+     ordered / dealers), preview, history, soft warning after 2 offers in 7 days. Text sanitized (< > stripped,
+     links only same-site).
+   - `web-push@3.6.7` installed on VPS with `pnpm add -w` (backup of package.json/lock in
+     `/root/jenix-bak-2026-10-03-push/`). Tested end-to-end on store copies (stubbed sender). Not yet seen on a
+     real phone (user must log in on the phone and turn notifications on). Prev dists `/tmp/*-dist-prev8`.
    Backup `/root/jenix-bak-2026-10-03-app-step2/`, prev storefront dist `/tmp/front-dist-prev6`.
 
 **PENDING / TODO (in priority order):**

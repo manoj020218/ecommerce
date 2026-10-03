@@ -796,6 +796,15 @@ async function notifyCustomerEvent({
     relatedResourceId,
     whatsappDocument
   });
+  // Same event as a phone notification for a logged-in buyer who allowed
+  // notifications (2026-10-03). Not awaited — never delays or breaks the event.
+  try {
+    require("../push/push.service")
+      .pushForEvent({ eventKey, variables, relatedResourceType, relatedResourceId })
+      .catch(() => {});
+  } catch (_error) {
+    // push module unavailable — email/WhatsApp already went
+  }
   return { email: emailResult, whatsapp: whatsappResult };
 }
 

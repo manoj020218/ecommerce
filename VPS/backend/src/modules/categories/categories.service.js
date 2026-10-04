@@ -1,7 +1,7 @@
 const path = require("node:path");
 const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
-const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
+const { readCatalogStore, writeCatalogStore, readCatalogStoreSnapshot } = require("../../database/catalog-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { sanitizeCategory, toPublicCategory } = require("./categories.model");
 const { toPublicProductCard } = require("../products/products.model");
@@ -79,7 +79,8 @@ async function listAdminCategories(filters) {
 }
 
 async function listPublicCategories() {
-  const store = await readCatalogStore();
+  // const store = await readCatalogStore();  // 2026-10-04: read-only path → shared snapshot
+  const store = await readCatalogStoreSnapshot();
   return sortCategories(store.categories.filter((category) => category.isActive)).map(
     toPublicCategory
   );
@@ -226,7 +227,8 @@ function buildCategoryBreadcrumb(store, category) {
 }
 
 async function getPublicCategoryPage(slug) {
-  const store = await readCatalogStore();
+  // const store = await readCatalogStore();  // 2026-10-04: read-only path → shared snapshot
+  const store = await readCatalogStoreSnapshot();
   const category = store.categories.find((row) => row.slug === slug && row.isActive);
   if (!category) {
     throw new HttpError(404, "Category not found.");

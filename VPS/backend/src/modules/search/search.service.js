@@ -5,7 +5,7 @@ const {
   readSearchStore,
   writeSearchStore
 } = require("../../database/search-store");
-const { readCatalogStore } = require("../../database/catalog-store");
+const { readCatalogStore, readCatalogStoreSnapshot } = require("../../database/catalog-store");
 const { readContentStore } = require("../../database/content-store");
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const {
@@ -382,7 +382,8 @@ async function performSearch(input) {
   const queryTokens = tokenizeSearchText(normalizedQuery);
 
   const [catalogStore, contentStore, searchStore, customerPricingContext] = await Promise.all([
-    readCatalogStore(),
+    // readCatalogStore(),  // 2026-10-04: read-only path → shared snapshot
+    readCatalogStoreSnapshot(),
     readContentStore(),
     readSearchStore(),
     resolveCustomerPricingContext(input.customerId)
@@ -560,7 +561,8 @@ async function performSearch(input) {
 async function suggestSearch(input) {
   const normalizedQuery = normalizeSearchText(input.q);
   const [catalogStore, contentStore, searchStore] = await Promise.all([
-    readCatalogStore(),
+    // readCatalogStore(),  // 2026-10-04: read-only path → shared snapshot
+    readCatalogStoreSnapshot(),
     readContentStore(),
     readSearchStore()
   ]);

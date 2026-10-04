@@ -1,6 +1,6 @@
 const { env } = require("../../config/env");
 const { HttpError } = require("../../common/http-error");
-const { readCatalogStore } = require("../../database/catalog-store");
+const { readCatalogStore, readCatalogStoreSnapshot } = require("../../database/catalog-store");
 const { readContentStore } = require("../../database/content-store");
 const { getAllSettings } = require("../settings/settings.service");
 const { cloneDefaultContentStore, isBlogPublished } = require("../blogs/blogs.model");
@@ -197,7 +197,8 @@ function buildOfferJsonLd(product, meta, settings) {
 }
 
 async function buildProductPageSeoPayload(product, breadcrumb) {
-  const [settings, catalogStore] = await Promise.all([getAllSettings(), readCatalogStore()]);
+  // const [settings, catalogStore] = await Promise.all([getAllSettings(), readCatalogStore()]);  // 2026-10-04: read-only path → shared snapshot
+  const [settings, catalogStore] = await Promise.all([getAllSettings(), readCatalogStoreSnapshot()]);
   const categoriesById = new Map(
     catalogStore.categories.map((category) => [category.id, category])
   );

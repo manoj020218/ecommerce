@@ -197,7 +197,18 @@ file from a mistyped command), `.claude/settings.local.json`.
      auth ≈ 5 MB per parse) and Node's default heap limit here is ~2 GB, so V8 never collected before pm2 killed it at
      600M on busy hours (crawler paging all products). Fix: `node_args: "--max-old-space-size=448"` in
      `ecosystem.config.cjs`, applied with `pm2 restart jenix-backend --node-args=...` + `pm2 save`. **Watch:** count
-     should stay 3847. Proper long-term fix (not done): cache parsed stores in memory instead of re-parsing per request.
+     should stay 3847.
+   - **Same day, the proper fix: catalog read-only snapshot cache** (`catalog-store.js → readCatalogStoreSnapshot()`).
+     One product page visit used to parse the 3.4 MB catalog ~7 times (SSR 3×, API 1×, /page 3×). Now the 10 public
+     READ-ONLY functions share one parsed copy: products list/best-sellers/by-slug/recommendations/page, public
+     categories + category page, search + suggest, product-page SEO. Cache dropped on every `writeCatalogStore()` and
+     when the file's mtime/size changes (scripts, manual edits). Frozen in production; outside production a Proxy
+     THROWS on any write, so the regression suite catches misuse. **Rule: code that modifies the catalog must keep
+     using `readCatalogStore()` (fresh private copy) — never the snapshot.** Cart/checkout/admin paths unchanged
+     (cart writes stock reservations). Tested: regression suite; all 1,376 public calls on the live catalog identical
+     to old code (dev + production mode); write/outside-edit invalidation; 100 product visits peak RSS 197 → 90 MB.
+     Live: 9 public endpoints byte-identical before/after restart. Backup `/root/jenix-bak-2026-10-04-catalog-cache/`.
+     Not done (smaller gain): auth-store (~5 MB/parse, 2× per cart call) — written constantly, needs more care.
    - Dashboard tiles + "Product Page Visits vs Sales" now refresh every 60 s while the tab is visible
      (`dashboard/use-auto-refresh.js`), panel shows "updated HH:MM (live, every minute)". Product visit counting itself
      was always fine (store totals == nginx hits).

@@ -3,7 +3,7 @@ const { HttpError } = require("../../common/http-error");
 const { generateId } = require("../../common/identity");
 const { readAuthStore } = require("../../database/auth-store");
 const { env } = require("../../config/env");
-const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
+const { readCatalogStore, writeCatalogStore, readCatalogStoreSnapshot } = require("../../database/catalog-store");
 const { readShippingStore } = require("../../database/shipping-store");
 const { readSearchStore } = require("../../database/search-store");
 const {
@@ -901,7 +901,8 @@ async function updateProductRelations(productId, relationsPatch, actor) {
 }
 
 async function listPublicProducts(filters, options = {}) {
-  const store = await readCatalogStore();
+  // const store = await readCatalogStore();  // 2026-10-04: read-only path → shared snapshot
+  const store = await readCatalogStoreSnapshot();
   const customerPricingContext = await resolveCustomerPricingContext(options.customerId);
   let rows = store.products.filter((product) => product.isActive);
   rows = filterProducts(rows, filters);
@@ -930,7 +931,8 @@ async function listPublicProducts(filters, options = {}) {
 // hide the section rather than padding it with unrelated products.
 async function listBestSellingProducts(limit = 8, options = {}) {
   const [catalogStore, authStore, customerPricingContext] = await Promise.all([
-    readCatalogStore(),
+    // readCatalogStore(),  // 2026-10-04: read-only path → shared snapshot
+    readCatalogStoreSnapshot(),
     readAuthStore(),
     resolveCustomerPricingContext(options.customerId)
   ]);
@@ -958,7 +960,8 @@ async function listBestSellingProducts(limit = 8, options = {}) {
 }
 
 async function getPublicProductBySlug(slug, options = {}) {
-  const store = await readCatalogStore();
+  // const store = await readCatalogStore();  // 2026-10-04: read-only path → shared snapshot
+  const store = await readCatalogStoreSnapshot();
   const row = findActiveProductBySlug(store, slug);
   if (!row) {
     throw new HttpError(404, "Product not found.");
@@ -971,7 +974,8 @@ async function getPublicProductBySlug(slug, options = {}) {
 
 async function getPublicProductRecommendations(slug, options) {
   const [catalogStore, searchStore, customerPricingContext] = await Promise.all([
-    readCatalogStore(),
+    // readCatalogStore(),  // 2026-10-04: read-only path → shared snapshot
+    readCatalogStoreSnapshot(),
     readSearchStore(),
     resolveCustomerPricingContext(options.customerId)
   ]);
@@ -1016,7 +1020,8 @@ async function getPublicProductRecommendations(slug, options) {
 }
 
 async function getPublicProductPage(slug, options) {
-  const store = await readCatalogStore();
+  // const store = await readCatalogStore();  // 2026-10-04: read-only path → shared snapshot
+  const store = await readCatalogStoreSnapshot();
   const product = findActiveProductBySlug(store, slug);
 
   if (!product) {

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { fetchProjects } from "./projects.api";
 import { ProjectEditor } from "./project-editor";
 import { ProjectEnquiries } from "./project-enquiries";
+import { ProjectVisitsLine } from "./project-visits-line";
+import { useAutoRefresh } from "../dashboard/use-auto-refresh";
 
 // Admin → Projects: project pages sold on quotation, and their enquiries.
 
@@ -23,6 +25,11 @@ export function ProjectsPage() {
       .finally(() => setLoading(false));
   };
   useEffect(() => { load(); }, []);
+
+  // Live visit counts: silent re-fetch every 60 s while the tab is visible.
+  useAutoRefresh(() => {
+    fetchProjects().then((data) => { if (Array.isArray(data)) setProjects(data); }).catch(() => {});
+  });
 
   const newEnquiries = projects.reduce((s, p) => s + Number(p.newEnquiryCount || 0), 0);
   const tabBtn = (key, text) => (
@@ -69,6 +76,7 @@ export function ProjectsPage() {
                   {p.isPublished ? <span style={{ color: "#15803d", fontWeight: 700 }}>● Published</span> : <span style={{ color: "#9ca3af", fontWeight: 700 }}>○ Draft</span>}
                   {" · "}{p.packages.length} packages · {p.enquiryCount} enquiries{p.newEnquiryCount ? ` (${p.newEnquiryCount} new)` : ""}
                 </div>
+                <ProjectVisitsLine visits={p.visits} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {p.isPublished && <a href={`${STOREFRONT}/projects/${p.slug}`} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#374151", background: "#f3f4f6", padding: "7px 12px", borderRadius: 8, textDecoration: "none" }}>View ↗</a>}

@@ -2,6 +2,7 @@ const { ZodError } = require("zod");
 const { HttpError } = require("../../common/http-error");
 const { ok, created } = require("../../common/http-response");
 const service = require("./projects.service");
+const { recordProjectView } = require("./project-views.service");
 const {
   parseCreateProject,
   parseUpdateProject,
@@ -30,7 +31,14 @@ function asyncHandler(handler) {
 
 // public
 const publicListProjects = asyncHandler(async (_req, res) => ok(res, await service.listPublicProjects(), "Projects fetched."));
-const publicGetProject = asyncHandler(async (req, res) => ok(res, await service.getPublicProject(req.params.slug), "Project fetched."));
+// const publicGetProject = asyncHandler(async (req, res) => ok(res, await service.getPublicProject(req.params.slug), "Project fetched."));
+const publicGetProject = asyncHandler(async (req, res) => {
+  const data = await service.getPublicProject(req.params.slug);
+  // Admin → Projects "Visits" — the storefront project page calls this once
+  // per view. In-memory counter, never blocks/throws.
+  recordProjectView(data?.id, req);
+  return ok(res, data, "Project fetched.");
+});
 const publicCreateEnquiry = asyncHandler(async (req, res) => {
   const payload = parseCreateEnquiry(req.body);
   const data = await service.createEnquiry(req.params.slug, payload);

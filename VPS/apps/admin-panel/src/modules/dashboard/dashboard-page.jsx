@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { fetchDashboardStats } from "./dashboard.api";
 import { OrderTrendChart } from "./order-trend-chart";
 import { ProductPerformancePanel } from "./product-performance-panel";
+import { useAutoRefresh } from "./use-auto-refresh";
 
 const BRAND = "#E8231A";
 const BRAND_DARK = "#C41D15";
@@ -343,6 +344,12 @@ export function DashboardPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Live tiles: re-fetch every 60 s while the tab is visible. Silent — keeps
+  // the current numbers on screen and ignores a failed background refresh.
+  useAutoRefresh(() => {
+    fetchDashboardStats().then((res) => { if (res) setStats(res); }).catch(() => {});
+  });
 
   const today = new Date().toLocaleDateString("en-IN", {
     weekday: "long", day: "numeric", month: "long", year: "numeric"

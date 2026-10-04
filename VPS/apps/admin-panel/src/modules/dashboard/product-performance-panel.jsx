@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchProductPerformance } from "./dashboard.api";
+import { useAutoRefresh } from "./use-auto-refresh";
 
 // Dashboard panel: product page visits vs real sales, to spot products that
 // get attention but don't sell (price, photos, description, stock?) and
@@ -84,17 +85,30 @@ export function ProductPerformancePanel({ isMobile }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [sortKey, setSortKey] = useState("views");
+  const [updatedAt, setUpdatedAt] = useState(null);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setError("");
     fetchProductPerformance(range, 100)
-      .then((res) => { if (alive) setData(res); })
+      .then((res) => { if (alive) { setData(res); setUpdatedAt(new Date()); } })
       .catch(() => { if (alive) setError("Could not load product visits"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [range]);
+
+  // Live visits: silent re-fetch every 60 s while the tab is visible (the
+  // backend counts views in memory, so each fetch includes the latest ones).
+  // A response for a range the admin has since switched away from is dropped.
+  const rangeRef = useRef(range);
+  rangeRef.current = range;
+  useAutoRefresh(() => {
+    const asked = rangeRef.current;
+    fetchProductPerformance(asked, 100)
+      .then((res) => { if (res && asked === rangeRef.current) { setData(res); setUpdatedAt(new Date()); } })
+      .catch(() => {});
+  });
 
   const rows = useMemo(() => {
     const list = Array.isArray(data?.rows) ? [...data.rows] : [];
@@ -119,6 +133,7 @@ export function ProductPerformancePanel({ isMobile }) {
             {totals.views.toLocaleString("en-IN")} views · {totals.visitors.toLocaleString("en-IN")} visitors · {totals.orders} orders · {fmtMoney(totals.revenue)}
             {overallConv !== null ? ` · ${overallConv}% overall conversion` : ""}
             {loading ? " · loading…" : ""}
+            {!loading && updatedAt ? ` · updated ${updatedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })} (live, every minute)` : ""}
           </p>
         </div>
         <Toggle value={range} onChange={setRange} />

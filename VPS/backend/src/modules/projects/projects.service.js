@@ -6,6 +6,7 @@ const { readProjectsStore, writeProjectsStore } = require("../../database/projec
 const { addActivityLog } = require("../audit-logs/audit-logs.service");
 const { getAllSettings } = require("../settings/settings.service");
 const { sanitizeProject, sanitizeProjectCard, sanitizeEnquiry, ensureArray } = require("./projects.model");
+const { getProjectVisitStats } = require("./project-views.service");
 
 function nowIso() {
   return new Date().toISOString();
@@ -34,12 +35,18 @@ async function getPublicProject(slug) {
 // ─── admin: projects ───────────────────────────────────────────────────────
 async function listAdminProjects() {
   const store = await readProjectsStore();
+  // Page visit counters (2026-10-04). A failure here must not hide the list.
+  const visitStats = await getProjectVisitStats(store.enquiries).catch(() => ({ trackingSince: null, stats: new Map() }));
   return store.projects
     .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
     .map((p) => ({
       ...sanitizeProject(p),
       enquiryCount: store.enquiries.filter((e) => e.projectId === p.id).length,
-      newEnquiryCount: store.enquiries.filter((e) => e.projectId === p.id && (e.status || "new") === "new").length
+      newEnquiryCount: store.enquiries.filter((e) => e.projectId === p.id && (e.status || "new") === "new").length,
+      visits: {
+        trackingSince: visitStats.trackingSince,
+        ...(visitStats.stats.get(p.id) || { today: 0, last7Days: 0, last30Days: 0, total: 0, visitors: 0, enquiriesSinceTracking: 0, conversionPct: null })
+      }
     }));
 }
 

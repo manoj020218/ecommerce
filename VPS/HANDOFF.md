@@ -191,6 +191,23 @@ file from a mistyped command), `.claude/settings.local.json`.
      (same pattern as the Aug 5 incident; a router restart fixed it then).
    Backup `/root/jenix-bak-2026-10-03-app-step2/`, prev storefront dist `/tmp/front-dist-prev6`.
 
+31. 2026-10-04: **Backend memory restarts found + fixed; live dashboard; project page visits.**
+   - pm2 memory restarts had come back: 5 since the Sep 27 fix (Sep 28 07:01, Sep 30 ×3, Oct 3 12:48) → count 3847.
+     Cause = garbage, not a leak: every request re-reads + JSON.parses the stores (catalog ≈ 8 MB heap, marketing ≈ 14 MB,
+     auth ≈ 5 MB per parse) and Node's default heap limit here is ~2 GB, so V8 never collected before pm2 killed it at
+     600M on busy hours (crawler paging all products). Fix: `node_args: "--max-old-space-size=448"` in
+     `ecosystem.config.cjs`, applied with `pm2 restart jenix-backend --node-args=...` + `pm2 save`. **Watch:** count
+     should stay 3847. Proper long-term fix (not done): cache parsed stores in memory instead of re-parsing per request.
+   - Dashboard tiles + "Product Page Visits vs Sales" now refresh every 60 s while the tab is visible
+     (`dashboard/use-auto-refresh.js`), panel shows "updated HH:MM (live, every minute)". Product visit counting itself
+     was always fine (store totals == nginx hits).
+   - **Project page visits:** `database/project-views-store.js` (→ `json/project-views-store.json`, same in-memory +
+     30 s flush design) + `projects/project-views.service.js`; counted in `publicGetProject`. Admin → Projects shows per
+     project: today / 7 days / 30 days / since start, visitors → enquiries, conversion %; page auto-refreshes 60 s.
+     Tracking started 2026-10-04 (first view = Claude's deploy check on Farm Pump).
+   - Backups: `/root/jenix-bak-2026-10-04-visits/` (backend-files.tgz = the 4 changed files before, full-code-snapshot.tgz,
+     json-stores.tgz), prev admin dist `/tmp/admin-panel-dist-prev9`. Regression suite passed before deploy.
+
 **PENDING / TODO (in priority order):**
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which
   one gets buyer interest).** Baseline 2026-09-28 = ~0 real visits (the 23/1/1/1/1 hits on

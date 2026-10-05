@@ -331,11 +331,15 @@ async function refreshRecoveryStore(timestamp = nowIso()) {
 
 async function writeTrackedRecovery(owner, cartView, options = {}) {
   const timestamp = options.timestamp || nowIso();
-  const [authStore, recoveryStore] = await Promise.all([
-    readAuthStore(),
-    readRecoveryStore()
-  ]);
-  ensureAuthStoreShape(authStore);
+  // const [authStore, recoveryStore] = await Promise.all([
+  //   readAuthStore(),
+  //   readRecoveryStore()
+  // ]);
+  // ensureAuthStoreShape(authStore);
+  // 2026-10-04: the auth store (~4 MB) is only needed for the contact lookup
+  // below, so it is read AFTER the empty-cart early return — most page views
+  // (empty cart, no open record) no longer parse it at all.
+  const recoveryStore = await readRecoveryStore();
   ensureRecoveryStoreShape(recoveryStore);
 
   // getCart() tracks on EVERY page view (the header loads the cart). For an
@@ -369,6 +373,9 @@ async function writeTrackedRecovery(owner, cartView, options = {}) {
     },
     timestamp
   );
+
+  const authStore = await readAuthStore();
+  ensureAuthStoreShape(authStore);
 
   const cartSnapshot = summarizeCartView(cartView);
   const contactSnapshot = resolveContactSnapshot(authStore, owner, options, record);

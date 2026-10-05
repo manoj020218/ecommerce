@@ -1,6 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { env } = require("../config/env");
+const { createReadOnlySnapshot } = require("./read-only-snapshot");
 
 const authStorePath = path.resolve(process.cwd(), env.authStorePath);
 
@@ -77,12 +78,25 @@ async function readAuthStore() {
   }
 }
 
+// Read-only shared snapshot (2026-10-04) — see read-only-snapshot.js. Used
+// only by read-only hot paths (guest GET /api/cart). Anything that modifies
+// the auth store must keep using readAuthStore() (fresh private copy).
+const authSnapshot = createReadOnlySnapshot({
+  filePath: authStorePath,
+  readFresh: readAuthStore,
+  label: "auth store"
+});
+const readAuthStoreSnapshot = authSnapshot.read;
+const invalidateAuthSnapshot = authSnapshot.invalidate;
+
 async function writeAuthStore(store) {
+  invalidateAuthSnapshot();
   const result = writeQueue.then(async () => {
     await ensureAuthStoreFile();
     const tmpPath = authStorePath + ".tmp";
     await fs.writeFile(tmpPath, JSON.stringify(store, null, 2), "utf-8");
     await fs.rename(tmpPath, authStorePath);
+    invalidateAuthSnapshot(); // again once the file is replaced
     return store;
   });
   writeQueue = result.catch(() => { });
@@ -98,6 +112,8 @@ async function resetAuthStoreForRegression() {
 module.exports = {
   cloneDefaultAuthStore,
   readAuthStore,
+  readAuthStoreSnapshot,
+  invalidateAuthSnapshot,
   writeAuthStore,
   resetAuthStoreForRegression,
   withAuthStoreLock

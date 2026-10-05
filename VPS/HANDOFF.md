@@ -208,7 +208,18 @@ file from a mistyped command), `.claude/settings.local.json`.
      (cart writes stock reservations). Tested: regression suite; all 1,376 public calls on the live catalog identical
      to old code (dev + production mode); write/outside-edit invalidation; 100 product visits peak RSS 197 → 90 MB.
      Live: 9 public endpoints byte-identical before/after restart. Backup `/root/jenix-bak-2026-10-04-catalog-cache/`.
-     Not done (smaller gain): auth-store (~5 MB/parse, 2× per cart call) — written constantly, needs more care.
+   - **2026-10-05: auth-store too, for GET /api/cart** (~1,070/day, the only busy auth reader; it parsed the ~4 MB
+     auth store twice per call). (a) `abandoned-cart.writeTrackedRecovery` now reads the auth store only AFTER the
+     empty-cart early return (it was read and thrown away for every empty cart). (b) `cart-checkout.getCart` first tries
+     `tryGetGuestCartReadOnly()` on shared snapshots (`database/read-only-snapshot.js` helper →
+     `auth-store.readAuthStoreSnapshot()`, invalidated in `writeAuthStore`); it returns null → the unchanged full path
+     runs whenever the full path would write: logged-in customer, any expired active stock reservation, cart items
+     not an array, or any item no longer valid. Tested on a throwaway copy of live data ON the VPS (customer data
+     not copied off the server): 409 guest carts + 200 missing × 3 queries = 1,827 calls; output identical to old
+     code (only `updatedAt` = run time on 9 carts with invalid items, which both versions rewrite); auth/catalog end
+     state identical, recovery-store differs only in timestamps + random ids/tokens; auth parses 3,654 → 995.
+     Backup `/root/jenix-bak-2026-10-04-auth-cache/`. NOTE: the live abandoned-cart.service.js had CRLF line endings
+     (code identical to git) — md5 mismatches vs git can be just line endings, check with `diff --strip-trailing-cr`.
    - Dashboard tiles + "Product Page Visits vs Sales" now refresh every 60 s while the tab is visible
      (`dashboard/use-auto-refresh.js`), panel shows "updated HH:MM (live, every minute)". Product visit counting itself
      was always fine (store totals == nginx hits).

@@ -2,9 +2,9 @@ const crypto = require("node:crypto");
 const { HttpError } = require("../../common/http-error");
 const { env } = require("../../config/env");
 const { generateId, hashValue } = require("../../common/identity");
-const { readAuthStore, writeAuthStore, withAuthStoreLock } = require("../../database/auth-store");
+const { readAuthStore, writeAuthStore, withAuthStoreLock, readAuthStoreSnapshot } = require("../../database/auth-store");
 const { withPaymentLock } = require("./payment-finalize-lock");
-const { readCatalogStore, writeCatalogStore } = require("../../database/catalog-store");
+const { readCatalogStore, writeCatalogStore, readCatalogStoreSnapshot } = require("../../database/catalog-store");
 const { readInvoiceStore } = require("../../database/invoice-store");
 const { readPaymentStore, writePaymentStore } = require("../../database/payment-store");
 const { readShippingStore } = require("../../database/shipping-store");
@@ -1453,12 +1453,86 @@ async function persistStores(authStore, catalogStore, options = {}) {
   }
 }
 
+// Read-only fast path for GET /api/cart (2026-10-04). The header loads the
+// cart on every page view (~1,000/day), and the full path below parses the
+// whole auth store (~4 MB) + catalog each time even though it almost never
+// writes. This path uses the shared read-only snapshots and returns exactly
+// what the full path would — but ONLY when the full path would not change
+// anything. It returns null (→ the unchanged full path runs) when:
+// - the owner is a logged-in customer (pricing context normalizes the user);
+// - any active stock reservation has expired (full path expires + writes it);
+// - the cart's items are not a plain array, or any item no longer builds a
+//   valid line (full path drops it + writes).
+async function tryGetGuestCartReadOnly(owner, query) {
+  if (owner.ownerType !== CART_OWNER_TYPES.GUEST) {
+    return null;
+  }
+  const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
+    readAuthStoreSnapshot(),
+    readCatalogStoreSnapshot(),
+    readShippingStore(),
+    readPaymentStore()
+  ]);
+  ensurePaymentStoreShape(paymentStore); // fresh private copy, as in the full path
+
+  const now = Date.now();
+  for (const reservation of ensureArray(authStore.stockReservations)) {
+    if (reservation.status === RESERVATION_STATUSES.ACTIVE && Date.parse(reservation.expiresAt) <= now) {
+      return null;
+    }
+  }
+
+  const existingCart = ensureArray(authStore.guestCarts).find((row) => row.sessionId === owner.ownerId);
+  if (existingCart && !Array.isArray(existingCart.items)) {
+    return null;
+  }
+  // Same as ensureCartRecord(..., true) for a missing cart, minus storing it
+  // (the full path doesn't persist an unchanged new empty cart either).
+  const cart = existingCart || { sessionId: owner.ownerId, items: [], updatedAt: nowIso() };
+
+  const lines = [];
+  for (const item of cart.items) {
+    try {
+      lines.push(
+        buildCartLineFromItem(catalogStore, item, {
+          enforceStockCheck: false,
+          customerPricingContext: null
+        })
+      );
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  const pricing = await calculatePricing(
+    lines,
+    query.paymentMethod,
+    query.shippingMethod,
+    {
+      pincode: query.shippingPincode,
+      stateCode: query.shippingStateCode,
+      state: query.shippingState
+    },
+    shippingStore,
+    paymentStore
+  );
+
+  const cartView = buildCartView(owner, cart, lines, pricing);
+  await trackCartSaved(owner, cartView);
+  return cartView;
+}
+
 async function getCart(context, query) {
   const owner = resolveCartOwner({
     customerId: context.customerId,
     sessionId: query.sessionId || context.sessionId || null,
     authTokenError: context.authTokenError || null
   });
+
+  const readOnlyView = await tryGetGuestCartReadOnly(owner, query);
+  if (readOnlyView) {
+    return readOnlyView;
+  }
 
   const [authStore, catalogStore, shippingStore, paymentStore] = await Promise.all([
     readAuthStore(),

@@ -231,6 +231,11 @@ file from a mistyped command), `.claude/settings.local.json`.
      json-stores.tgz), prev admin dist `/tmp/admin-panel-dist-prev9`. Regression suite passed before deploy.
 
 **PENDING / TODO (in priority order):**
+- **WhatsApp "Waiting for this message" — wait and watch (2026-10-05).** Outgoing sends all "sent" since the Oct 3
+  fix (9 messages, 0 failures). The latest case the user saw was on a message FROM a buyer (incoming) — buyer-side /
+  encryption session, matches 2 "Bad MAC / Failed to decrypt" incoming errors in the pm2 error log; not our sending.
+  Offered (user: later): log each re-send request (`getMessage` hit/miss) in `whatsapp.service.js` so future cases
+  can be traced. Remember: re-send memory is cleared on every backend restart (1 h window).
 - **Project page visits (user is promoting the 5 project pages from 2026-09-29, wants to see which
   one gets buyer interest).** Baseline 2026-09-28 = ~0 real visits (the 23/1/1/1/1 hits on
   `/api/projects/<slug>` in nginx logs were Claude's own testing). Quick count from nginx (every page

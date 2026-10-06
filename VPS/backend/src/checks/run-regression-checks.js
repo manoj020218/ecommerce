@@ -2480,7 +2480,10 @@ async function run() {
         headers: authHeaders(phase11OtpToken)
       }
     );
-    assert.equal(phase11GuestOrderBeforeLink.response.status, 403);
+    // assert.equal(phase11GuestOrderBeforeLink.response.status, 403);
+    // Verified-mobile login now auto-links matching guest orders
+    // (linkVerifiedGuestOrders in auth.service.js), so it's already visible.
+    assert.equal(phase11GuestOrderBeforeLink.response.status, 200);
 
     const phase11VerifiedLinkAttempt = await requestJson(
       baseUrl,
@@ -2494,7 +2497,9 @@ async function run() {
       }
     );
     assert.equal(phase11VerifiedLinkAttempt.response.status, 200);
-    assert.equal(phase11VerifiedLinkAttempt.json.data.linked, true);
+    // assert.equal(phase11VerifiedLinkAttempt.json.data.linked, true);
+    assert.equal(phase11VerifiedLinkAttempt.json.data.linked, false);
+    assert.equal(phase11VerifiedLinkAttempt.json.data.reason, "already_accessible");
 
     const phase11GuestOrderAfterLink = await requestJson(
       baseUrl,

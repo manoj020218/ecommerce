@@ -344,6 +344,41 @@ async function issueAdminTokens(store, staffUser) {
   };
 }
 
+// Guest checkouts leave order.userId null, so buyers who later log in never
+// see those orders/invoices under My Orders. Attach them automatically —
+// but ONLY by a VERIFIED email/mobile, otherwise anyone could register with
+// someone else's email and pull in their invoices. Mutates store; caller
+// writes it. Returns the number of orders linked.
+function linkVerifiedGuestOrders(store, customerUser) {
+  const email = customerUser.verifiedEmail
+    ? String(customerUser.email || "").trim().toLowerCase()
+    : "";
+  const last10 = (value) => String(value || "").replace(/\D/g, "").slice(-10);
+  const mobile = customerUser.verifiedMobile ? last10(customerUser.mobile) : "";
+  if (!email && mobile.length !== 10) return 0;
+
+  const now = new Date().toISOString();
+  let linked = 0;
+  for (const order of ensureArray(store.orders)) {
+    if (order.userId) continue;
+    if (order.ownerType === "customer" && order.ownerId && order.ownerId !== customerUser.id) continue;
+    const billing = order.billingAddress || {};
+    const shipping = order.shippingAddress || {};
+    const orderEmail = String(billing.email || shipping.email || billing.contactEmail || "")
+      .trim()
+      .toLowerCase();
+    const orderMobile = last10(billing.mobile || shipping.mobile || billing.contactMobile || "");
+    const byEmail = Boolean(email) && orderEmail === email;
+    const byMobile = mobile.length === 10 && orderMobile === mobile;
+    if (!byEmail && !byMobile) continue;
+    order.userId = customerUser.id;
+    order.linkedAt = now;
+    order.linkedByField = byEmail ? "auto_verified_email" : "auto_verified_mobile";
+    linked += 1;
+  }
+  return linked;
+}
+
 async function issueCustomerTokens(store, customerUser, guestSessionId) {
   ensureCustomerAccountShape(customerUser);
 
@@ -370,6 +405,7 @@ async function issueCustomerTokens(store, customerUser, guestSessionId) {
   });
 
   store.refreshSessions.push(session);
+  linkVerifiedGuestOrders(store, customerUser);
   customerUser.lastLoginAt = new Date().toISOString();
   customerUser.updatedAt = new Date().toISOString();
 
@@ -550,8 +586,23 @@ async function customerLoginEmail(payload) {
     (item) => item.email && normalizeEmail(item.email) === normalizedEmail
   );
 
-  if (!user || !user.passwordHash) {
+  // if (!user || !user.passwordHash) {
+  //   throw new HttpError(401, "Invalid customer credentials.");
+  // }
+  if (!user) {
     throw new HttpError(401, "Invalid customer credentials.");
+  }
+
+  // ~1,058 accounts were migrated from the old site (Jul 2026) without
+  // passwords, and OTP/Google-only accounts never had one. A generic
+  // "invalid credentials" left those buyers retyping their old password
+  // forever — point them at Forgot Password instead.
+  if (!user.passwordHash) {
+    throw new HttpError(
+      401,
+      "No password is set for this account yet (accounts moved from our old website need a new one). Please use \"Forgot Password?\" to set a password, or log in with OTP.",
+      { code: "PASSWORD_NOT_SET" }
+    );
   }
 
   const passwordOk = await bcrypt.compare(payload.password, user.passwordHash);
@@ -661,6 +712,9 @@ async function customerResetPassword(payload) {
 
   request.usedAt = nowIso();
   revokeCustomerRefreshSessions(store, user.id);
+  // Email is now proven (they clicked the reset link) — pull in any guest
+  // orders placed with it, e.g. migrated buyers who checked out as guest.
+  linkVerifiedGuestOrders(store, user);
   await writeAuthStore(store);
 
   await addActivityLog({

@@ -446,6 +446,8 @@ function buildCartLineFromItem(catalogStore, item, options = {}) {
     // Return policy snapshot (2026-09-27): stored on the line, so the order
     // keeps the product's return status as it was at the time of purchase.
     returnEligible: Boolean(product.returnEligible),
+    // 2026-10-06: "Sold as is" chip in cart/checkout only when ticked on the product
+    showSoldAsIsBadge: Boolean(product.showSoldAsIsBadge),
     qty,
     moq,
     customization: customOptionsSelection.resolved,

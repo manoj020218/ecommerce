@@ -229,6 +229,29 @@ file from a mistyped command), `.claude/settings.local.json`.
      Tracking started 2026-10-04 (first view = Claude's deploy check on Farm Pump).
    - Backups: `/root/jenix-bak-2026-10-04-visits/` (backend-files.tgz = the 4 changed files before, full-code-snapshot.tgz,
      json-stores.tgz), prev admin dist `/tmp/admin-panel-dist-prev9`. Regression suite passed before deploy.
+32. 2026-10-05: **Customer "invalid login" (NCN Technologies, admin@ncntechnologies.com) — migrated accounts
+   have NO password.** 1,058 of 1,062 accounts imported from the old site (2026-07-26, `legacyCustomerId`) have
+   no `passwordHash` (old passwords were never migrated); only 18 ever logged in. Email login used to answer
+   "Invalid customer credentials." for them — looked like a wrong password. Fixes (auth.service.js, DEPLOYED):
+   - `customerLoginEmail`: account exists but no password → 401 "No password is set for this account yet
+     (accounts moved from our old website need a new one). Please use "Forgot Password?" …", details
+     `{code: "PASSWORD_NOT_SET"}`. Unknown email / wrong password unchanged. (Reveals that the email is
+     registered — accepted trade-off.) Storefront shows the backend message as-is, no frontend change.
+   - **Guest orders auto-link:** `linkVerifiedGuestOrders(store, user)` — orders with `userId` null whose
+     billing/shipping email = the customer's **verified** email, or mobile (last 10 digits) = **verified**
+     mobile, get `userId` + `linkedByField: auto_verified_email|auto_verified_mobile`. Runs in
+     `issueCustomerTokens` (every login path) and in `customerResetPassword` (reset link proves the email).
+     Unverified accounts never auto-link (stops "register with someone else's email"). Regression check
+     phase 11 updated: OTP login now sees the guest order immediately; manual link-guest → already_accessible.
+   - NCN: told to use Forgot Password; their guest order JNX-ORD-20260922-00080 / invoice JNX/2026-27/64
+     links on reset. Backup `/root/auth.service.js.bak-20261005` (delete once NCN confirms login).
+33. 2026-10-06: **Checkout scared buyers → more abandoned carts.** (a) "Sold as is" chip removed from cart,
+   checkout review list and Order Summary — now shown only when the product has `showSoldAsIsBadge` ticked
+   (same rule as the product page, item 25); return-eligible items still get the green chip. Backend cart
+   lines now carry `showSoldAsIsBadge` (cart-checkout.service `buildCartLineFromItem` + model
+   `sanitizeCartLine`). (b) The grey policy box above Pay Now / Place Order (`ReturnPolicyCheckoutNotice`) is
+   commented out — policy stays in the footer (Legal → Return Policy). Old lines kept as comments.
+   Regression suite passed. **Deploy status: see git log / next entry** (deploy needed user approval).
 
 **PENDING / TODO (in priority order):**
 - **WhatsApp "Waiting for this message" — wait and watch (2026-10-05).** Outgoing sends all "sent" since the Oct 3

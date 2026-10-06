@@ -1071,7 +1071,9 @@ export function CheckoutPage() {
                     </div>
                     <div className="proto-checkout-item-copy">
                       <p>{item.title}</p>
-                      <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div>
+                      {/* <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div> */}
+                    {/* 2026-10-06: "Sold as is" chip at checkout scared buyers — only shown when ticked on the product (or return-eligible) */}
+                    {item.returnEligible || item.showSoldAsIsBadge ? <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div> : null}
                       <span>Qty {Number(item.qty || 0)}</span>
                       <strong>{formatCurrency(item.lineTotal)}</strong>
                     </div>
@@ -1617,7 +1619,8 @@ export function CheckoutPage() {
                     <strong>{formatCurrency(totals.grandTotal)} <span className="proto-review-total-caret">View details ›</span></strong>
                   </button>
                   <CheckoutOrderNote value={customerNote} onChange={setCustomerNote} />
-                  <ReturnPolicyCheckoutNotice items={items} />
+                  {/* 2026-10-06: highlighted policy box above Pay Now caused panic / cart abandonment — policy stays in footer (Legal)
+                  <ReturnPolicyCheckoutNotice items={items} /> */}
                   <div className="proto-inline-actions">
                     <StorefrontButton type="submit" disabled={submitting}>
                       {submitting ? "Submitting..." : paymentMethod === "online" ? "Pay Now" : "Place Order"}
@@ -1653,7 +1656,9 @@ export function CheckoutPage() {
                   </div>
                   <div className="proto-checkout-item-copy">
                     <p>{item.title}</p>
-                    <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div>
+                    {/* <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div> */}
+                    {/* 2026-10-06: "Sold as is" chip at checkout scared buyers — only shown when ticked on the product (or return-eligible) */}
+                    {item.returnEligible || item.showSoldAsIsBadge ? <div style={{ margin: "2px 0" }}><ReturnPolicyBadge eligible={Boolean(item.returnEligible)} compact /></div> : null}
                     <span>
                       Qty {Number(item.qty || 0)} · {humanizeStatus(item.availabilityStatus)}
                     </span>

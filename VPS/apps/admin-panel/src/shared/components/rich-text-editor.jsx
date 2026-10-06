@@ -1,4 +1,6 @@
 import { useRef, useEffect, useCallback } from "react";
+import { RichTextExtraTools, pastedTextAsUrl, linkHtml } from "./rich-text-extra-tools";
+import { RICH_TEXT_FX_CSS } from "./rich-text-fx-css";
 
 const TOOLS = [
   { cmd: "bold",                label: "B",    title: "Bold",           style: { fontWeight: 700 } },
@@ -44,6 +46,22 @@ export function RichTextEditor({ value, onChange, minRows = 5, placeholder }) {
     pushChange();
   }, [pushChange]);
 
+  // 2026-10-06: pasting a bare web address makes it a clickable link
+  // (it used to stay plain text). Selected words + pasted URL → those words
+  // become the link. Anything else pastes as before.
+  const handlePaste = useCallback((e) => {
+    const url = pastedTextAsUrl(e.clipboardData?.getData("text/plain"));
+    if (!url) return;
+    e.preventDefault();
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.getRangeAt(0).collapsed) {
+      document.execCommand("createLink", false, url);
+    } else {
+      document.execCommand("insertHTML", false, linkHtml(url, e.clipboardData.getData("text/plain").trim()) + "&nbsp;");
+    }
+    pushChange();
+  }, [pushChange]);
+
   return (
     // stopPropagation prevents the parent <label> (Field component) from forwarding
     // the click to the first <button> (Bold) instead of the contentEditable div.
@@ -71,12 +89,16 @@ export function RichTextEditor({ value, onChange, minRows = 5, placeholder }) {
             {t.label}
           </button>
         ))}
+        <RichTextExtraTools editorRef={editorRef} onChanged={pushChange} />
       </div>
+      <style>{RICH_TEXT_FX_CSS}</style>
       <div
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
         onInput={pushChange}
+        onPaste={handlePaste}
+        className="jx-rte-body"
         data-placeholder={placeholder || ""}
         style={{
           minHeight: `${minRows * 26}px`, padding: "10px 12px",

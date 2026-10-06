@@ -254,6 +254,20 @@ file from a mistyped command), `.claude/settings.local.json`.
    Regression suite passed. **DEPLOYED 2026-10-06.** Backups `/root/cart-bak-20261006/`, `apps/front/dist.bak-20261006`.
    At deploy time 0 of 432 products had showSoldAsIsBadge ticked → no chip shows anywhere at checkout.
 
+34. 2026-10-06: **Product description editor: clickable links, colours, eye-catcher effects (DEPLOYED).**
+   Cause of "pasted link is only text": `sanitizeRichText` (common/html-sanitizer.js) allowed no <a> and no
+   attributes. Now a strict allowlist: <a href> (http/https/mailto/tel only; always target=_blank
+   rel=noopener), <span>/<mark> styles limited to color/background-color (hex/rgb), font-size
+   0.85|1.15|1.35|1.6em, letter-spacing 0.05|0.1|0.2em, and classes jx-fx-pulse|blink|shine|badge|underline|shake;
+   <font color> → span. Tested: javascript:, //host, url(), on*, script, img all stripped. Also applies to
+   category/blog/job text that prerender passes through sanitizeRichText.
+   Admin `RichTextEditor` + new `rich-text-extra-tools.jsx`: 🔗 Link / ⛓ Unlink, A▾ colour, 🖍 Highlight,
+   Aa Size, ↔ Spacing, ✨ Effect (+ Remove effect); pasting a bare URL makes a link. Effects preview in the
+   editor (`rich-text-fx-css.js`, same CSS as storefront styles.css "Rich-text eye-catchers"; reduced-motion
+   respected). Storefront `shared/products/linkify-html.js` makes plain-text URLs in existing descriptions
+   clickable (6 products had URLs). Backups `/root/html-sanitizer.js.bak-20261006`, `apps/{front,admin-panel}/
+   dist.bak-20261006b`. Toolbar not yet clicked through in a real browser by Claude — user to try.
+
 **PENDING / TODO (in priority order):**
 - **WhatsApp "Waiting for this message" — wait and watch (2026-10-05).** Outgoing sends all "sent" since the Oct 3
   fix (9 messages, 0 failures). The latest case the user saw was on a message FROM a buyer (incoming) — buyer-side /

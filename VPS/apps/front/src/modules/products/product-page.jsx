@@ -36,6 +36,7 @@ import { watchdog } from "../../shared/watchdog-client";
 import { ProductReviewsSection } from "./product-reviews-section";
 import { CustomPrintConfigurator } from "./custom-print-configurator";
 import { ReturnPolicyBadge, ReturnPolicyNote } from "./return-policy-badge";
+import { linkifyHtml } from "../../shared/products/linkify-html";
 
 function currency(amount) {
   return new Intl.NumberFormat("en-IN", {
@@ -1546,7 +1547,7 @@ export function ProductPage() {
             // also empty.
             <div
               className="proto-tab-copy"
-              dangerouslySetInnerHTML={{ __html: product.shortDescription || product.fullDescription }}
+              dangerouslySetInnerHTML={{ __html: linkifyHtml(product.shortDescription || product.fullDescription) }}
             />
           ) : (
             <p className="proto-tab-copy">
@@ -1562,12 +1563,12 @@ export function ProductPage() {
                   description also exists -- both render together (short
                   first, as the summary) whenever each has data. */}
               {product.shortDescription ? (
-                <div dangerouslySetInnerHTML={{ __html: product.shortDescription }} />
+                <div dangerouslySetInnerHTML={{ __html: linkifyHtml(product.shortDescription) }} />
               ) : null}
               {product.fullDescription ? (
                 <div
                   style={product.shortDescription ? { marginTop: 16 } : undefined}
-                  dangerouslySetInnerHTML={{ __html: product.fullDescription }}
+                  dangerouslySetInnerHTML={{ __html: linkifyHtml(product.fullDescription) }}
                 />
               ) : null}
             </div>

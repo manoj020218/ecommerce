@@ -251,7 +251,8 @@ file from a mistyped command), `.claude/settings.local.json`.
    lines now carry `showSoldAsIsBadge` (cart-checkout.service `buildCartLineFromItem` + model
    `sanitizeCartLine`). (b) The grey policy box above Pay Now / Place Order (`ReturnPolicyCheckoutNotice`) is
    commented out — policy stays in the footer (Legal → Return Policy). Old lines kept as comments.
-   Regression suite passed. **Deploy status: see git log / next entry** (deploy needed user approval).
+   Regression suite passed. **DEPLOYED 2026-10-06.** Backups `/root/cart-bak-20261006/`, `apps/front/dist.bak-20261006`.
+   At deploy time 0 of 432 products had showSoldAsIsBadge ticked → no chip shows anywhere at checkout.
 
 **PENDING / TODO (in priority order):**
 - **WhatsApp "Waiting for this message" — wait and watch (2026-10-05).** Outgoing sends all "sent" since the Oct 3

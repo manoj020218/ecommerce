@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { WalkInStageModal } from "../walkin-orders/walkin-stage-modal";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuthSession } from "../auth/use-auth-session";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
@@ -1008,6 +1008,9 @@ function FulfillModal({ order, invoice, couriers, canCreateCourier, onCourierCre
     // have to retype a long tracking number by hand. Failure here (no
     // barcode in frame, blurry photo, etc.) is the common case for a plain
     // packed-parcel photo, not an error — silently no-op.
+    // 2026-10-10: number already entered (live scan / typed) → don't try to
+    // read a barcode off the parcel photo again.
+    if (String(form.trackingId || "").trim()) return;
     trackingIdWasEmptyAtScan.current = !form.trackingId;
     setScanningBarcode(true);
     try {
@@ -1605,6 +1608,11 @@ function InvoiceSection({ invoice, onInvoiceUpdated, order, storeProfile }) {
 export function OrderDetailPage() {
   const { orderId } = useParams();
   const navigate = useNavigate();
+  // 2026-10-10: order list "Mark Shipped"/"Ship" and side-panel "Add Shipment"
+  // link here with ?action=pack — open the tracking popup straight away
+  // instead of making staff tap Add Shipment → full page → Packed.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const packActionHandled = useRef(false);
   const { session } = useAuthSession();
   const canView = hasPermission(session, "orders.view");
   const canViewProducts = hasPermission(session, "products.view");
@@ -1628,6 +1636,18 @@ export function OrderDetailPage() {
   const [editItemsSaving, setEditItemsSaving] = useState(false);
 
   const [fulfillModal, setFulfillModal] = useState(false);
+  useEffect(() => {
+    if (packActionHandled.current || loading || !order) return;
+    if (searchParams.get("action") !== "pack") return;
+    packActionHandled.current = true;
+    const ship = order.shipmentStatus || "";
+    const readyToShip = order.orderStatus === "processing" && invoice &&
+      !["packed", "ready_to_dispatch", "shipped", "in_transit", "out_for_delivery"].includes(ship);
+    if (readyToShip) setFulfillModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("action");
+    setSearchParams(next, { replace: true });
+  }, [loading, order, invoice, searchParams, setSearchParams]);
   const [fulfillError, setFulfillError] = useState("");
   const [fulfillSaving, setFulfillSaving] = useState(false);
   const [printingLabel, setPrintingLabel] = useState(false);

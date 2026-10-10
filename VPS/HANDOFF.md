@@ -283,6 +283,14 @@ file from a mistyped command), `.claude/settings.local.json`.
    Same day: old backups cleaned per keep-latest rule (7 dist.bak, ~25 /tmp copies, 21 /root/jenix-bak-*).
    Left: fireguard/sitemitra/nginx backups, ~14 old JSON store snapshots in database/json, razorpay .bak-webhook.
 
+36. 2026-10-10: **User confirmed the live barcode scanner works on their phone.** Follow-ups (admin only, DEPLOYED):
+   (a) Mark as Packed: parcel photo upload no longer tries to read a barcode when a tracking number is
+   already in the box. (b) Order list "Mark Shipped" (mobile) / "Ship" (desktop) / side-panel "Add Shipment"
+   now go to `/orders/:id?action=pack`; the order page opens the Packed + tracking popup (FulfillModal)
+   right away when the order is processing + invoiced + not yet packed, then strips the param. Was 4 taps.
+   Processing orders WITHOUT an invoice just open the page (Generate Invoice first) — offered to auto-generate.
+   Admin backup `apps/admin-panel/dist.bak-20261010b` (previous one deleted).
+
 **PENDING / TODO (in priority order):**
 - **WhatsApp "Waiting for this message" — wait and watch (2026-10-05).** Outgoing sends all "sent" since the Oct 3
   fix (9 messages, 0 failures). The latest case the user saw was on a message FROM a buyer (incoming) — buyer-side /

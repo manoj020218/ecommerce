@@ -184,7 +184,7 @@ function SidePanelBtn({ children, variant = "default", onClick, disabled }) {
   );
 }
 
-function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancelOrder }) {
+function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onPack, onCancelOrder }) {
   const panelRef = useRef(null);
   const [cancelSaving, setCancelSaving] = useState(false);
   const [cancelError, setCancelError] = useState("");
@@ -373,7 +373,8 @@ function OrderSidePanel({ orderId, order, loading, onClose, onNavigate, onCancel
                   <SidePanelBtn variant="outline" onClick={onNavigate}>Download Invoice</SidePanelBtn>
                 )}
                 {o.orderStatus === "processing" && !o.trackingId && (
-                  <SidePanelBtn variant="outline" onClick={onNavigate}>Add Shipment</SidePanelBtn>
+                  // <SidePanelBtn variant="outline" onClick={onNavigate}>Add Shipment</SidePanelBtn>
+                  <SidePanelBtn variant="outline" onClick={onPack || onNavigate}>Add Shipment</SidePanelBtn>
                 )}
               </div>
               {!["cancelled","delivered"].includes(String(o.orderStatus || "").toLowerCase()) && (
@@ -603,6 +604,8 @@ export function OrdersPage() {
 
   const closePanel   = () => { setPanelId(null); setPanelOrder(null); };
   const goToFullPage = () => { if (panelId) navigate(`/orders/${panelId}`); };
+  // 2026-10-10: straight to the order page with the Packed / tracking popup open
+  const goToPack = (id) => { if (id) navigate(`/orders/${id}?action=pack`); };
 
   const onCancelOrderFromPanel = async (orderId) => {
     const updated = await updateOrder(orderId, { orderStatus: "cancelled" });
@@ -805,7 +808,8 @@ export function OrdersPage() {
                         }}>{hasProofSubmitted(row) ? "Verify" : "Demand"}</button>
                       )}
                       {!pending && row.orderStatus === "processing" && !row.trackingId && (
-                        <button type="button" onClick={() => openPanel(row)} style={{
+                        // <button type="button" onClick={() => openPanel(row)} style={{
+                        <button type="button" onClick={() => goToPack(row.id)} style={{
                           fontSize:11, fontWeight:600, padding:"5px 12px",
                           borderRadius:8, border:"1.5px solid #e5e7eb",
                           background:"transparent", color:"#374151", cursor:"pointer"
@@ -893,7 +897,8 @@ export function OrdersPage() {
                   }}>{hasProofSubmitted(row) ? "Verify Payment" : "Demand Proof"}</button>
                 )}
                 {!pending && row.orderStatus === "processing" && (
-                  <button type="button" onClick={() => openPanel(row)} style={{
+                  // <button type="button" onClick={() => openPanel(row)} style={{
+                  <button type="button" onClick={() => goToPack(row.id)} style={{
                     flex:1, fontSize:12, fontWeight:600, padding:"9px 0",
                     borderRadius:10, border:"1.5px solid #e5e7eb",
                     background:"transparent", color:"#374151", cursor:"pointer"
@@ -926,6 +931,7 @@ export function OrdersPage() {
         loading={panelLoading}
         onClose={closePanel}
         onNavigate={goToFullPage}
+        onPack={() => goToPack(panelId)}
         onCancelOrder={onCancelOrderFromPanel}
       />
     </div>

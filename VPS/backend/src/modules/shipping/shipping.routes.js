@@ -69,6 +69,11 @@ function createAdminShippingRouter() {
   );
 
   router.get(
+    "/recent-tracking",
+    requireAdminPermission(SHIPPING_PERMISSIONS.VIEW),
+    controller.adminRecentTrackingIds
+  );
+  router.get(
     "/couriers",
     requireAdminPermission(SHIPPING_PERMISSIONS.VIEW),
     controller.adminListCouriers

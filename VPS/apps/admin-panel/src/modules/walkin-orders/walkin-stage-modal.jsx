@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchCouriers } from "../shipping/shipping.api";
+import { TrackingNumberInput } from "../../shared/components/tracking-number-input";
 import { updateWalkInOrderStatus } from "./walkin-orders.api";
 
 // One popup for every walk-in fulfilment step (2026-10-02): Packed, Shipped
@@ -97,7 +98,9 @@ export function WalkInStageModal({ order, stage, onClose, onDone }) {
               <>
                 <label>
                   <span style={labelText}>Tracking / AWB number</span>
-                  <input style={input} value={trackingId} onChange={(e) => setTrackingId(e.target.value)} placeholder="e.g. 1234567890" />
+                  {/* <input style={input} value={trackingId} onChange={(e) => setTrackingId(e.target.value)} placeholder="e.g. 1234567890" /> */}
+                  <TrackingNumberInput value={trackingId} onChange={setTrackingId} courierProfileId={courierProfileId}
+                    currentOrderNo={order.orderNo} inputStyle={input} />
                 </label>
                 <label>
                   <span style={labelText}>Expected delivery date (optional)</span>

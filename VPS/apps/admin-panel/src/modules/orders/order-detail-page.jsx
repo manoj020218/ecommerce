@@ -5,6 +5,7 @@ import { useAuthSession } from "../auth/use-auth-session";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
+import { TrackingNumberInput } from "../../shared/components/tracking-number-input";
 import { hasPermission } from "../../shared/utils/permissions";
 import { formatCurrencyInr, formatDateTime } from "../../shared/utils/formatters";
 import {
@@ -1051,9 +1052,13 @@ function FulfillModal({ order, invoice, couriers, canCreateCourier, onCourierCre
 
         <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Tracking Number / AWB</span>
-          <input value={form.trackingId} onChange={(e) => set("trackingId", e.target.value)}
+          {/* <input value={form.trackingId} onChange={(e) => set("trackingId", e.target.value)}
             placeholder="Enter tracking / AWB number"
-            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} /> */}
+          {/* 2026-10-10: last-number prefill, +1/−1, live camera scan */}
+          <TrackingNumberInput value={form.trackingId} onChange={(v) => set("trackingId", v)}
+            courierProfileId={form.courierProfileId} currentOrderNo={order.orderNo}
+            inputStyle={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
         </label>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -1228,9 +1233,13 @@ function EditTrackingModal({ trackingDetails, couriers, canCreateCourier, onCour
 
         <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>Tracking Number / AWB</span>
-          <input value={form.trackingId} onChange={(e) => set("trackingId", e.target.value)}
+          {/* <input value={form.trackingId} onChange={(e) => set("trackingId", e.target.value)}
             placeholder="Enter tracking / AWB number"
-            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
+            style={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} /> */}
+          {/* 2026-10-10: last-number prefill, +1/−1, live camera scan */}
+          <TrackingNumberInput value={form.trackingId} onChange={(v) => set("trackingId", v)}
+            courierProfileId={form.courierProfileId} currentOrderNo={trackingDetails?.orderNo}
+            inputStyle={{ padding: "7px 10px", fontSize: 13, border: "1px solid var(--border)", borderRadius: 7 }} />
         </label>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ErrorBlock } from "../../shared/components/error-block";
 import { LoadingBlock } from "../../shared/components/loading-block";
 import { Modal } from "../../shared/components/modal";
+import { TrackingNumberInput } from "../../shared/components/tracking-number-input";
 import { PageHeader } from "../../shared/components/page-header";
 import { StatusBadge } from "../../shared/components/status-badge";
 import { formatCurrencyInr, formatDateTime } from "../../shared/utils/formatters";
@@ -555,13 +556,19 @@ function ShipmentsTab({ canUpdateTracking, canMarkDelivered, couriers }) {
 
           <label className="field field-full">
             <span>Tracking ID *</span>
-            <input
+            {/* <input
               value={trackingForm.trackingId}
               onChange={(event) =>
                 setTrackingForm((prev) => ({ ...prev, trackingId: event.target.value }))
               }
               required
               placeholder="e.g. 1234567890"
+            /> */}
+            <TrackingNumberInput
+              value={trackingForm.trackingId}
+              onChange={(v) => setTrackingForm((prev) => ({ ...prev, trackingId: v }))}
+              courierProfileId={trackingForm.courierProfileId}
+              currentOrderNo={selectedShipment?.orderNo}
             />
           </label>
 

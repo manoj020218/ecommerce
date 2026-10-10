@@ -111,3 +111,12 @@ export function createShippingClass(payload) {
 export function updateShippingClass(id, payload) {
   return apiFetch(`/admin/shipping/classes/${id}`, { method: "PATCH", body: payload });
 }
+
+// 2026-10-10: last tracking numbers for a courier (+ all used, for duplicate
+// warning) — used by shared/components/tracking-number-input.jsx.
+export function fetchRecentTrackingIds(courierProfileId, limit = 5) {
+  const params = new URLSearchParams();
+  if (courierProfileId) params.set("courierProfileId", courierProfileId);
+  params.set("limit", String(limit));
+  return apiFetch(`/admin/shipping/recent-tracking?${params.toString()}`);
+}

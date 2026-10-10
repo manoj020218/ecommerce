@@ -268,6 +268,21 @@ file from a mistyped command), `.claude/settings.local.json`.
    clickable (6 products had URLs). Backups `/root/html-sanitizer.js.bak-20261006`, `apps/{front,admin-panel}/
    dist.bak-20261006b`. Toolbar not yet clicked through in a real browser by Claude — user to try.
 
+35. 2026-10-10: **Tracking / AWB number box: last-number prefill, +1/−1, live camera scan (DEPLOYED).**
+   Staff retyped 12–15 digit AWBs where only the last 1–2 digits change. New `shared/components/
+   tracking-number-input.jsx` in Mark as Packed + Edit Tracking (order page), walk-in Dispatch, Shipping page:
+   tap empty box → courier's last number filled with last 3 digits selected; +1/−1 step the trailing number
+   (prefix + leading zeros kept); "Last used" chips; red warning if the number is already on another order.
+   Backend `GET /api/admin/shipping/recent-tracking?courierProfileId=` (`shipping-recent-tracking.service.js`,
+   read-only, shipping VIEW permission) → last 5 distinct + all used numbers for that courier.
+   📷 Scan = `barcode-scan-modal.jsx`: live camera, native BarcodeDetector (Android Chrome) else @zxing/browser;
+   a code is offered only after 2 identical reads and filled only on tap "Use this"; codes like the last
+   number shown green; torch button. Old photo-upload barcode read in Mark as Packed still there.
+   Camera scanner NOT tested on a phone by Claude. USB/Bluetooth barcode gun works in the box as a keyboard.
+   Backups `/root/shipping-bak-20261010/`, `apps/admin-panel/dist.bak-20261010`.
+   Same day: old backups cleaned per keep-latest rule (7 dist.bak, ~25 /tmp copies, 21 /root/jenix-bak-*).
+   Left: fireguard/sitemitra/nginx backups, ~14 old JSON store snapshots in database/json, razorpay .bak-webhook.
+
 **PENDING / TODO (in priority order):**
 - **WhatsApp "Waiting for this message" — wait and watch (2026-10-05).** Outgoing sends all "sent" since the Oct 3
   fix (9 messages, 0 failures). The latest case the user saw was on a message FROM a buyer (incoming) — buyer-side /

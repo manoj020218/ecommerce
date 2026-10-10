@@ -2,6 +2,7 @@ const { ZodError } = require("zod");
 const { HttpError } = require("../../common/http-error");
 const { ok, created } = require("../../common/http-response");
 const service = require("./shipping.service");
+const { listRecentTrackingIds } = require("./shipping-recent-tracking.service");
 const {
   parseShippingSettingsPatch,
   parseListRateCardsQuery,
@@ -68,6 +69,12 @@ const adminListCouriers = asyncHandler(async (req, res) => {
   const filters = parseListCouriersQuery(req.query || {});
   const data = await service.listCourierProfiles(filters);
   return ok(res, data, "Courier profiles fetched.");
+});
+
+const adminRecentTrackingIds = asyncHandler(async (req, res) => {
+  const courierProfileId = String(req.query?.courierProfileId || "").slice(0, 100);
+  const data = await listRecentTrackingIds(courierProfileId, req.query?.limit);
+  return ok(res, data, "Recent tracking numbers fetched.");
 });
 
 const adminCreateCourier = asyncHandler(async (req, res) => {
@@ -157,6 +164,7 @@ const publicTrackShipment = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  adminRecentTrackingIds,
   adminGetShippingSettings,
   adminPatchShippingSettings,
   adminListRateCards,
